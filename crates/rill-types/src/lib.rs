@@ -17,6 +17,8 @@ pub mod merge;
 pub mod objects;
 pub mod path;
 pub mod principal;
+#[cfg(feature = "testing")]
+pub mod testing;
 pub mod time;
 
 pub use encoding::{decode, encode, Encodable, FormatVersion};

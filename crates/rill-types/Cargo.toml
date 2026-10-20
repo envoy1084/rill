@@ -16,7 +16,13 @@ bytes = { workspace = true }
 thiserror = { workspace = true }
 rand = { workspace = true }
 time = { workspace = true }
+proptest = { workspace = true, optional = true }
+
+[features]
+# Property-test strategies for downstream tests and tools.
+testing = ["dep:proptest"]
 
 [dev-dependencies]
+rill-types = { path = ".", features = ["testing"] }
 proptest = { workspace = true }
 serde_json = { workspace = true }

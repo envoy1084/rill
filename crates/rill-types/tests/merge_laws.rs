@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 
 use proptest::prelude::*;
+use rill_types::testing::merge_of;
 use rill_types::Merge;
 
 fn value(m: &Merge<u8>) -> BTreeMap<u8, i32> {
@@ -18,11 +19,9 @@ fn value(m: &Merge<u8>) -> BTreeMap<u8, i32> {
     out
 }
 
-/// Small odd-length term lists over a tiny domain, so terms collide often.
+/// Merges over a tiny domain, so terms collide often.
 fn merge() -> impl Strategy<Value = Merge<u8>> {
-    (0usize..5)
-        .prop_flat_map(|sides| prop::collection::vec(0u8..4, 2 * sides + 1))
-        .prop_map(|v| Merge::from_vec(v).unwrap())
+    merge_of(0u8..4, 5)
 }
 
 proptest! {
