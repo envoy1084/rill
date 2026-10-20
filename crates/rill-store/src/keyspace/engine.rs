@@ -43,19 +43,19 @@ pub trait EngineTxn: Send {
 
     async fn scan(&mut self, range: &RawRange) -> Result<Vec<(Bytes, Bytes)>>;
 
-    fn set(&mut self, key: &[u8], value: &[u8]);
+    fn set(&mut self, key: Vec<u8>, value: Bytes);
 
-    fn clear(&mut self, key: &[u8]);
+    fn clear(&mut self, key: Vec<u8>);
 
-    fn clear_range(&mut self, start: &[u8], end: &[u8]);
+    fn clear_range(&mut self, start: Vec<u8>, end: Vec<u8>);
 
     /// Add `delta` to the little-endian `i64` at `key`; absent counts as 0.
-    fn add(&mut self, key: &[u8], delta: i64);
+    fn add(&mut self, key: Vec<u8>, delta: i64);
 
     /// Write a key holding a placeholder for this commit's 10-byte stamp.
     /// `key` ends with the placeholder's 4-byte little-endian offset, as
     /// FoundationDB's `SET_VERSIONSTAMPED_KEY` expects.
-    fn set_versionstamped_key(&mut self, key: &[u8], value: &[u8]);
+    fn set_versionstamped_key(&mut self, key: Vec<u8>, value: Bytes);
 
     /// Commit. Returns the commit's stamp when the transaction wrote a
     /// stamped key. Fails with [`Error::Retryable`] when nothing applied

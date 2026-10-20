@@ -43,7 +43,7 @@ impl<E: Engine> Keyspace<E> {
             let Some(row) = self.engine.get(&raw_key).await? else {
                 return Ok(None);
             };
-            if let Some(value) = self.resolve_outside(key, &row).await? {
+            if let Some(value) = self.resolve_outside(key, row).await? {
                 return Ok(Some(value));
             }
         }
@@ -55,7 +55,7 @@ impl<E: Engine> Keyspace<E> {
 
     /// The value a row describes, or `None` if its chunks were replaced
     /// between reading the row and reading them.
-    async fn resolve_outside(&self, key: &[u8], row: &Bytes) -> Result<Option<Bytes>> {
+    async fn resolve_outside(&self, key: &[u8], row: Bytes) -> Result<Option<Bytes>> {
         match parse(key, row)? {
             Row::Inline(value) => Ok(Some(value)),
             Row::Split { id, chunks, len } => {
@@ -66,7 +66,7 @@ impl<E: Engine> Keyspace<E> {
     }
 }
 
-fn parse(key: &[u8], row: &Bytes) -> Result<Row> {
+fn parse(key: &[u8], row: Bytes) -> Result<Row> {
     layout::parse_row(row)
         .ok_or_else(|| Error::Codec(format!("malformed row at {}", layout::show(key))))
 }
@@ -75,7 +75,7 @@ async fn get_in<T: EngineTxn>(txn: &mut T, key: &[u8]) -> Result<Option<Bytes>> 
     let Some(row) = txn.get(&layout::data_key(key)).await? else {
         return Ok(None);
     };
-    match parse(key, &row)? {
+    match parse(key, row)? {
         Row::Inline(value) => Ok(Some(value)),
         Row::Split { id, chunks, len } => {
             let rows = txn.scan(&layout::chunk_scan(key, &id)).await?;
@@ -108,24 +108,27 @@ async fn last_seq<T: EngineTxn>(txn: &mut T, prefix: &[u8]) -> Result<u64> {
     }
 }
 
-fn put<T: EngineTxn>(txn: &mut T, key: &[u8], value: &[u8]) {
+fn put<T: EngineTxn>(txn: &mut T, key: &[u8], value: &Bytes) {
     let (start, end) = layout::chunks_of(key);
-    txn.clear_range(&start, &end);
+    txn.clear_range(start, end);
     if layout::fits_inline(value) {
-        txn.set(&layout::data_key(key), &layout::inline_row(value));
+        txn.set(
+            layout::data_key(key),
+            Bytes::from(layout::inline_row(value)),
+        );
     } else {
         let (header, chunks) = layout::split_rows(key, value);
         for (chunk_key, part) in chunks {
-            txn.set(&chunk_key, &part);
+            txn.set(chunk_key, part);
         }
-        txn.set(&layout::data_key(key), &header);
+        txn.set(layout::data_key(key), Bytes::from(header));
     }
 }
 
 fn delete<T: EngineTxn>(txn: &mut T, key: &[u8]) {
     let (start, end) = layout::chunks_of(key);
-    txn.clear_range(&start, &end);
-    txn.clear(&layout::data_key(key));
+    txn.clear_range(start, end);
+    txn.clear(layout::data_key(key));
 }
 
 fn conflict(cond: &Condition) -> Error {
@@ -219,12 +222,12 @@ async fn attempt<T: EngineTxn>(txn: &mut T, tx: &Transaction) -> Result<TxOutcom
             Mutation::AppendStamped { prefix, value } => {
                 let user_version = user_versions.len() as u16;
                 txn.set_versionstamped_key(
-                    &layout::stamped_data_key(prefix, user_version),
-                    &layout::inline_row(value),
+                    layout::stamped_data_key(prefix, user_version),
+                    Bytes::from(layout::inline_row(value)),
                 );
                 user_versions.push(user_version);
             }
-            Mutation::Add { key, delta } => txn.add(&layout::counter_key(key), *delta),
+            Mutation::Add { key, delta } => txn.add(layout::counter_key(key), *delta),
         }
     }
     let stamp = txn.commit().await?;
@@ -257,10 +260,16 @@ impl<E: Engine> MetaStore for Keyspace<E> {
         let rows = self.engine.scan(&raw).await?;
         let mut out = Vec::with_capacity(rows.len());
         for (raw_key, row) in rows {
-            let key = layout::logical(&raw_key);
-            let value = match self.resolve_outside(&key, &row).await? {
-                Some(value) => Some(value),
-                None => self.get_outside(&key).await?,
+            let key = layout::logical(raw_key);
+            let value = match parse(&key, row)? {
+                Row::Inline(value) => Some(value),
+                Row::Split { id, chunks, len } => {
+                    let parts = self.engine.scan(&layout::chunk_scan(&key, &id)).await?;
+                    match layout::join_chunks(&id, chunks, len, parts) {
+                        Some(value) => Some(value),
+                        None => self.get_outside(&key).await?,
+                    }
+                }
             };
             if let Some(value) = value {
                 out.push((key, value));

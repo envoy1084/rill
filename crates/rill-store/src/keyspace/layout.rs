@@ -11,7 +11,7 @@
 use std::ops::Bound;
 use std::time::Duration;
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use rill_types::{ObjectHash, ObjectKind};
 
 use super::engine::RawRange;
@@ -47,9 +47,11 @@ pub fn counter_key(key: &[u8]) -> Vec<u8> {
     out
 }
 
-/// The logical key of a value row.
-pub fn logical(raw: &Bytes) -> Bytes {
-    raw.slice(1..)
+/// The logical key of a value row. Advancing, unlike slicing, never
+/// allocates.
+pub fn logical(mut raw: Bytes) -> Bytes {
+    raw.advance(1);
+    raw
 }
 
 /// The chunk rows of every version of `key`.
@@ -103,12 +105,15 @@ fn split_id(value: &[u8]) -> [u8; 8] {
 
 /// The rows of a value too large for one row: the header row and its
 /// chunks, as `(key, value)` pairs.
-pub fn split_rows(key: &[u8], value: &[u8]) -> (Vec<u8>, Vec<(Vec<u8>, Bytes)>) {
+pub fn split_rows(key: &[u8], value: &Bytes) -> (Vec<u8>, Vec<(Vec<u8>, Bytes)>) {
     let id = split_id(value);
-    let chunks: Vec<(Vec<u8>, Bytes)> = value
-        .chunks(ROW_BYTES)
+    let chunks: Vec<(Vec<u8>, Bytes)> = (0..value.len())
+        .step_by(ROW_BYTES)
         .enumerate()
-        .map(|(i, part)| (chunk_key(key, &id, i as u32), Bytes::copy_from_slice(part)))
+        .map(|(i, start)| {
+            let end = (start + ROW_BYTES).min(value.len());
+            (chunk_key(key, &id, i as u32), value.slice(start..end))
+        })
         .collect();
     let mut header = vec![SPLIT];
     header.extend_from_slice(&id);
@@ -124,9 +129,12 @@ pub enum Row {
 }
 
 /// Parse a value row.
-pub fn parse_row(row: &Bytes) -> Option<Row> {
+pub fn parse_row(mut row: Bytes) -> Option<Row> {
     match *row.first()? {
-        INLINE => Some(Row::Inline(row.slice(1..))),
+        INLINE => {
+            row.advance(1);
+            Some(Row::Inline(row))
+        }
         SPLIT if row.len() == 21 => Some(Row::Split {
             id: row[1..9].try_into().ok()?,
             chunks: u32::from_be_bytes(row[9..13].try_into().ok()?),

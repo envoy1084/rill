@@ -99,34 +99,26 @@ impl<B: Batch> EngineTxn for BufferedTxn<B> {
         self.backend.scan(range).await
     }
 
-    fn set(&mut self, key: &[u8], value: &[u8]) {
-        self.ops.push(Op::Set(
-            Bytes::copy_from_slice(key),
-            Bytes::copy_from_slice(value),
-        ));
+    fn set(&mut self, key: Vec<u8>, value: Bytes) {
+        self.ops.push(Op::Set(Bytes::from(key), value));
     }
 
-    fn clear(&mut self, key: &[u8]) {
-        self.ops.push(Op::Clear(Bytes::copy_from_slice(key)));
+    fn clear(&mut self, key: Vec<u8>) {
+        self.ops.push(Op::Clear(Bytes::from(key)));
     }
 
-    fn clear_range(&mut self, start: &[u8], end: &[u8]) {
-        self.ops.push(Op::ClearRange(
-            Bytes::copy_from_slice(start),
-            Bytes::copy_from_slice(end),
-        ));
+    fn clear_range(&mut self, start: Vec<u8>, end: Vec<u8>) {
+        self.ops
+            .push(Op::ClearRange(Bytes::from(start), Bytes::from(end)));
     }
 
-    fn add(&mut self, key: &[u8], delta: i64) {
-        self.ops.push(Op::Add(Bytes::copy_from_slice(key), delta));
+    fn add(&mut self, key: Vec<u8>, delta: i64) {
+        self.ops.push(Op::Add(Bytes::from(key), delta));
     }
 
-    fn set_versionstamped_key(&mut self, key: &[u8], value: &[u8]) {
+    fn set_versionstamped_key(&mut self, key: Vec<u8>, value: Bytes) {
         self.stamped = true;
-        self.ops.push(Op::SetStamped(
-            Bytes::copy_from_slice(key),
-            Bytes::copy_from_slice(value),
-        ));
+        self.ops.push(Op::SetStamped(Bytes::from(key), value));
     }
 
     async fn commit(&mut self) -> Result<Option<[u8; 10]>> {

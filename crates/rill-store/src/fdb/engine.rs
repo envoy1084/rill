@@ -194,37 +194,37 @@ impl EngineTxn for FdbTxn {
         result.map_err(|e| self.read_failed(e))
     }
 
-    fn set(&mut self, key: &[u8], value: &[u8]) {
+    fn set(&mut self, key: Vec<u8>, value: Bytes) {
         if let State::Open(trx) = &self.state {
-            trx.set(&prefixed(&self.root, key), value);
+            trx.set(&prefixed(&self.root, &key), &value);
         }
     }
 
-    fn clear(&mut self, key: &[u8]) {
+    fn clear(&mut self, key: Vec<u8>) {
         if let State::Open(trx) = &self.state {
-            trx.clear(&prefixed(&self.root, key));
+            trx.clear(&prefixed(&self.root, &key));
         }
     }
 
-    fn clear_range(&mut self, start: &[u8], end: &[u8]) {
+    fn clear_range(&mut self, start: Vec<u8>, end: Vec<u8>) {
         if let State::Open(trx) = &self.state {
             if start < end {
-                trx.clear_range(&prefixed(&self.root, start), &prefixed(&self.root, end));
+                trx.clear_range(&prefixed(&self.root, &start), &prefixed(&self.root, &end));
             }
         }
     }
 
-    fn add(&mut self, key: &[u8], delta: i64) {
+    fn add(&mut self, key: Vec<u8>, delta: i64) {
         if let State::Open(trx) = &self.state {
             trx.atomic_op(
-                &prefixed(&self.root, key),
+                &prefixed(&self.root, &key),
                 &delta.to_le_bytes(),
                 MutationType::Add,
             );
         }
     }
 
-    fn set_versionstamped_key(&mut self, key: &[u8], value: &[u8]) {
+    fn set_versionstamped_key(&mut self, key: Vec<u8>, value: Bytes) {
         self.stamped = true;
         if let State::Open(trx) = &self.state {
             // The trailing offset counts from the start of the key, which
@@ -234,7 +234,7 @@ impl EngineTxn for FdbTxn {
                 + self.root.len() as u32;
             let mut full = prefixed(&self.root, body);
             full.extend_from_slice(&offset.to_le_bytes());
-            trx.atomic_op(&full, value, MutationType::SetVersionstampedKey);
+            trx.atomic_op(&full, &value, MutationType::SetVersionstampedKey);
         }
     }
 
