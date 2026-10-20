@@ -21,7 +21,10 @@ pub mod principal;
 pub mod testing;
 pub mod time;
 
-pub use encoding::{decode, encode, Encodable, FormatVersion};
+pub use encoding::{
+    decode, decode_record, decode_tagged, encode, encode_record, encode_tagged, Encodable, Record,
+    Schema,
+};
 pub use error::{Error, Result};
 pub use hash::{ObjectHash, ObjectKind};
 pub use ids::{ChangeId, IntentId, OperationId, PrincipalId, RepoId, WorkspaceId};

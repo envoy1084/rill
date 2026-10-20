@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::encoding::{Encodable, FormatVersion};
+use crate::encoding::{Encodable, Schema};
 use crate::hash::{ObjectHash, ObjectKind};
 use crate::ids::{ChangeId, IntentId};
 use crate::merge::Merge;
@@ -203,7 +203,7 @@ impl ChangeVersion {
 
 impl Encodable for ChangeVersion {
     const KIND: ObjectKind = ObjectKind::ChangeVersion;
-    const VERSION: FormatVersion = 1;
+    const SCHEMA: Schema = 1;
     const NAME: &'static str = "ChangeVersion";
 }
 
@@ -292,4 +292,8 @@ mod tests {
         b.message.push('!');
         assert_ne!(a.hash(), b.hash());
     }
+}
+
+impl crate::Record for ChangeInfo {
+    const TAG: &'static str = "change_info";
 }

@@ -3,7 +3,7 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::encoding::{Encodable, FormatVersion};
+use crate::encoding::{Encodable, Schema};
 use crate::hash::{ObjectHash, ObjectKind};
 
 /// Files at or below this size are stored inline in the change that adds
@@ -78,6 +78,6 @@ pub struct BlobManifest {
 
 impl Encodable for BlobManifest {
     const KIND: ObjectKind = ObjectKind::BlobManifest;
-    const VERSION: FormatVersion = 1;
+    const SCHEMA: Schema = 1;
     const NAME: &'static str = "BlobManifest";
 }

@@ -125,3 +125,7 @@ impl Intent {
         matches!(self.status, IntentStatus::Done | IntentStatus::Abandoned)
     }
 }
+
+impl crate::Record for Intent {
+    const TAG: &'static str = "intent";
+}

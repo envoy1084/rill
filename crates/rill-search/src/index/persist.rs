@@ -16,7 +16,7 @@
 //! reader only needs the union of a shard's lists.
 
 use bytes::Bytes;
-use rill_store::repo::{decode_record, encode_record};
+use rill_store::repo::{decode_tagged, encode_tagged};
 use rill_store::RepoStore;
 use rill_types::ObjectHash;
 use serde::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ pub async fn put_shard(repo: &RepoStore, shard: u8, lists: Vec<(u32, &PostingLis
     let record = ShardRecord {
         lists: lists.into_iter().map(|(t, l)| (t, l.encode())).collect(),
     };
-    repo.put_derived(KIND_POST, &shard_key(shard), encode(&record)?)
+    repo.put_derived(KIND_POST, &shard_key(shard), encode(KIND_POST, &record)?)
         .await?;
     Ok(())
 }
@@ -78,7 +78,7 @@ pub async fn get_shard(repo: &RepoStore, shard: u8) -> Result<Option<Vec<(u32, P
     let Some(bytes) = repo.get_derived(KIND_POST, &shard_key(shard)).await? else {
         return Ok(None);
     };
-    let record: ShardRecord = decode(&bytes)?;
+    let record: ShardRecord = decode(KIND_POST, &bytes)?;
     record
         .lists
         .into_iter()
@@ -89,7 +89,7 @@ pub async fn get_shard(repo: &RepoStore, shard: u8) -> Result<Option<Vec<(u32, P
 
 /// Write the document table.
 pub async fn put_docs(repo: &RepoStore, record: &DocTableRecord) -> Result<()> {
-    repo.put_derived(KIND_DOCS, &ObjectHash::ZERO, encode(record)?)
+    repo.put_derived(KIND_DOCS, &ObjectHash::ZERO, encode(KIND_DOCS, record)?)
         .await?;
     Ok(())
 }
@@ -97,31 +97,32 @@ pub async fn put_docs(repo: &RepoStore, record: &DocTableRecord) -> Result<()> {
 /// Read the document table, if stored.
 pub async fn get_docs(repo: &RepoStore) -> Result<Option<DocTableRecord>> {
     match repo.get_derived(KIND_DOCS, &ObjectHash::ZERO).await? {
-        Some(bytes) => Ok(Some(decode(&bytes)?)),
+        Some(bytes) => Ok(Some(decode(KIND_DOCS, &bytes)?)),
         None => Ok(None),
     }
 }
 
 /// Write a blob marker.
 pub async fn put_marker(repo: &RepoStore, hash: &ObjectHash, marker: BlobMarker) -> Result<()> {
-    repo.put_derived(KIND_BLOB, hash, encode(&marker)?).await?;
+    repo.put_derived(KIND_BLOB, hash, encode(KIND_BLOB, &marker)?)
+        .await?;
     Ok(())
 }
 
 /// Read a blob marker, if stored.
 pub async fn get_marker(repo: &RepoStore, hash: &ObjectHash) -> Result<Option<BlobMarker>> {
     match repo.get_derived(KIND_BLOB, hash).await? {
-        Some(bytes) => Ok(Some(decode(&bytes)?)),
+        Some(bytes) => Ok(Some(decode(KIND_BLOB, &bytes)?)),
         None => Ok(None),
     }
 }
 
-/// Encode a record with the store's versioned record framing.
-pub fn encode<T: Serialize>(value: &T) -> Result<Bytes> {
-    Ok(encode_record(value)?)
+/// Encode a record under its storage kind as the tag.
+pub fn encode<T: Serialize>(kind: &str, value: &T) -> Result<Bytes> {
+    Ok(encode_tagged(kind, value)?)
 }
 
-/// Decode a record written by [`encode`].
-pub fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
-    Ok(decode_record(bytes)?)
+/// Decode a record written by [`encode`] under the same kind.
+pub fn decode<T: serde::de::DeserializeOwned>(kind: &str, bytes: &[u8]) -> Result<T> {
+    Ok(decode_tagged(kind, bytes)?)
 }

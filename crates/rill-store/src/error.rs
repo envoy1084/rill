@@ -26,6 +26,12 @@ pub enum Error {
     #[error("codec error: {0}")]
     Codec(String),
 
+    #[error(
+        "store format {found} does not match this build's format {expected}; \
+         Rill is pre-release, so recreate the store"
+    )]
+    IncompatibleFormat { found: u32, expected: u32 },
+
     #[error("backend error: {0}")]
     Backend(String),
 

@@ -66,6 +66,12 @@ impl AppState {
 
 /// Open the stores a [`StorageConfig`] describes.
 pub async fn open_stores(storage: &StorageConfig) -> Result<Stores> {
+    let stores = open_backends(storage).await?;
+    stores.check_format().await?;
+    Ok(stores)
+}
+
+async fn open_backends(storage: &StorageConfig) -> Result<Stores> {
     match storage {
         StorageConfig::Memory => Ok(Stores::memory()),
         StorageConfig::Local { dir } => Ok(rill_store::LocalStores::open(dir).await?),

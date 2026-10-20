@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use rill_types::{
-    ContentRef, Encodable, FormatVersion, ObjectHash, ObjectKind, RepoPathBuf, Timestamp, TreeHash,
+    ContentRef, Encodable, ObjectHash, ObjectKind, RepoPathBuf, Schema, Timestamp, TreeHash,
 };
 use serde::{Deserialize, Serialize};
 
@@ -41,7 +41,7 @@ pub struct Action {
 
 impl Encodable for Action {
     const KIND: ObjectKind = ObjectKind::Derived;
-    const VERSION: FormatVersion = 1;
+    const SCHEMA: Schema = 1;
     const NAME: &'static str = "Action";
 }
 

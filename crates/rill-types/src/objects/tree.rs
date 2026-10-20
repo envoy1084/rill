@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::encoding::{Encodable, FormatVersion};
+use crate::encoding::{Encodable, Schema};
 use crate::hash::{ObjectHash, ObjectKind};
 use crate::objects::blob::ContentRef;
 use crate::objects::change::FileKind;
@@ -111,7 +111,7 @@ impl Tree {
 
 impl Encodable for Tree {
     const KIND: ObjectKind = ObjectKind::Tree;
-    const VERSION: FormatVersion = 1;
+    const SCHEMA: Schema = 1;
     const NAME: &'static str = "Tree";
 }
 

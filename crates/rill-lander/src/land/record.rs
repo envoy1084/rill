@@ -5,7 +5,7 @@
 //! row `landings` (recent listing without a scan).
 
 use bytes::Bytes;
-use rill_store::repo::{decode_record, encode_record};
+use rill_store::repo::{decode_tagged, encode_tagged};
 use rill_store::RepoStore;
 use rill_types::{ChangeId, ChangeVersionHash, Principal, RiskClass, Timestamp, TrunkSeq};
 use serde::{Deserialize, Serialize};
@@ -38,22 +38,27 @@ pub struct Landing {
 /// The ring update is a read-modify-write; callers serialize it (the
 /// lander holds a lock) so concurrent landings do not drop entries.
 pub async fn record_landing(repo: &RepoStore, landing: &Landing) -> Result<()> {
-    repo.put_derived(LANDING_KIND, &landing.version, encode(landing)?)
-        .await?;
+    repo.put_derived(
+        LANDING_KIND,
+        &landing.version,
+        encode(LANDING_KIND, landing)?,
+    )
+    .await?;
     let mut ring = list_landings(repo).await?;
     ring.push(landing.clone());
     if ring.len() > LANDINGS_RING {
         let excess = ring.len() - LANDINGS_RING;
         ring.drain(..excess);
     }
-    repo.set_misc(LANDINGS_MISC, encode(&ring)?).await?;
+    repo.set_misc(LANDINGS_MISC, encode(LANDINGS_MISC, &ring)?)
+        .await?;
     Ok(())
 }
 
 /// The landing record of `version`, if it landed through the lander.
 pub async fn landing_of(repo: &RepoStore, version: &ChangeVersionHash) -> Result<Option<Landing>> {
     match repo.get_derived(LANDING_KIND, version).await? {
-        Some(bytes) => Ok(Some(decode(&bytes)?)),
+        Some(bytes) => Ok(Some(decode(LANDING_KIND, &bytes)?)),
         None => Ok(None),
     }
 }
@@ -61,15 +66,15 @@ pub async fn landing_of(repo: &RepoStore, version: &ChangeVersionHash) -> Result
 /// The most recent landings, oldest first, up to [`LANDINGS_RING`].
 pub async fn list_landings(repo: &RepoStore) -> Result<Vec<Landing>> {
     match repo.get_misc(LANDINGS_MISC).await? {
-        Some(bytes) => decode(&bytes),
+        Some(bytes) => decode(LANDINGS_MISC, &bytes),
         None => Ok(Vec::new()),
     }
 }
 
-fn encode<T: Serialize>(value: &T) -> Result<Bytes> {
-    encode_record(value).map_err(|e| Error::Codec(e.to_string()))
+fn encode<T: Serialize>(tag: &str, value: &T) -> Result<Bytes> {
+    encode_tagged(tag, value).map_err(|e| Error::Codec(e.to_string()))
 }
 
-fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
-    decode_record(bytes).map_err(|e| Error::Codec(e.to_string()))
+fn decode<T: serde::de::DeserializeOwned>(tag: &str, bytes: &[u8]) -> Result<T> {
+    decode_tagged(tag, bytes).map_err(|e| Error::Codec(e.to_string()))
 }

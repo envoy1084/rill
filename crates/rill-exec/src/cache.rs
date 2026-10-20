@@ -6,7 +6,7 @@
 
 use bytes::Bytes;
 use rill_core::store_content;
-use rill_store::repo::{decode_record, encode_record};
+use rill_store::repo::{decode_tagged, encode_tagged};
 use rill_store::RepoStore;
 use rill_types::{ContentRef, ObjectHash};
 
@@ -37,7 +37,7 @@ impl ActionCache {
     pub async fn get(&self, digest: &ObjectHash) -> Result<Option<ActionResult>> {
         match self.repo.get_derived(CACHE_KIND, digest).await? {
             Some(bytes) => Ok(Some(
-                decode_record(&bytes).map_err(|e| Error::Codec(e.to_string()))?,
+                decode_tagged(CACHE_KIND, &bytes).map_err(|e| Error::Codec(e.to_string()))?,
             )),
             None => Ok(None),
         }
@@ -45,7 +45,7 @@ impl ActionCache {
 
     /// Store `result` under `digest`, replacing any previous entry.
     pub async fn put(&self, digest: &ObjectHash, result: &ActionResult) -> Result<()> {
-        let bytes = encode_record(result).map_err(|e| Error::Codec(e.to_string()))?;
+        let bytes = encode_tagged(CACHE_KIND, result).map_err(|e| Error::Codec(e.to_string()))?;
         self.repo.put_derived(CACHE_KIND, digest, bytes).await?;
         Ok(())
     }

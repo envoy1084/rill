@@ -168,6 +168,11 @@ pub fn derived(repo: &RepoId, kind: &str, hash: &ObjectHash) -> Bytes {
     ])
 }
 
+/// The store-wide format marker.
+pub fn store_format() -> Bytes {
+    Bytes::from_static(b"meta/format")
+}
+
 pub fn repo(id: &RepoId) -> Bytes {
     join(&[table::REPO.as_bytes(), id.as_bytes()])
 }

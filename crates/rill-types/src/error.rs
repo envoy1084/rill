@@ -15,11 +15,11 @@ pub enum Error {
     #[error("invalid ref name {0:?}")]
     InvalidRefName(String),
 
-    #[error("unsupported format version {found} for {kind} (expected {expected})")]
-    UnsupportedFormat {
+    #[error("unsupported schema {found} for {kind} (this build reads {expected})")]
+    UnsupportedSchema {
         kind: &'static str,
-        found: u8,
-        expected: u8,
+        found: u16,
+        expected: u16,
     },
 
     #[error("object kind mismatch: expected {expected:?}, found {found:?}")]

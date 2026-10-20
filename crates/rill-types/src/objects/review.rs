@@ -181,3 +181,7 @@ impl ReviewState {
         self.threads.iter().filter(|t| !t.resolved).count()
     }
 }
+
+impl crate::Record for ReviewState {
+    const TAG: &'static str = "review";
+}

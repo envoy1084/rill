@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use dashmap::DashMap;
-use rill_store::repo::{decode_record, encode_record};
+use rill_store::repo::{decode_tagged, encode_tagged};
 use rill_store::RepoStore;
 use rill_types::{ChangeVersion, ChangeVersionHash, ObjectHash};
 use serde::de::DeserializeOwned;
@@ -118,13 +118,13 @@ impl DeriveManager {
             }
         };
         match bytes {
-            Some(b) => Ok(Some(decode_record(&b)?)),
+            Some(b) => Ok(Some(decode_tagged(kind, &b)?)),
             None => Ok(None),
         }
     }
 
     async fn store<V: Serialize>(&self, kind: &str, hash: &ObjectHash, value: &V) -> Result<()> {
-        let bytes = encode_record(value)?;
+        let bytes = encode_tagged(kind, value)?;
         self.repo.put_derived(kind, hash, bytes.clone()).await?;
         self.cache.put((kind.to_string(), *hash), bytes);
         Ok(())

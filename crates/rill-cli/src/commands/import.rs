@@ -58,6 +58,7 @@ async fn git(ctx: &mut Ctx<'_>, args: GitArgs) -> Result<()> {
         ));
     }
     let stores = LocalStores::open(&args.storage_dir).await?;
+    stores.check_format().await?;
     let config = match stores.get_repo_by_name(&args.repo).await? {
         Some(c) => c,
         None => stores.create_repo(&args.repo, "").await?,

@@ -264,7 +264,7 @@ impl SearchIndex {
             already_indexed: false,
         };
         self.repo
-            .put_derived(KIND_ROOT, &root, persist::encode(&manifest)?)
+            .put_derived(KIND_ROOT, &root, persist::encode(KIND_ROOT, &manifest)?)
             .await?;
         self.manifests.insert(root, Arc::new(manifest));
         tracing::info!(root = %root, ?stats, "indexed root");
@@ -294,7 +294,7 @@ impl SearchIndex {
         }
         match self.repo.get_derived(KIND_ROOT, &root).await? {
             Some(bytes) => {
-                let manifest: RootManifest = persist::decode(&bytes)?;
+                let manifest: RootManifest = persist::decode(KIND_ROOT, &bytes)?;
                 let manifest = Arc::new(manifest);
                 self.manifests.insert(root, manifest.clone());
                 Ok(Some(manifest))

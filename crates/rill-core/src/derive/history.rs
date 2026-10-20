@@ -20,7 +20,7 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use rill_store::ObjectStoreExt;
 use rill_types::{
-    ChangeVersion, ChangeVersionHash, Encodable, FormatVersion, ObjectHash, ObjectKind, RepoPath,
+    ChangeVersion, ChangeVersionHash, Encodable, ObjectHash, ObjectKind, RepoPath, Schema,
 };
 use serde::{Deserialize, Serialize};
 
@@ -48,7 +48,7 @@ pub struct HistoryNode {
 
 impl Encodable for HistoryNode {
     const KIND: ObjectKind = ObjectKind::Derived;
-    const VERSION: FormatVersion = 1;
+    const SCHEMA: Schema = 1;
     const NAME: &'static str = "HistoryNode";
 }
 

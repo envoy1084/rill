@@ -5,8 +5,8 @@ use std::sync::Arc;
 use bytes::Bytes;
 use rill_types::{
     ChangeId, ChangeInfo, ChangeVersion, ChangeVersionHash, Encodable, Intent, IntentId,
-    ObjectHash, ObjectKind, Operation, OperationId, RefName, RepoId, ReviewState, Signature,
-    Timestamp, TrunkSeq, Workspace, WorkspaceId,
+    ObjectHash, ObjectKind, Operation, OperationId, Record, RefName, RepoId, ReviewState,
+    Signature, Timestamp, TrunkSeq, Workspace, WorkspaceId,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -16,23 +16,25 @@ use crate::keys;
 use crate::meta::{seq_from_key, seq_key, KeyRange, MetaStore, Transaction};
 use crate::object::{ObjectStore, ObjectStoreExt};
 
-const RECORD_VERSION: u8 = 1;
-
-/// Encode a mutable record (not content-addressed) with a version byte.
-pub fn encode_record<T: Serialize>(value: &T) -> Result<Bytes> {
-    let mut out = vec![RECORD_VERSION];
-    out = postcard::to_extend(value, out).map_err(|e| Error::Codec(e.to_string()))?;
-    Ok(Bytes::from(out))
+/// Encode a mutable record (not content-addressed) with its type tag.
+pub fn encode_record<T: Record>(value: &T) -> Result<Bytes> {
+    Ok(Bytes::from(rill_types::encode_record(value)))
 }
 
-pub fn decode_record<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
-    match bytes.split_first() {
-        Some((&RECORD_VERSION, body)) => {
-            postcard::from_bytes(body).map_err(|e| Error::Codec(e.to_string()))
-        }
-        Some((&v, _)) => Err(Error::Codec(format!("unsupported record version {v}"))),
-        None => Err(Error::Codec("empty record".into())),
-    }
+/// Decode a record, refusing other record types and schemas.
+pub fn decode_record<T: Record>(bytes: &[u8]) -> Result<T> {
+    rill_types::decode_record(bytes).map_err(|e| Error::Codec(e.to_string()))
+}
+
+/// Encode a value that is not a [`Record`] under an explicit tag, usually
+/// the storage kind it is kept under.
+pub fn encode_tagged<T: Serialize + ?Sized>(tag: &str, value: &T) -> Result<Bytes> {
+    Ok(Bytes::from(rill_types::encode_tagged(tag, 1, value)))
+}
+
+/// Decode a value written by [`encode_tagged`] with the same tag.
+pub fn decode_tagged<T: DeserializeOwned>(tag: &str, bytes: &[u8]) -> Result<T> {
+    rill_types::decode_tagged(tag, 1, bytes).map_err(|e| Error::Codec(e.to_string()))
 }
 
 /// Per-repository configuration record.
@@ -46,12 +48,20 @@ pub struct RepoConfig {
     pub trunk: RefName,
 }
 
+impl Record for RepoConfig {
+    const TAG: &'static str = "repo";
+}
+
 /// The pair of backends a deployment is built on.
 #[derive(Clone)]
 pub struct Stores {
     pub objects: Arc<dyn ObjectStore>,
     pub meta: Arc<dyn MetaStore>,
 }
+
+/// Format of everything a store holds. Changing any encoding bumps it, and
+/// a build opens only stores of its own format.
+pub const STORE_FORMAT: u32 = 1;
 
 impl Stores {
     pub fn new(objects: Arc<dyn ObjectStore>, meta: Arc<dyn MetaStore>) -> Self {
@@ -62,6 +72,35 @@ impl Stores {
         Stores {
             objects: Arc::new(crate::memory::MemoryObjectStore::new()),
             meta: Arc::new(crate::memory::MemoryMetaStore::new()),
+        }
+    }
+
+    /// Stamp an empty store with [`STORE_FORMAT`], or refuse a store
+    /// written in another format.
+    pub async fn check_format(&self) -> Result<()> {
+        let key = keys::store_format();
+        match self.meta.get(&key).await? {
+            Some(bytes) => {
+                let found = <[u8; 4]>::try_from(bytes.as_ref())
+                    .map(u32::from_be_bytes)
+                    .map_err(|_| Error::Codec("malformed store format marker".into()))?;
+                if found != STORE_FORMAT {
+                    return Err(Error::IncompatibleFormat {
+                        found,
+                        expected: STORE_FORMAT,
+                    });
+                }
+                Ok(())
+            }
+            None => {
+                let tx = Transaction::new()
+                    .expect_absent(key.clone())
+                    .set(key, Bytes::copy_from_slice(&STORE_FORMAT.to_be_bytes()));
+                match self.meta.transact(tx).await {
+                    Ok(_) | Err(Error::Conflict(_)) => Ok(()),
+                    Err(e) => Err(e),
+                }
+            }
         }
     }
 
@@ -267,14 +306,14 @@ impl RepoStore {
         self.meta()
             .set(
                 keys::signatures(&self.id, hash),
-                encode_record(&signatures)?,
+                encode_tagged("signatures", signatures)?,
             )
             .await
     }
 
     pub async fn get_signatures(&self, hash: &ChangeVersionHash) -> Result<Vec<Signature>> {
         match self.meta().get(&keys::signatures(&self.id, hash)).await? {
-            Some(bytes) => decode_record(&bytes),
+            Some(bytes) => decode_tagged("signatures", &bytes),
             None => Ok(Vec::new()),
         }
     }

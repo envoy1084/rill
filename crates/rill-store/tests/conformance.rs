@@ -503,6 +503,28 @@ async fn repo_stores_conform() {
     }
 }
 
+#[tokio::test]
+async fn stores_refuse_another_format() {
+    for f in fixtures().await {
+        f.stores.check_format().await.unwrap();
+        f.stores.check_format().await.unwrap();
+        f.stores
+            .meta
+            .set(
+                Bytes::from_static(b"meta/format"),
+                Bytes::copy_from_slice(&(rill_store::STORE_FORMAT + 1).to_be_bytes()),
+            )
+            .await
+            .unwrap();
+        let err = f.stores.check_format().await.unwrap_err();
+        assert!(
+            matches!(err, rill_store::Error::IncompatibleFormat { .. }),
+            "{}: {err}",
+            f.name
+        );
+    }
+}
+
 #[cfg(feature = "local")]
 #[tokio::test]
 async fn redb_temporary_matches_memory() {

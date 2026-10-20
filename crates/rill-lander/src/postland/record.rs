@@ -1,7 +1,7 @@
 //! Post-land verification records and the worker's cursor.
 
 use bytes::Bytes;
-use rill_store::repo::{decode_record, encode_record};
+use rill_store::repo::{decode_tagged, encode_tagged};
 use rill_store::RepoStore;
 use rill_types::{ChangeVersionHash, Timestamp, TrunkSeq};
 use serde::{Deserialize, Serialize};
@@ -51,8 +51,12 @@ impl VerificationRecord {
 
 /// Store a record under its version and append it to the ring.
 pub async fn put_record(repo: &RepoStore, record: &VerificationRecord) -> Result<()> {
-    repo.put_derived(POSTLAND_KIND, &record.version, encode(record)?)
-        .await?;
+    repo.put_derived(
+        POSTLAND_KIND,
+        &record.version,
+        encode(POSTLAND_KIND, record)?,
+    )
+    .await?;
     let mut ring = recent_records(repo).await?;
     ring.retain(|r| r.seq != record.seq);
     ring.push(record.clone());
@@ -60,7 +64,8 @@ pub async fn put_record(repo: &RepoStore, record: &VerificationRecord) -> Result
         let excess = ring.len() - POSTLAND_RING;
         ring.drain(..excess);
     }
-    repo.set_misc(POSTLAND_INDEX_MISC, encode(&ring)?).await?;
+    repo.set_misc(POSTLAND_INDEX_MISC, encode(POSTLAND_INDEX_MISC, &ring)?)
+        .await?;
     Ok(())
 }
 
@@ -70,7 +75,7 @@ pub async fn record_of(
     version: &ChangeVersionHash,
 ) -> Result<Option<VerificationRecord>> {
     match repo.get_derived(POSTLAND_KIND, version).await? {
-        Some(bytes) => Ok(Some(decode(&bytes)?)),
+        Some(bytes) => Ok(Some(decode(POSTLAND_KIND, &bytes)?)),
         None => Ok(None),
     }
 }
@@ -86,7 +91,7 @@ pub async fn record_at(repo: &RepoStore, seq: TrunkSeq) -> Result<Option<Verific
 /// Recent records in sequence order, up to [`POSTLAND_RING`].
 pub async fn recent_records(repo: &RepoStore) -> Result<Vec<VerificationRecord>> {
     let mut records: Vec<VerificationRecord> = match repo.get_misc(POSTLAND_INDEX_MISC).await? {
-        Some(bytes) => decode(&bytes)?,
+        Some(bytes) => decode(POSTLAND_INDEX_MISC, &bytes)?,
         None => Vec::new(),
     };
     records.sort_by_key(|r| r.seq);
@@ -117,10 +122,10 @@ pub async fn store_cursor(repo: &RepoStore, seq: TrunkSeq) -> Result<()> {
     Ok(())
 }
 
-fn encode<T: Serialize>(value: &T) -> Result<Bytes> {
-    encode_record(value).map_err(|e| Error::Codec(e.to_string()))
+fn encode<T: Serialize>(tag: &str, value: &T) -> Result<Bytes> {
+    encode_tagged(tag, value).map_err(|e| Error::Codec(e.to_string()))
 }
 
-fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
-    decode_record(bytes).map_err(|e| Error::Codec(e.to_string()))
+fn decode<T: serde::de::DeserializeOwned>(tag: &str, bytes: &[u8]) -> Result<T> {
+    decode_tagged(tag, bytes).map_err(|e| Error::Codec(e.to_string()))
 }

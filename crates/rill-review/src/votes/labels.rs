@@ -84,8 +84,8 @@ mod tests {
     #[test]
     fn record_roundtrip() {
         let set = LabelSet::default();
-        let bytes = rill_store::repo::encode_record(&set).unwrap();
-        let back: LabelSet = rill_store::repo::decode_record(&bytes).unwrap();
+        let bytes = rill_store::repo::encode_tagged("labels", &set).unwrap();
+        let back: LabelSet = rill_store::repo::decode_tagged("labels", &bytes).unwrap();
         assert_eq!(back, set);
     }
 }

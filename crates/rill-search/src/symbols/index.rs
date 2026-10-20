@@ -7,7 +7,7 @@ use bytes::Bytes;
 use dashmap::DashMap;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use rill_core::{read_content, TreeOps};
-use rill_store::repo::{decode_record, encode_record};
+use rill_store::repo::{decode_tagged, encode_tagged};
 use rill_store::RepoStore;
 use rill_types::{ObjectHash, RepoPath, RepoPathBuf, SparseProfile, TreeHash};
 use serde::{Deserialize, Serialize};
@@ -114,14 +114,14 @@ impl SymbolIndex {
             return Ok(r.clone());
         }
         if let Some(bytes) = self.repo.get_derived(KIND_SYMBOLS, &root).await? {
-            let record: SymbolsRecord = decode_record(&bytes)?;
+            let record: SymbolsRecord = decode_tagged(KIND_SYMBOLS, &bytes)?;
             let built = Arc::new(RootSymbols::from_record(record));
             self.roots.insert(root, built.clone());
             return Ok(built);
         }
         let record = self.build(root).await?;
         self.repo
-            .put_derived(KIND_SYMBOLS, &root, encode_record(&record)?)
+            .put_derived(KIND_SYMBOLS, &root, encode_tagged(KIND_SYMBOLS, &record)?)
             .await?;
         let built = Arc::new(RootSymbols::from_record(record));
         self.roots.insert(root, built.clone());

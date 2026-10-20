@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use rill_store::repo::{decode_record, encode_record};
+use rill_store::repo::{decode_tagged, encode_tagged};
 use rill_store::RepoStore;
 use rill_types::ChangeVersionHash;
 use serde::{Deserialize, Serialize};
@@ -34,14 +34,16 @@ impl ImportMap {
     /// Load the map stored in `repo`, or an empty one.
     pub async fn load(repo: &RepoStore) -> Result<Self> {
         match repo.get_misc(IMPORT_MAP_KEY).await? {
-            Some(bytes) => decode_record(&bytes).map_err(|e| Error::Codec(e.to_string())),
+            Some(bytes) => {
+                decode_tagged(IMPORT_MAP_KEY, &bytes).map_err(|e| Error::Codec(e.to_string()))
+            }
             None => Ok(ImportMap::new()),
         }
     }
 
     /// Store the map in `repo`.
     pub async fn save(&self, repo: &RepoStore) -> Result<()> {
-        let bytes = encode_record(self).map_err(|e| Error::Codec(e.to_string()))?;
+        let bytes = encode_tagged(IMPORT_MAP_KEY, self).map_err(|e| Error::Codec(e.to_string()))?;
         repo.set_misc(IMPORT_MAP_KEY, bytes).await?;
         Ok(())
     }
