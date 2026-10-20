@@ -7,8 +7,9 @@ use rill_sdk::LogStart;
 use rill_types::{ChangeInfo, EntryKind, RepoPathBuf};
 use serde_json::{json as j, Value};
 
-use crate::commands::{change_ref, root_arg};
+use crate::commands::{change_ref, root_arg, ChangeRef};
 use crate::context::Ctx;
+use crate::error::CliError;
 use crate::output::{short, when, Out, Table};
 use crate::Result;
 
@@ -41,8 +42,9 @@ pub struct BlameArgs {
 /// `rill show`.
 #[derive(Args, Debug)]
 pub struct ShowArgs {
-    /// A version hash or a change id (its current version).
-    pub change: String,
+    /// A version hash or a change id (its current version). Defaults to the
+    /// checkout's working change, or the trunk head outside a checkout.
+    pub change: Option<String>,
 }
 
 /// `rill ls`.
@@ -175,7 +177,17 @@ pub async fn blame(ctx: &mut Ctx<'_>, args: BlameArgs) -> Result<()> {
 /// Run `rill show`.
 pub async fn show(ctx: &mut Ctx<'_>, args: ShowArgs) -> Result<()> {
     let repo = ctx.repo()?;
-    let info = change_ref(&args.change)?.info(&repo).await?;
+    let target = match args.change.as_deref() {
+        Some(text) => change_ref(text)?,
+        None => match ctx.checkout_meta().and_then(|m| m.working_change) {
+            Some(id) => ChangeRef::Id(id),
+            None => match repo.trunk_head().await? {
+                Some((_, head)) => ChangeRef::Version(head),
+                None => return Err(CliError::usage("trunk is empty; pass a change id")),
+            },
+        },
+    };
+    let info = target.info(&repo).await?;
     let version = repo.change_version(info.hash).await?;
     let mut value = json::change_version(&version);
     value["info"] = json::change_info(&info);

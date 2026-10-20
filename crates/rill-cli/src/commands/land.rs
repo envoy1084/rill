@@ -5,9 +5,11 @@ use std::time::Duration;
 
 use clap::Args;
 use rill_mcp::json;
-use rill_sdk::VerificationRecord;
+use rill_sdk::{Root, VerificationRecord};
+use rill_types::{ChangeId, RepoPathBuf};
 use serde_json::json as j;
 
+use crate::commands::change::update_checkout;
 use crate::commands::review::change_or_working;
 use crate::commands::seq_arg;
 use crate::context::Ctx;
@@ -26,6 +28,10 @@ pub struct LandArgs {
     /// Seconds to wait with --wait.
     #[arg(long, default_value_t = 300)]
     pub timeout: u64,
+    /// After a successful --wait, leave the checkout where it is instead of
+    /// syncing it to trunk.
+    #[arg(long)]
+    pub no_sync: bool,
 }
 
 /// `rill landings`.
@@ -87,14 +93,33 @@ pub async fn land(ctx: &mut Ctx<'_>, args: LandArgs) -> Result<()> {
         .await_land(&ticket.id, Duration::from_secs(args.timeout))
         .await;
     match progress {
-        Ok(progress) => ctx.emit(json::land_progress(&progress), |out| {
-            out.line(format!(
-                "landed {} as trunk@{} ({})",
-                out.id(&id.to_string()),
-                progress.seq.map(|s| s.get()).unwrap_or_default(),
-                progress.landed_hash.map(|h| short(&h)).unwrap_or_default()
-            ))
-        }),
+        Ok(progress) => {
+            let sync = if args.no_sync {
+                AfterLand::Skipped
+            } else {
+                sync_after_land(ctx, id).await?
+            };
+            let mut value = json::land_progress(&progress);
+            value["synced"] = j!(matches!(sync, AfterLand::Synced { .. }));
+            ctx.emit(value, |out| {
+                out.line(format!(
+                    "landed {} as trunk@{} ({})",
+                    out.id(&id.to_string()),
+                    progress.seq.map(|s| s.get()).unwrap_or_default(),
+                    progress.landed_hash.map(|h| short(&h)).unwrap_or_default()
+                ))?;
+                match &sync {
+                    AfterLand::Synced { conflicts } if conflicts.is_empty() => {
+                        out.line("synced checkout to trunk")
+                    }
+                    AfterLand::Synced { conflicts } => out.line(out.warn(&format!(
+                        "synced checkout to trunk; local edits conflict in {}; edit them, then `rill resolve`",
+                        conflicts.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ")
+                    ))),
+                    AfterLand::Skipped => Ok(()),
+                }
+            })
+        }
         Err(rill_sdk::Error::LandFailed {
             ticket,
             status,
@@ -268,5 +293,28 @@ pub async fn bisect(ctx: &mut Ctx<'_>, args: BisectArgs) -> Result<()> {
             ))?;
         }
         Ok(())
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum AfterLand {
+    Synced { conflicts: Vec<RepoPathBuf> },
+    Skipped,
+}
+
+/// Bring the checkout to trunk after its own working change landed, so the
+/// next change is not based on stale history. Edits made since the last
+/// snapshot are merged exactly as `rill sync` would.
+async fn sync_after_land(ctx: &mut Ctx<'_>, landed: ChangeId) -> Result<AfterLand> {
+    if ctx.find_checkout().is_none() {
+        return Ok(AfterLand::Skipped);
+    }
+    let mut checkout = ctx.checkout().await?;
+    if checkout.meta().working_change != Some(landed) {
+        return Ok(AfterLand::Skipped);
+    }
+    let report = update_checkout(ctx, &mut checkout, &Root::trunk()).await?;
+    Ok(AfterLand::Synced {
+        conflicts: report.conflicts,
     })
 }

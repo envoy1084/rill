@@ -237,20 +237,7 @@ fn print_report(out: &mut Out<'_>, report: &UpdateReport) -> std::io::Result<()>
 pub async fn sync(ctx: &mut Ctx<'_>, args: SyncArgs) -> Result<()> {
     let onto = root_arg(args.onto.as_deref())?;
     let mut checkout = ctx.checkout().await?;
-    if let Some(ws) = checkout.meta().workspace {
-        // Keep the server-side workspace's base in step; a failure here is
-        // not fatal for the local update, so it is logged rather than raised.
-        if let Err(e) = checkout
-            .repo()
-            .workspaces()
-            .update_base(ws, Some(onto.clone()))
-            .await
-        {
-            tracing::warn!(workspace = %ws, error = %e, "workspace base not updated");
-        }
-    }
-    let report = checkout.update(onto.clone()).await?;
-    forget_landed_working_change(ctx, &checkout).await?;
+    let report = update_checkout(ctx, &mut checkout, &onto).await?;
     let base_version = checkout.meta().base_version;
     let conflicts = report.conflicts.clone();
     let mut value = json::update_report(&report);
@@ -284,6 +271,30 @@ pub async fn sync(ctx: &mut Ctx<'_>, args: SyncArgs) -> Result<()> {
             join_paths(&conflicts)
         )))
     }
+}
+
+/// Move the checkout and its server workspace to `onto`, merging local
+/// edits, and forget the working change if it has landed.
+pub(crate) async fn update_checkout(
+    ctx: &mut Ctx<'_>,
+    checkout: &mut Checkout,
+    onto: &Root,
+) -> Result<UpdateReport> {
+    if let Some(ws) = checkout.meta().workspace {
+        // The local update must not fail because the advisory server-side
+        // workspace could not follow, so this is logged rather than raised.
+        if let Err(e) = checkout
+            .repo()
+            .workspaces()
+            .update_base(ws, Some(onto.clone()))
+            .await
+        {
+            tracing::warn!(workspace = %ws, error = %e, "workspace base not updated");
+        }
+    }
+    let report = checkout.update(onto.clone()).await?;
+    forget_landed_working_change(ctx, checkout).await?;
+    Ok(report)
 }
 
 /// Clear the checkout's working change once it has landed, so the next
