@@ -168,9 +168,16 @@ impl Checkout {
         if opts.change_id.is_none() {
             opts.change_id = self.meta.working_change;
         }
+        // The edits are relative to the version the files were materialized
+        // from; a symbolic base like `trunk` would be re-resolved by the
+        // server and silently overwrite anything landed since.
+        let base = match self.meta.base_version {
+            Some(version) => Root::Version(version),
+            None => self.meta.base.clone(),
+        };
         let result = self
             .repo
-            .apply_edits(EditBase::Root(self.meta.base.clone()), edits, opts)
+            .apply_edits(EditBase::Root(base), edits, opts)
             .await?;
         self.meta.working_change = Some(result.version.change_id);
         self.save().await?;
