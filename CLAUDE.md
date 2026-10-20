@@ -8,6 +8,14 @@ in the local, untracked `research/scale-plan/`; v1 gaps are in
 `research/production-readiness/`. When you change behavior, update the page
 that owns it in the same change.
 
+## Development stage
+
+Rill is pre-release. There is no backward compatibility to keep: stored
+formats, the wire protocol and APIs change freely, and old data is
+recreated rather than migrated. Everything stays "v1" (`rill.v1`, schema 1);
+do not introduce v2 names or compatibility shims. The roadmap's "v2" means
+"the next design", not a version label.
+
 ## Structure
 
 * **One concern per file, one topic per folder.** A folder groups related
