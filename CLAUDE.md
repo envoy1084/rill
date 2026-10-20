@@ -102,6 +102,15 @@ behind a `testing` feature.
 
 ## CI
 
-`.github/workflows/ci.yml` runs `cargo fmt --check`, `cargo clippy -D
-warnings` and `cargo test --workspace`. Keep it that small; anything else is
-run locally or added only when it catches real problems.
+`.github/workflows/ci.yml` has two jobs. `check` runs `cargo fmt --check`,
+`cargo clippy -D warnings` and `cargo test --workspace`. `foundationdb`
+installs a pinned FoundationDB (version and package checksums in the job's
+env) and runs the store conformance suite and the end-to-end server test
+with the `fdb` feature. Keep it that small; anything else is run locally or
+added only when it catches real problems.
+
+Locally, with FoundationDB running:
+`cargo test -p rill-store --features fdb,s3` and
+`cargo test -p rill-server --features fdb --test grpc`. Run lint checks as
+`cargo clippy ... -- -D warnings`, not with `RUSTFLAGS`, which rebuilds
+the whole workspace into a second copy.
