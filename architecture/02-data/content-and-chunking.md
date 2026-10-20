@@ -23,7 +23,7 @@ flowchart TD
 | --- | --- | --- |
 | `INLINE_THRESHOLD` | 256 bytes (inline at or below) | `rill-types` `objects/blob.rs` |
 | `CHUNK_THRESHOLD` | 1 MiB (chunked at or above) | `rill-types` `objects/blob.rs` |
-| `CHUNK_MIN` / `CHUNK_AVG` / `CHUNK_MAX` | 16 / 64 / 256 KiB | `rill-core` `blobs.rs` |
+| `CHUNK_MIN` / `CHUNK_AVG` / `CHUNK_MAX` | 16 / 64 / 256 KiB | `rill-core` `blobs/mod.rs` |
 
 `BlobManifest { total_size, chunks: Vec<ChunkRef { hash, size: u32 }> }` is
 `Encodable` and hashed under `BlobManifest`. Chunks and blobs are raw bytes
@@ -54,9 +54,21 @@ Every `put` verifies the hash (see
 exists is a no-op. An edit in the middle of a large file therefore stores
 only the chunks whose boundaries moved.
 
-Producers: the server's `PutBlob` RPC buffers the whole stream, checks the
-announced `size` and optional `expected_hash` (the `Blob`-kind hash of the
-bytes, whatever form is chosen), then calls `store_content`. The SDK's
+`store_content_stream(objects, parts)` does the same for a stream of byte
+parts in bounded memory. It buffers up to `8 × CHUNK_MAX`, runs FastCDC on
+the buffer, and writes every chunk that ends at least `CHUNK_MAX` before the
+buffer's end; such a cut cannot move when more bytes arrive, so the result
+is identical to `store_content` on the whole content (a test checks this).
+The tail is carried into the next round. It hashes the bytes as they pass,
+returns `StoredContent { content, blob_hash, size }`, and fails with
+`Error::Upload` past 5 GiB. Content that ends up under `CHUNK_THRESHOLD`
+falls back to `store_content`. A 1 GiB upload grows resident memory by less
+than 64 MiB (`tests/streaming_memory.rs`).
+
+Producers: the server's `PutBlob` RPC reads the header message, checks
+write permission, streams the rest through `store_content_stream`, then
+checks the announced `size` and optional `expected_hash` (the `Blob`-kind
+hash of the bytes, whatever form is chosen) against the result. The SDK's
 `store_content` inlines at or below `INLINE_THRESHOLD` and otherwise sends
 `PutBlob`, so chunking is always decided on the server. The change builder,
 text merge and patch paths in `rill-core` and `rill-server` call
@@ -77,30 +89,36 @@ inline content must not exceed `MAX_INLINE` (1 MiB).
 | `Chunked` | load the manifest, one `get_many` over all chunks, concatenate, check each chunk against `ChunkRef.size` and the total against `size` | `ObjectNotFound` for manifest or chunk, `ContentSize` |
 
 The invariant readers rely on: `read_content` returns exactly
-`ContentRef::size()` bytes or fails. `BlobReader` is the trait form,
+`ContentRef::size()` bytes or fails. The manifest's `total_size` must equal
+the `ContentRef` size and the chunk sizes must sum to it. Every object read
+is re-hashed by `VerifiedObjectStore`. `BlobReader` is the trait form,
 implemented for `Arc<dyn ObjectStore>`, so merge and blame code can take any
-reader. The `GetBlob` RPC reads the whole content with `read_content`, then
-slices the requested range and streams it.
+reader.
+
+Range reads touch only what they need. `read_content_range(objects,
+content, offset, len)` returns the requested bytes, fetching only the
+chunks that cover them. `content_parts` returns the same range as a
+`'static` stream of parts, reading up to 16 chunks concurrently. `GetBlob`
+streams `content_parts` in 256 KiB messages (`BLOB_CHUNK`), so serving any
+range of any file needs memory for a few chunks, not the file.
 
 ## Limitations
 
-* Content is read and written whole in memory; there is no streaming read
-  or write, and `GetBlob` ranges still load the full file.
+* `read_content` and `store_content` still hold whole content in memory;
+  merge, diff and the SDK use them. Only `PutBlob` and `GetBlob` stream.
 * Chunks are put one at a time, so a large file costs one sequential store
   round-trip per chunk.
-* `read_content` does not re-hash chunk bytes; it trusts the store, which
-  verified on `put`, and checks sizes only. `BlobManifest.total_size` is not
-  checked against `ContentRef` size.
 * A failure part-way through chunking leaves orphan chunks with no manifest;
   nothing removes them.
 * The 256-byte inline rule is a producer convention. The server accepts
   inline content up to `MAX_INLINE` (1 MiB), so equal bytes can appear as
   both `Inline` and `Blob` and only `content_hash()` matches them.
-* The manifest has no per-chunk offsets; random access means summing sizes.
+* The manifest has no per-chunk offsets; a range read sums chunk sizes to
+  find its first chunk.
 
 ## Code
 
-* [rill-core blobs.rs](../../crates/rill-core/src/blobs.rs): `store_content`, `read_content`, `chunk_boundaries`, `BlobReader`
+* [rill-core blobs/](../../crates/rill-core/src/blobs/mod.rs): `store.rs` (`store_content`, `chunk_boundaries`), `stream.rs` (`store_content_stream`), `read.rs` (`read_content`, `read_content_range`, `content_parts`)
 * [rill-types objects/blob.rs](../../crates/rill-types/src/objects/blob.rs): `ContentRef`, `ChunkRef`, `BlobManifest`, thresholds
 * [rill-store object.rs](../../crates/rill-store/src/object.rs): `put_blob`, `get_many`, `verify`
 * [rill-server services/repo/trees.rs](../../crates/rill-server/src/services/repo/trees.rs): `PutBlob`, `GetBlob`, `check_content_exists`, `MAX_INLINE`

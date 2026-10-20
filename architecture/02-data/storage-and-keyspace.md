@@ -27,6 +27,10 @@ flowchart TD
   under `kind` (with `digest_parallel` at 1 MiB and above) and fails with
   `Error::HashMismatch { expected, actual }`. Every backend does this. A put
   of an existing object is a no-op and never overwrites.
+* Reads are verified too. `Stores::new` wraps every object store in
+  `VerifiedObjectStore`, which re-hashes each `get` and `get_many` result
+  and returns `Error::Corrupt { kind, hash }` (gRPC `DATA_LOSS`) on a
+  mismatch, so bit rot or a tampered file is never served.
 * `has_many` and `get_many` default to loops. The local store overrides
   `has_many`; the `object_store` backend overrides both with 16 requests in
   flight.
@@ -75,10 +79,24 @@ a table.
 | `repo` | `repo/<repo-id>` (no repo prefix) | `RepoConfig` record |
 | `repon` | `repon/<name>` (no repo prefix) | repo id |
 
-Change versions themselves live in the object store. Records are framed by
-`encode_record`: version byte `RECORD_VERSION = 1`, then postcard;
-`decode_record` rejects any other version with `Error::Codec`. Records are
-not hashed, so fields can be added with `#[serde(default)]`.
+Change versions themselves live in the object store. A record is framed
+as `[schema u16][tag len u8][tag][postcard]`. Typed records implement
+`Record` (`TAG`, `SCHEMA = 1`) and use `encode_record` / `decode_record`:
+`review`, `workspace`, `operation`, `intent`, `change_info`, `repo`. Other
+values use `encode_tagged(tag, value)` with their storage kind as the tag
+(`signatures`, `land@1`, a derived kind, a misc row name). Decoding checks
+the tag, so a row read as the wrong type fails with `Error::Codec` rather
+than decoding garbage.
+
+`meta/format` holds the store format, `STORE_FORMAT = 1`.
+`Stores::check_format` stamps it on a new store and fails with
+`Error::IncompatibleFormat { found, expected }` on any other value; the
+server calls it at start-up, so a store from an incompatible build is
+refused rather than misread. Since Rill is pre-release, such a store is
+recreated.
+
+`RepoConfig` carries `RepoSettings { windows_safe }`, set at
+`create_repo_with` and read by commit validation.
 
 ## Transaction boundaries
 
@@ -95,7 +113,8 @@ not hashed, so fields can be added with `#[serde(default)]`.
   record encoding.
 * `append_operation` commits `Absent(opi/<op>)`, `AppendLog op/` and the
   `ws/` record, then sets `opi/<op>` in a second write.
-* `put_derived`, `put_signatures`, `put_intent`, `set_misc` are plain sets.
+* `put_derived`, `put_signatures`, `put_intent`, `set_misc` are plain sets;
+  `add_signatures` appends to the existing list.
 * `Stores::create_repo` uses `Absent(repon/<name>)` so names are unique.
 
 ## Backends
@@ -104,9 +123,9 @@ not hashed, so fields can be added with `#[serde(default)]`.
 | --- | --- | --- |
 | `MemoryObjectStore` | always | `HashMap`, unframed bytes; reference semantics |
 | `MemoryMetaStore` | always | `BTreeMap`; `transact` holds the write lock across check and apply |
-| `LocalObjectStore` | `local` (default) | `<root>/<kind>/<hh>/<hex>`, each file a codec frame |
+| `LocalObjectStore` | `local` (default) | `<root>/<namespace>/<kind>/<hh>/<hex>`, each file a codec frame |
 | `RedbMetaStore` | `local` (default) | one redb file, one table `kv`; one `Transaction` is one redb write transaction |
-| `ObjectStoreBackend` | `s3` | `<prefix>/<kind>/<hh>/<hex>` on any `object_store` store (`s3://`, `file://`, `memory://` via `from_url`) |
+| `ObjectStoreBackend` | `s3` | `<prefix>/<namespace>/<kind>/<hh>/<hex>` on any `object_store` store (`s3://`, `file://`, `memory://` via `from_url`) |
 
 `LocalStores::open(dir)` creates `<dir>/objects` and `<dir>/meta.redb`. The
 server's `open_stores` maps `StorageConfig::Memory`, `Local { dir }` and
@@ -118,7 +137,16 @@ The local object store runs all file work on `spawn_blocking`. It writes a
 winner, renames into place and fsyncs the directory, so readers never see a
 partial object. The `object_store` backend writes with `PutMode::Create` and
 treats `AlreadyExists` as success, since the bytes are identical by
-construction; it relies on the service honouring conditional create.
+construction. At start-up `probe` creates one probe object twice: if the
+second create also succeeds, the service ignores conditional puts and the
+server refuses to start unless `allow_unconditional_put` is set, in which
+case the backend falls back to check-then-put (`PutStrategy::CheckThenPut`).
+
+Object paths include a namespace, `DEFAULT_NAMESPACE = "default"`, the
+seam for per-tenant isolation. Both persistent backends pass each frame
+through a `Sealer` (`seal` on write, `open` on read); the default
+`Plaintext` sealer is the identity, and an encrypting sealer can be
+plugged in without touching the layout.
 
 ## Codec
 
@@ -141,11 +169,12 @@ version or method.
   atomic; a failure between them leaves an unreferenced object.
 * The `object_store` backend is tested only against in-process stores,
   never a real S3 endpoint.
+* Only one namespace is used and no encrypting sealer ships yet.
 
 ## Code
 
 * [lib.rs](../../crates/rill-store/src/lib.rs), [error.rs](../../crates/rill-store/src/error.rs), [object.rs](../../crates/rill-store/src/object.rs), [meta.rs](../../crates/rill-store/src/meta.rs)
-* [keys.rs](../../crates/rill-store/src/keys.rs), [repo.rs](../../crates/rill-store/src/repo.rs), [codec.rs](../../crates/rill-store/src/codec.rs)
+* [keys.rs](../../crates/rill-store/src/keys.rs), [repo.rs](../../crates/rill-store/src/repo.rs), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal.rs](../../crates/rill-store/src/seal.rs)
 * [memory.rs](../../crates/rill-store/src/memory.rs), [local/mod.rs](../../crates/rill-store/src/local/mod.rs), [local/objects.rs](../../crates/rill-store/src/local/objects.rs), [local/meta.rs](../../crates/rill-store/src/local/meta.rs), [s3.rs](../../crates/rill-store/src/s3.rs)
 * [tests/conformance.rs](../../crates/rill-store/tests/conformance.rs): one scenario run against every backend
 * [rill-server state/app.rs](../../crates/rill-server/src/state/app.rs): `open_stores`

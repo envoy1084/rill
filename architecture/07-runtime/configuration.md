@@ -34,6 +34,7 @@ defaults with a comment header that lists every alternative.
 | `listen_grpc` | `127.0.0.1:7420` (`DEFAULT_GRPC_ADDR`) | gRPC API |
 | `listen_http` | `127.0.0.1:7421` (`DEFAULT_HTTP_ADDR`) | object protocol and health |
 | `dev_mode` | `false` | anonymous requests act as `dev`; ReBAC checks pass |
+| `attestation_key` | none | path to an Ed25519 key file the server signs every stored version with; without it a per-process key is generated (warned outside dev mode). Its public half is in `Health` |
 | `[storage] kind` | `memory` | backend, see below |
 | `[auth] kind` | `static` with no tokens | token scheme, see below |
 | `[lander]` | `LandPolicy::default()` | verify mode per risk class, `max_wait`, `batch_window`, `auto_revert`, `revert_grace`, `max_retries` |
@@ -55,7 +56,7 @@ this file. They are stored in the repository and set with `SetPolicy`
 | --- | --- | --- | --- |
 | `memory` | none | in memory | in memory, lost on exit |
 | `local` | `dir` | files under `dir` (`LocalStores::open`) | redb file in `dir` |
-| `s3` | `url`, `prefix`, `meta_dir` | `ObjectStoreBackend::from_url` (for example `s3://bucket`) | redb file `LocalStores::META_FILE` in `meta_dir`, created if missing |
+| `s3` | `url`, `prefix`, `meta_dir`, `allow_unconditional_put` | `ObjectStoreBackend::from_url` (for example `s3://bucket`) | redb file `LocalStores::META_FILE` in `meta_dir`, created if missing |
 
 See [storage and keyspace](../02-data/storage-and-keyspace.md) for what the
 stores hold.
@@ -83,6 +84,7 @@ server always trusts its own issuer, whatever the mode. See
 | `RILL_DEV_MODE` | boolean (`1/0`, `true/false`, `yes/no`, `on/off`) |
 | `RILL_STORAGE` | `memory`, `local:<dir>` or `s3:<url>` |
 | `RILL_S3_PREFIX`, `RILL_S3_META_DIR` | details for `s3:`; `RILL_S3_META_DIR` is required with it |
+| `RILL_S3_ALLOW_UNCONDITIONAL_PUT` | boolean; start even when the service ignores conditional puts (see [storage](../02-data/storage-and-keyspace.md#backends)) |
 | `RILL_STATIC_TOKENS` | `token=name[:kind[:team,team]];...`; replaces auth with that static list |
 | `RILL_ROOT_PUBLIC_KEY`, `RILL_ROOT_PRIVATE_KEY` | hex keys; switch auth to `biscuit` |
 | `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED` | booleans |
@@ -115,6 +117,7 @@ startup. In dev mode:
 * Some fields have no environment variable: `lander`, `risk`, `labels`,
   `verify.network`, `postland.batch_size`. They are set only in the file.
 * Configuration is read once at startup. There is no reload.
+* `attestation_key` has no environment variable.
 
 ## Code
 

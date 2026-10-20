@@ -67,6 +67,15 @@ round trips in `src/convert/roundtrip_tests.rs`.
   delete-versus-modify conflicts as data (`rill-core/tests/workflow.rs`);
   criss-cross merges against a virtual base (`criss_cross.rs`); subtree
   operations surviving rebase without clobbering (`rebase.rs`).
+- **Formats and limits**: golden fixtures pin the bytes of every encoded
+  object (`rill-types/tests/golden.rs`); every store backend refuses a
+  store with another format marker (`rill-store/tests/conformance.rs`); a
+  flipped byte on disk is reported as corrupt; a blob-stored symlink that
+  escapes the repository is rejected and an existing case collision does
+  not block unrelated edits (`rill-core/tests/validation.rs`).
+- **Content**: streamed storage equals whole-content storage; a 4 KiB range
+  read touches at most two chunks; a 1 GiB upload grows memory by less than
+  64 MiB (`rill-core/tests/streaming_memory.rs`).
 - **Landing from a checkout**: a stale change conflicts at landing and is
   reported as such, markers are refused by `resolve`, and the checkout
   syncs after landing (`rill-cli/tests/landing.rs`).
@@ -90,6 +99,9 @@ round trips in `src/convert/roundtrip_tests.rs`.
   submit, vote, land, log, diff, grep, object `GET` with `ETag`, a malformed
   object path (400), `/healthz`, `WhoAmI`, `Health` and `AddRelation`.
   `static_auth_denies_unrelated_principal` checks `PERMISSION_DENIED`.
+  `commits_enforce_path_rules` and
+  `server_stamps_authorship_and_attests_commits` cover path rules, spoofed
+  authorship and attestations.
 - **CLI**: `create_checkout_land_and_sync` and
   `conflicting_sync_exits_three` check exit codes and `--json` output.
   `parse.rs` parses every command group without a server.
@@ -140,7 +152,9 @@ libFuzzer) with four targets for code that parses untrusted bytes:
 | `decode_objects` | `ChangeVersion`, `Tree` and `BlobManifest` decoding never panics; decoded values survive re-encoding |
 | `conflict_markers` | Marker parsing never panics; parsed output re-materializes stably |
 | `apply_patch` | Applying an arbitrary patch to arbitrary content never panics or grows unboundedly |
-| `repo_path` | Accepted paths have no empty, `.`, `..`, `\` or NUL components and round-trip |
+| `repo_path` | Accepted paths have no empty, `.`, `..`, `\` or control-character components, are NFC, and round-trip |
+| `symlink_target` | An accepted symlink target never resolves above the repository root |
+| `records` | Record decoding never panics; decoded records re-encode to the same value |
 
 ```
 cd fuzz && cargo +nightly fuzz run decode_objects -- -max_total_time=600

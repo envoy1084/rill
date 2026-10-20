@@ -43,7 +43,11 @@ than a model of it.
 `FaultyMetaStore` and `FaultyObjectStore` wrap the memory stores. A write
 can fail with no effect, or take effect and still report failure (a lost
 acknowledgement, as when a process dies after committing). Reads can fail
-at a quarter of the write rate.
+at a quarter of the write rate, and an object read can return corrupted
+bytes (first byte flipped), which `VerifiedObjectStore` must catch.
+Actors treat store errors, injected faults and failed hash checks as
+environmental, so a corrupt read retries instead of counting as a content
+failure.
 
 Each decision is a hash of the seed, the operation, the keys it touches
 and how often that same operation has run. It is not a draw from a shared
@@ -78,7 +82,7 @@ change ids explicitly. A run's `digest` hashes every action and outcome, and
 | --- | --- | --- |
 | `clean` | none | every invariant |
 | `contended` | none; 16 agents, 70% of edits on the hot file | every invariant |
-| `faulty` | 3% failed writes, 2% lost acknowledgements, 2% restarts | only known issues |
+| `faulty` | 3% failed writes, 2% lost acknowledgements, 1% corrupt reads, 2% restarts | only known issues |
 
 `known.rs` lists the violations the current code produces under faults,
 with the roadmap phase whose redesign removes each:

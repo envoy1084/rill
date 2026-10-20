@@ -48,17 +48,17 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | T1 | Tokens sniffed on the wire | No TLS on either listener; the SDK cannot dial `https` | TLS everywhere, mTLS between services | 8 |
 | T2 | Repository writer runs code on the server | `.rill/verify.toml` steps run as host processes with the server's user and network when verification is enabled | Sandboxed remote execution; refuse unsandboxed outside dev | 15 |
-| T3 | Checkout writes outside its directory | Materialization follows symlinks and writes in path order | Server-side symlink validation; `O_NOFOLLOW` writes on clients | 3, 20 |
-| T4 | Repository content rewrites client state | A file at `.rill/checkout.toml` overwrites the client's endpoint and state | Client state outside the working tree; reserved paths rejected at commit | 3, 20 |
+| T3 | Checkout writes outside its directory | Server side fixed: every commit rejects symlink targets that are absolute or climb above the root, inline or blob-stored. Clients still follow symlinks when writing | `O_NOFOLLOW` writes on clients | 20 |
+| T4 | Repository content rewrites client state | Server side fixed: `.rill/checkout.toml` and `.rill/manifest.toml` cannot be committed, copied into or targeted by a symlink. Client state still lives in the working tree | Client state outside the working tree | 20 |
 | T5 | Reader of one directory reads another | `GetTree`, `GetBlob` and the object routes check only repository-level read; any object is fetchable by hash | Signed read grants checked at every tier | 11 |
 | T6 | Path-scoped token searches everything | `Grep` performs no path permit | Permit on every read RPC, generated permission matrix | 11 |
 | T7 | Writer edits paths they cannot write | `CreateChangeVersion` checks `file_changes` only; a version made only of `subtree_changes` gets no path check | All write checks inside the commit transaction | 11 |
-| T8 | Spoofed authorship | `CreateChangeVersion` stores client-supplied `author` and `provenance`; risk rules read `author_kind` and `resolved_by` from them | Server-assigned author, time and sponsor; client claims recorded as claims | 3 |
+| T8 | Spoofed authorship | Fixed: the server stamps `author` and `created_at`, drops client `sponsor` and `resolved_by`, and signs an attestation for every version it stores | — | — |
 | T9 | Impersonation through token issuance | A repository owner can issue a token for any principal name | Issuance bound to the caller; agent registry with sponsors | 10 |
 | T10 | Leaked token stays valid | No revocation; no maximum TTL; ephemeral issuer key by default | Revocation list, max TTLs, KMS-backed keys | 10 |
 | T11 | Agent approves its own swarm's work | Votes from any agent count toward agent quorums | Independence rules (session, sponsor, model) in policy facts | 23 |
 | T12 | Compromised model or session lands bad code at scale | No way to find or revert by provenance | Kill switch and blast-radius revert by provenance | 10, 18 |
-| T13 | Memory exhaustion by one request | No size limits on `PutBlob` streams or message sizes; `Chunked { size: u64::MAX }` allocates on read | Input limits on every RPC; streaming with caps | 3, 12 |
+| T13 | Memory exhaustion by one request | Partly fixed: `PutBlob` streams in bounded memory with a 5 GiB cap, chunked reads check manifest sizes, change versions are capped at 8 MiB and 100k paths. Other RPCs have no message-size limits | Input limits on every RPC | 12 |
 | T14 | Repository open to everyone | A repository with no relation tuples is readable and writable by every authenticated principal | Explicit open flag; refuse removing the last owner | 11 |
 | T15 | Secret committed to history | Nothing detects it; nothing can remove it | Secret scanning on ingest; audited redaction | 12 |
 | T16 | Silent tampering by an admin | No audit log | Hash-chained audit log exported off-system | 12 |

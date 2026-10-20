@@ -62,23 +62,30 @@ each `Set` (inline, single blob or chunked; see
 
 ## Validation
 
-The builder checks path syntax only. The server's `commit_version` does the
-rest before storing:
+`build` runs `validate_version` with default rules: the change limits,
+reserved paths and symlink targets from
+[objects and ids](../02-data/objects-and-ids.md#change-limits). The
+server's `commit_version` runs it again with the repository's rules
+(adding Windows names when `windows_safe` is set), then the checks below,
+before storing:
 
 | Check | Error |
 | --- | --- |
 | Every parent and the predecessor exist | precondition |
 | No `file_changes` key is the root path | invalid argument |
 | Every `Set` content is in the object store | from `check_content_exists` |
-| The root tree materialises | `RootTree` is derived right after `put_change_version`, so a bad change fails the request |
+| A `copy_from` source exists in its version | invalid argument |
+| The root tree materialises, with no added name differing only in case from a sibling | `RootTree` is derived right after `put_change_version`, so a bad change fails the request |
 
-`ChangeBuilder::commit` performs none of these checks. Tests and tools that
-trust their input use it.
+`ChangeBuilder::commit` performs only the `build` checks. Tests and tools
+that trust their input use it.
 
 ## Provenance and signing
 
 `Provenance` is a plain field. The builder stores what the caller passes and
-it is hashed with the rest of the version. The builder has no signing hook.
+it is hashed with the rest of the version; through the server, `author`,
+`created_at`, `sponsor` and `resolved_by` are replaced before hashing. The
+builder has no signing hook.
 Signatures are separate objects over the version hash, produced by
 `rill-policy` and stored with `RepoStore::put_signatures`. Signing never
 changes a version's hash. See [signing](../05-policy/signing.md).
@@ -96,7 +103,7 @@ or `Error::Join` (the chunking task).
 - `extra` cannot be set through the builder.
 - `copy_from` on `FileChange::Set` has no setter; it can only be passed in
   through `change(..)`.
-- No validation beyond path syntax: an unknown parent or a root-path edit
+- `build` does not check parents: an unknown parent or a root-path edit
   builds successfully.
 - The builder reads nothing. To modify the parent's content at a path, the
   caller must fetch it first.
@@ -105,7 +112,7 @@ or `Error::Join` (the chunking task).
 ## Code
 
 - [builder.rs](../../crates/rill-core/src/builder.rs)
-- [blobs.rs](../../crates/rill-core/src/blobs.rs)
+- [blobs/](../../crates/rill-core/src/blobs/mod.rs), [validate.rs](../../crates/rill-core/src/validate.rs)
 - [rill-types objects/change.rs](../../crates/rill-types/src/objects/change.rs)
 - [rill-server services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs)
 
