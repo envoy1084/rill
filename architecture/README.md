@@ -4,6 +4,11 @@ Technical knowledge base for Rill's current implementation. Start with the
 [system model](system.md), then follow the boundary relevant to your work.
 Source, protobuf definitions and tests remain authoritative.
 
+These pages describe v1. Rill is being rebuilt as v2 following the
+[scale plan](../research/scale-plan/index.md); the fixed design decisions are
+in [decisions/](decisions/README.md). When a v2 component replaces a v1 one,
+its page here is rewritten in the same change.
+
 ## Data
 
 - [Objects](data/objects.md): ids, hashing, blobs, trees, change versions, refs, records.

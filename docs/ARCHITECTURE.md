@@ -64,3 +64,5 @@ on axum. The library crates (`core`, `policy`, `review`, `lander`, `exec`,
 | Who may do what | [identity](../architecture/policy/identity-and-authentication.md), [permissions](../architecture/policy/permissions.md), [submit policy](../architecture/policy/submit-policy.md) |
 | How the server is put together | [server](../architecture/runtime/server.md), [protocol](../architecture/runtime/protocol.md) |
 | What is missing before production | [research](../research/production-readiness/index.md) |
+| Which design decisions are fixed for v2 | [decisions](../architecture/decisions/README.md) |
+| What v2 looks like and in which order it is built | [scale plan](../research/scale-plan/index.md) |
