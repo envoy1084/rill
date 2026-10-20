@@ -387,6 +387,9 @@ impl AdminService for AdminSvc {
                 ok: components.iter().all(|c| c.ok),
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 components,
+                attestation_key: rill_policy::KeyFile::encode_public(
+                    &self.state.attestor.public_key(),
+                ),
             }))
         }
         .await;

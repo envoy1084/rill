@@ -331,6 +331,17 @@ impl RepoStore {
             .await
     }
 
+    /// Append signatures to the ones already stored for `hash`.
+    pub async fn add_signatures(
+        &self,
+        hash: &ChangeVersionHash,
+        signatures: &[Signature],
+    ) -> Result<()> {
+        let mut all = self.get_signatures(hash).await?;
+        all.extend_from_slice(signatures);
+        self.put_signatures(hash, &all).await
+    }
+
     pub async fn get_signatures(&self, hash: &ChangeVersionHash) -> Result<Vec<Signature>> {
         match self.meta().get(&keys::signatures(&self.id, hash)).await? {
             Some(bytes) => decode_tagged("signatures", &bytes),

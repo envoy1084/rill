@@ -26,10 +26,15 @@ impl RepoSvc {
     ) -> Result<pb::CreateChangeVersionResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
-        let cv = ChangeVersion::try_from(
+        let mut cv = ChangeVersion::try_from(
             req.version
                 .ok_or_else(|| Error::invalid("version is required"))?,
         )?;
+        // Authorship and time are facts the server observes, never claims a
+        // client makes; the hash is computed over the stamped values.
+        cv.author = opened.principal().clone();
+        cv.created_at = Timestamp::now();
+        common::clear_server_fields(&mut cv.provenance);
         for path in cv.file_changes.keys() {
             opened.permit().write(path).await?;
         }
@@ -43,7 +48,7 @@ impl RepoSvc {
             .collect::<std::result::Result<Vec<_>, _>>()?;
         let (hash, _) = commit_version(&opened, cv).await?;
         if !signatures.is_empty() {
-            opened.repo.repo.put_signatures(&hash, &signatures).await?;
+            opened.repo.repo.add_signatures(&hash, &signatures).await?;
         }
         Ok(pb::CreateChangeVersionResponse {
             hash: hash_to_proto(&hash),
@@ -336,11 +341,21 @@ pub async fn commit_version(
         if path.is_root() {
             return Err(Error::invalid("file change at the repository root"));
         }
-        if let FileChange::Set { content, .. } = change {
+        if let FileChange::Set {
+            content, copy_from, ..
+        } = change
+        {
             check_content_exists(ctx.repo.objects().as_ref(), content).await?;
+            if let Some(source) = copy_from {
+                check_copy_source(ctx, source).await?;
+            }
         }
     }
     let hash = ctx.repo.put_change_version(&cv).await?;
+    let attestation = ctx
+        .attestor
+        .sign(&hash, &rill_types::Principal::service("rill-server"));
+    ctx.repo.add_signatures(&hash, &[attestation]).await?;
     // Materialise the root tree now so a bad change fails the request
     // rather than a later read.
     ctx.derive.get::<rill_core::RootTree>(&hash).await?;
@@ -389,5 +404,29 @@ pub fn version_from_diff(
         message,
         created_at: Timestamp::now(),
         extra: BTreeMap::new(),
+    }
+}
+
+/// A copy source must name a file that exists in the version it cites.
+async fn check_copy_source(
+    ctx: &crate::state::RepoContext,
+    source: &rill_types::objects::change::CopySource,
+) -> Result<()> {
+    let missing = || {
+        Error::precondition(format!(
+            "copy source {} does not exist in {}",
+            source.path, source.version
+        ))
+    };
+    if !ctx.repo.has_change_version(&source.version).await? {
+        return Err(missing());
+    }
+    let root = ctx
+        .derive
+        .get::<rill_core::RootTree>(&source.version)
+        .await?;
+    match ctx.trees.lookup(root, &source.path).await? {
+        Some(rill_types::EntryKind::File { .. }) => Ok(()),
+        _ => Err(missing()),
     }
 }

@@ -23,6 +23,8 @@ pub struct AppState {
     pub repos: RepoRegistry,
     /// Signs capability tokens handed out by `IssueToken`.
     pub issuer: Arc<Issuer>,
+    /// Signs commit attestations.
+    pub attestor: Arc<rill_policy::Signer>,
     /// Cancelled when the server is shutting down; workers watch it.
     pub shutdown: CancellationToken,
     /// Process start time, for health reporting.
@@ -46,13 +48,20 @@ impl AppState {
         let config = Arc::new(config);
         let issuer = Arc::new(auth::build_issuer(&config.auth)?);
         let auth = auth::build_authenticator(&config.auth, &issuer)?;
-        let repos = RepoRegistry::new(stores.clone(), config.clone(), shutdown.clone());
+        let attestor = Arc::new(load_attestor(&config)?);
+        let repos = RepoRegistry::new(
+            stores.clone(),
+            config.clone(),
+            attestor.clone(),
+            shutdown.clone(),
+        );
         Ok(Arc::new(AppState {
             stores,
             config,
             auth,
             repos,
             issuer,
+            attestor,
             shutdown,
             started_at: std::time::Instant::now(),
         }))
@@ -87,6 +96,26 @@ async fn open_backends(storage: &StorageConfig) -> Result<Stores> {
                 .map_err(|e| Error::Config(format!("creating {}: {e}", meta_dir.display())))?;
             let meta = rill_store::RedbMetaStore::open(meta_path).await?;
             Ok(Stores::new(Arc::new(objects), Arc::new(meta)))
+        }
+    }
+}
+
+/// The key commit attestations are signed with.
+fn load_attestor(config: &ServerConfig) -> Result<rill_policy::Signer> {
+    match &config.attestation_key {
+        Some(path) => {
+            let contents = std::fs::read_to_string(path)
+                .map_err(|e| Error::Config(format!("reading {}: {e}", path.display())))?;
+            rill_policy::KeyFile::decode(contents.trim())
+                .map_err(|e| Error::Config(format!("{}: {e}", path.display())))
+        }
+        None => {
+            if !config.dev_mode {
+                tracing::warn!(
+                    "no attestation_key configured; commit attestations use a per-process key"
+                );
+            }
+            Ok(rill_policy::Signer::generate())
         }
     }
 }

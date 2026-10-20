@@ -160,11 +160,22 @@ pub fn operation_id(bytes: &[u8]) -> Result<OperationId> {
 }
 
 /// Decode an optional provenance message.
+/// Client-supplied provenance, with the fields only the server may set
+/// cleared: `sponsor` and `resolved_by` feed risk and submit policy, so a
+/// client claiming them could lower its own review bar.
 pub fn provenance(value: Option<pb::Provenance>) -> Result<Provenance> {
-    match value {
-        Some(p) => Ok(Provenance::try_from(p)?),
-        None => Ok(Provenance::default()),
-    }
+    let mut provenance = match value {
+        Some(p) => Provenance::try_from(p)?,
+        None => Provenance::default(),
+    };
+    clear_server_fields(&mut provenance);
+    Ok(provenance)
+}
+
+/// Clear the provenance fields only the server may set.
+pub fn clear_server_fields(provenance: &mut Provenance) {
+    provenance.sponsor = None;
+    provenance.resolved_by = None;
 }
 
 /// The wire record for a repository.

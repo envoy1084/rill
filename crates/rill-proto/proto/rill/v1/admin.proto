@@ -109,4 +109,6 @@ message HealthResponse {
   bool ok = 1;
   string version = 2;
   repeated ComponentHealth components = 3;
+  // Hex Ed25519 public key commit attestations are signed with.
+  string attestation_key = 4;
 }

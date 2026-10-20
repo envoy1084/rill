@@ -76,6 +76,8 @@ pub struct RepoContext {
     review: Arc<ArcSwap<ReviewService>>,
     review_events: broadcast::Sender<ReviewEvent>,
     server_config: Arc<ServerConfig>,
+    /// Signs an attestation for every committed version.
+    pub attestor: Arc<rill_policy::Signer>,
 }
 
 impl RepoContext {
@@ -167,6 +169,7 @@ async fn build_review(
 pub struct RepoRegistry {
     stores: Stores,
     config: Arc<ServerConfig>,
+    attestor: Arc<rill_policy::Signer>,
     contexts: DashMap<RepoId, Arc<RepoContext>>,
     build_lock: tokio::sync::Mutex<()>,
     shutdown: CancellationToken,
@@ -175,10 +178,16 @@ pub struct RepoRegistry {
 impl RepoRegistry {
     /// A registry over `stores`. Workers spawned for a context stop when
     /// `shutdown` is cancelled.
-    pub fn new(stores: Stores, config: Arc<ServerConfig>, shutdown: CancellationToken) -> Self {
+    pub fn new(
+        stores: Stores,
+        config: Arc<ServerConfig>,
+        attestor: Arc<rill_policy::Signer>,
+        shutdown: CancellationToken,
+    ) -> Self {
         RepoRegistry {
             stores,
             config,
+            attestor,
             contexts: DashMap::new(),
             build_lock: tokio::sync::Mutex::new(()),
             shutdown,
@@ -328,6 +337,7 @@ impl RepoRegistry {
             review,
             review_events,
             server_config: self.config.clone(),
+            attestor: self.attestor.clone(),
         })
     }
 }

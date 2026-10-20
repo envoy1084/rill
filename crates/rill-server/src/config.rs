@@ -45,6 +45,10 @@ pub struct ServerConfig {
     pub verify: VerifyConfig,
     /// Post-land verification worker.
     pub postland: PostLandConfig,
+    /// File holding the hex Ed25519 seed the server signs commit
+    /// attestations with. Without it a key is generated per process, so
+    /// attestations do not verify across restarts.
+    pub attestation_key: Option<std::path::PathBuf>,
     /// When true, requests without a bearer token act as the `dev` human
     /// principal and every permission check passes. Never enable this on a
     /// server reachable by anyone you do not trust.
@@ -67,6 +71,7 @@ impl Default for ServerConfig {
             labels: LabelSet::default(),
             verify: VerifyConfig::default(),
             postland: PostLandConfig::default(),
+            attestation_key: None,
             dev_mode: false,
         }
     }
