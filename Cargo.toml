@@ -17,6 +17,7 @@ members = [
     "crates/rill-git-import",
     "crates/rill-sim",
     "crates/rill-bench",
+    "crates/rill-load",
 ]
 
 [workspace.package]
