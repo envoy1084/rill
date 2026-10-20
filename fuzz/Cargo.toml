@@ -45,3 +45,17 @@ path = "fuzz_targets/repo_path.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "symlink_target"
+path = "fuzz_targets/symlink_target.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "records"
+path = "fuzz_targets/records.rs"
+test = false
+doc = false
+bench = false
