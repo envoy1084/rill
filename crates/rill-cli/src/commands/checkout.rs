@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use clap::Args;
 use rill_mcp::json;
 use rill_sdk::{Checkout, Root};
-use rill_types::{Encodable, RepoPathBuf, SparseProfile, Tree};
+use rill_types::{RepoPathBuf, SparseProfile, Tree};
 use serde_json::json as j;
 
 use crate::commands::root_arg;
@@ -63,7 +63,7 @@ pub async fn run(ctx: &mut Ctx<'_>, args: CheckoutArgs) -> Result<()> {
                 "the repository is empty: checking it out needs a workspace (drop --no-workspace)",
             ));
         }
-        Root::Tree(Tree::empty().hash())
+        Root::Tree(Tree::empty_hash())
     } else {
         root
     };

@@ -421,11 +421,11 @@ fn tree_roundtrip_through_wire() {
             file_count: 3,
             dir_count: 1,
             total_size: 99,
+            max_depth: 2,
         },
     );
     let back = Tree::try_from(wire(pb::Tree::from(&tree))).unwrap();
     assert_eq!(back, tree);
-    assert_eq!(back.hash(), tree.hash());
 }
 
 #[test]

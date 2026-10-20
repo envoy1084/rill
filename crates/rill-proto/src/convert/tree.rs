@@ -14,6 +14,7 @@ impl From<DirSummary> for pb::DirSummary {
             file_count: s.file_count,
             dir_count: s.dir_count,
             total_size: s.total_size,
+            max_depth: s.max_depth,
         }
     }
 }
@@ -24,6 +25,7 @@ impl From<pb::DirSummary> for DirSummary {
             file_count: s.file_count,
             dir_count: s.dir_count,
             total_size: s.total_size,
+            max_depth: s.max_depth,
         }
     }
 }
@@ -102,7 +104,7 @@ impl TryFrom<pb::Tree> for Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rill_types::{ContentRef, Encodable, FileKind};
+    use rill_types::{ContentRef, FileKind};
 
     #[test]
     fn tree_roundtrip() {
@@ -118,7 +120,7 @@ mod tests {
             FileKind::Executable,
         );
         let mut outer = Tree::empty();
-        outer.insert_dir("src", inner.hash(), inner.summary());
+        outer.insert_dir("src", Tree::empty_hash(), inner.summary());
         outer.insert_file(
             "big",
             ContentRef::Chunked {
@@ -130,7 +132,6 @@ mod tests {
         let wire = pb::Tree::from(&outer);
         let back = Tree::try_from(wire).unwrap();
         assert_eq!(back, outer);
-        assert_eq!(back.hash(), outer.hash());
     }
 
     #[test]

@@ -12,7 +12,7 @@ use rill_types::objects::tree::DirSummary;
 use rill_types::{
     encode_record, BlobManifest, ChangeId, ChangeVersion, ContentRef, Encodable, FileChange,
     FileKind, IntentId, Merge, ObjectHash, Principal, Provenance, RepoId, RepoPathBuf,
-    SparseProfile, Timestamp, Tree, Workspace, WorkspaceId,
+    SparseProfile, Timestamp, Tree, TreeNode, Workspace, WorkspaceId,
 };
 
 fn hash(n: u8) -> ObjectHash {
@@ -87,6 +87,7 @@ fn tree() -> Tree {
             file_count: 2,
             dir_count: 0,
             total_size: 40,
+            max_depth: 0,
         },
     );
     tree
@@ -144,7 +145,7 @@ fn check(name: &str, bytes: &[u8]) {
 #[test]
 fn stored_types_encode_as_pinned() {
     check("change_version", &change_version().encode());
-    check("tree", &tree().encode());
+    check("tree", &TreeNode::Leaf(tree()).encode());
     check("blob_manifest", &manifest().encode());
     check("workspace_record", &encode_record(&workspace()));
 }
@@ -157,7 +158,10 @@ fn pinned_bytes_decode_to_the_canonical_values() {
         ChangeVersion::decode(&read("change_version")).unwrap(),
         change_version()
     );
-    assert_eq!(Tree::decode(&read("tree")).unwrap(), tree());
+    assert_eq!(
+        TreeNode::decode(&read("tree")).unwrap(),
+        TreeNode::Leaf(tree())
+    );
     assert_eq!(
         BlobManifest::decode(&read("blob_manifest")).unwrap(),
         manifest()

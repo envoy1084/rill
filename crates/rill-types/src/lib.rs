@@ -41,7 +41,9 @@ pub use objects::refs::{RefName, RefUpdate, TrunkSeq};
 pub use objects::review::{
     Comment, Label, LabelRange, LabelVote, ReviewState, ReviewStatus, Thread, ThreadAnchor,
 };
-pub use objects::tree::{EntryKind, Tree, TreeEntry, TreeHash};
+pub use objects::tree::{
+    DirSummary, EntryKind, Tree, TreeChild, TreeEntry, TreeHash, TreeNode, SHARD_ENTRIES,
+};
 pub use objects::workspace::{Operation, OperationKind, SparseProfile, Workspace};
 pub use path::{RepoPath, RepoPathBuf};
 pub use principal::{Principal, PrincipalKind};

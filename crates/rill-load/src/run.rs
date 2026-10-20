@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use rill_sdk::{ApplyOptions, Client, ClientConfig, Edit, EditBase, LandStatus, Root};
-use rill_types::{Encodable, FileKind, SparseProfile, Tree};
+use rill_types::{FileKind, SparseProfile, Tree};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
@@ -185,7 +185,7 @@ async fn seed(repo: &rill_sdk::RepoClient) -> anyhow::Result<()> {
     }
     let result = repo
         .apply_edits(
-            EditBase::Root(Root::Tree(Tree::empty().hash())),
+            EditBase::Root(Root::Tree(Tree::empty_hash())),
             edits,
             ApplyOptions::message("seed"),
         )

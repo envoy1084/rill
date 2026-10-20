@@ -4,7 +4,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use rill_types::{BlobManifest, ChangeVersion, Encodable, Tree};
+use rill_types::{BlobManifest, ChangeVersion, Encodable, TreeNode};
 
 fn check<T: Encodable + PartialEq + std::fmt::Debug>(data: &[u8]) {
     if let Ok(value) = T::decode(data) {
@@ -15,6 +15,6 @@ fn check<T: Encodable + PartialEq + std::fmt::Debug>(data: &[u8]) {
 
 fuzz_target!(|data: &[u8]| {
     check::<ChangeVersion>(data);
-    check::<Tree>(data);
+    check::<TreeNode>(data);
     check::<BlobManifest>(data);
 });

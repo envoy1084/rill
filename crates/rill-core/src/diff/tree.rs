@@ -46,17 +46,8 @@ pub async fn diff_trees(
         if b == a {
             continue;
         }
-        let bt = match b {
-            Some(h) => Some(ops.get_tree(&h).await?),
-            None => None,
-        };
-        let at = match a {
-            Some(h) => Some(ops.get_tree(&h).await?),
-            None => None,
-        };
-        let empty = std::collections::BTreeMap::new();
-        let b_entries = bt.as_ref().map_or(&empty, |t| &t.entries);
-        let a_entries = at.as_ref().map_or(&empty, |t| &t.entries);
+        let (bt, at) = ops.differing(b, a).await?;
+        let (b_entries, a_entries) = (&bt.entries, &at.entries);
         let mut names: Vec<&String> = b_entries.keys().chain(a_entries.keys()).collect();
         names.sort();
         names.dedup();

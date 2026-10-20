@@ -169,6 +169,8 @@ message DirSummary {
   uint64 file_count = 1;
   uint64 dir_count = 2;
   uint64 total_size = 3;
+  // Levels of directories below this one; 0 when it holds only files.
+  uint32 max_depth = 4;
 }
 
 // What a directory entry points at.
