@@ -1,11 +1,12 @@
 # Working on Rill
 
-Read `docs/ARCHITECTURE.md` first; the invariants there are not negotiable.
-Fixed design decisions are in `architecture/decisions/` (ADRs); changing one
-needs a new ADR. The knowledge base is `architecture/` (one page per
-boundary, start at `architecture/system.md`). The v2 plan and roadmap are in
-`research/scale-plan/`; v1 gaps are in `research/production-readiness/`.
-When you change behavior, update the page that owns it in the same change.
+Start with `architecture/index.md` (reading order) and
+`architecture/01-overview/principles-and-invariants.md`; the invariants are
+not negotiable. Fixed design decisions are in `architecture/10-decisions/`
+(ADRs); changing one needs a new ADR. The v2 plan, roadmap and progress are
+in the local, untracked `research/scale-plan/`; v1 gaps are in
+`research/production-readiness/`. When you change behavior, update the page
+that owns it in the same change.
 
 ## Structure
 

@@ -29,7 +29,7 @@ importer exists for migrating a git history; that is the whole bridge.
 - Serves trigram code search and symbol lookup from the same object store,
   filtered by what the caller may read.
 
-See the [system model](architecture/system.md) before extending landing,
+See the [system model](architecture/01-overview/system-model.md) before extending landing,
 policy or storage.
 
 ## Quick start
@@ -76,10 +76,10 @@ Rust 2021 workspace; `cargo build --workspace` needs Rust 1.85+ and no `protoc`
 | [rill-mcp](crates/rill-mcp) | MCP server exposing the SDK to agents |
 | [rill-git-import](crates/rill-git-import) | One-way importer from git |
 
-The [architecture knowledge base](architecture/README.md) documents each
+The [architecture knowledge base](architecture/index.md) documents each
 boundary: data model, algorithms, workflow, policy, runtime and integrations.
-[Research](research/README.md) holds the production-readiness analysis and
-design directions.
+The fixed design decisions for v2 are in
+[architecture/10-decisions](architecture/10-decisions/README.md).
 
 ## Running a server
 
@@ -118,8 +118,8 @@ cargo fmt --check
 
 Dev and test profiles use `debug = "line-tables-only"` to keep `target/` near
 9 GB. [CLAUDE.md](CLAUDE.md) states the code conventions and layering rule;
-[development](architecture/engineering/development.md) and
-[testing](architecture/engineering/testing.md) describe the workspace.
+[development](architecture/09-engineering/development.md) and
+[testing](architecture/09-engineering/testing.md) describe the workspace.
 
 ## Status
 
@@ -127,8 +127,8 @@ Version 1. Every crate above is implemented and tested in-process (357 tests).
 Not production-ready: S3 and FoundationDB backends are untested against real
 services, authentication is static tokens or self-issued Biscuits with no
 identity provider, execution is unsandboxed, there is no web UI, no virtual
-filesystem client, and structural merge is a hook. Each gap, why it matters and
-the recommended direction is in
-[research/production-readiness](research/production-readiness/index.md).
+filesystem client, and structural merge is a hook. Rill is being rebuilt as v2
+for large monorepos shared by many agents and humans; the decisions behind it
+are in [architecture/10-decisions](architecture/10-decisions/README.md).
 
 License: Apache-2.0.

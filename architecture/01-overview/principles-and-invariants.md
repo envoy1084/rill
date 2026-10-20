@@ -1,0 +1,129 @@
+# Principles and invariants
+
+This page is the authority for Rill's design principles and its
+non-negotiable invariants. Principles decide trade-offs; invariants are rules
+every change to the code must keep. When a change touches one of them, this
+page and the page that owns the mechanism change together.
+
+## Principles (in priority order)
+
+When two principles conflict, the lower number wins.
+
+1. **The server is the repository.** Clients hold bounded caches; every
+   operation a client can do is an API call that needs no checkout.
+2. **Immutable, content-addressed data everywhere (BLAKE3).** Mutable state
+   is a small set of refs plus append-only logs.
+3. **Cost scales with the change, not the repo.**
+4. **Stable identity (`ChangeId`), mutable content (`ChangeVersion`).**
+5. **Conflicts are data (`Merge<T>` terms), never errors.**
+6. **Intent and provenance are first-class and signed into every change.**
+   `Provenance` and the intent id are fields of the `ChangeVersion`, so they
+   are covered by its hash; Ed25519 signatures over that hash are detached
+   records, stored when the client supplies them.
+7. **Landing is optimistic; verification is continuous** (post-land,
+   bisect, revert).
+8. **Agents are principals** with their own identity, capabilities and
+   budgets.
+9. **Build, test and search share the object store.**
+10. **Humans get the ergonomic surface; agents get the structural one.**
+    Nothing is possible in a UI that is not possible through the API.
+
+## Invariants
+
+```mermaid
+flowchart LR
+  W[write path] --> O[object put: hash verified]
+  O --> M[metadata write: O size of change]
+  M --> T{trunk move?}
+  T -->|only| CAS[RepoStore::land_on_trunk CAS, seq = head + 1]
+  CAS --> L[landing record under process-local lock]
+  L --> E[Landed event -> indexer, post-land]
+```
+
+**Data and storage**
+
+- Every write to the metadata store is O(size of change). The root tree of a
+  version is derived data, never stored in the version: `ChangeVersion`
+  holds only `file_changes` and `subtree_changes` relative to its first
+  parent. See [objects and ids](../02-data/objects-and-ids.md).
+- Objects are verified against their hash on every `put`. Every
+  `ObjectStore` backend (memory, local files, S3) calls `object::verify`
+  before writing and rejects a mismatch with `Error::HashMismatch`.
+- Serde types that go through postcard never use `skip_serializing_if`.
+  (The only uses in the workspace are JSON-RPC types in `rill-mcp`.)
+
+**Merge algebra**
+
+- `Merge::simplify` operates on separate add/remove lists, never on the
+  interleaved vector. Removing a pair from the interleaved vector would
+  shift the parity of the terms between them. See
+  [merge algebra](../02-data/merge-algebra.md).
+- A rebase never fails on content; it may produce a conflicted version.
+  `rill_core::rebase` turns every disagreeing path into a
+  `FileChange::Conflict` and errors only on storage failures. See
+  [rebase](../03-core-algorithms/rebase.md).
+
+**Trunk and landing**
+
+- Trunk moves only by compare-and-swap on the trunk ref, through
+  `RepoStore::land_on_trunk`; sequence numbers are gap-free. One transaction
+  checks the expected head, asserts the next sequence key is absent, and sets
+  the ref, the `seq -> hash` row and the `hash -> seq` row. In the server the
+  lander is the only caller; `RepoService.MoveRef` refuses `trunk`. The git importer
+  also calls `land_on_trunk` directly for imported mainline history. See
+  [landing](../04-workflow/landing.md).
+- One lander per repository per process; landing records are serialised by a
+  process-local lock (`Lander::record_lock`). The landings ring is a
+  read-modify-write, so without the lock concurrent landings would drop
+  entries.
+
+**Crate boundaries**
+
+- The server hot-swaps the `ReviewService` when `SetPolicy` changes the
+  Cedar text: `AdminService.SetPolicy` validates and stores the text, then
+  `RepoContext::reload_policy` rebuilds the service and stores it in an
+  `ArcSwap`. Callers must not hold the returned `Arc` across requests.
+- `rill-review` is the only crate that evaluates `rill-policy::submit`. The
+  server parses and validates policy text (`SubmitPolicy::from_source`) to
+  build the review service, but every `SubmitDecision` comes from
+  `ReviewService::evaluate_for`.
+- `rill-lander` does not depend on `rill-review`; the server adapts the two
+  through `ReviewHooks` (`ReviewHooksAdapter`, which reads the same
+  `ArcSwap`). `rill-exec` reaches the lander the same way, through the
+  `Verifier` trait (`ExecVerifier`).
+- Layering is strict: lower crates never depend on higher ones, no crate
+  below `rill-proto` depends on tonic, and only `rill-server` depends on
+  axum. See [crates and layering](crates-and-layering.md).
+
+**Search**
+
+- Search indexes blobs by hash, so an unchanged blob is never re-indexed.
+  The indexer follows `Landed` events and indexes on demand otherwise
+  (`RepoContext::grep` indexes a root that has no manifest). See
+  [search](../06-services/search.md).
+
+## Limitations
+
+- The O(size of change) rule has one bounded exception: recording a landing
+  rewrites the landings ring, up to `LANDINGS_RING` (1000) entries.
+- The single-lander invariant is a deployment assumption. Nothing stops two
+  processes from opening the same store; the CAS keeps trunk correct, but
+  the landing ring and tickets are not shared.
+- No test or lint enforces the postcard and layering rules mechanically.
+
+## Code
+
+- [Merge::simplify](../../crates/rill-types/src/merge.rs)
+- [ChangeVersion](../../crates/rill-types/src/objects/change.rs)
+- [Object verification](../../crates/rill-store/src/object.rs)
+- [land_on_trunk](../../crates/rill-store/src/repo.rs)
+- [Landing record lock](../../crates/rill-lander/src/land/pipeline.rs)
+- [Lander traits](../../crates/rill-lander/src/traits.rs)
+- [ReviewHooksAdapter](../../crates/rill-server/src/workers/hooks.rs)
+- [Policy hot-swap](../../crates/rill-server/src/state/registry.rs)
+- [SetPolicy handler](../../crates/rill-server/src/services/admin.rs)
+- [Rebase](../../crates/rill-core/src/rebase.rs)
+- [Search index](../../crates/rill-search/src/index/search_index.rs)
+
+---
+← Previous: [System model](system-model.md) · [Index](../index.md) · Next: [Crates and layering](crates-and-layering.md) →
