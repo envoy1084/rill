@@ -25,8 +25,20 @@ impl Lander {
     /// failure becomes a status so the caller's sweep continues.
     pub(super) async fn process(&self, queued: &QueuedRequest) {
         let change_id = queued.request.change_id;
+        // Review refuses when the change is no longer landable: abandoned,
+        // returned to its owner, or already landing through another request.
+        // Landing anyway would bypass review or land the change twice.
         if let Err(e) = self.hooks.mark_landing(change_id).await {
-            tracing::error!(%change_id, error = %e, "mark_landing hook failed");
+            let reason = format!("change is no longer landable: {e}");
+            tracing::warn!(%change_id, ticket = %queued.ticket, reason, "landing refused");
+            self.set_status(
+                queued.ticket,
+                LandStatus::Failed {
+                    reason: reason.clone(),
+                },
+            );
+            self.publish(LandEvent::Failed { change_id, reason });
+            return;
         }
         let mode = queued
             .request

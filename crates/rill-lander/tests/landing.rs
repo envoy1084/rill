@@ -222,6 +222,53 @@ async fn lands_on_empty_trunk() {
     assert!(matches!(status, LandStatus::Failed { .. }));
 }
 
+/// Hooks whose review refuses to move any change to `Landing`.
+struct RefusingHooks;
+
+#[async_trait]
+impl ReviewHooks for RefusingHooks {
+    async fn mark_landing(&self, change: ChangeId) -> rill_lander::Result<()> {
+        Err(rill_lander::Error::Hook(format!("{change} is abandoned")))
+    }
+
+    async fn mark_landed(
+        &self,
+        _change: ChangeId,
+        _seq: TrunkSeq,
+        _version: ChangeVersionHash,
+    ) -> rill_lander::Result<()> {
+        Ok(())
+    }
+
+    async fn return_to_owner(&self, _change: ChangeId, _reason: String) -> rill_lander::Result<()> {
+        Ok(())
+    }
+
+    async fn dependents_of(&self, _change: ChangeId) -> rill_lander::Result<Vec<ChangeId>> {
+        Ok(Vec::new())
+    }
+}
+
+#[tokio::test]
+async fn request_the_review_refuses_does_not_land() {
+    let fx = Fixture::new().await;
+    let lander = fx.lander(
+        Arc::new(RefusingHooks),
+        Arc::new(AlwaysGreen),
+        fast_policy(),
+    );
+    let (_, cv) = fx.commit(None, &[("a.txt", "a")], "init").await;
+    let status = lander
+        .land_now(request(&cv, RiskClass::Normal))
+        .await
+        .unwrap();
+    let LandStatus::Failed { reason } = status else {
+        panic!("expected a refusal, got {status:?}");
+    };
+    assert!(reason.contains("no longer landable"), "{reason}");
+    assert!(fx.repo.trunk_head().await.unwrap().is_none());
+}
+
 #[tokio::test]
 async fn independent_changes_land_in_one_run() {
     let fx = Fixture::new().await;

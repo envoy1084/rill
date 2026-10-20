@@ -60,7 +60,11 @@ the CAS. A request whose touched paths cannot be computed fails at once.
 ## Attempt loop
 
 `process` never returns an error; every outcome becomes a ticket status.
-It calls `hooks.mark_landing` once (an error is logged and ignored), picks
+It first calls `hooks.mark_landing`. If review refuses (the change was
+abandoned or returned after `RequestLand`, or another request for it is
+already landing), the ticket fails with `change is no longer landable`
+and nothing lands; this is what stops a change requested twice from landing
+twice. Otherwise it picks
 the verify mode (`verify_override`, else `LandPolicy.modes` for the
 request's risk), and runs up to `max_retries + 1` attempts with `tip`
 starting at the requested version:
@@ -140,8 +144,10 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 * `VerifyMode::Affected` and `Full` call the same verifier; the mode is not
   passed through.
 * A request keeps the risk class it was enqueued with.
-* A failed `mark_landing` (for example, approvals withdrawn or the change
-  abandoned after `RequestLand`) does not stop the landing.
+* `mark_landing` checks status only. Votes withdrawn after the request
+  while the change stays `Landable` are not re-evaluated against policy.
+* A store failure inside `mark_landing` also refuses the request; the
+  client has to request again.
 * After a failed landing the rebased version stays stored but is not the
   review's current version.
 
