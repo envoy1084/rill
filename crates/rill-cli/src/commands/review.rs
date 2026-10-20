@@ -51,7 +51,7 @@ pub struct ChangeArg {
 /// `rill review list`.
 #[derive(Args, Debug)]
 pub struct ListArgs {
-    /// Only this status (draft, open, landable, landing, landed, abandoned).
+    /// Only this status (open, landable, landing, landed, abandoned).
     #[arg(long)]
     pub status: Option<String>,
     /// Only reviews owned by this principal id.
@@ -132,7 +132,6 @@ pub async fn change_or_working(
 
 fn parse_status(s: &str) -> Result<ReviewStatus> {
     Ok(match s.to_ascii_lowercase().as_str() {
-        "draft" => ReviewStatus::Draft,
         "open" => ReviewStatus::Open,
         "landable" => ReviewStatus::Landable,
         "landing" => ReviewStatus::Landing,

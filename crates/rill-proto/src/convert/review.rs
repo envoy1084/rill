@@ -235,7 +235,6 @@ impl TryFrom<pb::Thread> for Thread {
 impl From<ReviewStatus> for pb::ReviewStatus {
     fn from(s: ReviewStatus) -> Self {
         match s {
-            ReviewStatus::Draft => pb::ReviewStatus::Draft,
             ReviewStatus::Open => pb::ReviewStatus::Open,
             ReviewStatus::Landable => pb::ReviewStatus::Landable,
             ReviewStatus::Landing => pb::ReviewStatus::Landing,
@@ -249,7 +248,6 @@ impl From<ReviewStatus> for pb::ReviewStatus {
 pub fn review_status_from_proto(field: &'static str, value: i32) -> Result<ReviewStatus> {
     let s: pb::ReviewStatus = enum_from_proto(field, value)?;
     match s {
-        pb::ReviewStatus::Draft => Ok(ReviewStatus::Draft),
         pb::ReviewStatus::Open => Ok(ReviewStatus::Open),
         pb::ReviewStatus::Landable => Ok(ReviewStatus::Landable),
         pb::ReviewStatus::Landing => Ok(ReviewStatus::Landing),

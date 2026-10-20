@@ -313,7 +313,8 @@ message Thread {
 
 enum ReviewStatus {
   REVIEW_STATUS_UNSPECIFIED = 0;
-  REVIEW_STATUS_DRAFT = 1;
+  reserved 1;
+  reserved "REVIEW_STATUS_DRAFT";
   REVIEW_STATUS_OPEN = 2;
   REVIEW_STATUS_LANDABLE = 3;
   REVIEW_STATUS_LANDING = 4;

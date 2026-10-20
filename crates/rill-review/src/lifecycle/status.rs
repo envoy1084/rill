@@ -11,11 +11,7 @@ impl ReviewService {
         let state = self
             .transition(
                 change_id,
-                &[
-                    ReviewStatus::Draft,
-                    ReviewStatus::Open,
-                    ReviewStatus::Landable,
-                ],
+                &[ReviewStatus::Open, ReviewStatus::Landable],
                 ReviewStatus::Abandoned,
                 "abandon",
             )

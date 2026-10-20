@@ -89,8 +89,6 @@ for build profiles and features.
 
 - Layering is enforced by review only; there is no `cargo deny` or
   dependency-graph check.
-- `rill-store` carries an optional `fdb` feature for a FoundationDB metadata
-  store that no crate enables.
 
 ## Code
 

@@ -11,8 +11,6 @@ use crate::meta::seq_key;
 
 /// Record tables.
 pub mod table {
-    /// `cv/<repo>/<hash>` → encoded ChangeVersion
-    pub const CHANGE_VERSION: &str = "cv";
     /// `ci/<repo>/<hash>` → encoded ChangeInfo
     pub const CHANGE_INFO: &str = "ci";
     /// `sig/<repo>/<hash>` → encoded Vec<Signature>
@@ -66,14 +64,6 @@ pub fn repo_prefix(table: &str, repo: &RepoId) -> Bytes {
     let mut out = join(&[table.as_bytes(), repo.as_bytes()]).to_vec();
     out.push(b'/');
     Bytes::from(out)
-}
-
-pub fn change_version(repo: &RepoId, hash: &ObjectHash) -> Bytes {
-    join(&[
-        table::CHANGE_VERSION.as_bytes(),
-        repo.as_bytes(),
-        hash.as_bytes(),
-    ])
 }
 
 pub fn change_info(repo: &RepoId, hash: &ObjectHash) -> Bytes {

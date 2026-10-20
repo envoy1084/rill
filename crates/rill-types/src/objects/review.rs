@@ -129,8 +129,6 @@ pub struct Thread {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ReviewStatus {
-    /// Work in progress; not yet submitted for review.
-    Draft,
     Open,
     /// Submit rules pass; eligible for landing.
     Landable,

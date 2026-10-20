@@ -140,7 +140,6 @@ per-repository channel forwarded to the `EventBus` and `WatchReview`.
 * `reopen` exists in `ReviewService` but has no RPC.
 * The version the lander lands (often a rebased one) is not appended to
   `versions`.
-* `ReviewStatus::Draft` exists in the enum but nothing sets it.
 
 ## Code
 

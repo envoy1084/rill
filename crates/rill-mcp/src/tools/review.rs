@@ -16,7 +16,7 @@ pub fn definitions() -> Vec<ToolDef> {
     vec![
         ToolDef {
             name: "rill_submit",
-            description: "Submit a change for review, moving it from draft to open.",
+            description: "Submit a change for review; it starts open, or landable if policy already allows it.",
             input_schema: Props::repo().req("change_id", string("Change id")).build(),
         },
         ToolDef {

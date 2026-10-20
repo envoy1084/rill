@@ -71,7 +71,7 @@ impl ReviewClient {
         Ok(Page::new(items, resp.next_page_token))
     }
 
-    /// Move a change from draft to open.
+    /// Submit a change for review.
     pub async fn submit(&self, change_id: ChangeId) -> Result<ReviewState> {
         self.submit_with_op(OperationId::new(), change_id).await
     }
