@@ -14,9 +14,10 @@ pub type FdbMetaStore = Keyspace<FdbEngine>;
 
 impl Keyspace<FdbEngine> {
     /// Connect through `cluster_file` (the platform default when `None`)
-    /// and keep every key under `root`.
-    pub fn connect(cluster_file: Option<&str>, root: &[u8]) -> Result<Self> {
+    /// and keep every key in the subspace named `root`.
+    pub fn connect(cluster_file: Option<&str>, root: &str) -> Result<Self> {
         let db = open_database(cluster_file)?;
-        Ok(Keyspace::with_engine(FdbEngine::new(db, root)?))
+        let root = foundationdb_tuple::pack(&(root,));
+        Ok(Keyspace::with_engine(FdbEngine::new(db, &root)?))
     }
 }

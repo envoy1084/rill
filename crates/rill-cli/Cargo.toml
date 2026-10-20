@@ -11,6 +11,10 @@ repository.workspace = true
 name = "rill_cli"
 path = "src/lib.rs"
 
+[features]
+# Let `rill-server` keep metadata in FoundationDB.
+fdb = ["rill-server/fdb"]
+
 [[bin]]
 name = "rill"
 path = "src/bin/rill.rs"

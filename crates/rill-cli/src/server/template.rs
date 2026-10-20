@@ -27,7 +27,13 @@ const HEADER: &str = r#"# rill-server configuration.
 #   kind = "s3"
 #   url = "s3://bucket"
 #   prefix = "rill/"
-#   meta_dir = "/var/lib/rill/meta"
+#   meta_dir = "/var/lib/rill/meta"   # not needed with FoundationDB metadata
+#
+# Metadata in FoundationDB (server built with --features fdb):
+#   [metadata]
+#   kind = "fdb"
+#   cluster_file = "/etc/foundationdb/fdb.cluster"   # optional
+#   root = "rill"                                     # subspace name
 #
 # Authentication alternatives:
 #   [auth]

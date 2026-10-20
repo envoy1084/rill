@@ -7,8 +7,9 @@ use rill_store::Stores;
 use tokio_util::sync::CancellationToken;
 
 use super::registry::RepoRegistry;
+use super::stores::open_stores;
 use crate::auth;
-use crate::config::{ServerConfig, StorageConfig};
+use crate::config::ServerConfig;
 use crate::error::{Error, Result};
 
 /// Everything a request handler can reach.
@@ -35,7 +36,7 @@ impl AppState {
     /// Open the configured storage and build the state. Workers are
     /// spawned lazily per repository (or eagerly via [`RepoRegistry::warm`]).
     pub async fn new(config: ServerConfig, shutdown: CancellationToken) -> Result<Arc<Self>> {
-        let stores = open_stores(&config.storage).await?;
+        let stores = open_stores(&config.storage, &config.metadata).await?;
         Self::with_stores(config, stores, shutdown)
     }
 
@@ -70,36 +71,6 @@ impl AppState {
     /// Whether anonymous requests are allowed and everything is permitted.
     pub fn dev_mode(&self) -> bool {
         self.config.dev_mode
-    }
-}
-
-/// Open the stores a [`StorageConfig`] describes.
-pub async fn open_stores(storage: &StorageConfig) -> Result<Stores> {
-    let stores = open_backends(storage).await?;
-    stores.check_format().await?;
-    Ok(stores)
-}
-
-async fn open_backends(storage: &StorageConfig) -> Result<Stores> {
-    match storage {
-        StorageConfig::Memory => Ok(Stores::memory()),
-        StorageConfig::Local { dir } => Ok(rill_store::LocalStores::open(dir).await?),
-        StorageConfig::S3 {
-            url,
-            prefix,
-            meta_dir,
-            allow_unconditional_put,
-        } => {
-            let objects = rill_store::ObjectStoreBackend::from_url(url, prefix)?
-                .probe(*allow_unconditional_put)
-                .await?;
-            let meta_path = meta_dir.join(rill_store::LocalStores::META_FILE);
-            tokio::fs::create_dir_all(meta_dir)
-                .await
-                .map_err(|e| Error::Config(format!("creating {}: {e}", meta_dir.display())))?;
-            let meta = rill_store::RedbMetaStore::open(meta_path).await?;
-            Ok(Stores::new(Arc::new(objects), Arc::new(meta)))
-        }
     }
 }
 

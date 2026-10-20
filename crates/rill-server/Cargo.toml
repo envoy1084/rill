@@ -7,6 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# Keep metadata in FoundationDB. Needs the FoundationDB client library.
+fdb = ["rill-store/fdb"]
+
 [dependencies]
 rill-types = { workspace = true }
 rill-store = { workspace = true, features = ["s3"] }

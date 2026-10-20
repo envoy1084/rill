@@ -93,8 +93,7 @@ async fn fixtures() -> Vec<Fixture> {
     #[cfg(feature = "fdb")]
     {
         let cluster = std::env::var("RILL_FDB_CLUSTER_FILE").ok();
-        let root =
-            foundationdb_tuple::pack(&("rill-test", hex::encode(rill_types::ids::random_id())));
+        let root = format!("rill-test-{}", hex::encode(rill_types::ids::random_id()));
         let fdb = Arc::new(
             rill_store::FdbMetaStore::connect(cluster.as_deref(), &root)
                 .expect("the fdb feature needs a running FoundationDB cluster"),
