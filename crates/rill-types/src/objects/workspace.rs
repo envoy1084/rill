@@ -105,6 +105,14 @@ pub struct Operation {
     pub at: Timestamp,
 }
 
+impl crate::Record for Workspace {
+    const TAG: &'static str = "workspace";
+}
+
+impl crate::Record for Operation {
+    const TAG: &'static str = "operation";
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,12 +128,4 @@ mod tests {
         assert!(!p.contains(&RepoPathBuf::new("docs/x").unwrap()));
         assert!(SparseProfile::full().contains(&RepoPathBuf::new("docs/x").unwrap()));
     }
-}
-
-impl crate::Record for Workspace {
-    const TAG: &'static str = "workspace";
-}
-
-impl crate::Record for Operation {
-    const TAG: &'static str = "operation";
 }

@@ -23,6 +23,8 @@ pub fn invalid_component() -> impl Strategy<Value = String> {
         Just("..".to_string()),
         "[a-z]{0,3}\\\\[a-z]{0,3}",
         "[a-z]{0,3}\0[a-z]{0,3}",
+        "[a-z]{0,3}[\x01-\x1f\x7f][a-z]{0,3}",
+        "[a-z]{256,300}",
     ]
 }
 

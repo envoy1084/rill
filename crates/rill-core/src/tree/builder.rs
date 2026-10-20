@@ -8,10 +8,11 @@ use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
 
+use rill_types::limits::case_key;
 use rill_types::{ContentRef, EntryKind, FileKind, RepoPath, Tree, TreeHash};
 
 use super::ops::TreeOps;
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 /// One edit to apply at a path.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,7 +84,11 @@ fn build_dir(ops: &TreeOps, base: Option<TreeHash>, node: Node) -> BuildFuture<'
             None => Tree::empty(),
         };
         let mut changed = base.is_none();
+        let mut added: Vec<String> = Vec::new();
         for (name, mut child) in node.children {
+            if !tree.entries.contains_key(&name) {
+                added.push(name.clone());
+            }
             if let Some(edit) = child.edit.take() {
                 let before = tree.entries.get(&name).cloned();
                 match edit {
@@ -123,6 +128,7 @@ fn build_dir(ops: &TreeOps, base: Option<TreeHash>, node: Node) -> BuildFuture<'
                 tree.insert_dir(name, hash, subtree.summary());
             }
         }
+        check_case_collisions(&tree, &added)?;
         if !changed {
             // Cannot be None: `changed` starts true when there is no base.
             return Ok((base.expect("unchanged tree has a base"), false));
@@ -130,6 +136,25 @@ fn build_dir(ops: &TreeOps, base: Option<TreeHash>, node: Node) -> BuildFuture<'
         let hash = ops.put_tree(&tree).await?;
         Ok((hash, Some(hash) != base))
     })
+}
+
+/// A name this build added must not collide by case with another entry,
+/// or the directory cannot be checked out on case-insensitive filesystems.
+/// Entries that were already there are left alone.
+fn check_case_collisions(tree: &Tree, added: &[String]) -> Result<()> {
+    for name in added.iter().filter(|n| tree.entries.contains_key(*n)) {
+        let key = case_key(name);
+        if let Some(other) = tree
+            .entries
+            .keys()
+            .find(|other| *other != name && case_key(other) == key)
+        {
+            return Err(Error::InvalidChange(format!(
+                "{name:?} and {other:?} differ only in case"
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

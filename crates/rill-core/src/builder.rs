@@ -12,6 +12,7 @@ use rill_types::{
 
 use crate::blobs::store_content;
 use crate::error::Result;
+use crate::validate::{validate_version, PathRules};
 
 enum Pending {
     Set(Bytes, FileKind),
@@ -149,7 +150,7 @@ impl ChangeBuilder {
             };
             file_changes.insert(path, change);
         }
-        Ok(ChangeVersion {
+        let cv = ChangeVersion {
             change_id: self.change_id,
             parents: self.parents,
             predecessor: self.predecessor,
@@ -161,7 +162,9 @@ impl ChangeBuilder {
             message: self.message,
             created_at: self.created_at,
             extra: BTreeMap::new(),
-        })
+        };
+        validate_version(objects, &cv, PathRules::default()).await?;
+        Ok(cv)
     }
 
     /// Build and store the version in `repo`, returning its hash.

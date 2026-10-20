@@ -140,6 +140,7 @@ impl RepoService for MockRepo {
                 description: Some("mock".into()),
                 created_at: 1,
                 trunk_head_seq: 3,
+                windows_safe: false,
             }),
         }))
     }

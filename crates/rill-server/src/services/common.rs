@@ -176,6 +176,7 @@ pub async fn repo_proto(ctx: &RepoContext) -> Result<pb::Repo> {
         description: (!ctx.config.description.is_empty()).then(|| ctx.config.description.clone()),
         created_at: timestamp_to_proto(ctx.config.created_at),
         trunk_head_seq: head.map(|(s, _)| s.get()).unwrap_or(0),
+        windows_safe: ctx.config.settings.windows_safe,
     })
 }
 

@@ -69,7 +69,13 @@ impl RepoSvc {
         let repo = self
             .state
             .repos
-            .create(&req.repo, req.description.as_deref().unwrap_or(""))
+            .create(
+                &req.repo,
+                req.description.as_deref().unwrap_or(""),
+                rill_store::RepoSettings {
+                    windows_safe: req.windows_safe,
+                },
+            )
             .await?;
         repo.authorizer
             .grant(

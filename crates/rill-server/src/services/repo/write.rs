@@ -314,6 +314,10 @@ pub async fn commit_version(
     cv: ChangeVersion,
 ) -> Result<(ChangeVersionHash, ChangeVersion)> {
     let ctx = &opened.repo;
+    let rules = rill_core::PathRules {
+        windows_safe: ctx.config.settings.windows_safe,
+    };
+    rill_core::validate_version(ctx.repo.objects().as_ref(), &cv, rules).await?;
     for parent in &cv.parents {
         if !ctx.repo.has_change_version(parent).await? {
             return Err(Error::precondition(format!(

@@ -249,6 +249,10 @@ impl ChangeInfo {
     }
 }
 
+impl crate::Record for ChangeInfo {
+    const TAG: &'static str = "change_info";
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,8 +296,4 @@ mod tests {
         b.message.push('!');
         assert_ne!(a.hash(), b.hash());
     }
-}
-
-impl crate::Record for ChangeInfo {
-    const TAG: &'static str = "change_info";
 }

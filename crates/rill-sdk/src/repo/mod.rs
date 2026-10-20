@@ -115,7 +115,7 @@ impl Client {
 
     /// Create a repository.
     pub async fn create_repo(&self, name: &str, description: Option<String>) -> Result<RepoInfo> {
-        self.create_repo_with_op(OperationId::new(), name, description)
+        self.create_repo_with_op(OperationId::new(), name, description, false)
             .await
     }
 
@@ -125,6 +125,7 @@ impl Client {
         op: OperationId,
         name: &str,
         description: Option<String>,
+        windows_safe: bool,
     ) -> Result<RepoInfo> {
         let resp = self
             .repo_svc()
@@ -132,6 +133,7 @@ impl Client {
                 operation_id: id_to_proto(&op),
                 repo: name.to_string(),
                 description,
+                windows_safe,
             })
             .await?
             .into_inner();

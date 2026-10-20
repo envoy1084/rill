@@ -34,6 +34,9 @@ pub struct CreateArgs {
     /// Free-form description.
     #[arg(long)]
     pub description: Option<String>,
+    /// Reject paths Windows cannot create (CON, aux.txt, a:b, ...).
+    #[arg(long)]
+    pub windows_safe: bool,
 }
 
 /// Run a repo subcommand.
@@ -72,7 +75,12 @@ async fn list(ctx: &mut Ctx<'_>, args: ListArgs) -> Result<()> {
 async fn create(ctx: &mut Ctx<'_>, args: CreateArgs) -> Result<()> {
     let repo = ctx
         .client()?
-        .create_repo(&args.name, args.description)
+        .create_repo_with_op(
+            rill_types::OperationId::new(),
+            &args.name,
+            args.description,
+            args.windows_safe,
+        )
         .await?;
     ctx.emit(json::repo_info(&repo), |out| {
         out.line(format!(

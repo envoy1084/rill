@@ -13,6 +13,7 @@ pub mod encoding;
 pub mod error;
 pub mod hash;
 pub mod ids;
+pub mod limits;
 pub mod merge;
 pub mod objects;
 pub mod path;

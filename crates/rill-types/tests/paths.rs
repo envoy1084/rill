@@ -3,6 +3,7 @@
 use proptest::prelude::*;
 use rill_types::testing::{component, invalid_component, path};
 use rill_types::RepoPathBuf;
+use unicode_normalization::UnicodeNormalization;
 
 proptest! {
     #[test]
@@ -24,4 +25,21 @@ proptest! {
         parts.extend(after);
         prop_assert!(RepoPathBuf::new(parts.join("/")).is_err());
     }
+
+    #[test]
+    fn decomposed_spellings_name_the_same_path(p in path()) {
+        let decomposed: String = p.as_str().nfd().collect();
+        prop_assert_eq!(RepoPathBuf::new(decomposed).unwrap(), p);
+    }
+}
+
+#[test]
+fn paths_longer_than_the_limit_are_rejected() {
+    let component = "a".repeat(200);
+    let long = vec![component.as_str(); 21].join("/");
+    assert!(long.len() > 4096);
+    assert!(RepoPathBuf::new(&long).is_err());
+    let mut built = RepoPathBuf::root();
+    let pushed: Result<Vec<()>, _> = (0..21).map(|_| built.push(&component)).collect();
+    assert!(pushed.is_err());
 }

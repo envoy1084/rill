@@ -230,10 +230,15 @@ impl RepoRegistry {
     }
 
     /// Create a repository and build its context.
-    pub async fn create(&self, name: &str, description: &str) -> Result<Arc<RepoContext>> {
+    pub async fn create(
+        &self,
+        name: &str,
+        description: &str,
+        settings: rill_store::RepoSettings,
+    ) -> Result<Arc<RepoContext>> {
         let config = self
             .stores
-            .create_repo(name, description)
+            .create_repo_with(name, description, settings)
             .await
             .map_err(|e| {
                 if e.is_conflict() {

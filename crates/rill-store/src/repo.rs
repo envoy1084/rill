@@ -46,6 +46,14 @@ pub struct RepoConfig {
     pub created_at: Timestamp,
     /// Trunk ref name; always `trunk` today but stored so it can change.
     pub trunk: RefName,
+    pub settings: RepoSettings,
+}
+
+/// Per-repository rules chosen at creation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoSettings {
+    /// Reject paths Windows cannot create.
+    pub windows_safe: bool,
 }
 
 impl Record for RepoConfig {
@@ -112,12 +120,24 @@ impl Stores {
     }
 
     pub async fn create_repo(&self, name: &str, description: &str) -> Result<RepoConfig> {
+        self.create_repo_with(name, description, RepoSettings::default())
+            .await
+    }
+
+    /// [`Stores::create_repo`] with explicit settings.
+    pub async fn create_repo_with(
+        &self,
+        name: &str,
+        description: &str,
+        settings: RepoSettings,
+    ) -> Result<RepoConfig> {
         let config = RepoConfig {
             id: RepoId::new(),
             name: name.to_string(),
             description: description.to_string(),
             created_at: Timestamp::now(),
             trunk: RefName::trunk(),
+            settings,
         };
         let tx = Transaction::new()
             .expect_absent(keys::repo_by_name(name))

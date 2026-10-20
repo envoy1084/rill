@@ -83,6 +83,8 @@ message CreateRepoRequest {
   bytes operation_id = 1;
   string repo = 2;
   optional string description = 3;
+  // Reject paths Windows cannot create.
+  bool windows_safe = 4;
 }
 message CreateRepoResponse {
   Repo repo = 1;

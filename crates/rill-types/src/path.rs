@@ -1,9 +1,11 @@
 //! Repository paths.
 //!
 //! A `RepoPath` is a normalized, `/`-separated, relative path inside a
-//! repository tree. The empty path is the root. Validation rejects `.`, `..`,
-//! empty components, backslashes and NUL so that every path has exactly one
-//! spelling and sorts the same everywhere.
+//! repository tree. The empty path is the root. Paths are NFC-normalized, so
+//! the same name typed on macOS (NFD) and Linux has one spelling, and
+//! validation rejects `.`, `..`, empty components, backslashes, control
+//! characters and over-long names, so every path is safe to materialize on
+//! any common filesystem and sorts the same everywhere.
 
 use std::borrow::Borrow;
 use std::fmt;
@@ -11,8 +13,10 @@ use std::ops::Deref;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use unicode_normalization::{is_nfc, UnicodeNormalization};
 
 use crate::error::{Error, Result};
+use crate::limits::{MAX_COMPONENT_BYTES, MAX_PATH_BYTES};
 
 /// Owned repository path.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -35,11 +39,12 @@ impl RepoPathBuf {
         if trimmed.is_empty() {
             return Ok(Self::root());
         }
-        validate(trimmed).map_err(|reason| Error::InvalidPath {
+        let normalized = nfc(trimmed);
+        validate(&normalized).map_err(|reason| Error::InvalidPath {
             path: raw.to_string(),
             reason,
         })?;
-        Ok(RepoPathBuf(trimmed.to_string()))
+        Ok(RepoPathBuf(normalized))
     }
 
     pub fn as_path(&self) -> &RepoPath {
@@ -51,14 +56,20 @@ impl RepoPathBuf {
     }
 
     pub fn push(&mut self, component: &str) -> Result<()> {
-        validate_component(component).map_err(|reason| Error::InvalidPath {
-            path: component.to_string(),
+        let component = nfc(component);
+        let invalid = |reason| Error::InvalidPath {
+            path: component.clone(),
             reason,
-        })?;
-        if !self.0.is_empty() {
+        };
+        validate_component(&component).map_err(invalid)?;
+        let separator = usize::from(!self.0.is_empty());
+        if self.0.len() + separator + component.len() > MAX_PATH_BYTES {
+            return Err(invalid("path longer than 4096 bytes"));
+        }
+        if separator == 1 {
             self.0.push('/');
         }
-        self.0.push_str(component);
+        self.0.push_str(&component);
         Ok(())
     }
 
@@ -145,7 +156,18 @@ impl RepoPath {
     }
 }
 
+fn nfc(s: &str) -> String {
+    if is_nfc(s) {
+        s.to_string()
+    } else {
+        s.nfc().collect()
+    }
+}
+
 fn validate(path: &str) -> std::result::Result<(), &'static str> {
+    if path.len() > MAX_PATH_BYTES {
+        return Err("path longer than 4096 bytes");
+    }
     for component in path.split('/') {
         validate_component(component)?;
     }
@@ -164,6 +186,12 @@ fn validate_component(component: &str) -> std::result::Result<(), &'static str> 
     }
     if component.contains('\0') {
         return Err("NUL in path");
+    }
+    if component.chars().any(char::is_control) {
+        return Err("control character in path");
+    }
+    if component.len() > MAX_COMPONENT_BYTES {
+        return Err("path component longer than 255 bytes");
     }
     if component.contains('/') {
         return Err("slash in path component");

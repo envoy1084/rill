@@ -14,6 +14,7 @@ pub mod merge;
 pub mod rebase;
 pub mod tree;
 mod util;
+pub mod validate;
 
 pub use blobs::{read_content, store_content, BlobReader};
 pub use builder::ChangeBuilder;
@@ -32,3 +33,4 @@ pub use merge::{
 };
 pub use rebase::rebase;
 pub use tree::{TreeBuilder, TreeOps};
+pub use validate::{validate_version, PathRules};

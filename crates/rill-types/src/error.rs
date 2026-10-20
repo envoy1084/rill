@@ -25,6 +25,9 @@ pub enum Error {
     #[error("object kind mismatch: expected {expected:?}, found {found:?}")]
     KindMismatch { expected: String, found: String },
 
+    #[error("change rejected: {0}")]
+    ChangeRejected(String),
+
     #[error("decode error: {0}")]
     Decode(String),
 

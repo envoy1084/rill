@@ -494,4 +494,6 @@ message Repo {
   optional string description = 3;
   int64 created_at = 4;
   uint64 trunk_head_seq = 5;
+  // Paths Windows cannot create are rejected.
+  bool windows_safe = 6;
 }

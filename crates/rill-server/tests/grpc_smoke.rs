@@ -234,6 +234,7 @@ async fn dev_mode_end_to_end() {
             operation_id: Bytes::new(),
             repo: repo.into(),
             description: Some("smoke".into()),
+            windows_safe: false,
         })
         .await
         .unwrap()
@@ -607,6 +608,7 @@ async fn static_auth_denies_unrelated_principal() {
             operation_id: Bytes::new(),
             repo: "private".into(),
             description: None,
+            windows_safe: false,
         })
         .await
         .unwrap();
@@ -694,4 +696,58 @@ async fn static_auth_denies_unrelated_principal() {
     assert!(raw.starts_with("HTTP/1.1 401"), "{raw}");
 
     server.stop().await;
+}
+
+#[tokio::test]
+async fn commits_enforce_path_rules() {
+    let server = TestServer::start(dev_config()).await;
+    let mut c = clients(&server, None).await;
+    c.repo
+        .create_repo(pb::CreateRepoRequest {
+            operation_id: Bytes::new(),
+            repo: "win".into(),
+            description: None,
+            windows_safe: true,
+        })
+        .await
+        .unwrap();
+    let edit = |path: &'static str| {
+        let mut repo = c.repo.clone();
+        async move {
+            repo.apply_edits(pb::ApplyEditsRequest {
+                operation_id: Bytes::new(),
+                repo: "win".into(),
+                base: None,
+                edits: vec![set_edit(path, b"x\n")],
+                message: path.into(),
+                intent: None,
+                provenance: None,
+                change_id: None,
+            })
+            .await
+        }
+    };
+    assert_eq!(
+        edit("src/CON.txt").await.unwrap_err().code(),
+        Code::InvalidArgument
+    );
+    assert_eq!(
+        edit(".rill/checkout.toml").await.unwrap_err().code(),
+        Code::InvalidArgument
+    );
+    edit("README.md").await.unwrap();
+    let first = c
+        .repo
+        .apply_edits(pb::ApplyEditsRequest {
+            operation_id: Bytes::new(),
+            repo: "win".into(),
+            base: None,
+            edits: vec![set_edit("README.md", b"x\n"), set_edit("readme.md", b"y\n")],
+            message: "case".into(),
+            intent: None,
+            provenance: None,
+            change_id: None,
+        })
+        .await;
+    assert_eq!(first.unwrap_err().code(), Code::InvalidArgument);
 }

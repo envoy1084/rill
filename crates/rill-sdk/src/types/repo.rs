@@ -27,6 +27,8 @@ pub struct RepoInfo {
     pub created_at: Timestamp,
     /// Sequence number of the trunk head.
     pub trunk_head_seq: TrunkSeq,
+    /// Paths Windows cannot create are rejected.
+    pub windows_safe: bool,
 }
 
 impl TryFrom<pb::Repo> for RepoInfo {
@@ -39,6 +41,7 @@ impl TryFrom<pb::Repo> for RepoInfo {
             description: r.description,
             created_at: timestamp_from_proto(r.created_at),
             trunk_head_seq: trunk_seq_from_proto(r.trunk_head_seq),
+            windows_safe: r.windows_safe,
         })
     }
 }
