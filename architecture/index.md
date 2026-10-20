@@ -61,34 +61,35 @@ Read in this order the first time; each page ends with Previous / Next links.
 27. [Risk classification](05-policy/risk-classification.md)
 28. [Submit policy](05-policy/submit-policy.md)
 29. [Signing](05-policy/signing.md)
+30. [Threat model](05-policy/threat-model.md)
 
 **06 Services**
 
-30. [Search](06-services/search.md)
-31. [Exec](06-services/exec.md)
-32. [Git import](06-services/git-import.md)
+31. [Search](06-services/search.md)
+32. [Exec](06-services/exec.md)
+33. [Git import](06-services/git-import.md)
 
 **07 Runtime**
 
-33. [Server](07-runtime/server.md)
-34. [API surface](07-runtime/api-surface.md)
-35. [Events and workers](07-runtime/events-and-workers.md)
-36. [Configuration](07-runtime/configuration.md)
+34. [Server](07-runtime/server.md)
+35. [API surface](07-runtime/api-surface.md)
+36. [Events and workers](07-runtime/events-and-workers.md)
+37. [Configuration](07-runtime/configuration.md)
 
 **08 Clients**
 
-37. [SDK](08-clients/sdk.md)
-38. [CLI](08-clients/cli.md)
-39. [MCP server](08-clients/mcp.md)
+38. [SDK](08-clients/sdk.md)
+39. [CLI](08-clients/cli.md)
+40. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-40. [Development](09-engineering/development.md)
-41. [Testing](09-engineering/testing.md)
+41. [Development](09-engineering/development.md)
+42. [Testing](09-engineering/testing.md)
 
 **10 Decisions**
 
-42. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
+43. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -113,6 +114,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Bisect and automatic revert | [Post-land verification](04-workflow/post-land-verification.md) |
 | Who a caller is and what they may do | [Identity and authentication](05-policy/identity-and-auth.md), [Capability tokens](05-policy/capability-tokens.md), [Permissions](05-policy/permissions.md) |
 | What a change needs before it may land | [Risk classification](05-policy/risk-classification.md), [Submit policy](05-policy/submit-policy.md) |
+| Known threats and which phase closes each | [Threat model](05-policy/threat-model.md) |
 | Code search and symbols | [Search](06-services/search.md) |
 | Pre-land checks and the action cache | [Exec](06-services/exec.md) |
 | How the server is assembled and a request is handled | [Server](07-runtime/server.md) |
