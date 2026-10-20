@@ -36,9 +36,9 @@ impl std::fmt::Debug for Signer {
 impl Signer {
     /// Generate a fresh random keypair.
     pub fn generate() -> Self {
-        Signer {
-            key: SigningKey::generate(&mut rand::rngs::OsRng),
-        }
+        // rand's thread RNG is a CSPRNG seeded from the OS, and a seed is all
+        // an Ed25519 key needs; this avoids coupling to ed25519's rand_core.
+        Signer::from_seed(&rand::random())
     }
 
     /// Build from a 32-byte seed.

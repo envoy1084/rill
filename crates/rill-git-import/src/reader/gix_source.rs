@@ -101,7 +101,7 @@ impl GitSource for GixSource {
     fn resolve(&mut self, head_ref: &str) -> Result<GitSha> {
         let repo = self.repo.to_thread_local();
         if let Ok(mut reference) = repo.find_reference(head_ref) {
-            let id = reference.peel_to_id_in_place().map_err(Error::git)?;
+            let id = reference.peel_to_id().map_err(Error::git)?;
             return Ok(GitSha::new(id.to_hex().to_string()));
         }
         let id = ObjectId::from_hex(head_ref.as_bytes())
@@ -118,15 +118,17 @@ impl GitSource for GixSource {
             .find_commit(id)
             .map_err(|_| Error::CommitNotFound(sha.clone()))?;
         let decoded = commit.decode().map_err(Error::git)?;
-        let committed_at = Timestamp::from_unix_seconds(decoded.committer.seconds());
+        let author = decoded.author().map_err(Error::git)?;
+        let committer = decoded.committer().map_err(Error::git)?;
+        let committed_at = Timestamp::from_unix_seconds(committer.seconds());
         Ok(GitCommit {
             sha: sha.clone(),
             parents: commit
                 .parent_ids()
                 .map(|p| GitSha::new(p.to_hex().to_string()))
                 .collect(),
-            author_name: decoded.author.name.to_str_lossy().into_owned(),
-            author_email: decoded.author.email.to_str_lossy().into_owned(),
+            author_name: author.name.to_str_lossy().into_owned(),
+            author_email: author.email.to_str_lossy().into_owned(),
             committed_at,
             message: decoded.message.to_str_lossy().into_owned(),
         })
@@ -148,8 +150,8 @@ impl GitSource for GixSource {
         };
         let mut recorder = Recorder::default().track_location(Some(Location::Path));
         gix::diff::tree(
-            TreeRefIter::from_bytes(&old_tree),
-            TreeRefIter::from_bytes(&new_tree),
+            TreeRefIter::from_bytes(&old_tree, repo.object_hash()),
+            TreeRefIter::from_bytes(&new_tree, repo.object_hash()),
             State::default(),
             &repo.objects,
             &mut recorder,

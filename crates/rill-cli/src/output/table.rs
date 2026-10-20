@@ -37,7 +37,7 @@ impl Table {
         }
         let mut table = comfy_table::Table::new();
         table
-            .load_preset(presets::NOTHING)
+            .load_style(presets::NOTHING)
             .set_content_arrangement(ContentArrangement::Dynamic);
         if color {
             table.enforce_styling();
