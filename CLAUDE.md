@@ -60,8 +60,9 @@ that owns it in the same change.
 
 ## Commits
 
-* Commit after each meaningful, self-contained change, on a branch (never
-  directly on `main`). The tree builds and tests pass at every commit.
+* Commit after each meaningful, self-contained change, directly on `main`
+  (no feature branches). Do not push unless asked. The tree builds and
+  tests pass at every commit.
 * Message format: `area: what changed` in the imperative
   (`core: honour context lines in unified diff`), with a body when the why
   is not obvious.
