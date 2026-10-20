@@ -126,10 +126,12 @@ characters long, so content is never read as a marker. `materialize_with`
 takes `ConflictLabels` to name sides in headers.
 
 `parse_materialized(bytes) -> Option<Merge<Option<Bytes>>>` is the inverse.
-It takes the marker length from the longest `<` run and returns `None` for
-malformed input: an unterminated conflict, a side count that changes
-between conflicts, an unknown section or a bad line prefix. A file with no
-markers parses as `Merge::resolved`. Auto-merged regions come back as the
+A conflict opens only at a `<` run followed by the ` Conflict ` header that
+`materialize` writes; any other marker-like line, including git-style
+markers, is content. The marker length is the longest such header run. It
+returns `None` for malformed input: an unterminated conflict, a side count
+that changes between conflicts, an unknown section or a bad line prefix. A
+file with no conflict headers parses as `Merge::resolved`. Auto-merged regions come back as the
 same text in every term, an equivalent merge under the algebra that
 re-materialises to identical bytes.
 
