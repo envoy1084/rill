@@ -14,6 +14,8 @@ local = ["dep:redb"]
 # `object_store`-backed object store (S3 and compatible services, plus the
 # local and in-memory stores the crate ships for tests).
 s3 = ["dep:object_store", "dep:url", "dep:futures"]
+# FoundationDB metadata store. Needs the FoundationDB client library.
+fdb = ["dep:foundationdb", "dep:futures"]
 
 [dependencies]
 rill-types = { workspace = true }
@@ -28,6 +30,8 @@ parking_lot = { workspace = true }
 hex = { workspace = true }
 zstd = { workspace = true }
 redb = { workspace = true, optional = true }
+foundationdb = { workspace = true, optional = true }
+foundationdb-tuple = { workspace = true }
 object_store = { workspace = true, optional = true, features = ["aws"] }
 url = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }

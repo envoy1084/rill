@@ -3,14 +3,17 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use parking_lot::RwLock;
 use rill_types::{ObjectHash, ObjectKind};
 
-use crate::error::{Error, Result};
-use crate::meta::{Condition, KeyRange, MetaStore, Mutation, Transaction, TxOutcome};
+use crate::error::Result;
+use crate::keyspace::buffered::{resolve_stamps, stamp_of};
+use crate::keyspace::engine::add_le;
+use crate::keyspace::{Batch, Buffered, Keyspace, Op, RawRange};
 use crate::object::{verify, ObjectStore};
 
 #[derive(Default)]
@@ -49,139 +52,102 @@ impl ObjectStore for MemoryObjectStore {
     }
 }
 
+/// The in-memory engine: a sorted map behind a lock.
 #[derive(Default)]
-pub struct MemoryMetaStore {
+pub struct MemoryBatch {
     data: RwLock<BTreeMap<Bytes, Bytes>>,
+    commits: AtomicU64,
 }
 
-impl MemoryMetaStore {
+/// The in-memory metadata store.
+pub type MemoryMetaStore = Keyspace<Buffered<MemoryBatch>>;
+
+impl Keyspace<Buffered<MemoryBatch>> {
+    /// An empty store.
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn len(&self) -> usize {
-        self.data.read().len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.data.read().is_empty()
+        Keyspace::with_engine(Buffered::new(MemoryBatch::default()))
     }
 }
 
-/// Check conditions against a snapshot; shared by backends that evaluate
-/// transactions in process.
-pub fn check_conditions(
-    conditions: &[Condition],
-    lookup: impl Fn(&[u8]) -> Option<Bytes>,
-) -> Result<()> {
-    for cond in conditions {
-        match cond {
-            Condition::Equals { key, value } => {
-                let current = lookup(key);
-                if &current != value {
-                    return Err(Error::Conflict(format!(
-                        "key {} changed",
-                        String::from_utf8_lossy(key)
-                    )));
-                }
-            }
-            Condition::Absent { key } => {
-                if lookup(key).is_some() {
-                    return Err(Error::Conflict(format!(
-                        "key {} exists",
-                        String::from_utf8_lossy(key)
-                    )));
-                }
-            }
-            Condition::Present { key } => {
-                if lookup(key).is_none() {
-                    return Err(Error::Conflict(format!(
-                        "key {} missing",
-                        String::from_utf8_lossy(key)
-                    )));
-                }
-            }
-        }
+impl Default for Keyspace<Buffered<MemoryBatch>> {
+    fn default() -> Self {
+        Self::new()
     }
-    Ok(())
 }
 
-/// Next sequence number for an append-log prefix given the highest existing
-/// key under that prefix.
-pub fn next_seq(prefix: &[u8], last_key: Option<&[u8]>) -> u64 {
-    match last_key.and_then(|k| crate::meta::seq_from_key(prefix.len(), k)) {
-        Some(last) => last + 1,
-        None => 1,
+/// The rows of `data` in `range`.
+pub fn scan_map(data: &BTreeMap<Bytes, Bytes>, range: &RawRange) -> Vec<(Bytes, Bytes)> {
+    let iter = data.range::<[u8], _>((
+        Bound::Included(range.start.as_ref()),
+        Bound::Excluded(range.end.as_ref()),
+    ));
+    let pair = |(k, v): (&Bytes, &Bytes)| (k.clone(), v.clone());
+    if range.reverse {
+        iter.rev().take(range.limit).map(pair).collect()
+    } else {
+        iter.take(range.limit).map(pair).collect()
     }
 }
 
 #[async_trait]
-impl MetaStore for MemoryMetaStore {
+impl Batch for MemoryBatch {
     async fn get(&self, key: &[u8]) -> Result<Option<Bytes>> {
         Ok(self.data.read().get(key).cloned())
     }
 
-    async fn scan(&self, range: KeyRange) -> Result<Vec<(Bytes, Bytes)>> {
-        let data = self.data.read();
-        let bounds = (
-            match &range.start {
-                Bound::Included(s) => Bound::Included(s.clone()),
-                Bound::Excluded(s) => Bound::Excluded(s.clone()),
-                Bound::Unbounded => Bound::Unbounded,
-            },
-            match &range.end {
-                Bound::Included(e) => Bound::Included(e.clone()),
-                Bound::Excluded(e) => Bound::Excluded(e.clone()),
-                Bound::Unbounded => Bound::Unbounded,
-            },
-        );
-        let iter = data.range::<Bytes, _>(bounds);
-        let out: Vec<(Bytes, Bytes)> = if range.reverse {
-            iter.rev()
-                .take(range.limit)
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect()
-        } else {
-            iter.take(range.limit)
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect()
-        };
-        Ok(out)
+    async fn scan(&self, range: &RawRange) -> Result<Vec<(Bytes, Bytes)>> {
+        if range.start >= range.end {
+            return Ok(Vec::new());
+        }
+        Ok(scan_map(&self.data.read(), range))
     }
 
-    async fn transact(&self, tx: Transaction) -> Result<TxOutcome> {
+    async fn apply(&self, ops: Vec<Op>, stamp: bool) -> Result<Option<[u8; 10]>> {
         let mut data = self.data.write();
-        check_conditions(&tx.conditions, |k| data.get(k).cloned())?;
-        let mut outcome = TxOutcome::default();
-        for m in tx.mutations {
-            match m {
-                Mutation::Set { key, value } => {
-                    data.insert(key, value);
+        let stamp = stamp.then(|| stamp_of(self.commits.load(Ordering::SeqCst) + 1));
+        let ops = resolve_stamps(ops, stamp.as_ref())?;
+        if stamp.is_some() {
+            self.commits.fetch_add(1, Ordering::SeqCst);
+        }
+        for op in ops {
+            match op {
+                Op::Set(k, v) | Op::SetStamped(k, v) => {
+                    data.insert(k, v);
                 }
-                Mutation::Delete { key } => {
-                    data.remove(&key);
+                Op::Clear(k) => {
+                    data.remove(&k);
                 }
-                Mutation::AppendLog { prefix, value } => {
-                    let last = {
-                        let range = KeyRange::prefix(prefix.clone());
-                        let (start, end) = (range.start, range.end);
-                        data.range::<Bytes, _>((start, end))
-                            .next_back()
-                            .map(|(k, _)| k.clone())
-                    };
-                    let seq = next_seq(&prefix, last.as_deref());
-                    data.insert(crate::meta::seq_key(&prefix, seq), value);
-                    outcome.appended.push(seq);
+                Op::ClearRange(start, end) => {
+                    let doomed: Vec<Bytes> = scan_map(
+                        &data,
+                        &RawRange {
+                            start,
+                            end,
+                            limit: usize::MAX,
+                            reverse: false,
+                        },
+                    )
+                    .into_iter()
+                    .map(|(k, _)| k)
+                    .collect();
+                    for k in doomed {
+                        data.remove(&k);
+                    }
+                }
+                Op::Add(k, delta) => {
+                    let sum = add_le(data.get(&k).map(|v| v.as_ref()), delta);
+                    data.insert(k, Bytes::copy_from_slice(&sum));
                 }
             }
         }
-        Ok(outcome)
+        Ok(stamp)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::Error;
 
     #[tokio::test]
     async fn object_store_verifies_hash() {
@@ -201,56 +167,5 @@ mod tests {
             store.put(ObjectKind::Blob, &bad, bytes).await,
             Err(Error::HashMismatch { .. })
         ));
-    }
-
-    #[tokio::test]
-    async fn transactions_are_conditional() {
-        let store = MemoryMetaStore::new();
-        store
-            .transact(Transaction::new().set(&b"a"[..], &b"1"[..]))
-            .await
-            .unwrap();
-        let err = store
-            .transact(
-                Transaction::new()
-                    .expect(&b"a"[..], Some(Bytes::from_static(b"2")))
-                    .set(&b"a"[..], &b"3"[..]),
-            )
-            .await
-            .unwrap_err();
-        assert!(err.is_conflict());
-        store
-            .transact(
-                Transaction::new()
-                    .expect(&b"a"[..], Some(Bytes::from_static(b"1")))
-                    .set(&b"a"[..], &b"3"[..]),
-            )
-            .await
-            .unwrap();
-        assert_eq!(
-            store.get(b"a").await.unwrap(),
-            Some(Bytes::from_static(b"3"))
-        );
-    }
-
-    #[tokio::test]
-    async fn append_log_assigns_sequences() {
-        let store = MemoryMetaStore::new();
-        let out = store
-            .transact(
-                Transaction::new()
-                    .append_log(&b"log/"[..], &b"x"[..])
-                    .append_log(&b"log/"[..], &b"y"[..]),
-            )
-            .await
-            .unwrap();
-        assert_eq!(out.appended, vec![1, 2]);
-        let rows = store.scan(KeyRange::prefix(&b"log/"[..])).await.unwrap();
-        assert_eq!(rows.len(), 2);
-        let rev = store
-            .scan(KeyRange::prefix(&b"log/"[..]).reverse().limit(1))
-            .await
-            .unwrap();
-        assert_eq!(rev[0].1, Bytes::from_static(b"y"));
     }
 }

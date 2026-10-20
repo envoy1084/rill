@@ -18,6 +18,7 @@ pub mod merge;
 pub mod objects;
 pub mod path;
 pub mod principal;
+pub mod stamp;
 #[cfg(feature = "testing")]
 pub mod testing;
 pub mod time;
@@ -44,4 +45,5 @@ pub use objects::tree::{EntryKind, Tree, TreeEntry, TreeHash};
 pub use objects::workspace::{Operation, OperationKind, SparseProfile, Workspace};
 pub use path::{RepoPath, RepoPathBuf};
 pub use principal::{Principal, PrincipalKind};
+pub use stamp::Versionstamp;
 pub use time::Timestamp;

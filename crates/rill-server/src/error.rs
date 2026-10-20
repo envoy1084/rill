@@ -145,7 +145,8 @@ fn store_code(e: &rill_store::Error) -> Code {
         E::HashMismatch { .. } | E::Types(_) => Code::InvalidArgument,
         E::Codec(_) | E::Corrupt { .. } => Code::DataLoss,
         E::IncompatibleFormat { .. } => Code::FailedPrecondition,
-        E::Backend(_) | E::Io(_) => Code::Unavailable,
+        E::TooLarge(_) => Code::ResourceExhausted,
+        E::Backend(_) | E::Io(_) | E::Retryable(_) | E::CommitUnknown(_) => Code::Unavailable,
     }
 }
 

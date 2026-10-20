@@ -38,6 +38,20 @@ pub enum Error {
     )]
     IncompatibleFormat { found: u32, expected: u32 },
 
+    #[error("too large: {0}")]
+    TooLarge(String),
+
+    /// A transient backend failure; the transaction did not commit and is
+    /// retried by the keyspace layer.
+    #[error("retryable backend error: {0}")]
+    Retryable(String),
+
+    /// The commit may or may not have applied (the reply was lost). Not
+    /// retried, because retrying a non-idempotent transaction could apply
+    /// it twice.
+    #[error("commit result unknown: {0}")]
+    CommitUnknown(String),
+
     #[error("backend error: {0}")]
     Backend(String),
 

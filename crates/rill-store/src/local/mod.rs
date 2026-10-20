@@ -9,7 +9,7 @@ mod objects;
 use std::path::Path;
 use std::sync::Arc;
 
-pub use meta::RedbMetaStore;
+pub use meta::{RedbBatch, RedbMetaStore};
 pub use objects::{LocalObjectStore, LocalOptions};
 
 use crate::error::Result;

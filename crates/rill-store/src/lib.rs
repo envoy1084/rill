@@ -22,6 +22,7 @@
 pub mod codec;
 pub mod error;
 pub mod keys;
+pub mod keyspace;
 pub mod memory;
 pub mod meta;
 pub mod object;
@@ -36,6 +37,7 @@ pub mod local;
 pub mod s3;
 
 pub use error::{Error, Result};
+pub use keyspace::Keyspace;
 #[cfg(feature = "local")]
 pub use local::{LocalObjectStore, LocalOptions, LocalStores, RedbMetaStore};
 pub use memory::{MemoryMetaStore, MemoryObjectStore};

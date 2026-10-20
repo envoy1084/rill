@@ -36,6 +36,13 @@ impl MetaStore for FaultyMetaStore {
         self.inner.scan(range).await
     }
 
+    async fn counter(&self, key: &[u8]) -> Result<i64> {
+        if self.plan.read_fails(("counter", key)) {
+            return Err(injected_error("meta counter"));
+        }
+        self.inner.counter(key).await
+    }
+
     async fn transact(&self, tx: Transaction) -> Result<TxOutcome> {
         match self.plan.write(written_keys(&tx)) {
             Fault::None => self.inner.transact(tx).await,
@@ -55,7 +62,10 @@ fn written_keys(tx: &Transaction) -> Vec<&[u8]> {
         .iter()
         .map(|m| match m {
             Mutation::Set { key, .. } | Mutation::Delete { key } => key.as_ref(),
-            Mutation::AppendLog { prefix, .. } => prefix.as_ref(),
+            Mutation::AppendLog { prefix, .. } | Mutation::AppendStamped { prefix, .. } => {
+                prefix.as_ref()
+            }
+            Mutation::Add { key, .. } => key.as_ref(),
         })
         .collect()
 }

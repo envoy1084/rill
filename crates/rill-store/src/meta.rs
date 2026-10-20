@@ -1,16 +1,18 @@
 //! The transactional metadata store.
 //!
-//! A minimal ordered key-value interface that every backend (in-memory,
-//! redb, FoundationDB) can implement exactly. Writes are batched into a
+//! A minimal ordered key-value interface. Writes are batched into a
 //! [`Transaction`] of conditions and mutations that commits atomically or
-//! not at all, which is all that refs, the change log and review state
-//! need.
+//! not at all. Every backend implements it through the shared
+//! [`Keyspace`](crate::keyspace::Keyspace) layer, so memory, redb and
+//! FoundationDB agree on every rule.
 
 use std::ops::Bound;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+
+use rill_types::Versionstamp;
 
 use crate::error::Result;
 
@@ -36,11 +38,28 @@ pub enum Mutation {
         key: Bytes,
     },
     /// Append `value` under `prefix` with the next sequence number for that
-    /// prefix, producing key `prefix ++ be64(seq)`. The assigned sequence is
-    /// reported in [`TxOutcome::appended`].
+    /// prefix, producing key [`seq_key`]`(prefix, seq)`. Sequences are dense,
+    /// so concurrent appenders to one prefix conflict; use it for logs with
+    /// one writer at a time. The sequence is reported in
+    /// [`TxOutcome::appended`].
     AppendLog {
         prefix: Bytes,
         value: Bytes,
+    },
+    /// Append `value` under `prefix` keyed by the commit's versionstamp,
+    /// producing key [`stamp_key`]`(prefix, stamp)`. Appenders never
+    /// conflict. The stamp is reported in [`TxOutcome::stamped`]; the value
+    /// must fit in one row.
+    AppendStamped {
+        prefix: Bytes,
+        value: Bytes,
+    },
+    /// Add `delta` to the counter at `key` without reading it, so
+    /// concurrent adds never conflict. Counters live apart from values and
+    /// are read with [`MetaStore::counter`].
+    Add {
+        key: Bytes,
+        delta: i64,
     },
 }
 
@@ -94,6 +113,22 @@ impl Transaction {
         self
     }
 
+    pub fn append_stamped(mut self, prefix: impl Into<Bytes>, value: impl Into<Bytes>) -> Self {
+        self.mutations.push(Mutation::AppendStamped {
+            prefix: prefix.into(),
+            value: value.into(),
+        });
+        self
+    }
+
+    pub fn add(mut self, key: impl Into<Bytes>, delta: i64) -> Self {
+        self.mutations.push(Mutation::Add {
+            key: key.into(),
+            delta,
+        });
+        self
+    }
+
     pub fn is_empty(&self) -> bool {
         self.conditions.is_empty() && self.mutations.is_empty()
     }
@@ -104,6 +139,8 @@ impl Transaction {
 pub struct TxOutcome {
     /// Sequence numbers assigned to `AppendLog` mutations, in order.
     pub appended: Vec<u64>,
+    /// Stamps assigned to `AppendStamped` mutations, in order.
+    pub stamped: Vec<Versionstamp>,
 }
 
 /// A key range for scans. `end` is exclusive.
@@ -197,6 +234,9 @@ pub trait MetaStore: Send + Sync + 'static {
     /// if a condition fails.
     async fn transact(&self, tx: Transaction) -> Result<TxOutcome>;
 
+    /// The value of a counter written by [`Mutation::Add`]; 0 if absent.
+    async fn counter(&self, key: &[u8]) -> Result<i64>;
+
     /// Unconditional single-key write; a convenience over `transact`.
     async fn set(&self, key: Bytes, value: Bytes) -> Result<()> {
         self.transact(Transaction::new().set(key, value)).await?;
@@ -221,22 +261,41 @@ impl<T: MetaStore + ?Sized> MetaStore for Arc<T> {
     async fn transact(&self, tx: Transaction) -> Result<TxOutcome> {
         (**self).transact(tx).await
     }
+
+    async fn counter(&self, key: &[u8]) -> Result<i64> {
+        (**self).counter(key).await
+    }
 }
 
-/// Encode a sequence number as a big-endian key suffix so lexical order is
-/// numeric order.
+/// The key of entry `seq` in a log under `prefix`: the prefix followed by
+/// the tuple encoding of `seq`, which sorts numerically.
 pub fn seq_key(prefix: &[u8], seq: u64) -> Bytes {
-    let mut key = Vec::with_capacity(prefix.len() + 8);
-    key.extend_from_slice(prefix);
-    key.extend_from_slice(&seq.to_be_bytes());
+    let mut key = prefix.to_vec();
+    foundationdb_tuple::pack_into(&seq, &mut key);
     Bytes::from(key)
 }
 
-/// Decode the sequence number from a key produced by [`seq_key`].
+/// The sequence number of a key produced by [`seq_key`].
 pub fn seq_from_key(prefix_len: usize, key: &[u8]) -> Option<u64> {
-    let tail = key.get(prefix_len..)?;
-    let arr: [u8; 8] = tail.try_into().ok()?;
-    Some(u64::from_be_bytes(arr))
+    foundationdb_tuple::unpack(key.get(prefix_len..)?).ok()
+}
+
+/// The key of the entry stamped `stamp` in a log under `prefix`.
+pub fn stamp_key(prefix: &[u8], stamp: &Versionstamp) -> Bytes {
+    let mut key = prefix.to_vec();
+    let (tr, user) = stamp.as_bytes().split_at(10);
+    let tr: [u8; 10] = tr.try_into().expect("a stamp splits into 10 and 2 bytes");
+    let stamp =
+        foundationdb_tuple::Versionstamp::complete(tr, u16::from_be_bytes([user[0], user[1]]));
+    foundationdb_tuple::pack_into(&stamp, &mut key);
+    Bytes::from(key)
+}
+
+/// The stamp of a key produced by [`stamp_key`].
+pub fn stamp_from_key(prefix_len: usize, key: &[u8]) -> Option<Versionstamp> {
+    let stamp: foundationdb_tuple::Versionstamp =
+        foundationdb_tuple::unpack(key.get(prefix_len..)?).ok()?;
+    Some(Versionstamp(*stamp.as_bytes()))
 }
 
 #[cfg(test)]
@@ -252,9 +311,11 @@ mod tests {
 
     #[test]
     fn seq_keys_sort_numerically() {
-        let a = seq_key(b"l/", 9);
-        let b = seq_key(b"l/", 10);
-        assert!(a < b);
-        assert_eq!(seq_from_key(2, &b), Some(10));
+        let keys: Vec<Bytes> = [0, 9, 255, 256, 70_000, u64::MAX]
+            .into_iter()
+            .map(|s| seq_key(b"l/", s))
+            .collect();
+        assert!(keys.windows(2).all(|w| w[0] < w[1]));
+        assert_eq!(seq_from_key(2, &keys[3]), Some(256));
     }
 }
