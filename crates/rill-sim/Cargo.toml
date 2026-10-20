@@ -1,0 +1,24 @@
+[package]
+name = "rill-sim"
+description = "Deterministic simulation of Rill's review and landing workflow under faults"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+rill-types = { workspace = true, features = ["testing"] }
+rill-store = { workspace = true }
+rill-core = { workspace = true }
+rill-policy = { workspace = true }
+rill-review = { workspace = true }
+rill-lander = { workspace = true }
+rill-server = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
+async-trait = { workspace = true }
+bytes = { workspace = true }
+parking_lot = { workspace = true }
+arc-swap = { workspace = true }
+clap = { workspace = true }

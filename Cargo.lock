@@ -4097,7 +4097,6 @@ dependencies = [
  "bytes",
  "futures",
  "hex",
- "rand 0.10.3",
  "regex",
  "rill-core",
  "rill-policy",
@@ -4191,6 +4190,25 @@ dependencies = [
  "tower",
  "tower-http 0.7.1",
  "tracing",
+]
+
+[[package]]
+name = "rill-sim"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "bytes",
+ "clap",
+ "parking_lot",
+ "rill-core",
+ "rill-lander",
+ "rill-policy",
+ "rill-review",
+ "rill-server",
+ "rill-store",
+ "rill-types",
+ "tokio",
 ]
 
 [[package]]
