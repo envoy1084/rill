@@ -16,3 +16,13 @@ proptest! {
         prop_assert_eq!(materialize(&parsed), written);
     }
 }
+
+#[test]
+fn marker_like_lines_without_a_conflict_header_are_content() {
+    // Found by fuzzing: a plain `<<<<<<<` line made the file unparseable
+    // after a round trip.
+    let input = b"<<<<<<<\n<<<<<<<<<<<<<<\n++++++++++++++\n>>>>>>>>>>>>>>";
+    let parsed = parse_materialized(input).unwrap();
+    assert_eq!(parsed.as_resolved(), Some(&Some(Bytes::from_static(input))));
+    assert_eq!(materialize(&parsed), input);
+}

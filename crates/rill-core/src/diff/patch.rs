@@ -71,8 +71,10 @@ pub fn apply_unified(old: &[u8], patch: &[u8]) -> Result<Vec<u8>> {
 }
 
 fn locate(old: &[&[u8]], expected: &[&[u8]], stated: usize, min: usize) -> Option<usize> {
+    // Header line numbers are untrusted, so positions use checked arithmetic.
     let matches_at = |at: usize| {
-        at + expected.len() <= old.len()
+        at.checked_add(expected.len())
+            .is_some_and(|end| end <= old.len())
             && expected
                 .iter()
                 .zip(&old[at..])
@@ -85,9 +87,10 @@ fn locate(old: &[&[u8]], expected: &[&[u8]], stated: usize, min: usize) -> Optio
         return Some(stated);
     }
     (1..=FUZZ_WINDOW).find_map(|delta| {
-        if matches_at(stated + delta) {
-            Some(stated + delta)
-        } else if stated >= min + delta && matches_at(stated - delta) {
+        let later = stated.checked_add(delta);
+        if let Some(at) = later.filter(|&at| matches_at(at)) {
+            Some(at)
+        } else if stated >= min.saturating_add(delta) && matches_at(stated - delta) {
             Some(stated - delta)
         } else {
             None
@@ -205,6 +208,13 @@ mod tests {
         let old = b"caf\xe9\nna\xefve\n\xff\xfe\n";
         let new = b"caf\xe9\nna\xefvet\xe9\n\xff\xfe\n";
         roundtrip(old, new);
+    }
+
+    #[test]
+    fn huge_hunk_positions_are_rejected_not_overflowed() {
+        // Found by fuzzing: a start line near usize::MAX overflowed.
+        let patch = b"@@ -18446744073709551615 +1 @@\n a\n";
+        assert!(apply_unified(b"a\n", patch).is_err());
     }
 
     #[test]

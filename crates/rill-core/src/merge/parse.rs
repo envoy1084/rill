@@ -14,13 +14,13 @@ use crate::diff::tokens::split_lines;
 /// markers parses as a resolved merge.
 pub fn parse_materialized(bytes: &[u8]) -> Option<Merge<Option<Bytes>>> {
     let lines: Vec<&[u8]> = split_lines(bytes).collect();
-    // Content runs are always shorter than the marker (see materialize),
-    // so the longest `<` run is the marker length.
-    let marker_len = lines
-        .iter()
-        .filter_map(|l| marker_run(l, b'<'))
-        .max()
-        .unwrap_or(MIN_MARKER_LEN);
+    // Only a `<` run followed by materialize's ` Conflict ` header opens a
+    // conflict, so a plain `<<<<<<<` line in a file is content. Content runs
+    // are always shorter than the marker, so the longest header run is the
+    // marker length.
+    let Some(marker_len) = lines.iter().filter_map(|l| conflict_header(l)).max() else {
+        return Some(Merge::resolved(Some(Bytes::copy_from_slice(bytes))));
+    };
 
     // Per-term accumulated content; the term count is fixed by the first
     // conflict.
@@ -31,7 +31,7 @@ pub fn parse_materialized(bytes: &[u8]) -> Option<Merge<Option<Bytes>>> {
     let mut i = 0;
     while i < lines.len() {
         let line = lines[i];
-        if marker_run(line, b'<') != Some(marker_len) {
+        if conflict_header(line) != Some(marker_len) {
             resolved.extend_from_slice(line);
             i += 1;
             continue;
@@ -172,6 +172,12 @@ fn marker_run(line: &[u8], ch: u8) -> Option<usize> {
     } else {
         None
     }
+}
+
+/// The marker length of a conflict's opening line, `<<<<<<< Conflict ...`.
+fn conflict_header(line: &[u8]) -> Option<usize> {
+    let run = marker_run(line, b'<')?;
+    line[run..].starts_with(b" Conflict ").then_some(run)
 }
 
 fn is_any_marker(line: &[u8], marker_len: usize) -> bool {
