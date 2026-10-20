@@ -2,3 +2,6 @@
 **/*.rs.bk
 .rill/
 *.redb
+
+# Local research notes and plans (not tracked)
+research/
