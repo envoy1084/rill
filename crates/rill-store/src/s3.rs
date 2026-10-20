@@ -2,10 +2,14 @@
 //! services, plus the in-memory and local-filesystem stores it ships, which
 //! make this backend testable without network access.
 //!
-//! Keys are `<prefix>/<kind>/<hh>/<hash-hex>`, the same shape as the local
-//! store, and values are [`codec`](crate::codec) frames. Writes use
-//! `PutMode::Create` so an object is never overwritten; a concurrent writer
-//! of the same (identical) object is treated as success.
+//! Keys are `<prefix>/<namespace>/<kind>/<hh>/<hash-hex>`, the same shape as
+//! the local store, and values are [`codec`](crate::codec) frames passed
+//! through the backend's [`Sealer`]. Writes use conditional put
+//! (`If-None-Match: *`) so an object is never overwritten. Some
+//! S3-compatible services do not support it; [`ObjectStoreBackend::probe`]
+//! detects that at startup, and when allowed the backend falls back to
+//! checking for the object before an unconditional put, which is safe
+//! because content-addressed writes of one key are always identical.
 
 use std::sync::Arc;
 
@@ -20,24 +24,92 @@ use url::Url;
 use crate::codec;
 use crate::error::{Error, Result};
 use crate::object::{verify, ObjectStore};
+use crate::seal::{Plaintext, Sealer, DEFAULT_NAMESPACE};
 
 /// How many `has`/`get` requests a batch call keeps in flight.
 const BATCH_CONCURRENCY: usize = 16;
+
+/// How writes avoid overwriting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PutStrategy {
+    /// `PutMode::Create`, enforced by the service.
+    Conditional,
+    /// A `HEAD` before an unconditional put, for services without
+    /// conditional put.
+    CheckThenPut,
+}
 
 /// [`ObjectStore`] over any [`object_store::ObjectStore`].
 #[derive(Debug, Clone)]
 pub struct ObjectStoreBackend {
     store: Arc<dyn object_store::ObjectStore>,
     prefix: Path,
+    sealer: Arc<dyn Sealer>,
+    strategy: PutStrategy,
 }
 
 impl ObjectStoreBackend {
-    /// Wrap `store`, placing every key under `prefix` (may be empty).
+    /// Wrap `store`, placing every key under `prefix` (may be empty) and the
+    /// default namespace.
     pub fn new(store: Arc<dyn object_store::ObjectStore>, prefix: impl AsRef<str>) -> Self {
         ObjectStoreBackend {
             store,
-            prefix: Path::from(prefix.as_ref()),
+            prefix: Path::from(prefix.as_ref()).join(DEFAULT_NAMESPACE),
+            sealer: Arc::new(Plaintext),
+            strategy: PutStrategy::Conditional,
         }
+    }
+
+    /// Seal frames with `sealer`.
+    pub fn with_sealer(mut self, sealer: Arc<dyn Sealer>) -> Self {
+        self.sealer = sealer;
+        self
+    }
+
+    /// The write strategy in use.
+    pub fn strategy(&self) -> PutStrategy {
+        self.strategy
+    }
+
+    /// Check whether the service honours conditional put by creating a probe
+    /// object twice. Without it the backend refuses to start unless
+    /// `allow_unconditional` is set, in which case it falls back to
+    /// [`PutStrategy::CheckThenPut`].
+    pub async fn probe(mut self, allow_unconditional: bool) -> Result<Self> {
+        let path = self.prefix.clone().join(".rill-probe");
+        let create = || {
+            self.store.put_opts(
+                &path,
+                Bytes::from_static(b"probe").into(),
+                PutOptions::from(PutMode::Create),
+            )
+        };
+        // Supported means the second create of the same key is refused. An
+        // unsupported mode errors either way or lets the overwrite through.
+        let supported = match create().await {
+            Err(e) if is_unsupported(&e) => false,
+            Err(object_store::Error::AlreadyExists { .. }) | Ok(_) => match create().await {
+                Err(object_store::Error::AlreadyExists { .. }) => true,
+                Ok(_) => false,
+                Err(e) if is_unsupported(&e) => false,
+                Err(e) => return Err(Error::backend(e)),
+            },
+            Err(e) => return Err(Error::backend(e)),
+        };
+        if supported {
+            self.strategy = PutStrategy::Conditional;
+            return Ok(self);
+        }
+        if !allow_unconditional {
+            return Err(Error::Backend(
+                "object store does not support conditional put; set \
+                 allow_unconditional_put to fall back to check-then-put"
+                    .into(),
+            ));
+        }
+        tracing::warn!("object store lacks conditional put; using check-then-put");
+        self.strategy = PutStrategy::CheckThenPut;
+        Ok(self)
     }
 
     /// Build a backend from a URL such as `s3://bucket/path`, `file:///dir`
@@ -54,7 +126,9 @@ impl ObjectStoreBackend {
         }
         Ok(ObjectStoreBackend {
             store: Arc::from(store),
-            prefix: full,
+            prefix: full.join(DEFAULT_NAMESPACE),
+            sealer: Arc::new(Plaintext),
+            strategy: PutStrategy::Conditional,
         })
     }
 
@@ -76,7 +150,8 @@ impl ObjectStoreBackend {
         let path = self.path_for(kind, hash);
         match self.store.get(&path).await {
             Ok(result) => {
-                let frame = result.bytes().await.map_err(Error::backend)?;
+                let stored = result.bytes().await.map_err(Error::backend)?;
+                let frame = Bytes::from(self.sealer.open(stored.to_vec())?);
                 // Decompression is CPU work proportional to the object; keep
                 // it off the reactor for anything larger than a tree node.
                 let decoded = if frame.len() > 64 * 1024 {
@@ -115,16 +190,29 @@ impl ObjectStore for ObjectStoreBackend {
 
     async fn put(&self, kind: ObjectKind, hash: &ObjectHash, bytes: Bytes) -> Result<()> {
         let expected = *hash;
+        let sealer = self.sealer.clone();
         let frame = tokio::task::spawn_blocking(move || {
             verify(kind, &expected, &bytes)?;
-            Ok::<_, Error>(Bytes::from(codec::compress(&bytes)))
+            Ok::<_, Error>(Bytes::from(sealer.seal(codec::compress(&bytes))?))
         })
         .await
         .map_err(Error::backend)??;
 
         let path = self.path_for(kind, hash);
-        let opts = PutOptions::from(PutMode::Create);
-        match self.store.put_opts(&path, frame.into(), opts).await {
+        let mode = match self.strategy {
+            PutStrategy::Conditional => PutMode::Create,
+            PutStrategy::CheckThenPut => {
+                if self.exists(kind, hash).await? {
+                    return Ok(());
+                }
+                PutMode::Overwrite
+            }
+        };
+        match self
+            .store
+            .put_opts(&path, frame.into(), PutOptions::from(mode))
+            .await
+        {
             Ok(_) => Ok(()),
             // Content-addressed: whoever got there first wrote the same bytes.
             Err(object_store::Error::AlreadyExists { .. }) => Ok(()),
@@ -149,6 +237,14 @@ impl ObjectStore for ObjectStoreBackend {
     }
 }
 
+/// Errors a service gives for a conditional put it does not implement.
+fn is_unsupported(e: &object_store::Error) -> bool {
+    matches!(
+        e,
+        object_store::Error::NotImplemented { .. } | object_store::Error::NotSupported { .. }
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,7 +261,7 @@ mod tests {
         let hex = hash.to_hex();
         assert_eq!(
             b.path_for(ObjectKind::Blob, &hash).as_ref(),
-            format!("rill/objects/blob/{}/{}", &hex[..2], hex)
+            format!("rill/objects/default/blob/{}/{}", &hex[..2], hex)
         );
     }
 
@@ -216,7 +312,7 @@ mod tests {
     #[tokio::test]
     async fn from_url_memory_and_file() {
         let mem = ObjectStoreBackend::from_url("memory:///", "p/q").unwrap();
-        assert_eq!(mem.prefix().as_ref(), "p/q");
+        assert_eq!(mem.prefix().as_ref(), "p/q/default");
         let bytes = Bytes::from_static(b"hello");
         let hash = ObjectHash::digest(ObjectKind::Blob, &bytes);
         mem.put(ObjectKind::Blob, &hash, bytes.clone())
@@ -238,6 +334,7 @@ mod tests {
         assert!(dir
             .path()
             .join("objs")
+            .join(DEFAULT_NAMESPACE)
             .join("blob")
             .join(&hex[..2])
             .join(&hex)
@@ -247,5 +344,135 @@ mod tests {
     #[test]
     fn from_url_rejects_garbage() {
         assert!(ObjectStoreBackend::from_url("not a url", "").is_err());
+    }
+
+    /// An S3-compatible service that ignores `If-None-Match`, as some do:
+    /// every put overwrites.
+    #[derive(Debug, Default)]
+    struct IgnoresConditional(InMemory);
+
+    impl std::fmt::Display for IgnoresConditional {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("ignores-conditional")
+        }
+    }
+
+    #[async_trait]
+    impl object_store::ObjectStore for IgnoresConditional {
+        async fn put_opts(
+            &self,
+            location: &Path,
+            payload: object_store::PutPayload,
+            _opts: PutOptions,
+        ) -> object_store::Result<object_store::PutResult> {
+            self.0
+                .put_opts(location, payload, PutOptions::default())
+                .await
+        }
+        async fn put_multipart_opts(
+            &self,
+            location: &Path,
+            opts: object_store::PutMultipartOptions,
+        ) -> object_store::Result<Box<dyn object_store::MultipartUpload>> {
+            self.0.put_multipart_opts(location, opts).await
+        }
+        async fn get_opts(
+            &self,
+            location: &Path,
+            options: object_store::GetOptions,
+        ) -> object_store::Result<object_store::GetResult> {
+            self.0.get_opts(location, options).await
+        }
+        fn delete_stream(
+            &self,
+            locations: futures::stream::BoxStream<'static, object_store::Result<Path>>,
+        ) -> futures::stream::BoxStream<'static, object_store::Result<Path>> {
+            self.0.delete_stream(locations)
+        }
+        fn list(
+            &self,
+            prefix: Option<&Path>,
+        ) -> futures::stream::BoxStream<'static, object_store::Result<object_store::ObjectMeta>>
+        {
+            self.0.list(prefix)
+        }
+        async fn list_with_delimiter(
+            &self,
+            prefix: Option<&Path>,
+        ) -> object_store::Result<object_store::ListResult> {
+            self.0.list_with_delimiter(prefix).await
+        }
+        async fn copy_opts(
+            &self,
+            from: &Path,
+            to: &Path,
+            options: object_store::CopyOptions,
+        ) -> object_store::Result<()> {
+            self.0.copy_opts(from, to, options).await
+        }
+    }
+
+    #[tokio::test]
+    async fn probe_detects_missing_conditional_put() {
+        let good = backend().probe(false).await.unwrap();
+        assert_eq!(good.strategy(), PutStrategy::Conditional);
+
+        let store = Arc::new(IgnoresConditional::default());
+        assert!(ObjectStoreBackend::new(store.clone(), "p")
+            .probe(false)
+            .await
+            .is_err());
+        let fallback = ObjectStoreBackend::new(store, "p")
+            .probe(true)
+            .await
+            .unwrap();
+        assert_eq!(fallback.strategy(), PutStrategy::CheckThenPut);
+        let bytes = Bytes::from_static(b"content");
+        let hash = ObjectHash::digest(ObjectKind::Blob, &bytes);
+        fallback
+            .put(ObjectKind::Blob, &hash, bytes.clone())
+            .await
+            .unwrap();
+        fallback
+            .put(ObjectKind::Blob, &hash, bytes.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            fallback.get(ObjectKind::Blob, &hash).await.unwrap(),
+            Some(bytes)
+        );
+    }
+
+    /// Reverses bytes: enough to tell sealed from plain on the backend.
+    #[derive(Debug)]
+    struct Reverse;
+
+    impl Sealer for Reverse {
+        fn seal(&self, mut frame: Vec<u8>) -> Result<Vec<u8>> {
+            frame.reverse();
+            Ok(frame)
+        }
+        fn open(&self, mut stored: Vec<u8>) -> Result<Vec<u8>> {
+            stored.reverse();
+            Ok(stored)
+        }
+    }
+
+    #[tokio::test]
+    async fn frames_pass_through_the_sealer() {
+        let raw = Arc::new(InMemory::new());
+        let sealed = ObjectStoreBackend::new(raw.clone(), "s").with_sealer(Arc::new(Reverse));
+        let bytes = Bytes::from_static(b"secret source code, long enough to frame");
+        let hash = ObjectHash::digest(ObjectKind::Blob, &bytes);
+        sealed
+            .put(ObjectKind::Blob, &hash, bytes.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            sealed.get(ObjectKind::Blob, &hash).await.unwrap(),
+            Some(bytes)
+        );
+        let plain = ObjectStoreBackend::new(raw, "s");
+        assert!(plain.get(ObjectKind::Blob, &hash).await.is_err());
     }
 }

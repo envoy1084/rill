@@ -88,8 +88,11 @@ async fn open_backends(storage: &StorageConfig) -> Result<Stores> {
             url,
             prefix,
             meta_dir,
+            allow_unconditional_put,
         } => {
-            let objects = rill_store::ObjectStoreBackend::from_url(url, prefix)?;
+            let objects = rill_store::ObjectStoreBackend::from_url(url, prefix)?
+                .probe(*allow_unconditional_put)
+                .await?;
             let meta_path = meta_dir.join(rill_store::LocalStores::META_FILE);
             tokio::fs::create_dir_all(meta_dir)
                 .await

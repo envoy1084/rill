@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 pub use meta::RedbMetaStore;
-pub use objects::LocalObjectStore;
+pub use objects::{LocalObjectStore, LocalOptions};
 
 use crate::error::Result;
 use crate::repo::Stores;
@@ -65,6 +65,7 @@ mod tests {
         let file = dir
             .path()
             .join(LocalStores::OBJECTS_DIR)
+            .join(crate::DEFAULT_NAMESPACE)
             .join(ObjectKind::Blob.as_str())
             .join(&hex[..2])
             .join(&hex);

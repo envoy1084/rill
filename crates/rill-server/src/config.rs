@@ -97,6 +97,10 @@ pub enum StorageConfig {
         prefix: String,
         /// Directory holding the redb metadata store.
         meta_dir: PathBuf,
+        /// Start even if the service lacks conditional put, checking for an
+        /// object before writing it instead.
+        #[serde(default)]
+        allow_unconditional_put: bool,
     },
 }
 
@@ -260,6 +264,8 @@ impl ServerConfig {
                         meta_dir: lookup("RILL_S3_META_DIR").map(PathBuf::from).ok_or_else(
                             || Error::Config("RILL_S3_META_DIR is required with s3 storage".into()),
                         )?,
+                        allow_unconditional_put: lookup("RILL_S3_ALLOW_UNCONDITIONAL_PUT")
+                            .is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true")),
                     },
                     _ => {
                         return Err(Error::Config(format!(

@@ -1,8 +1,9 @@
 //! Content-addressed object store on a local filesystem.
 //!
-//! Layout: `<root>/<kind>/<hh>/<hash-hex>` where `hh` is the first two hex
-//! characters of the hash, keeping directories small. Each file is a
-//! [`codec`](crate::codec) frame. Writes go to a temp file in the final
+//! Layout: `<root>/<namespace>/<kind>/<hh>/<hash-hex>` where `hh` is the
+//! first two hex characters of the hash, keeping directories small. Each
+//! file is a [`codec`](crate::codec) frame, passed through the store's
+//! [`Sealer`]. Writes go to a temp file in the final
 //! directory, are fsynced, then renamed into place, so a reader never sees a
 //! partial object and a crash leaves at worst a stray `.tmp-*` file.
 
@@ -19,6 +20,7 @@ use rill_types::{ObjectHash, ObjectKind};
 use crate::codec;
 use crate::error::{Error, Result};
 use crate::object::{verify, ObjectStore};
+use crate::seal::{Plaintext, Sealer, DEFAULT_NAMESPACE};
 
 /// Filesystem-backed [`ObjectStore`].
 #[derive(Debug, Clone)]
@@ -26,10 +28,30 @@ pub struct LocalObjectStore {
     inner: Arc<Inner>,
 }
 
+/// How a [`LocalObjectStore`] lays out and encodes objects.
+#[derive(Debug, Clone)]
+pub struct LocalOptions {
+    /// zstd level for new objects.
+    pub level: i32,
+    pub namespace: String,
+    pub sealer: Arc<dyn Sealer>,
+}
+
+impl Default for LocalOptions {
+    fn default() -> Self {
+        LocalOptions {
+            level: codec::DEFAULT_LEVEL,
+            namespace: DEFAULT_NAMESPACE.to_string(),
+            sealer: Arc::new(Plaintext),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Inner {
     root: PathBuf,
     level: i32,
+    sealer: Arc<dyn Sealer>,
     /// Distinguishes temp files of concurrent writers for the same object.
     temp_counter: AtomicU64,
 }
@@ -37,12 +59,24 @@ struct Inner {
 impl LocalObjectStore {
     /// Open (creating if needed) a store rooted at `root`.
     pub async fn open(root: impl Into<PathBuf>) -> Result<Self> {
-        Self::open_with_level(root, codec::DEFAULT_LEVEL).await
+        Self::open_with(root, LocalOptions::default()).await
     }
 
     /// Open a store that compresses new objects with the given zstd level.
     pub async fn open_with_level(root: impl Into<PathBuf>, level: i32) -> Result<Self> {
-        let root = root.into();
+        Self::open_with(
+            root,
+            LocalOptions {
+                level,
+                ..LocalOptions::default()
+            },
+        )
+        .await
+    }
+
+    /// Open a store with explicit options.
+    pub async fn open_with(root: impl Into<PathBuf>, options: LocalOptions) -> Result<Self> {
+        let root = root.into().join(&options.namespace);
         let dir = root.clone();
         tokio::task::spawn_blocking(move || fs::create_dir_all(&dir))
             .await
@@ -50,7 +84,8 @@ impl LocalObjectStore {
         Ok(LocalObjectStore {
             inner: Arc::new(Inner {
                 root,
-                level,
+                level: options.level,
+                sealer: options.sealer,
                 temp_counter: AtomicU64::new(0),
             }),
         })
@@ -81,7 +116,10 @@ impl Inner {
 
     fn read(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<Option<Bytes>> {
         match fs::read(self.path_for(kind, hash)) {
-            Ok(frame) => Ok(Some(Bytes::from(codec::decompress(&frame)?))),
+            Ok(stored) => {
+                let frame = self.sealer.open(stored)?;
+                Ok(Some(Bytes::from(codec::decompress(&frame)?)))
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e.into()),
         }
@@ -103,7 +141,9 @@ impl Inner {
         })?;
         fs::create_dir_all(dir)?;
 
-        let frame = codec::compress_with_level(bytes, self.level);
+        let frame = self
+            .sealer
+            .seal(codec::compress_with_level(bytes, self.level))?;
         let tmp = dir.join(format!(
             ".tmp-{}-{}-{}",
             std::process::id(),
@@ -188,7 +228,12 @@ mod tests {
             .unwrap();
 
         let hex = hash.to_hex();
-        let path = dir.path().join("tree").join(&hex[..2]).join(&hex);
+        let path = dir
+            .path()
+            .join(DEFAULT_NAMESPACE)
+            .join("tree")
+            .join(&hex[..2])
+            .join(&hex);
         let on_disk = fs::read(&path).unwrap();
         assert_eq!(&on_disk[..4], b"RILZ");
         assert!(on_disk.len() < bytes.len());
@@ -225,6 +270,7 @@ mod tests {
             .unwrap();
         let path = dir
             .path()
+            .join(DEFAULT_NAMESPACE)
             .join("blob")
             .join(&hash.to_hex()[..2])
             .join(hash.to_hex());
