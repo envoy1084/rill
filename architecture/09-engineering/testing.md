@@ -108,6 +108,26 @@ The test profile builds with line-table debuginfo to keep binaries small
 ([development](development.md)). The git importer test needs `git` on
 `PATH`.
 
+## Benchmarks
+
+`rill-bench` generates a deterministic repository (`Shape`: file count,
+fan-out 32, 16 lines per file, fixed seed) and runs criterion benchmarks
+over it: `cargo bench -p rill-bench --bench core`, with `RILL_BENCH_FILES`
+setting the size (default 100,000). Baselines on an Apple M-series laptop
+(release, memory stores):
+
+| Benchmark | 100k files | 1M files |
+| --- | --- | --- |
+| `commit_10_files` (build, store, derive root) | 0.58 ms | 0.84 ms |
+| `diff_adjacent_roots` (10 files changed) | 0.18 ms | 0.27 ms |
+| `rebase_10_files_over_20` | 0.20 ms | 0.29 ms |
+| `diff_lines_2000` | 58 µs | 60 µs |
+| `merge_file_2000` | 127 µs | 183 µs |
+
+Ten times the files costs one more directory level, not ten times the
+work: commits, diffs and rebases are O(size of change). Building the 1M-file
+corpus takes about a minute and 4.5 GB of memory.
+
 ## Limitations
 
 - No test runs against a real S3 bucket. The `s3` fixture uses an
