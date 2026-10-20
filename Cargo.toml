@@ -109,7 +109,7 @@ ignore = "0.4"
 globset = "0.4"
 regex = "1"
 regex-syntax = "0.8"
-gix = { version = "0.73", default-features = false, features = ["parallel"] }
+gix = { version = "0.83", default-features = false, features = ["parallel"] }
 toml = "0.8"
 dirs = "6"
 tempfile = "3"
