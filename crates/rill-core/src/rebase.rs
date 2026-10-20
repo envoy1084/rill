@@ -3,12 +3,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-use rill_types::{ChangeVersion, ChangeVersionHash, Merge, RepoPathBuf, Timestamp};
+use rill_types::{
+    ChangeVersion, ChangeVersionHash, Merge, RepoPath, RepoPathBuf, Timestamp, TreeHash,
+};
 
 use crate::derive::{DeriveManager, RootTree};
 use crate::diff::{diff_trees, file_state};
 use crate::error::Result;
 use crate::merge::change::{is_same_as, merge_path, root_of, tip_terms};
+use crate::tree::TreeOps;
 
 /// Rebase `version` onto `new_parent`, producing the next version of the
 /// same change (predecessor = `version`).
@@ -18,8 +21,12 @@ use crate::merge::change::{is_same_as, merge_path, root_of, tip_terms};
 /// merged three-way with base = old parent, left = new parent and right =
 /// the old version, so the new version carries the same intent on top of
 /// the new base; conflicts become `Conflict` entries. Paths whose merged
-/// state equals the new parent's are dropped. Subtree changes are copied
-/// verbatim and the paths beneath them are left to those entries.
+/// state equals the new parent's are dropped.
+///
+/// A subtree change is kept as-is only when the new parent left that
+/// directory exactly as the old parent had it. Otherwise replaying it would
+/// silently overwrite the new parent's work there, so it is expanded into
+/// the per-file changes it made and those are merged like any other path.
 pub async fn rebase(
     derive: &Arc<DeriveManager>,
     version: &ChangeVersionHash,
@@ -39,10 +46,19 @@ pub async fn rebase(
         .map(|e| e.path)
         .collect();
     paths.extend(cv.conflicted_paths().cloned());
+
+    let mut subtree_changes = BTreeMap::new();
+    for (dir, change) in &cv.subtree_changes {
+        let before = dir_at(trees, old_parent_root, dir).await?;
+        let after = dir_at(trees, Some(new_parent_root), dir).await?;
+        if before == after {
+            subtree_changes.insert(dir.clone(), change.clone());
+        }
+    }
     paths.retain(|p| {
-        !cv.subtree_changes
+        !subtree_changes
             .keys()
-            .any(|s| p.starts_with(s) && p != s)
+            .any(|s: &RepoPathBuf| p.starts_with(s) && p != s)
     });
 
     let mut file_changes = BTreeMap::new();
@@ -63,7 +79,7 @@ pub async fn rebase(
         change_id: cv.change_id,
         parents,
         predecessor: Some(*version),
-        subtree_changes: cv.subtree_changes,
+        subtree_changes,
         file_changes,
         author: cv.author,
         provenance: cv.provenance,
@@ -72,4 +88,15 @@ pub async fn rebase(
         created_at,
         extra: cv.extra,
     })
+}
+
+async fn dir_at(
+    trees: &TreeOps,
+    root: Option<TreeHash>,
+    path: &RepoPath,
+) -> Result<Option<TreeHash>> {
+    match root {
+        Some(root) => trees.dir_hash(root, path).await,
+        None => Ok(None),
+    }
 }
