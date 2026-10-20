@@ -1,64 +1,18 @@
 //! End-to-end: build history, derive trees, merge, rebase, resolve, blame.
 
-use std::sync::Arc;
-
-use bytes::Bytes;
 use rill_core::derive::{ChangeSummary, Generation, PathHistory, RootTree};
 use rill_core::merge::state::to_change;
 use rill_core::{
     materialize, merge_changes, parse_materialized, read_content, rebase, ChangeBuilder,
-    CommitGraph, DeriveManager, MergeChangeOptions, TreeOps,
+    MergeChangeOptions,
 };
-use rill_store::{RepoStore, Stores};
-use rill_types::{
-    ChangeVersionHash, EntryKind, FileChange, Merge, Principal, RepoPathBuf, Timestamp,
-};
+use rill_types::{FileChange, Merge};
 
 const BASE: &str = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\n";
 
-struct Fixture {
-    repo: RepoStore,
-    derive: Arc<DeriveManager>,
-    graph: CommitGraph,
-    alice: Principal,
-    bob: Principal,
-}
+mod common;
 
-async fn fixture() -> Fixture {
-    let stores = Stores::memory();
-    let config = stores.create_repo("demo", "").await.unwrap();
-    let repo = stores.repo(config.id);
-    let trees = TreeOps::new(stores.objects.clone(), 256);
-    let derive = DeriveManager::new(repo.clone(), trees, 256);
-    let graph = CommitGraph::new(repo.clone(), derive.clone());
-    Fixture {
-        repo,
-        derive,
-        graph,
-        alice: Principal::human("alice"),
-        bob: Principal::agent("bob"),
-    }
-}
-
-fn p(s: &str) -> RepoPathBuf {
-    RepoPathBuf::new(s).unwrap()
-}
-
-fn t(ms: i64) -> Timestamp {
-    Timestamp::from_millis(ms)
-}
-
-async fn content_at(f: &Fixture, version: &ChangeVersionHash, path: &str) -> Option<Bytes> {
-    let root = f.derive.get::<RootTree>(version).await.unwrap();
-    match f.derive.trees().lookup(root, &p(path)).await.unwrap() {
-        Some(EntryKind::File { content, .. }) => Some(
-            read_content(f.repo.objects().as_ref(), &content)
-                .await
-                .unwrap(),
-        ),
-        _ => None,
-    }
-}
+use common::{content_at, fixture, p, t};
 
 #[tokio::test]
 async fn full_workflow() {

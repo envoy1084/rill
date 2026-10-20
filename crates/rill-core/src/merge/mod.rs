@@ -1,5 +1,6 @@
 //! Three-way merging: text, conflict materialization and file states.
 
+mod base;
 pub mod change;
 mod file;
 mod materialize;

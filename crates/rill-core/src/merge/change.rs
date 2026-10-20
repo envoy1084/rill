@@ -9,6 +9,7 @@ use rill_types::{
     RepoPathBuf, Timestamp, TreeHash,
 };
 
+use super::base::MergeBase;
 use super::state::{change_terms, merge_file_state};
 use crate::derive::{DeriveManager, RootTree};
 use crate::diff::{diff_trees, file_state};
@@ -55,33 +56,36 @@ pub async fn merge_changes(
     right: &ChangeVersionHash,
     options: MergeChangeOptions,
 ) -> Result<ChangeVersion> {
-    let base = graph.merge_base(left, right).await?;
-    let base_root = match base {
-        Some(b) => Some(derive.get::<RootTree>(&b).await?),
-        None => None,
-    };
+    let base = MergeBase::of(derive, graph, left, right).await?;
     let left_root = derive.get::<RootTree>(left).await?;
     let right_root = derive.get::<RootTree>(right).await?;
     let left_cv = derive.change(left).await?;
     let right_cv = derive.change(right).await?;
+    let trees = derive.trees();
 
-    let mut paths: BTreeSet<RepoPathBuf> = diff_trees(derive.trees(), base_root, Some(right_root))
-        .await?
-        .into_iter()
-        .map(|e| e.path)
-        .collect();
+    let base_roots: Vec<Option<TreeHash>> = match &base {
+        Some(base) => base.roots().into_iter().map(Some).collect(),
+        None => vec![None],
+    };
+    let mut paths: BTreeSet<RepoPathBuf> = BTreeSet::new();
+    for base_root in base_roots {
+        let changed = diff_trees(trees, base_root, Some(right_root)).await?;
+        paths.extend(changed.into_iter().map(|e| e.path));
+    }
     paths.extend(left_cv.conflicted_paths().cloned());
     paths.extend(right_cv.conflicted_paths().cloned());
 
-    let trees = derive.trees();
     let mut file_changes = std::collections::BTreeMap::new();
     for path in paths {
-        let base_state = file_state(trees, base_root, &path).await?;
+        let base_terms = match &base {
+            Some(base) => base.terms(derive, &path).await?,
+            None => Merge::resolved(None),
+        };
         let left_state = file_state(trees, Some(left_root), &path).await?;
         let left_terms = tip_terms(&left_cv, &path, left_state.clone());
         let right_state = file_state(trees, Some(right_root), &path).await?;
         let right_terms = tip_terms(&right_cv, &path, right_state);
-        let change = merge_path(derive, base_state, left_terms, right_terms).await?;
+        let change = merge_terms(derive, base_terms, left_terms, right_terms).await?;
         if is_same_as(&change, &left_state) {
             continue;
         }
@@ -124,7 +128,18 @@ pub(crate) async fn merge_path(
     left: Merge<FileState>,
     right: Merge<FileState>,
 ) -> Result<FileChange> {
-    let terms = Merge::three_way(Merge::resolved(base), left, right).flatten();
+    merge_terms(derive, Merge::resolved(base), left, right).await
+}
+
+/// [`merge_path`] with a base that may itself be conflicted (a virtual
+/// base from a criss-cross history).
+async fn merge_terms(
+    derive: &Arc<DeriveManager>,
+    base: Merge<FileState>,
+    left: Merge<FileState>,
+    right: Merge<FileState>,
+) -> Result<FileChange> {
+    let terms = Merge::three_way(base, left, right).flatten();
     let objects = derive.repo().objects();
     merge_file_state(terms, objects, objects.as_ref()).await
 }

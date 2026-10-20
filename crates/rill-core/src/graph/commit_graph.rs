@@ -99,24 +99,35 @@ impl CommitGraph {
         Ok(false)
     }
 
-    /// A best common ancestor of `a` and `b`: the one with the highest
-    /// generation, ties broken by hash for determinism.
-    ///
-    /// Two-colour walk in decreasing generation order, like git's
-    /// `paint_down_to_common`: a version reached from both sides is a
-    /// candidate, and its ancestors are marked stale so they are never
-    /// reported. The walk ends once every queued version is stale.
+    /// A best common ancestor of `a` and `b`: the first of
+    /// [`merge_bases`](Self::merge_bases).
     pub async fn merge_base(
         &self,
         a: &ChangeVersionHash,
         b: &ChangeVersionHash,
     ) -> Result<Option<ChangeVersionHash>> {
+        Ok(self.merge_bases(a, b).await?.into_iter().next())
+    }
+
+    /// Every best common ancestor of `a` and `b` (none is an ancestor of
+    /// another), highest generation first, ties broken by hash. More than
+    /// one means a criss-cross history.
+    ///
+    /// Two-colour walk in decreasing generation order, like git's
+    /// `paint_down_to_common`: a version reached from both sides is a
+    /// candidate, and its ancestors are marked stale so they are never
+    /// reported. The walk ends once every queued version is stale.
+    pub async fn merge_bases(
+        &self,
+        a: &ChangeVersionHash,
+        b: &ChangeVersionHash,
+    ) -> Result<Vec<ChangeVersionHash>> {
         if a == b {
-            return Ok(Some(*a));
+            return Ok(vec![*a]);
         }
         let mut flags: HashMap<ChangeVersionHash, u8> = HashMap::new();
         let mut heap: BinaryHeap<(u64, ChangeVersionHash)> = BinaryHeap::new();
-        let mut best: Option<(u64, ChangeVersionHash)> = None;
+        let mut found: Vec<(u64, ChangeVersionHash)> = Vec::new();
         flags.insert(*a, LEFT);
         flags.insert(*b, RIGHT);
         heap.push((self.generation(a).await?, *a));
@@ -127,9 +138,7 @@ impl CommitGraph {
             let Some((gen, hash)) = heap.pop() else { break };
             let mut flag = flags[&hash];
             if flag & (LEFT | RIGHT) == LEFT | RIGHT && flag & STALE == 0 {
-                if best.is_none_or(|(g, h)| (gen, Reverse(hash)) > (g, Reverse(h))) {
-                    best = Some((gen, hash));
-                }
+                found.push((gen, hash));
                 flag |= STALE;
                 flags.insert(hash, flag);
             }
@@ -142,6 +151,8 @@ impl CommitGraph {
                 }
             }
         }
-        Ok(best.map(|(_, h)| h))
+        found.sort_by_key(|&(gen, hash)| (Reverse(gen), hash));
+        found.dedup();
+        Ok(found.into_iter().map(|(_, h)| h).collect())
     }
 }
