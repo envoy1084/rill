@@ -21,7 +21,9 @@ fn benches(c: &mut Criterion) {
     let rt = runtime();
     let corpus = rt.block_on(Corpus::build(Shape::from_env(100_000)));
     let files = corpus.shape.files;
-    let base_root = rt.block_on(corpus.derive.get::<RootTree>(&corpus.root)).unwrap();
+    let base_root = rt
+        .block_on(corpus.derive.get::<RootTree>(&corpus.root))
+        .unwrap();
     let next = rt.block_on(corpus.change(corpus.root, 10, 1));
     let next_root = rt.block_on(corpus.derive.get::<RootTree>(&next)).unwrap();
     let mut revision = 1000;
@@ -38,8 +40,12 @@ fn benches(c: &mut Criterion) {
 
     c.bench_function(&format!("diff_adjacent_roots/{files}"), |b| {
         b.iter(|| {
-            rt.block_on(diff_trees(corpus.derive.trees(), Some(base_root), Some(next_root)))
-                .unwrap()
+            rt.block_on(diff_trees(
+                corpus.derive.trees(),
+                Some(base_root),
+                Some(next_root),
+            ))
+            .unwrap()
         })
     });
 
@@ -51,7 +57,14 @@ fn benches(c: &mut Criterion) {
     c.bench_function(&format!("rebase_10_files_over_20/{files}"), |b| {
         b.iter_batched(
             || (),
-            |_| rt.block_on(rebase(&corpus.derive, &behind, &head, Timestamp::from_millis(0))),
+            |_| {
+                rt.block_on(rebase(
+                    &corpus.derive,
+                    &behind,
+                    &head,
+                    Timestamp::from_millis(0),
+                ))
+            },
             BatchSize::SmallInput,
         )
     });
@@ -60,7 +73,11 @@ fn benches(c: &mut Criterion) {
         lines: 2_000,
         ..corpus.shape
     };
-    let (base, left, right) = (shape.content(1, 0), shape.content(1, 1), shape.content(1, 3));
+    let (base, left, right) = (
+        shape.content(1, 0),
+        shape.content(1, 1),
+        shape.content(1, 3),
+    );
     c.bench_function("diff_lines_2000", |b| {
         b.iter(|| diff_lines(black_box(&base), black_box(&left)))
     });
