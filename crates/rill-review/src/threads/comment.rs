@@ -9,7 +9,7 @@ use crate::service::{ReviewEvent, ReviewService};
 
 /// A new thread id: 16 random bytes, hex encoded.
 pub fn new_thread_id() -> String {
-    hex::encode(rand::random::<[u8; 16]>())
+    hex::encode(rill_types::ids::random_id())
 }
 
 /// What a comment carries besides its body.

@@ -14,6 +14,10 @@ pub struct Timestamp(i64);
 
 impl Timestamp {
     pub fn now() -> Self {
+        #[cfg(feature = "testing")]
+        if let Some(millis) = crate::testing::clock::fixed_now() {
+            return Timestamp(millis);
+        }
         let now = OffsetDateTime::now_utc();
         Timestamp((now.unix_timestamp_nanos() / 1_000_000) as i64)
     }

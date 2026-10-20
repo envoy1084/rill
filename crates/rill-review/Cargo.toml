@@ -16,7 +16,6 @@ serde = { workspace = true }
 bytes = { workspace = true }
 blake3 = { workspace = true }
 hex = { workspace = true }
-rand = { workspace = true }
 regex = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }

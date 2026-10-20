@@ -12,6 +12,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
+/// Sixteen random bytes for a new identifier. Seeded instead when a
+/// simulation has called `testing::set_id_seed` on this thread.
+pub fn random_id() -> [u8; 16] {
+    #[cfg(feature = "testing")]
+    if let Some(bytes) = crate::testing::clock::seeded_id() {
+        return bytes;
+    }
+    rand::random()
+}
+
 macro_rules! define_id {
     ($(#[$meta:meta])* $name:ident, $prefix:literal) => {
         $(#[$meta])*
@@ -22,7 +32,7 @@ macro_rules! define_id {
             pub const PREFIX: &'static str = $prefix;
 
             pub fn new() -> Self {
-                $name(rand::random())
+                $name(random_id())
             }
 
             pub fn from_bytes(bytes: [u8; 16]) -> Self {
