@@ -65,6 +65,22 @@ When you change behavior, update the page that owns it in the same change.
   (`core: honour context lines in unified diff`), with a body when the why
   is not obvious.
 
+## Keeping docs and progress current
+
+* `research/` is local planning material and is **not tracked** by git
+  (it is in `.gitignore`). Never commit it and never link to it from
+  tracked docs.
+* **Progress:** as roadmap work completes, update
+  `research/scale-plan/progress.md`: the current phase, each work item's
+  status (`todo` / `in progress` / `done`) with the commit that finished it,
+  exit-gate results, and anything deferred or discovered. Update it at the
+  end of every work session, not only at phase boundaries.
+* **Architecture docs:** when a major feature or component lands (or v1
+  behaviour changes), rewrite the owning page under `architecture/` in the
+  same change. Keep pages short, accurate to the code, and keep the reading
+  order in `architecture/index.md` and each page's previous/next footer in
+  sync when pages are added, moved or removed.
+
 ## Layering
 
 `rill-types` ← `rill-store` ← `rill-core` ← `rill-policy` / `rill-review` /
