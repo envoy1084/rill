@@ -1,0 +1,112 @@
+// Admin service: identity, capability tokens, relationships and policies.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+service AdminService {
+  rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse);
+  rpc IssueToken(IssueTokenRequest) returns (IssueTokenResponse);
+  rpc AddRelation(AddRelationRequest) returns (AddRelationResponse);
+  rpc RemoveRelation(RemoveRelationRequest) returns (RemoveRelationResponse);
+  rpc ListRelations(ListRelationsRequest) returns (ListRelationsResponse);
+  rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
+  rpc SetPolicy(SetPolicyRequest) returns (SetPolicyResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message WhoAmIRequest {}
+
+// A capability the caller's token grants, as a human-readable summary.
+message Capability {
+  // Action name, e.g. `repo.write`, `review.vote`, `lander.land`.
+  string action = 1;
+  // Object pattern the action applies to, e.g. `repo:main/*`.
+  string scope = 2;
+  optional int64 expires_at = 3;
+}
+
+message WhoAmIResponse {
+  Principal principal = 1;
+  repeated string teams = 2;
+  repeated Capability capabilities = 3;
+  optional int64 token_expires_at = 4;
+}
+
+message IssueTokenRequest {
+  bytes operation_id = 1;
+  // Capabilities to attenuate the caller's token to; must be a subset.
+  repeated Capability capabilities = 2;
+  optional int64 expires_at = 3;
+  // Principal the token acts as; defaults to the caller. Used to mint
+  // agent identities sponsored by the caller.
+  optional Principal for_principal = 4;
+}
+message IssueTokenResponse {
+  string token = 1;
+  int64 expires_at = 2;
+}
+
+// A ReBAC tuple: `subject` has `relation` on `object`.
+message Relation {
+  // `repo:main`, `path:main/src/auth`, `team:infra`, `intent:in_...`.
+  string object = 1;
+  // `owner`, `reviewer`, `member`, `lander`, ...
+  string relation = 2;
+  // `principal:pr_...`, `team:infra#member`.
+  string subject = 3;
+}
+
+message AddRelationRequest {
+  bytes operation_id = 1;
+  Relation relation = 2;
+}
+message AddRelationResponse {}
+
+message RemoveRelationRequest {
+  bytes operation_id = 1;
+  Relation relation = 2;
+}
+message RemoveRelationResponse {}
+
+message ListRelationsRequest {
+  string object = 1;
+  optional string relation = 2;
+}
+message ListRelationsResponse {
+  repeated Relation relations = 1;
+}
+
+message GetPolicyRequest {
+  string name = 1;
+}
+message GetPolicyResponse {
+  string name = 1;
+  // Cedar policy text.
+  string text = 2;
+  int64 updated_at = 3;
+  Principal updated_by = 4;
+}
+
+message SetPolicyRequest {
+  bytes operation_id = 1;
+  string name = 2;
+  string text = 3;
+}
+message SetPolicyResponse {
+  int64 updated_at = 1;
+}
+
+message HealthRequest {}
+
+message ComponentHealth {
+  string name = 1;
+  bool ok = 2;
+  optional string detail = 3;
+}
+message HealthResponse {
+  bool ok = 1;
+  string version = 2;
+  repeated ComponentHealth components = 3;
+}

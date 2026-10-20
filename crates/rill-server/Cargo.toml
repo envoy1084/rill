@@ -1,0 +1,48 @@
+[package]
+name = "rill-server"
+description = "The Rill services: gRPC API, object HTTP protocol, event bus and background workers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-types = { workspace = true }
+rill-store = { workspace = true, features = ["s3"] }
+rill-core = { workspace = true }
+rill-policy = { workspace = true }
+rill-proto = { workspace = true }
+rill-review = { workspace = true }
+rill-lander = { workspace = true }
+rill-search = { workspace = true }
+rill-exec = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+bytes = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+dashmap = { workspace = true }
+arc-swap = { workspace = true }
+
+tonic = { workspace = true }
+tonic-prost = { workspace = true }
+tonic-reflection = { workspace = true }
+tonic-health = { workspace = true }
+prost = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -1,0 +1,22 @@
+[package]
+name = "rill-proto"
+description = "Protobuf definitions, generated tonic services and conversions for the rill.v1 API"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-types = { workspace = true }
+tonic = { workspace = true }
+tonic-prost = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }
+protox = { workspace = true }
+prost = { workspace = true }

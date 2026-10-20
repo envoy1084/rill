@@ -1,0 +1,28 @@
+[package]
+name = "rill-review"
+description = "Review state machine for Rill: labels, votes, threads, stacks, submit evaluation and reviewer orchestration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-types = { workspace = true }
+rill-store = { workspace = true }
+rill-core = { workspace = true }
+rill-policy = { workspace = true }
+serde = { workspace = true }
+bytes = { workspace = true }
+blake3 = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+regex = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

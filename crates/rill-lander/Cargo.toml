@@ -1,0 +1,27 @@
+[package]
+name = "rill-lander"
+description = "Landing pipeline for Rill: rebase onto trunk, CAS land, post-land verification, culprit finding and revert"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-types = { workspace = true }
+rill-store = { workspace = true }
+rill-core = { workspace = true }
+serde = { workspace = true }
+postcard = { workspace = true }
+bytes = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+dashmap = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tokio-util = { workspace = true }

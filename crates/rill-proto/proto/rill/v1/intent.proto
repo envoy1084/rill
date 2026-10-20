@@ -1,0 +1,91 @@
+// Intent service: the "why" behind changes.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+service IntentService {
+  rpc CreateIntent(CreateIntentRequest) returns (CreateIntentResponse);
+  rpc GetIntent(GetIntentRequest) returns (GetIntentResponse);
+  rpc UpdateIntent(UpdateIntentRequest) returns (UpdateIntentResponse);
+  rpc ListIntents(ListIntentsRequest) returns (ListIntentsResponse);
+  rpc LinkChange(LinkChangeRequest) returns (LinkChangeResponse);
+  rpc FindSimilarIntents(FindSimilarIntentsRequest) returns (FindSimilarIntentsResponse);
+}
+
+message CreateIntentRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  string title = 3;
+  string body = 4;
+  IntentKind kind = 5;
+  optional bytes parent = 6;
+  optional RiskClass risk_override = 7;
+}
+message CreateIntentResponse {
+  Intent intent = 1;
+}
+
+message GetIntentRequest {
+  string repo = 1;
+  bytes id = 2;
+}
+message GetIntentResponse {
+  Intent intent = 1;
+}
+
+message UpdateIntentRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes id = 3;
+  optional string title = 4;
+  optional string body = 5;
+  optional IntentStatus status = 6;
+  optional bytes parent = 7;
+  // Explicitly clears the parent when set.
+  bool clear_parent = 8;
+  optional RiskClass risk_override = 9;
+  bool clear_risk_override = 10;
+}
+message UpdateIntentResponse {
+  Intent intent = 1;
+}
+
+message ListIntentsRequest {
+  string repo = 1;
+  repeated IntentStatus status = 2;
+  repeated IntentKind kind = 3;
+  optional bytes owner = 4;
+  optional bytes parent = 5;
+  uint32 limit = 6;
+  optional string page_token = 7;
+}
+message ListIntentsResponse {
+  repeated Intent intents = 1;
+  optional string next_page_token = 2;
+}
+
+message LinkChangeRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes intent = 3;
+  bytes change_id = 4;
+}
+message LinkChangeResponse {
+  Intent intent = 1;
+}
+
+message FindSimilarIntentsRequest {
+  string repo = 1;
+  string title = 2;
+  string body = 3;
+  uint32 limit = 4;
+}
+message ScoredIntent {
+  Intent intent = 1;
+  float score = 2;
+}
+message FindSimilarIntentsResponse {
+  repeated ScoredIntent results = 1;
+}

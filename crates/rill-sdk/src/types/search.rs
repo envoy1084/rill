@@ -1,0 +1,117 @@
+//! Code search types.
+
+use rill_proto::convert::path_from_proto;
+use rill_proto::rill::v1 as pb;
+use rill_types::RepoPathBuf;
+
+use crate::error::Result;
+
+/// A regex search over the files of a root.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrepQuery {
+    /// Regular expression in Rust `regex` syntax.
+    pub pattern: String,
+    /// Match without regard to ASCII case.
+    pub case_insensitive: bool,
+    /// Glob filters on paths; empty matches everything.
+    pub path_globs: Vec<String>,
+    /// Maximum hits; `0` lets the server pick its default.
+    pub max_results: u32,
+    /// Lines of context around each hit.
+    pub context_lines: u32,
+}
+
+impl GrepQuery {
+    /// A query for `pattern` with no filters and server defaults.
+    pub fn new(pattern: impl Into<String>) -> Self {
+        GrepQuery {
+            pattern: pattern.into(),
+            case_insensitive: false,
+            path_globs: Vec::new(),
+            max_results: 0,
+            context_lines: 0,
+        }
+    }
+
+    /// Match case-insensitively.
+    pub fn case_insensitive(mut self, yes: bool) -> Self {
+        self.case_insensitive = yes;
+        self
+    }
+
+    /// Restrict results to paths matching `glob`.
+    pub fn glob(mut self, glob: impl Into<String>) -> Self {
+        self.path_globs.push(glob.into());
+        self
+    }
+
+    /// Cap the number of hits.
+    pub fn max_results(mut self, n: u32) -> Self {
+        self.max_results = n;
+        self
+    }
+
+    /// Lines of context to return around each hit.
+    pub fn context_lines(mut self, n: u32) -> Self {
+        self.context_lines = n;
+        self
+    }
+}
+
+/// One matching line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrepHit {
+    /// File containing the match.
+    pub path: RepoPathBuf,
+    /// One-based line number.
+    pub line_no: u32,
+    /// The matching line without its terminator.
+    pub line: String,
+    /// Lines preceding the match.
+    pub before: Vec<String>,
+    /// Lines following the match.
+    pub after: Vec<String>,
+    /// Byte offsets of the first match on the line within the whole file.
+    pub byte_start: u64,
+    /// End of that match.
+    pub byte_end: u64,
+}
+
+impl TryFrom<pb::GrepHit> for GrepHit {
+    type Error = rill_proto::ConvertError;
+
+    fn try_from(h: pb::GrepHit) -> std::result::Result<Self, Self::Error> {
+        Ok(GrepHit {
+            path: path_from_proto("grep_hit.path", &h.path)?,
+            line_no: h.line_no,
+            line: h.line,
+            before: h.before,
+            after: h.after,
+            byte_start: h.byte_start,
+            byte_end: h.byte_end,
+        })
+    }
+}
+
+/// Result of a search.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GrepResult {
+    /// Hits in path, then line order.
+    pub hits: Vec<GrepHit>,
+    /// True when the result set was cut at `max_results`.
+    pub truncated: bool,
+}
+
+impl GrepResult {
+    pub(crate) fn from_proto(resp: pb::GrepResponse) -> Result<Self> {
+        let hits = resp
+            .hits
+            .into_iter()
+            .map(GrepHit::try_from)
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(GrepResult {
+            hits,
+            truncated: resp.truncated,
+        })
+    }
+}

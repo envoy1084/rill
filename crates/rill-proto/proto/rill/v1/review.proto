@@ -1,0 +1,196 @@
+// Review service: labels, votes, threads, stacks and submit evaluation.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+service ReviewService {
+  rpc GetReview(GetReviewRequest) returns (GetReviewResponse);
+  rpc ListReviews(ListReviewsRequest) returns (ListReviewsResponse);
+  rpc SubmitForReview(SubmitForReviewRequest) returns (SubmitForReviewResponse);
+  rpc Vote(VoteRequest) returns (VoteResponse);
+  rpc Comment(CommentRequest) returns (CommentResponse);
+  rpc ReplyThread(ReplyThreadRequest) returns (ReplyThreadResponse);
+  rpc ResolveThread(ResolveThreadRequest) returns (ResolveThreadResponse);
+  rpc SetStack(SetStackRequest) returns (SetStackResponse);
+  rpc EvaluateSubmit(EvaluateSubmitRequest) returns (EvaluateSubmitResponse);
+  rpc Abandon(AbandonRequest) returns (AbandonResponse);
+  rpc RequestLand(RequestLandRequest) returns (RequestLandResponse);
+  rpc GetLandStatus(GetLandStatusRequest) returns (GetLandStatusResponse);
+  rpc WatchReview(WatchReviewRequest) returns (stream ReviewEvent);
+}
+
+message GetReviewRequest {
+  string repo = 1;
+  bytes change_id = 2;
+}
+message GetReviewResponse {
+  ReviewState review = 1;
+  repeated Label labels = 2;
+}
+
+message ListReviewsRequest {
+  string repo = 1;
+  repeated ReviewStatus status = 2;
+  optional bytes owner = 3;
+  optional bytes intent = 4;
+  uint32 limit = 5;
+  optional string page_token = 6;
+}
+message ListReviewsResponse {
+  repeated ReviewState reviews = 1;
+  optional string next_page_token = 2;
+}
+
+message SubmitForReviewRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes change_id = 3;
+}
+message SubmitForReviewResponse {
+  ReviewState review = 1;
+}
+
+message VoteRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes change_id = 3;
+  string label = 4;
+  int32 value = 5;
+  optional string reason = 6;
+  // Defaults to the current version.
+  optional bytes version = 7;
+}
+message VoteResponse {
+  ReviewState review = 1;
+}
+
+message CommentRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes change_id = 3;
+  ThreadAnchor anchor = 4;
+  string body = 5;
+  optional CommentCategory category = 6;
+  optional uint32 confidence = 7;
+  optional Principal to = 8;
+}
+message CommentResponse {
+  string thread_id = 1;
+  Thread thread = 2;
+}
+
+message ReplyThreadRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes change_id = 3;
+  string thread_id = 4;
+  string body = 5;
+  optional CommentCategory category = 6;
+  optional uint32 confidence = 7;
+}
+message ReplyThreadResponse {
+  Thread thread = 1;
+}
+
+message ResolveThreadRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes change_id = 3;
+  string thread_id = 4;
+  // False re-opens the thread.
+  bool resolved = 5;
+}
+message ResolveThreadResponse {
+  Thread thread = 1;
+}
+
+message SetStackRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  // Bottom-to-top; every change gets the same stack.
+  repeated bytes change_ids = 3;
+}
+message SetStackResponse {
+  repeated ReviewState reviews = 1;
+}
+
+message EvaluateSubmitRequest {
+  string repo = 1;
+  bytes change_id = 2;
+}
+message SubmitDecision {
+  bool allowed = 1;
+  repeated string reasons = 2;
+  repeated string matched_policies = 3;
+  RiskClass risk = 4;
+  repeated string risk_reasons = 5;
+}
+message EvaluateSubmitResponse {
+  SubmitDecision decision = 1;
+}
+
+message AbandonRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes change_id = 3;
+  optional string reason = 4;
+}
+message AbandonResponse {
+  ReviewState review = 1;
+}
+
+enum LandStatus {
+  LAND_STATUS_UNSPECIFIED = 0;
+  LAND_STATUS_QUEUED = 1;
+  LAND_STATUS_REBASING = 2;
+  LAND_STATUS_LANDED = 3;
+  LAND_STATUS_FAILED = 4;
+  LAND_STATUS_CANCELLED = 5;
+}
+
+message LandTicket {
+  string id = 1;
+  bytes change_id = 2;
+  LandStatus status = 3;
+  int64 requested_at = 4;
+}
+
+message RequestLandRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes change_id = 3;
+}
+message RequestLandResponse {
+  LandTicket ticket = 1;
+}
+
+message GetLandStatusRequest {
+  string repo = 1;
+  string ticket = 2;
+}
+message GetLandStatusResponse {
+  LandTicket ticket = 1;
+  // Set once landed.
+  optional uint64 seq = 2;
+  optional bytes landed_hash = 3;
+  optional string error = 4;
+}
+
+message WatchReviewRequest {
+  string repo = 1;
+  bytes change_id = 2;
+}
+
+message ReviewEvent {
+  bytes change_id = 1;
+  int64 at = 2;
+  oneof event {
+    ReviewStatus status_changed = 3;
+    LabelVote voted = 4;
+    Thread thread_updated = 5;
+    bytes new_version = 6;
+    LandTicket land_update = 7;
+  }
+}

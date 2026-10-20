@@ -1,0 +1,28 @@
+[package]
+name = "rill-policy"
+description = "Policy for Rill: risk classification, Cedar submit rules, ReBAC checks, capability tokens and object signing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-types = { workspace = true }
+rill-store = { workspace = true }
+cedar-policy = { workspace = true }
+biscuit-auth = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand = { workspace = true }
+globset = { workspace = true }
+hex = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+time = { workspace = true }
+
+[dev-dependencies]

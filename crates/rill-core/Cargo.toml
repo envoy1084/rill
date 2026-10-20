@@ -1,0 +1,27 @@
+[package]
+name = "rill-core"
+description = "Diff, merge, trees, ancestry, blame and derived data for Rill"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-types = { workspace = true }
+rill-store = { workspace = true }
+serde = { workspace = true }
+postcard = { workspace = true }
+bytes = { workspace = true }
+imara-diff = { workspace = true }
+fastcdc = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

@@ -1,0 +1,551 @@
+//! `rill.v1.ReviewService`: a thin mapping onto `rill_review::ReviewService`
+//! plus the hand-off to the lander.
+
+use std::pin::Pin;
+use std::sync::Arc;
+
+use futures::Stream;
+use rill_lander::{LandEvent, LandRequest};
+use rill_proto::convert::{
+    comment_category_from_proto, confidence_from_proto, hash_to_proto, id_from_proto, id_to_proto,
+    ids_from_proto, opt_id_from_proto, review_status_from_proto, timestamp_to_proto,
+};
+use rill_proto::rill::v1 as pb;
+use rill_proto::rill::v1::review_service_server::ReviewService;
+use rill_review::service::ReviewEvent;
+use rill_review::threads::CommentMeta;
+use rill_types::{ChangeId, Principal, RepoPathBuf, ReviewStatus, ThreadAnchor, Timestamp};
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tonic::{Request, Response, Status};
+
+use super::common::{self, open, GrpcResult, Opened};
+use crate::error::{Error, Result};
+use crate::state::{AppState, RepoEvent};
+
+/// Server stream of review events.
+pub type ReviewEventStream =
+    Pin<Box<dyn Stream<Item = std::result::Result<pb::ReviewEvent, Status>> + Send>>;
+
+/// The review service.
+#[derive(Clone)]
+pub struct ReviewSvc {
+    state: Arc<AppState>,
+}
+
+impl ReviewSvc {
+    /// A service over `state`.
+    pub fn new(state: Arc<AppState>) -> Self {
+        ReviewSvc { state }
+    }
+}
+
+fn change_id(bytes: &[u8]) -> Result<ChangeId> {
+    Ok(id_from_proto("change_id", bytes)?)
+}
+
+fn review_response(state: rill_types::ReviewState) -> pb::ReviewState {
+    pb::ReviewState::from(state)
+}
+
+async fn thread_of(opened: &Opened, change_id: &ChangeId, thread_id: &str) -> Result<pb::Thread> {
+    let state = opened.repo.review().get(change_id).await?;
+    state
+        .threads
+        .iter()
+        .find(|t| t.id == thread_id)
+        .map(pb::Thread::from)
+        .ok_or_else(|| Error::not_found(format!("thread {thread_id}")))
+}
+
+#[tonic::async_trait]
+impl ReviewService for ReviewSvc {
+    async fn get_review(
+        &self,
+        request: Request<pb::GetReviewRequest>,
+    ) -> GrpcResult<pb::GetReviewResponse> {
+        let result: crate::error::Result<Response<pb::GetReviewResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().read(&RepoPathBuf::root()).await?;
+            let id = change_id(&request.get_ref().change_id)?;
+            let state = opened.repo.review().get(&id).await?;
+            Ok(Response::new(pb::GetReviewResponse {
+                review: Some(review_response(state)),
+                labels: opened.repo.labels.iter().map(pb::Label::from).collect(),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn list_reviews(
+        &self,
+        request: Request<pb::ListReviewsRequest>,
+    ) -> GrpcResult<pb::ListReviewsResponse> {
+        let result: crate::error::Result<Response<pb::ListReviewsResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().read(&RepoPathBuf::root()).await?;
+            let req = request.get_ref();
+            let statuses: Vec<ReviewStatus> = req
+                .status
+                .iter()
+                .map(|s| review_status_from_proto("status", *s))
+                .collect::<std::result::Result<_, _>>()?;
+            let owner: Option<rill_types::PrincipalId> =
+                opt_id_from_proto("owner", req.owner.as_ref())?;
+            let intent: Option<rill_types::IntentId> =
+                opt_id_from_proto("intent", req.intent.as_ref())?;
+            let limit = common::limit(req.limit, 100, 10_000);
+            let mut reviews = opened.repo.review().list().await?;
+            reviews.retain(|r| {
+                (statuses.is_empty() || statuses.contains(&r.status))
+                    && owner.is_none_or(|o| r.owner.id == o)
+                    && intent.is_none_or(|i| r.intent == Some(i))
+            });
+            reviews.sort_by_key(|r| std::cmp::Reverse(r.updated_at));
+            reviews.truncate(limit);
+            Ok(Response::new(pb::ListReviewsResponse {
+                reviews: reviews.into_iter().map(review_response).collect(),
+                next_page_token: None,
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn submit_for_review(
+        &self,
+        request: Request<pb::SubmitForReviewRequest>,
+    ) -> GrpcResult<pb::SubmitForReviewResponse> {
+        let result: crate::error::Result<Response<pb::SubmitForReviewResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().write(&RepoPathBuf::root()).await?;
+            let id = change_id(&request.get_ref().change_id)?;
+            let state = opened.repo.review().submit(&id, opened.principal()).await?;
+            Ok(Response::new(pb::SubmitForReviewResponse {
+                review: Some(review_response(state)),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn vote(&self, request: Request<pb::VoteRequest>) -> GrpcResult<pb::VoteResponse> {
+        let result: crate::error::Result<Response<pb::VoteResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().review().await?;
+            let req = request.get_ref();
+            let id = change_id(&req.change_id)?;
+            let value = i8::try_from(req.value)
+                .map_err(|_| Error::invalid(format!("vote value {} out of range", req.value)))?;
+            if let Some(version) = common::opt_hash("version", req.version.as_ref())? {
+                let current = opened.repo.review().get(&id).await?.current_version();
+                if current != Some(version) {
+                    return Err(Error::precondition(format!(
+                        "version {version} is not the current version of {id}"
+                    )));
+                }
+            }
+            let state = opened
+                .repo
+                .review()
+                .vote(
+                    &id,
+                    opened.principal(),
+                    &req.label,
+                    value,
+                    req.reason.clone(),
+                )
+                .await?;
+            Ok(Response::new(pb::VoteResponse {
+                review: Some(review_response(state)),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn comment(
+        &self,
+        request: Request<pb::CommentRequest>,
+    ) -> GrpcResult<pb::CommentResponse> {
+        let result: crate::error::Result<Response<pb::CommentResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().review().await?;
+            let req = request.into_inner();
+            let id = change_id(&req.change_id)?;
+            let anchor = match req.anchor {
+                Some(a) => ThreadAnchor::try_from(a)?,
+                None => ThreadAnchor::Change,
+            };
+            let category = req
+                .category
+                .map(|c| comment_category_from_proto("category", c))
+                .transpose()?;
+            let confidence = req
+                .confidence
+                .map(|c| confidence_from_proto("confidence", c))
+                .transpose()?;
+            let to = req.to.map(Principal::try_from).transpose()?;
+            let thread_id = opened
+                .repo
+                .review()
+                .comment(
+                    &id,
+                    opened.principal(),
+                    anchor,
+                    req.body,
+                    category,
+                    confidence,
+                    to,
+                )
+                .await?;
+            let thread = thread_of(&opened, &id, &thread_id).await?;
+            Ok(Response::new(pb::CommentResponse {
+                thread_id,
+                thread: Some(thread),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn reply_thread(
+        &self,
+        request: Request<pb::ReplyThreadRequest>,
+    ) -> GrpcResult<pb::ReplyThreadResponse> {
+        let result: crate::error::Result<Response<pb::ReplyThreadResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().review().await?;
+            let req = request.into_inner();
+            let id = change_id(&req.change_id)?;
+            let meta = CommentMeta {
+                category: req
+                    .category
+                    .map(|c| comment_category_from_proto("category", c))
+                    .transpose()?,
+                confidence: req
+                    .confidence
+                    .map(|c| confidence_from_proto("confidence", c))
+                    .transpose()?,
+            };
+            opened
+                .repo
+                .review()
+                .reply(&id, &req.thread_id, opened.principal(), req.body, meta)
+                .await?;
+            let thread = thread_of(&opened, &id, &req.thread_id).await?;
+            Ok(Response::new(pb::ReplyThreadResponse {
+                thread: Some(thread),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn resolve_thread(
+        &self,
+        request: Request<pb::ResolveThreadRequest>,
+    ) -> GrpcResult<pb::ResolveThreadResponse> {
+        let result: crate::error::Result<Response<pb::ResolveThreadResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().review().await?;
+            let req = request.get_ref();
+            let id = change_id(&req.change_id)?;
+            let review = opened.repo.review();
+            if req.resolved {
+                review
+                    .resolve(&id, &req.thread_id, opened.principal())
+                    .await?;
+            } else {
+                review.unresolve(&id, &req.thread_id).await?;
+            }
+            let thread = thread_of(&opened, &id, &req.thread_id).await?;
+            Ok(Response::new(pb::ResolveThreadResponse {
+                thread: Some(thread),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn set_stack(
+        &self,
+        request: Request<pb::SetStackRequest>,
+    ) -> GrpcResult<pb::SetStackResponse> {
+        let result: crate::error::Result<Response<pb::SetStackResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().write(&RepoPathBuf::root()).await?;
+            let ids: Vec<ChangeId> = ids_from_proto("change_ids", &request.get_ref().change_ids)?;
+            let states = opened.repo.review().set_stack(&ids).await?;
+            Ok(Response::new(pb::SetStackResponse {
+                reviews: states.into_iter().map(review_response).collect(),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn evaluate_submit(
+        &self,
+        request: Request<pb::EvaluateSubmitRequest>,
+    ) -> GrpcResult<pb::EvaluateSubmitResponse> {
+        let result: crate::error::Result<Response<pb::EvaluateSubmitResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().read(&RepoPathBuf::root()).await?;
+            let id = change_id(&request.get_ref().change_id)?;
+            let review = opened.repo.review();
+            let state = review.get(&id).await?;
+            let decision = review.evaluate_for(&state, opened.principal()).await?;
+            Ok(Response::new(pb::EvaluateSubmitResponse {
+                decision: Some(pb::SubmitDecision {
+                    allowed: decision.allowed,
+                    reasons: decision.reasons,
+                    matched_policies: decision.matched_policies,
+                    risk: pb::RiskClass::from(state.risk) as i32,
+                    risk_reasons: state.risk_reasons,
+                }),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn abandon(
+        &self,
+        request: Request<pb::AbandonRequest>,
+    ) -> GrpcResult<pb::AbandonResponse> {
+        let result: crate::error::Result<Response<pb::AbandonResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().write(&RepoPathBuf::root()).await?;
+            let req = request.get_ref();
+            let id = change_id(&req.change_id)?;
+            let review = opened.repo.review();
+            let current = review.get(&id).await?;
+            opened.permit().owns_or_admin(&current.owner).await?;
+            let state = review.abandon(&id, opened.principal()).await?;
+            if let Some(reason) = req.reason.clone().filter(|r| !r.is_empty()) {
+                review
+                    .comment(
+                        &id,
+                        opened.principal(),
+                        ThreadAnchor::Change,
+                        format!("Abandoned: {reason}"),
+                        None,
+                        None,
+                        None,
+                    )
+                    .await?;
+            }
+            Ok(Response::new(pb::AbandonResponse {
+                review: Some(review_response(state)),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    /// Evaluate the submit policy for the caller and, if it permits,
+    /// queue the change's current version for landing.
+    async fn request_land(
+        &self,
+        request: Request<pb::RequestLandRequest>,
+    ) -> GrpcResult<pb::RequestLandResponse> {
+        let result: crate::error::Result<Response<pb::RequestLandResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().land().await?;
+            let id = change_id(&request.get_ref().change_id)?;
+            let review = opened.repo.review();
+            let state = review.get(&id).await?;
+            match state.status {
+                ReviewStatus::Landed => {
+                    return Err(Error::precondition(format!("change {id} already landed")))
+                }
+                ReviewStatus::Landing => {
+                    return Err(Error::precondition(format!(
+                        "change {id} is already landing"
+                    )))
+                }
+                ReviewStatus::Abandoned => {
+                    return Err(Error::precondition(format!("change {id} is abandoned")))
+                }
+                _ => {}
+            }
+            let decision = review.evaluate_for(&state, opened.principal()).await?;
+            if !decision.allowed {
+                return Err(Error::precondition(format!(
+                    "submit policy does not allow landing: {}",
+                    decision.reasons.join("; ")
+                )));
+            }
+            let version = state
+                .current_version()
+                .ok_or_else(|| Error::precondition(format!("change {id} has no versions")))?;
+            let ticket = opened
+                .repo
+                .lander
+                .enqueue(LandRequest::new(
+                    id,
+                    version,
+                    opened.principal().clone(),
+                    state.risk,
+                ))
+                .await;
+            common::remember_ticket(&opened.repo, ticket, id);
+            let (proto, _) = common::ticket_status(&opened.repo, ticket).await?;
+            Ok(Response::new(pb::RequestLandResponse {
+                ticket: Some(proto),
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    async fn get_land_status(
+        &self,
+        request: Request<pb::GetLandStatusRequest>,
+    ) -> GrpcResult<pb::GetLandStatusResponse> {
+        let result: crate::error::Result<Response<pb::GetLandStatusResponse>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().read(&RepoPathBuf::root()).await?;
+            let ticket = common::parse_ticket(&request.get_ref().ticket)?;
+            let (proto, status) = common::ticket_status(&opened.repo, ticket).await?;
+            let (seq, landed_hash, error) = match status {
+                rill_lander::LandStatus::Landed { seq } => {
+                    let hash = opened.repo.repo.trunk_at(seq).await?;
+                    (Some(seq.get()), hash.map(|h| hash_to_proto(&h)), None)
+                }
+                rill_lander::LandStatus::Failed { reason }
+                | rill_lander::LandStatus::Returned { reason } => (None, None, Some(reason)),
+                rill_lander::LandStatus::Conflict { paths } => (
+                    None,
+                    None,
+                    Some(format!(
+                        "rebase onto trunk conflicts at: {}",
+                        paths
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )),
+                ),
+                _ => (None, None, None),
+            };
+            Ok(Response::new(pb::GetLandStatusResponse {
+                ticket: Some(proto),
+                seq,
+                landed_hash,
+                error,
+            }))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+
+    type WatchReviewStream = ReviewEventStream;
+
+    async fn watch_review(
+        &self,
+        request: Request<pb::WatchReviewRequest>,
+    ) -> GrpcResult<Self::WatchReviewStream> {
+        let result: crate::error::Result<Response<Self::WatchReviewStream>> = async {
+            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+            opened.permit().read(&RepoPathBuf::root()).await?;
+            let id = change_id(&request.get_ref().change_id)?;
+            let ctx = opened.repo.clone();
+            let mut rx = ctx.events.subscribe();
+            let (tx, out) = mpsc::channel(256);
+            tokio::spawn(async move {
+                loop {
+                    let received = tokio::select! {
+                        _ = ctx.shutdown.cancelled() => break,
+                        r = rx.recv() => r,
+                    };
+                    let event = match received {
+                        Ok(event) => event,
+                        Err(RecvError::Lagged(_)) => continue,
+                        Err(RecvError::Closed) => break,
+                    };
+                    let Some(mapped) = review_event_proto(&ctx, &id, event).await else {
+                        continue;
+                    };
+                    if tx.send(Ok(mapped)).await.is_err() {
+                        break;
+                    }
+                }
+            });
+            let stream: ReviewEventStream = Box::pin(ReceiverStream::new(out));
+            Ok(Response::new(stream))
+        }
+        .await;
+        result.map_err(Status::from)
+    }
+}
+
+/// Map a bus event to a wire review event for `change_id`, or `None`
+/// when it concerns another change.
+async fn review_event_proto(
+    ctx: &crate::state::RepoContext,
+    change_id: &ChangeId,
+    event: RepoEvent,
+) -> Option<pb::ReviewEvent> {
+    use pb::review_event::Event;
+    let at = timestamp_to_proto(Timestamp::now());
+    let wrap = |event: Event| pb::ReviewEvent {
+        change_id: id_to_proto(change_id),
+        at,
+        event: Some(event),
+    };
+    match event {
+        RepoEvent::Review(review) if review.change_id() == *change_id => match review {
+            ReviewEvent::StatusChanged { to, .. } => Some(wrap(Event::StatusChanged(
+                pb::ReviewStatus::from(to) as i32,
+            ))),
+            ReviewEvent::Submitted { .. } => {
+                Some(wrap(Event::StatusChanged(pb::ReviewStatus::Open as i32)))
+            }
+            ReviewEvent::Abandoned { .. } => Some(wrap(Event::StatusChanged(
+                pb::ReviewStatus::Abandoned as i32,
+            ))),
+            ReviewEvent::Voted { vote, .. } => Some(wrap(Event::Voted(pb::LabelVote::from(&vote)))),
+            ReviewEvent::Commented { thread_id, .. }
+            | ReviewEvent::ThreadResolved { thread_id, .. } => {
+                let state = ctx.review().get(change_id).await.ok()?;
+                let thread = state.threads.iter().find(|t| t.id == thread_id)?;
+                Some(wrap(Event::ThreadUpdated(pb::Thread::from(thread))))
+            }
+            ReviewEvent::VersionAdded { version, .. } => {
+                Some(wrap(Event::NewVersion(hash_to_proto(&version))))
+            }
+            ReviewEvent::StackChanged { .. } | ReviewEvent::Landed { .. } => None,
+        },
+        RepoEvent::Land(land) => {
+            let (ticket_change, status) = match &land {
+                LandEvent::Queued { change_id, .. } => (*change_id, pb::LandStatus::Queued),
+                LandEvent::Landed { change_id, .. } => (*change_id, pb::LandStatus::Landed),
+                LandEvent::Conflict { change_id, .. } | LandEvent::Failed { change_id, .. } => {
+                    (*change_id, pb::LandStatus::Failed)
+                }
+                _ => return None,
+            };
+            if ticket_change != *change_id {
+                return None;
+            }
+            let ticket = ctx
+                .tickets
+                .iter()
+                .filter(|t| t.value().change_id == *change_id)
+                .max_by_key(|t| *t.key())
+                .map(|t| (*t.key(), t.value().requested_at));
+            let (id, requested_at) = ticket.unwrap_or((0, Timestamp::now()));
+            Some(wrap(Event::LandUpdate(pb::LandTicket {
+                id: id.to_string(),
+                change_id: id_to_proto(change_id),
+                status: status as i32,
+                requested_at: timestamp_to_proto(requested_at),
+            })))
+        }
+        _ => None,
+    }
+}

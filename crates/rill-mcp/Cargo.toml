@@ -1,0 +1,35 @@
+[package]
+name = "rill-mcp"
+description = "MCP server exposing the Rill SDK to agents over stdio, plus the JSON encoding of SDK values shared with the CLI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "rill-mcp"
+path = "src/bin/rill_mcp.rs"
+
+[dependencies]
+rill-sdk = { workspace = true }
+rill-types = { workspace = true }
+rill-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+bytes = { workspace = true }
+hex = { workspace = true }
+regex = { workspace = true }
+globset = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+rill-proto = { workspace = true }
+tonic = { workspace = true }
+tokio-stream = { workspace = true }

@@ -1,0 +1,498 @@
+// Repository service: history, trees, blobs, diffs, change creation and refs.
+//
+// Every write request carries `operation_id` (16 bytes) so the server can
+// make it idempotent, and `repo` naming the repository.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+service RepoService {
+  // Repositories.
+  rpc GetRepo(GetRepoRequest) returns (GetRepoResponse);
+  rpc ListRepos(ListReposRequest) returns (ListReposResponse);
+  rpc CreateRepo(CreateRepoRequest) returns (CreateRepoResponse);
+
+  // History.
+  rpc GetChangeVersion(GetChangeVersionRequest) returns (GetChangeVersionResponse);
+  rpc GetChangeInfo(GetChangeInfoRequest) returns (GetChangeInfoResponse);
+  rpc GetChangeVersions(GetChangeVersionsRequest) returns (GetChangeVersionsResponse);
+  rpc Log(LogRequest) returns (LogResponse);
+  rpc PathHistory(PathHistoryRequest) returns (PathHistoryResponse);
+  rpc Blame(BlameRequest) returns (BlameResponse);
+  // Regex search over the files of a root, served from the trigram index.
+  rpc Grep(GrepRequest) returns (GrepResponse);
+
+  // Trees and blobs.
+  rpc GetTree(GetTreeRequest) returns (GetTreeResponse);
+  rpc ListDir(ListDirRequest) returns (ListDirResponse);
+  rpc ResolvePath(ResolvePathRequest) returns (ResolvePathResponse);
+  rpc GetBlob(GetBlobRequest) returns (stream BlobChunk);
+  rpc PutBlob(stream PutBlobRequest) returns (PutBlobResponse);
+  rpc HasObjects(HasObjectsRequest) returns (HasObjectsResponse);
+
+  // Comparison.
+  rpc Diff(DiffRequest) returns (DiffResponse);
+  rpc MergeBase(MergeBaseRequest) returns (MergeBaseResponse);
+  rpc IsAncestor(IsAncestorRequest) returns (IsAncestorResponse);
+
+  // Writing history.
+  rpc CreateChangeVersion(CreateChangeVersionRequest) returns (CreateChangeVersionResponse);
+  rpc ApplyEdits(ApplyEditsRequest) returns (ApplyEditsResponse);
+  rpc Rebase(RebaseRequest) returns (RebaseResponse);
+  rpc Merge(MergeRequest) returns (MergeResponse);
+  rpc Resolve(ResolveRequest) returns (ResolveResponse);
+
+  // Refs and trunk.
+  rpc ResolveRef(ResolveRefRequest) returns (ResolveRefResponse);
+  rpc ListRefs(ListRefsRequest) returns (ListRefsResponse);
+  rpc MoveRef(MoveRefRequest) returns (MoveRefResponse);
+  rpc TrunkHead(TrunkHeadRequest) returns (TrunkHeadResponse);
+  rpc TrunkRange(TrunkRangeRequest) returns (TrunkRangeResponse);
+
+  // Watches.
+  rpc WatchRefs(WatchRefsRequest) returns (stream RefEvent);
+  rpc WatchTrunk(WatchTrunkRequest) returns (stream LandEvent);
+  rpc WatchLog(WatchLogRequest) returns (stream ChangeInfo);
+
+  // Derived data.
+  rpc GetDerived(GetDerivedRequest) returns (GetDerivedResponse);
+  rpc WaitDerived(WaitDerivedRequest) returns (WaitDerivedResponse);
+}
+
+// --- Repositories ---------------------------------------------------------
+
+message GetRepoRequest {
+  string repo = 1;
+}
+message GetRepoResponse {
+  Repo repo = 1;
+}
+
+message ListReposRequest {
+  uint32 limit = 1;
+  optional string page_token = 2;
+}
+message ListReposResponse {
+  repeated Repo repos = 1;
+  optional string next_page_token = 2;
+}
+
+message CreateRepoRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  optional string description = 3;
+}
+message CreateRepoResponse {
+  Repo repo = 1;
+}
+
+// --- History --------------------------------------------------------------
+
+message GetChangeVersionRequest {
+  string repo = 1;
+  bytes hash = 2;
+}
+message GetChangeVersionResponse {
+  ChangeVersion version = 1;
+  repeated Signature signatures = 2;
+}
+
+message GetChangeInfoRequest {
+  string repo = 1;
+  bytes hash = 2;
+}
+message GetChangeInfoResponse {
+  ChangeInfo info = 1;
+}
+
+message GetChangeVersionsRequest {
+  string repo = 1;
+  bytes change_id = 2;
+}
+message GetChangeVersionsResponse {
+  // In creation order; the last one is current.
+  repeated ChangeInfo versions = 1;
+}
+
+message LogRequest {
+  string repo = 1;
+  // Where to start walking; defaults to trunk head.
+  RootSpec start = 2;
+  uint32 limit = 3;
+  // Restrict to versions touching a path or prefix.
+  optional string path = 4;
+  // Walk first parents only.
+  bool first_parent = 5;
+}
+message LogResponse {
+  repeated ChangeInfo entries = 1;
+  // Hash to pass as `start` to continue the walk.
+  optional bytes next_start = 2;
+}
+
+message PathHistoryRequest {
+  string repo = 1;
+  string path = 2;
+  RootSpec start = 3;
+  uint32 limit = 4;
+}
+message PathHistoryResponse {
+  repeated PathHistoryEntry entries = 1;
+  optional bytes next_start = 2;
+}
+message PathHistoryEntry {
+  ChangeInfo info = 1;
+  // The path as of this version (differs across renames).
+  string path = 2;
+  FileChange change = 3;
+}
+
+message BlameRequest {
+  string repo = 1;
+  bytes hash = 2;
+  string path = 3;
+}
+message BlameResponse {
+  repeated BlameLine lines = 1;
+}
+message GrepRequest {
+  string repo = 1;
+  // Root to search; defaults to the trunk head.
+  RootSpec root = 2;
+  // Regular expression (Rust `regex` syntax).
+  string pattern = 3;
+  bool case_insensitive = 4;
+  // Glob filters on paths, e.g. `src/**/*.rs`; empty means all paths.
+  repeated string path_globs = 5;
+  uint32 max_results = 6;
+  uint32 context_lines = 7;
+}
+message GrepResponse {
+  repeated GrepHit hits = 1;
+  // True when `max_results` cut the result set.
+  bool truncated = 2;
+}
+message GrepHit {
+  string path = 1;
+  uint32 line_no = 2;
+  string line = 3;
+  repeated string before = 4;
+  repeated string after = 5;
+  uint64 byte_start = 6;
+  uint64 byte_end = 7;
+}
+message BlameLine {
+  uint32 line_no = 1;
+  bytes version = 2;
+  Principal author = 3;
+  optional uint64 trunk_seq = 4;
+  bytes text = 5;
+}
+
+// --- Trees and blobs ------------------------------------------------------
+
+message GetTreeRequest {
+  string repo = 1;
+  bytes hash = 2;
+}
+message GetTreeResponse {
+  Tree tree = 1;
+}
+
+message ListDirRequest {
+  string repo = 1;
+  RootSpec root = 2;
+  string path = 3;
+}
+message ListDirResponse {
+  bytes tree_hash = 1;
+  repeated NamedTreeEntry entries = 2;
+}
+
+message ResolvePathRequest {
+  string repo = 1;
+  RootSpec root = 2;
+  string path = 3;
+}
+message ResolvePathResponse {
+  // Absent if the path does not exist.
+  optional TreeEntry entry = 1;
+}
+
+message GetBlobRequest {
+  string repo = 1;
+  ContentRef content = 2;
+  // Byte range; defaults to the whole blob.
+  optional uint64 offset = 3;
+  optional uint64 length = 4;
+}
+message BlobChunk {
+  bytes data = 1;
+}
+
+message PutBlobRequest {
+  oneof msg {
+    PutBlobHeader header = 1;
+    bytes data = 2;
+  }
+}
+message PutBlobHeader {
+  bytes operation_id = 1;
+  string repo = 2;
+  // Total size, if known; lets the server pick chunking up front.
+  optional uint64 size = 3;
+  // Expected content hash; the upload fails if it does not match.
+  optional bytes expected_hash = 4;
+}
+message PutBlobResponse {
+  ContentRef content = 1;
+}
+
+message HasObjectsRequest {
+  string repo = 1;
+  repeated ObjectRef objects = 2;
+}
+message ObjectRef {
+  ObjectKind kind = 1;
+  bytes hash = 2;
+}
+message HasObjectsResponse {
+  // Parallel to the request's `objects`.
+  repeated bool present = 1;
+}
+
+// --- Comparison -----------------------------------------------------------
+
+message DiffRequest {
+  string repo = 1;
+  RootSpec base = 2;
+  RootSpec target = 3;
+  // Restrict to these paths or prefixes; empty means everything.
+  repeated string paths = 4;
+  DiffFormat format = 5;
+  uint32 context_lines = 6;
+  uint32 limit = 7;
+}
+message DiffResponse {
+  repeated FileDiff files = 1;
+  bool truncated = 2;
+}
+
+message MergeBaseRequest {
+  string repo = 1;
+  bytes a = 2;
+  bytes b = 3;
+}
+message MergeBaseResponse {
+  // Empty when the two versions share no history.
+  repeated bytes bases = 1;
+}
+
+message IsAncestorRequest {
+  string repo = 1;
+  bytes ancestor = 2;
+  bytes descendant = 3;
+}
+message IsAncestorResponse {
+  bool is_ancestor = 1;
+}
+
+// --- Writing history ------------------------------------------------------
+
+message CreateChangeVersionRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  ChangeVersion version = 3;
+  repeated Signature signatures = 4;
+}
+message CreateChangeVersionResponse {
+  bytes hash = 1;
+}
+
+// Base of an edit: a point in history or the current version of a change.
+message EditBase {
+  oneof base {
+    RootSpec root = 1;
+    bytes change_id = 2;
+  }
+}
+
+// One edit to apply to a path.
+message Edit {
+  string path = 1;
+  oneof op {
+    SetContent set_content = 2;
+    bool delete = 3;
+    // A unified diff against the base content.
+    string patch = 4;
+  }
+}
+message SetContent {
+  ContentRef content = 1;
+  FileKind kind = 2;
+  optional CopySource copy_from = 3;
+}
+
+message ApplyEditsRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  EditBase base = 3;
+  repeated Edit edits = 4;
+  string message = 5;
+  optional bytes intent = 6;
+  Provenance provenance = 7;
+  // Amend this change rather than creating a new one.
+  optional bytes change_id = 8;
+}
+message ApplyEditsResponse {
+  bytes hash = 1;
+  ChangeVersion version = 2;
+}
+
+message RebaseRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes hash = 3;
+  bytes new_parent = 4;
+}
+message RebaseResponse {
+  bytes hash = 1;
+  ChangeVersion version = 2;
+}
+
+message MergeRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes left = 3;
+  bytes right = 4;
+  string message = 5;
+  optional bytes intent = 6;
+  Provenance provenance = 7;
+}
+message MergeResponse {
+  bytes hash = 1;
+  ChangeVersion version = 2;
+}
+
+message Resolution {
+  string path = 1;
+  oneof resolution {
+    SetContent set = 2;
+    bool delete = 3;
+  }
+}
+message ResolveRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes hash = 3;
+  repeated Resolution resolutions = 4;
+  Provenance provenance = 5;
+}
+message ResolveResponse {
+  bytes hash = 1;
+  ChangeVersion version = 2;
+}
+
+// --- Refs and trunk -------------------------------------------------------
+
+message ResolveRefRequest {
+  string repo = 1;
+  string name = 2;
+}
+message ResolveRefResponse {
+  bytes hash = 1;
+  optional uint64 trunk_seq = 2;
+}
+
+message ListRefsRequest {
+  string repo = 1;
+  optional string prefix = 2;
+}
+message ListRefsResponse {
+  repeated Ref refs = 1;
+}
+
+message MoveRefRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  RefUpdate update = 3;
+}
+message MoveRefResponse {
+  // Target after the update; absent when the ref was deleted.
+  optional bytes hash = 1;
+}
+
+message TrunkHeadRequest {
+  string repo = 1;
+}
+message TrunkHeadResponse {
+  uint64 seq = 1;
+  bytes hash = 2;
+}
+
+message TrunkRangeRequest {
+  string repo = 1;
+  // Inclusive bounds.
+  uint64 from = 2;
+  uint64 to = 3;
+}
+message TrunkRangeResponse {
+  repeated LandEvent landings = 1;
+}
+
+// --- Watches --------------------------------------------------------------
+
+message WatchRefsRequest {
+  string repo = 1;
+  optional string prefix = 2;
+}
+message RefEvent {
+  string name = 1;
+  optional bytes old = 2;
+  optional bytes new = 3;
+  int64 at = 4;
+}
+
+message WatchTrunkRequest {
+  string repo = 1;
+  // Resume after this sequence number.
+  optional uint64 after_seq = 2;
+}
+message LandEvent {
+  uint64 seq = 1;
+  bytes hash = 2;
+  bytes change_id = 3;
+  Principal landed_by = 4;
+  int64 at = 5;
+  // Set when this landing is a revert of an earlier sequence.
+  optional uint64 reverts_seq = 6;
+}
+
+message WatchLogRequest {
+  string repo = 1;
+  optional uint64 after_seq = 2;
+}
+
+// --- Derived data ---------------------------------------------------------
+
+message GetDerivedRequest {
+  string repo = 1;
+  string kind = 2;
+  bytes hash = 3;
+}
+message GetDerivedResponse {
+  bytes data = 1;
+}
+
+message WaitDerivedRequest {
+  string repo = 1;
+  string kind = 2;
+  bytes hash = 3;
+  uint64 timeout_ms = 4;
+}
+message WaitDerivedResponse {
+  bool ready = 1;
+  optional bytes data = 2;
+}

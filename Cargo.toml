@@ -1,0 +1,133 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rill-types",
+    "crates/rill-store",
+    "crates/rill-core",
+    "crates/rill-policy",
+    "crates/rill-proto",
+    "crates/rill-review",
+    "crates/rill-lander",
+    "crates/rill-search",
+    "crates/rill-exec",
+    "crates/rill-server",
+    "crates/rill-sdk",
+    "crates/rill-cli",
+    "crates/rill-mcp",
+    "crates/rill-git-import",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/rill-vcs/rill"
+authors = ["Rill contributors"]
+
+[workspace.dependencies]
+# Internal crates
+rill-types = { path = "crates/rill-types" }
+rill-store = { path = "crates/rill-store" }
+rill-core = { path = "crates/rill-core" }
+rill-policy = { path = "crates/rill-policy" }
+rill-proto = { path = "crates/rill-proto" }
+rill-review = { path = "crates/rill-review" }
+rill-lander = { path = "crates/rill-lander" }
+rill-search = { path = "crates/rill-search" }
+rill-exec = { path = "crates/rill-exec" }
+rill-server = { path = "crates/rill-server" }
+rill-sdk = { path = "crates/rill-sdk" }
+rill-git-import = { path = "crates/rill-git-import" }
+rill-mcp = { path = "crates/rill-mcp" }
+
+# Serialization and hashing
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+postcard = { version = "1.1", features = ["use-std"] }
+blake3 = { version = "1.8", features = ["rayon"] }
+hex = "0.4"
+bytes = { version = "1", features = ["serde"] }
+fastcdc = "5"
+zstd = "0.13"
+
+# Async and runtime
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-util = { version = "0.7", features = ["io", "rt"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# RPC and HTTP
+tonic = { version = "0.14", features = ["transport", "codegen"] }
+tonic-prost = "0.14"
+tonic-prost-build = "0.14"
+tonic-reflection = "0.14"
+tonic-health = "0.14"
+prost = "0.14"
+prost-types = "0.14"
+protox = "0.10"
+axum = { version = "0.8", features = ["http2"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "cors"] }
+http = "1"
+hyper = "1"
+http-body-util = "0.1"
+arc-swap = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+
+# Storage
+redb = "4"
+object_store = "0.14"
+url = "2"
+
+# Diff and merge
+imara-diff = "0.2"
+
+# Policy and auth
+cedar-policy = "4"
+biscuit-auth = "6"
+ed25519-dalek = { version = "2", features = ["rand_core", "serde"] }
+rand = "0.8"
+
+# Errors, logging, misc
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4.5"
+comfy-table = "7"
+owo-colors = { version = "4", features = ["supports-colors"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+time = { version = "0.3", features = ["serde", "formatting", "parsing", "macros"] }
+parking_lot = "0.12"
+dashmap = "6"
+libc = "0.2"
+walkdir = "2"
+ignore = "0.4"
+globset = "0.4"
+regex = "1"
+regex-syntax = "0.8"
+gix = { version = "0.73", default-features = false, features = ["parallel"] }
+toml = "0.8"
+dirs = "6"
+tempfile = "3"
+proptest = "1"
+similar-asserts = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+debug = 1
+
+[profile.dev]
+opt-level = 1
+# Line tables only: full debuginfo makes each test binary several hundred MB.
+debug = "line-tables-only"
+
+[profile.test]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2

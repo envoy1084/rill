@@ -1,0 +1,49 @@
+[package]
+name = "rill-cli"
+description = "The `rill` user command and the `rill-server` binary"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "rill_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rill"
+path = "src/bin/rill.rs"
+
+[[bin]]
+name = "rill-server"
+path = "src/bin/rill_server.rs"
+
+[dependencies]
+rill-sdk = { workspace = true }
+rill-mcp = { workspace = true }
+rill-types = { workspace = true }
+rill-core = { workspace = true }
+rill-server = { workspace = true }
+rill-store = { workspace = true }
+rill-git-import = { workspace = true }
+clap = { workspace = true }
+clap_complete = { workspace = true }
+comfy-table = { workspace = true }
+owo-colors = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+bytes = { workspace = true }
+tonic = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

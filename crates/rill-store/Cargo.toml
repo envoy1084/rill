@@ -1,0 +1,40 @@
+[package]
+name = "rill-store"
+description = "Storage traits and backends for Rill: content-addressed object store and transactional metadata store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["local"]
+# Filesystem object store and redb metadata store.
+local = ["dep:redb"]
+# `object_store`-backed object store (S3 and compatible services, plus the
+# local and in-memory stores the crate ships for tests).
+s3 = ["dep:object_store", "dep:url", "dep:futures"]
+# FoundationDB metadata store. Needs libfdb_c at link time.
+fdb = ["dep:foundationdb", "dep:futures"]
+
+[dependencies]
+rill-types = { workspace = true }
+serde = { workspace = true }
+postcard = { workspace = true }
+bytes = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+hex = { workspace = true }
+zstd = { workspace = true }
+redb = { workspace = true, optional = true }
+object_store = { workspace = true, optional = true, features = ["aws"] }
+url = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+foundationdb = { version = "0.9", optional = true, features = ["embedded-fdb-include", "fdb-7_3"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+object_store = { workspace = true }

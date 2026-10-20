@@ -1,0 +1,122 @@
+// Lander service: trunk status, post-land verification, culprits and reverts.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+import "rill/v1/repo.proto";
+import "rill/v1/review.proto";
+
+service LanderService {
+  rpc GetTrunkStatus(GetTrunkStatusRequest) returns (GetTrunkStatusResponse);
+  rpc ListLandings(ListLandingsRequest) returns (ListLandingsResponse);
+  rpc GetVerification(GetVerificationRequest) returns (GetVerificationResponse);
+  rpc ReportVerification(ReportVerificationRequest) returns (ReportVerificationResponse);
+  rpc RevertSeq(RevertSeqRequest) returns (RevertSeqResponse);
+  rpc Bisect(BisectRequest) returns (BisectResponse);
+}
+
+enum VerificationStatus {
+  VERIFICATION_STATUS_UNSPECIFIED = 0;
+  VERIFICATION_STATUS_PENDING = 1;
+  VERIFICATION_STATUS_RUNNING = 2;
+  VERIFICATION_STATUS_PASSED = 3;
+  VERIFICATION_STATUS_FAILED = 4;
+  // Failed, and a later bisect found an earlier culprit.
+  VERIFICATION_STATUS_INHERITED = 5;
+  VERIFICATION_STATUS_SKIPPED = 6;
+}
+
+// One runner's report for one landed sequence.
+message VerificationReport {
+  // Name of the verification target or runner (`unit`, `lint`, ...).
+  string target = 1;
+  VerificationStatus status = 2;
+  Principal reporter = 3;
+  int64 reported_at = 4;
+  optional string details = 5;
+  // Content-addressed log or artifact, if the runner stored one.
+  optional bytes artifact = 6;
+}
+
+message VerificationResult {
+  uint64 seq = 1;
+  VerificationStatus status = 2;
+  // The sequence that introduced the failure, when known.
+  optional uint64 culprit = 3;
+  repeated VerificationReport reports = 4;
+}
+
+message GetTrunkStatusRequest {
+  string repo = 1;
+  uint32 recent_limit = 2;
+}
+message InFlightLanding {
+  LandTicket ticket = 1;
+  bytes version = 2;
+}
+message GetTrunkStatusResponse {
+  uint64 head_seq = 1;
+  bytes head_hash = 2;
+  repeated InFlightLanding in_flight = 3;
+  repeated LandEvent recent = 4;
+  // Latest sequence whose verification has passed.
+  optional uint64 last_verified_seq = 5;
+}
+
+message ListLandingsRequest {
+  string repo = 1;
+  uint32 limit = 2;
+  optional uint64 before_seq = 3;
+}
+message ListLandingsResponse {
+  repeated LandEvent landings = 1;
+  repeated VerificationResult verifications = 2;
+}
+
+message GetVerificationRequest {
+  string repo = 1;
+  uint64 seq = 2;
+}
+message GetVerificationResponse {
+  VerificationResult result = 1;
+}
+
+message ReportVerificationRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  uint64 seq = 3;
+  string target = 4;
+  VerificationStatus status = 5;
+  optional string details = 6;
+  optional bytes artifact = 7;
+}
+message ReportVerificationResponse {
+  VerificationResult result = 1;
+}
+
+message RevertSeqRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  uint64 seq = 3;
+  string reason = 4;
+}
+message RevertSeqResponse {
+  LandEvent landing = 1;
+  ChangeVersion version = 2;
+}
+
+message BisectRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  // Last known-good sequence.
+  uint64 from = 3;
+  // First known-bad sequence.
+  uint64 to = 4;
+  string target = 5;
+}
+message BisectResponse {
+  optional uint64 culprit = 1;
+  // Sequences the bisect tested, with their outcomes.
+  repeated VerificationResult tested = 2;
+}

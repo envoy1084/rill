@@ -1,0 +1,496 @@
+// Core object model of Rill, mirroring the `rill-types` crate.
+//
+// Conventions:
+//   * object hashes are 32-byte BLAKE3 digests carried as `bytes`;
+//   * record ids (ChangeId, IntentId, ...) are 16 random bytes;
+//   * repository paths are normalized `/`-separated strings, "" is the root;
+//   * timestamps are int64 milliseconds since the Unix epoch, UTC;
+//   * `Merge<T>` terms are a repeated interleaved list
+//     [add0, remove0, add1, remove1, ..., addN] (always odd length).
+syntax = "proto3";
+
+package rill.v1;
+
+// A 256-bit BLAKE3 content hash wrapped as a message, for use where a
+// bare `bytes` field would be ambiguous (e.g. in `oneof`s and lists).
+message ObjectHash {
+  bytes bytes = 1;
+}
+
+// The kind of object a hash refers to.
+enum ObjectKind {
+  OBJECT_KIND_UNSPECIFIED = 0;
+  OBJECT_KIND_BLOB = 1;
+  OBJECT_KIND_CHUNK = 2;
+  OBJECT_KIND_BLOB_MANIFEST = 3;
+  OBJECT_KIND_TREE = 4;
+  OBJECT_KIND_CHANGE_VERSION = 5;
+  OBJECT_KIND_DERIVED = 6;
+}
+
+// What kind of actor a principal is.
+enum PrincipalKind {
+  PRINCIPAL_KIND_UNSPECIFIED = 0;
+  PRINCIPAL_KIND_HUMAN = 1;
+  PRINCIPAL_KIND_AGENT = 2;
+  PRINCIPAL_KIND_SERVICE = 3;
+}
+
+// An authenticated actor: a human, an agent workload, or a service.
+message Principal {
+  bytes id = 1;
+  PrincipalKind kind = 2;
+  string name = 3;
+  optional string identity = 4;
+}
+
+// Who and what produced a change.
+message Provenance {
+  optional string tool = 1;
+  optional string model = 2;
+  optional string session = 3;
+  optional string prompt_ref = 4;
+  optional Principal sponsor = 5;
+  optional string resolved_by = 6;
+  map<string, string> extra = 7;
+}
+
+// Reference to file content.
+message ContentRef {
+  oneof ref {
+    bytes inline = 1;
+    BlobRef blob = 2;
+    BlobRef chunked = 3;
+  }
+}
+
+// A stored blob or blob manifest with its total size.
+message BlobRef {
+  bytes hash = 1;
+  uint64 size = 2;
+}
+
+// How a file is stored and executed.
+enum FileKind {
+  FILE_KIND_UNSPECIFIED = 0;
+  FILE_KIND_REGULAR = 1;
+  FILE_KIND_EXECUTABLE = 2;
+  FILE_KIND_SYMLINK = 3;
+}
+
+// A file's state on one side of a merge; no `content` means absent.
+message FileState {
+  optional ContentRef content = 1;
+  FileKind kind = 2;
+}
+
+// Interleaved `Merge<FileState>` terms; see the file header.
+message MergeTerms {
+  repeated FileState terms = 1;
+}
+
+// Explicit copy source of a file, pinned to a parent version.
+message CopySource {
+  string path = 1;
+  bytes version = 2;
+}
+
+// What happened to one path, relative to the first parent.
+message FileChange {
+  message Set {
+    ContentRef content = 1;
+    FileKind kind = 2;
+    optional CopySource copy_from = 3;
+  }
+  message Delete {}
+
+  oneof change {
+    Set set = 1;
+    Delete delete = 2;
+    MergeTerms conflict = 3;
+  }
+}
+
+// A whole-directory operation, applied before file changes.
+message SubtreeChange {
+  message Copy {
+    string from_path = 1;
+    bytes from_version = 2;
+  }
+  message Delete {}
+
+  oneof change {
+    Copy copy = 1;
+    Delete delete = 2;
+  }
+}
+
+// One concrete version of a change; its hash is the version identity.
+message ChangeVersion {
+  bytes change_id = 1;
+  repeated bytes parents = 2;
+  optional bytes predecessor = 3;
+  map<string, SubtreeChange> subtree_changes = 4;
+  map<string, FileChange> file_changes = 5;
+  Principal author = 6;
+  Provenance provenance = 7;
+  optional bytes intent = 8;
+  string message = 9;
+  int64 created_at = 10;
+  map<string, bytes> extra = 11;
+}
+
+// Metadata-only projection of a change version.
+message ChangeInfo {
+  bytes hash = 1;
+  bytes change_id = 2;
+  repeated bytes parents = 3;
+  optional bytes predecessor = 4;
+  Principal author = 5;
+  Provenance provenance = 6;
+  optional bytes intent = 7;
+  string message = 8;
+  int64 created_at = 9;
+  uint64 files_changed = 10;
+  bool has_conflicts = 11;
+  optional uint64 trunk_seq = 12;
+}
+
+// A detached Ed25519 signature over a change version's hash.
+message Signature {
+  Principal signer = 1;
+  bytes public_key = 2;
+  bytes signature = 3;
+  int64 signed_at = 4;
+}
+
+// Aggregate facts about a subtree.
+message DirSummary {
+  uint64 file_count = 1;
+  uint64 dir_count = 2;
+  uint64 total_size = 3;
+}
+
+// What a directory entry points at.
+message TreeEntry {
+  message File {
+    ContentRef content = 1;
+    FileKind kind = 2;
+  }
+  message Dir {
+    bytes hash = 1;
+    DirSummary summary = 2;
+  }
+
+  oneof kind {
+    File file = 1;
+    Dir dir = 2;
+  }
+}
+
+// A directory: its entries keyed by name.
+message Tree {
+  map<string, TreeEntry> entries = 1;
+}
+
+// A tree entry together with its name, for listings.
+message NamedTreeEntry {
+  string name = 1;
+  TreeEntry entry = 2;
+}
+
+// Risk classification of a change.
+enum RiskClass {
+  RISK_CLASS_UNSPECIFIED = 0;
+  RISK_CLASS_TRIVIAL = 1;
+  RISK_CLASS_LOW = 2;
+  RISK_CLASS_NORMAL = 3;
+  RISK_CLASS_SENSITIVE = 4;
+  RISK_CLASS_CRITICAL = 5;
+}
+
+enum IntentKind {
+  INTENT_KIND_UNSPECIFIED = 0;
+  INTENT_KIND_FEATURE = 1;
+  INTENT_KIND_BUG = 2;
+  INTENT_KIND_REFACTOR = 3;
+  INTENT_KIND_CHORE = 4;
+  INTENT_KIND_EXPERIMENT = 5;
+  INTENT_KIND_SYSTEM = 6;
+}
+
+enum IntentStatus {
+  INTENT_STATUS_UNSPECIFIED = 0;
+  INTENT_STATUS_OPEN = 1;
+  INTENT_STATUS_IN_PROGRESS = 2;
+  INTENT_STATUS_DONE = 3;
+  INTENT_STATUS_ABANDONED = 4;
+}
+
+// A task, spec, bug or plan that changes link to.
+message Intent {
+  bytes id = 1;
+  string title = 2;
+  string body = 3;
+  IntentKind kind = 4;
+  IntentStatus status = 5;
+  Principal owner = 6;
+  optional bytes parent = 7;
+  optional RiskClass risk_override = 8;
+  repeated bytes changes = 9;
+  int64 created_at = 10;
+  int64 updated_at = 11;
+}
+
+// A typed vote range on a change.
+message Label {
+  string name = 1;
+  int32 min = 2;
+  int32 max = 3;
+  bool copy_on_trivial_rebase = 4;
+  bool max_requires_human = 5;
+}
+
+// One principal's vote on one label for one version.
+message LabelVote {
+  string label = 1;
+  int32 value = 2;
+  Principal voter = 3;
+  bytes version = 4;
+  int64 voted_at = 5;
+  optional string reason = 6;
+}
+
+// Where a thread is anchored.
+message ThreadAnchor {
+  message Change {}
+  message Lines {
+    bytes version = 1;
+    string path = 2;
+    uint32 start = 3;
+    uint32 end = 4;
+    string context_hash = 5;
+  }
+  message File {
+    bytes version = 1;
+    string path = 2;
+  }
+
+  oneof anchor {
+    Change change = 1;
+    Lines lines = 2;
+    File file = 3;
+  }
+}
+
+enum CommentCategory {
+  COMMENT_CATEGORY_UNSPECIFIED = 0;
+  COMMENT_CATEGORY_DISCUSSION = 1;
+  COMMENT_CATEGORY_BUG = 2;
+  COMMENT_CATEGORY_SECURITY = 3;
+  COMMENT_CATEGORY_STYLE = 4;
+  COMMENT_CATEGORY_TEST_GAP = 5;
+  COMMENT_CATEGORY_QUESTION = 6;
+  COMMENT_CATEGORY_SUGGESTION = 7;
+}
+
+message Comment {
+  Principal author = 1;
+  string body = 2;
+  int64 created_at = 3;
+  optional CommentCategory category = 4;
+  // Reviewer confidence as a percentage 0-100.
+  optional uint32 confidence = 5;
+}
+
+message Thread {
+  string id = 1;
+  ThreadAnchor anchor = 2;
+  repeated Comment comments = 3;
+  bool resolved = 4;
+  optional Principal to = 5;
+}
+
+enum ReviewStatus {
+  REVIEW_STATUS_UNSPECIFIED = 0;
+  REVIEW_STATUS_DRAFT = 1;
+  REVIEW_STATUS_OPEN = 2;
+  REVIEW_STATUS_LANDABLE = 3;
+  REVIEW_STATUS_LANDING = 4;
+  REVIEW_STATUS_LANDED = 5;
+  REVIEW_STATUS_ABANDONED = 6;
+}
+
+// The review state of a change, keyed by its stable change id.
+message ReviewState {
+  bytes change_id = 1;
+  repeated bytes versions = 2;
+  ReviewStatus status = 3;
+  optional bytes intent = 4;
+  Principal owner = 5;
+  repeated LabelVote votes = 6;
+  repeated Thread threads = 7;
+  RiskClass risk = 8;
+  repeated string risk_reasons = 9;
+  repeated bytes stack = 10;
+  optional uint64 landed_seq = 11;
+  int64 created_at = 12;
+  int64 updated_at = 13;
+  map<string, string> extra = 14;
+}
+
+// Which directories a workspace materializes.
+message SparseProfile {
+  repeated string include = 1;
+  repeated string exclude = 2;
+}
+
+// A principal's in-progress state on a repository.
+message Workspace {
+  bytes id = 1;
+  bytes repo = 2;
+  Principal owner = 3;
+  string name = 4;
+  bytes base = 5;
+  bytes working_change = 6;
+  optional bytes snapshot = 7;
+  SparseProfile sparse = 8;
+  optional bytes head_op = 9;
+  int64 created_at = 10;
+  int64 updated_at = 11;
+}
+
+message OperationKind {
+  message Create {}
+  message Snapshot {
+    bytes tree = 1;
+  }
+  message NewChange {
+    bytes change = 1;
+    bytes base = 2;
+  }
+  message Describe {
+    bytes version = 1;
+  }
+  message Rebase {
+    bytes from = 1;
+    bytes to = 2;
+  }
+  message Resolve {
+    bytes version = 1;
+  }
+  message SetSparse {
+    SparseProfile profile = 1;
+  }
+  message Handoff {
+    Principal to = 1;
+  }
+  message Undo {
+    bytes undone = 1;
+  }
+  message Other {
+    string description = 1;
+  }
+
+  oneof kind {
+    Create create = 1;
+    Snapshot snapshot = 2;
+    NewChange new_change = 3;
+    Describe describe = 4;
+    Rebase rebase = 5;
+    Resolve resolve = 6;
+    SetSparse set_sparse = 7;
+    Handoff handoff = 8;
+    Undo undo = 9;
+    Other other = 10;
+  }
+}
+
+// One entry in a workspace's operation log.
+message Operation {
+  bytes id = 1;
+  bytes workspace = 2;
+  optional bytes parent = 3;
+  Principal actor = 4;
+  OperationKind kind = 5;
+  bytes resulting_base = 6;
+  optional bytes resulting_snapshot = 7;
+  int64 at = 8;
+}
+
+// A compare-and-swap request on a ref; absent `expected` means the ref
+// must not exist, absent `target` deletes it.
+message RefUpdate {
+  string name = 1;
+  optional bytes expected = 2;
+  optional bytes target = 3;
+}
+
+// A named pointer and its current target.
+message Ref {
+  string name = 1;
+  bytes target = 2;
+  // Set for `trunk`: the sequence number of the head.
+  optional uint64 trunk_seq = 3;
+}
+
+// A point in history named by ref, version hash or trunk sequence.
+message RootSpec {
+  oneof root {
+    string ref = 1;
+    bytes version_hash = 2;
+    bytes tree_hash = 3;
+    uint64 trunk_seq = 4;
+  }
+}
+
+// One line of a structured diff.
+message DiffLine {
+  enum Op {
+    OP_UNSPECIFIED = 0;
+    OP_CONTEXT = 1;
+    OP_INSERT = 2;
+    OP_DELETE = 3;
+  }
+  Op op = 1;
+  bytes text = 2;
+}
+
+// A contiguous block of changed lines.
+message DiffHunk {
+  uint32 before_start = 1;
+  uint32 before_len = 2;
+  uint32 after_start = 3;
+  uint32 after_len = 4;
+  repeated DiffLine lines = 5;
+}
+
+// Format of hunks in a diff response.
+enum DiffFormat {
+  DIFF_FORMAT_UNSPECIFIED = 0;
+  DIFF_FORMAT_STRUCTURED = 1;
+  DIFF_FORMAT_UNIFIED = 2;
+}
+
+// The difference of one path between two roots.
+message FileDiff {
+  string path = 1;
+  FileState before = 2;
+  FileState after = 3;
+  // Structured hunks when the format is STRUCTURED.
+  repeated DiffHunk hunks = 4;
+  // Unified diff text when the format is UNIFIED.
+  optional string unified = 5;
+  bool binary = 6;
+  // Set when `after` is a conflict rather than a resolved state.
+  optional MergeTerms conflict = 7;
+}
+
+// A repository record.
+message Repo {
+  bytes id = 1;
+  string name = 2;
+  optional string description = 3;
+  int64 created_at = 4;
+  uint64 trunk_head_seq = 5;
+}
