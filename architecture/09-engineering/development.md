@@ -33,6 +33,11 @@ No `protoc` is needed. `rill-proto/build.rs` compiles the protobufs with
 `protox` and writes a descriptor set that the server serves for reflection
 ([api surface](../07-runtime/api-surface.md)).
 
+`crates/rill-proto/buf.yaml` holds the lint and breaking-change rules for
+`rill.v2` (buf's `STANDARD` lint set and `FILE` breaking rules); `rill.v1`
+is exempt. Run `buf lint` from `crates/rill-proto` (`npx @bufbuild/buf lint`
+works without installing buf). It is not part of CI.
+
 ## Build profiles
 
 | Profile | Settings | Reason |

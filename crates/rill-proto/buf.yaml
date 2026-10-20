@@ -1,0 +1,18 @@
+# Lint and breaking-change rules for the protobuf API.
+#
+# rill.v1 predates these rules and is exempt; it is replaced by rill.v2,
+# which must pass them. Run from this directory: `buf lint` and, once v2
+# is published, `buf breaking --against <last release>`.
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+  ignore:
+    - proto/rill/v1
+breaking:
+  use:
+    - FILE
+  ignore:
+    - proto/rill/v1
