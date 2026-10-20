@@ -11,6 +11,8 @@ pub struct Scenario {
     pub fail_rate: f64,
     /// Probability a store write commits but reports failure.
     pub lose_ack_rate: f64,
+    /// Probability an object read returns corrupted bytes.
+    pub corrupt_rate: f64,
     /// Probability a step is a process restart.
     pub restart_rate: f64,
     /// Share of edits that touch the one shared hot file.
@@ -28,6 +30,7 @@ impl Scenario {
             steps: 160,
             fail_rate: 0.0,
             lose_ack_rate: 0.0,
+            corrupt_rate: 0.0,
             restart_rate: 0.0,
             hot_file_share: 0.3,
             stale_base_share: 0.2,
@@ -40,6 +43,7 @@ impl Scenario {
             name: "faulty",
             fail_rate: 0.03,
             lose_ack_rate: 0.02,
+            corrupt_rate: 0.01,
             restart_rate: 0.02,
             ..Scenario::clean()
         }

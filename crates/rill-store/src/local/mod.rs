@@ -46,4 +46,37 @@ mod tests {
         let config = stores.create_repo("r", "").await.unwrap();
         assert_eq!(stores.get_repo(&config.id).await.unwrap(), Some(config));
     }
+
+    #[tokio::test]
+    async fn a_byte_flipped_on_disk_is_refused_on_read() {
+        use crate::object::ObjectStoreExt;
+        use rill_types::ObjectKind;
+
+        let dir = tempfile::tempdir().unwrap();
+        let stores = LocalStores::open(dir.path()).await.unwrap();
+        let hash = stores
+            .objects
+            .put_blob(bytes::Bytes::from_static(
+                b"thirty-two bytes of file content",
+            ))
+            .await
+            .unwrap();
+        let hex = hash.to_hex();
+        let file = dir
+            .path()
+            .join(LocalStores::OBJECTS_DIR)
+            .join(ObjectKind::Blob.as_str())
+            .join(&hex[..2])
+            .join(&hex);
+        let mut bytes = std::fs::read(&file).unwrap();
+        *bytes.last_mut().unwrap() ^= 0x01;
+        std::fs::write(&file, bytes).unwrap();
+
+        let err = stores
+            .objects
+            .get(ObjectKind::Blob, &hash)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, crate::Error::Corrupt { .. }), "{err}");
+    }
 }

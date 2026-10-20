@@ -52,6 +52,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
         rng.next_u64(),
         scenario.fail_rate,
         scenario.lose_ack_rate,
+        scenario.corrupt_rate,
     ));
     set_clock(Some(START_MILLIS));
     set_id_seed(Some(rng.next_u64()));

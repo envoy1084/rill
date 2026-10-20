@@ -343,7 +343,7 @@ impl Ctx<'_> {
         };
         let rebased = match rebase(&self.world.derive, &current, &head, self.now()).await {
             Ok(cv) => cv,
-            Err(e) if e.to_string().contains("injected fault") => return Outcome::Failed,
+            Err(e) if is_environmental(&e) => return Outcome::Failed,
             Err(e) => {
                 self.oracle.violate(
                     Invariant::RebaseNeverFailsOnContent,
@@ -386,4 +386,13 @@ impl Ctx<'_> {
             Err(_) => Outcome::Failed,
         }
     }
+}
+
+/// Errors that come from the storage environment (injected faults,
+/// corruption caught on read) rather than from the change's content.
+fn is_environmental(e: &rill_core::Error) -> bool {
+    let text = e.to_string();
+    matches!(e, rill_core::Error::Store(_))
+        || text.contains("injected fault")
+        || text.contains("failed its hash check")
 }

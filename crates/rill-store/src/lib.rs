@@ -26,6 +26,7 @@ pub mod memory;
 pub mod meta;
 pub mod object;
 pub mod repo;
+pub mod verified;
 
 #[cfg(feature = "local")]
 pub mod local;
@@ -42,3 +43,4 @@ pub use object::{ObjectStore, ObjectStoreExt, StoredObject};
 pub use repo::{RepoSettings, RepoStore, Stores, STORE_FORMAT};
 #[cfg(feature = "s3")]
 pub use s3::ObjectStoreBackend;
+pub use verified::VerifiedObjectStore;

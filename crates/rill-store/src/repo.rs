@@ -72,15 +72,20 @@ pub struct Stores {
 pub const STORE_FORMAT: u32 = 1;
 
 impl Stores {
+    /// Stores over `objects` (wrapped so every read is hash-checked) and
+    /// `meta`.
     pub fn new(objects: Arc<dyn ObjectStore>, meta: Arc<dyn MetaStore>) -> Self {
-        Stores { objects, meta }
+        Stores {
+            objects: Arc::new(crate::verified::VerifiedObjectStore::new(objects)),
+            meta,
+        }
     }
 
     pub fn memory() -> Self {
-        Stores {
-            objects: Arc::new(crate::memory::MemoryObjectStore::new()),
-            meta: Arc::new(crate::memory::MemoryMetaStore::new()),
-        }
+        Stores::new(
+            Arc::new(crate::memory::MemoryObjectStore::new()),
+            Arc::new(crate::memory::MemoryMetaStore::new()),
+        )
     }
 
     /// Stamp an empty store with [`STORE_FORMAT`], or refuse a store

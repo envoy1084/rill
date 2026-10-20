@@ -27,7 +27,21 @@ impl ObjectStore for FaultyObjectStore {
         if self.plan.read_fails(("get", kind as u8, hash.as_bytes())) {
             return Err(injected_error("object read"));
         }
-        self.inner.get(kind, hash).await
+        let bytes = self.inner.get(kind, hash).await?;
+        match bytes {
+            Some(bytes)
+                if self
+                    .plan
+                    .read_corrupts(("get", kind as u8, hash.as_bytes())) =>
+            {
+                let mut flipped = bytes.to_vec();
+                if let Some(first) = flipped.first_mut() {
+                    *first ^= 0xFF;
+                }
+                Ok(Some(Bytes::from(flipped)))
+            }
+            other => Ok(other),
+        }
     }
 
     async fn has(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<bool> {

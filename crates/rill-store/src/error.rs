@@ -14,6 +14,12 @@ pub enum Error {
         actual: rill_types::ObjectHash,
     },
 
+    #[error("object {kind} {hash} failed its hash check on read")]
+    Corrupt {
+        kind: rill_types::ObjectKind,
+        hash: rill_types::ObjectHash,
+    },
+
     #[error("key not found: {0}")]
     KeyNotFound(String),
 

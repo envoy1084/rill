@@ -27,6 +27,7 @@ pub struct FaultPlan {
     seed: u64,
     fail_rate: f64,
     lose_ack_rate: f64,
+    corrupt_rate: f64,
     enabled: AtomicBool,
     injected: AtomicU64,
     calls: Mutex<HashMap<u64, u64>>,
@@ -34,11 +35,12 @@ pub struct FaultPlan {
 
 impl FaultPlan {
     /// A plan for `seed`; starts disabled so setup is fault-free.
-    pub fn new(seed: u64, fail_rate: f64, lose_ack_rate: f64) -> Self {
+    pub fn new(seed: u64, fail_rate: f64, lose_ack_rate: f64, corrupt_rate: f64) -> Self {
         FaultPlan {
             seed,
             fail_rate,
             lose_ack_rate,
+            corrupt_rate,
             enabled: AtomicBool::new(false),
             injected: AtomicU64::new(0),
             calls: Mutex::new(HashMap::new()),
@@ -77,6 +79,18 @@ impl FaultPlan {
             self.injected.fetch_add(1, Ordering::SeqCst);
         }
         failed
+    }
+
+    /// Whether an object read identified by `op` returns corrupted bytes,
+    /// as a bad disk or a truncated bucket object would.
+    pub fn read_corrupts(&self, op: impl Hash) -> bool {
+        let corrupt = self
+            .roll(("corrupt", op))
+            .is_some_and(|roll| roll < self.corrupt_rate);
+        if corrupt {
+            self.injected.fetch_add(1, Ordering::SeqCst);
+        }
+        corrupt
     }
 
     /// Faults injected so far.
