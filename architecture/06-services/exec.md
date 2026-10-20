@@ -145,7 +145,7 @@ The lander picks a `VerifyMode` per risk class: `None` skips verification;
 * [action.rs](../../crates/rill-exec/src/action.rs), [cache.rs](../../crates/rill-exec/src/cache.rs), [runner.rs](../../crates/rill-exec/src/runner.rs), [materialize.rs](../../crates/rill-exec/src/materialize.rs)
 * [sandbox/mod.rs](../../crates/rill-exec/src/sandbox/mod.rs), [sandbox/local.rs](../../crates/rill-exec/src/sandbox/local.rs), [sandbox/firecracker.rs](../../crates/rill-exec/src/sandbox/firecracker.rs)
 * [verify.rs](../../crates/rill-exec/src/verify.rs)
-* Server: [workers/verifier.rs](../../crates/rill-server/src/workers/verifier.rs), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [config.rs](../../crates/rill-server/src/config.rs)
+* Server: [workers/verifier.rs](../../crates/rill-server/src/workers/verifier.rs), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [config/server.rs](../../crates/rill-server/src/config/server.rs)
 * Lander: [config.rs](../../crates/rill-lander/src/config.rs), [land/pipeline.rs](../../crates/rill-lander/src/land/pipeline.rs)
 
 ---

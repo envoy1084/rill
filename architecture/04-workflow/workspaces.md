@@ -39,9 +39,9 @@ Every mutating RPC ends in `WorkspaceSvc::record`. It builds
 `Operation { id, workspace, parent: ws.head_op, actor, kind,
 resulting_base, resulting_snapshot, at }`, sets `head_op`, and calls
 `RepoStore::append_operation`. That is one metadata transaction:
-`expect_absent(opi/<op_id>)`, append to `op/<repo>/<ws>/`, set
-`ws/<repo>/<ws>`. The `opi` index row is written by a second, separate
-`set` after the transaction commits.
+`Absent(opi op_id)`, a dense append to the workspace's `op` log, the `ws`
+record and the `opi` marker, so an operation and its idempotency marker
+commit together.
 
 The `operation_id` in the request is the idempotency key. An empty id means
 the server generates one. A reused id fails the transaction and surfaces as
@@ -112,9 +112,9 @@ committed version stays in history.
 
 | Key | Value |
 | --- | --- |
-| `ws/<repo>/<ws>` (`keys::workspace`) | `Workspace` record |
-| `op/<repo>/<ws>/<be64 seq>` (`keys::operation_prefix`) | `Operation`, append-only |
-| `opi/<repo>/<op_id>` (`keys::operation_index`) | log sequence, for idempotency |
+| `(ws, ns, repo, ws)` (`RepoKeys::workspace`) | `Workspace` record |
+| `(op, ns, repo, ws, seq)` (`RepoKeys::operations`) | `Operation`, append-only |
+| `(opi, ns, repo, op_id)` (`RepoKeys::operation_index`) | empty marker, for idempotency |
 
 ## Limitations
 
@@ -139,7 +139,7 @@ committed version stays in history.
 * [rill-types/src/objects/workspace.rs](../../crates/rill-types/src/objects/workspace.rs)
 * [rill-server/src/services/workspace.rs](../../crates/rill-server/src/services/workspace.rs)
 * [rill-server/src/services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs) (`commit_version`, `version_from_diff`)
-* [rill-store/src/repo.rs](../../crates/rill-store/src/repo.rs) (`append_operation`, `list_operations`)
+* [rill-store/src/repo/records.rs](../../crates/rill-store/src/repo/records.rs) (`append_operation`, `list_operations`)
 * [rill-store/src/keys.rs](../../crates/rill-store/src/keys.rs)
 * [rill-sdk/src/workspace.rs](../../crates/rill-sdk/src/workspace.rs)
 * [rill-cli/src/commands/ws.rs](../../crates/rill-cli/src/commands/ws.rs)

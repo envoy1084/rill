@@ -48,8 +48,40 @@ works without installing buf). It is not part of CI.
 | `test` | `debug = "line-tables-only"` | same size control for test binaries |
 | `release` | `lto = "thin"`, `codegen-units = 4`, `debug = 1` | cross-crate inlining with bounded link time; line tables kept for backtraces |
 
-`rill-store` features: `local` (default, redb plus files) and `s3`
-(`object_store`). `rill-server` enables `s3`.
+`rill-store` features: `local` (default, redb plus files), `s3`
+(`object_store`) and `fdb` (the FoundationDB metadata store).
+`rill-server` enables `s3`; `rill-server/fdb` and `rill-cli/fdb` forward
+`fdb`. Without `fdb` nothing needs the FoundationDB client library.
+
+## FoundationDB locally
+
+The `fdb` feature links `libfdb_c` from FoundationDB 7.3 (the newest line
+the `foundationdb` crate supports, feature `fdb-7_3`). On macOS install the
+official package from the FoundationDB releases page
+(`FoundationDB-7.3.x_arm64.pkg` or `_x86_64.pkg`, checked against its
+`.sha256`); it installs the client library, `fdbcli` and a single-node
+server started by launchd, with its cluster file at
+`/usr/local/etc/foundationdb/fdb.cluster`. On Debian or Ubuntu install the
+`foundationdb-clients` and `foundationdb-server` packages.
+`fdbcli --exec status` should report `Healthy`; if the database is
+unconfigured, run `fdbcli --exec "configure new single ssd"`.
+
+```
+cargo test -p rill-store --features fdb,s3              # conformance on FoundationDB
+cargo test -p rill-server --features fdb --test grpc    # end to end on FoundationDB
+RILL_FDB_CLUSTER_FILE= cargo run -p rill-cli --features fdb --bin rill-server -- \
+    --dev --storage local:/tmp/rill-dev                 # objects on disk, metadata in FoundationDB
+```
+
+Keep objects persistent when metadata is: `--dev` alone keeps objects in
+memory, so after a restart the metadata would point at objects that are
+gone. Tests use a fresh `rill-test-<random>` root subspace each and clear
+it afterwards, so they never touch a deployment's data.
+
+The macOS package installs `libfdb_c.dylib` as `@rpath/libfdb_c.dylib`.
+`rill-cli`'s build script adds an rpath to `/usr/local/lib` (or
+`FDB_LIB_DIR`) for `fdb` builds, so `rill-server` starts outside `cargo
+run`.
 
 ## CI
 
@@ -58,14 +90,22 @@ flowchart LR
     Trig[push to main / pull request] --> Fmt[cargo fmt --all --check]
     Fmt --> Clippy[cargo clippy --workspace --all-targets]
     Clippy --> Test[cargo test --workspace]
+    Trig --> Install[install FoundationDB 7.3.77]
+    Install --> FClippy[clippy with fdb]
+    FClippy --> FTest[conformance + end to end on FoundationDB]
 ```
 
-`.github/workflows/ci.yml` runs one `check` job on `ubuntu-latest`. It uses
+`.github/workflows/ci.yml` runs two jobs on `ubuntu-latest`. `check` uses
 the stable toolchain with rustfmt and clippy and `Swatinem/rust-cache`.
 `RUSTFLAGS=-D warnings` turns every compiler and clippy warning into an
 error. No feature flags are passed. With `--workspace`, feature unification
 still turns on `s3` for `rill-store`, because `rill-server` requests it. The
 git importer test uses the runner's `git` binary.
+
+`foundationdb` installs the FoundationDB client and server packages, whose
+version and SHA-256 sums are pinned in the job's `env`, waits for the
+single-node cluster to report healthy, then lints the `fdb` code and runs
+the store conformance suite and the server's end-to-end test against it.
 
 ## Conventions
 
@@ -107,10 +147,11 @@ logging in all three binaries.
   `rust-version` minimum.
 - No `cargo-deny`, `cargo-audit` or license check.
 - There is no `[workspace.lints]` table. Lint levels come from defaults,
-  per-crate attributes and the CI `RUSTFLAGS`.
-- Some files are over the 400-line guideline: `rill-store/src/repo.rs`, the
-  `review`, `workspace` and `admin` gRPC service files, `rill-server/src/config.rs`
-  and `rill-cli/src/commands/review.rs`.
+  per-crate attributes and the CI `RUSTFLAGS`. Locally, pass `-D warnings`
+  to clippy after `--` instead: changing `RUSTFLAGS` rebuilds the whole
+  workspace into a second copy of `target/`.
+- Some files are over the 400-line guideline: the `review`, `workspace` and
+  `admin` gRPC service files and `rill-cli/src/commands/review.rs`.
 
 ## Code
 

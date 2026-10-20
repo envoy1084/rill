@@ -29,69 +29,70 @@ Read in this order the first time; each page ends with Previous / Next links.
 
 5. [Objects and ids](02-data/objects-and-ids.md)
 6. [Storage and keyspace](02-data/storage-and-keyspace.md)
-7. [Merge algebra](02-data/merge-algebra.md)
-8. [Content and chunking](02-data/content-and-chunking.md)
-9. [Derived data](02-data/derived-data.md)
+7. [Metadata engines](02-data/metadata-engines.md)
+8. [Merge algebra](02-data/merge-algebra.md)
+9. [Content and chunking](02-data/content-and-chunking.md)
+10. [Derived data](02-data/derived-data.md)
 
 **03 Core algorithms**
 
-10. [Diff](03-core-algorithms/diff.md)
-11. [Merge](03-core-algorithms/merge.md)
-12. [Rebase](03-core-algorithms/rebase.md)
-13. [Trees](03-core-algorithms/trees.md)
-14. [History graph](03-core-algorithms/history-graph.md)
-15. [Change builder](03-core-algorithms/change-builder.md)
+11. [Diff](03-core-algorithms/diff.md)
+12. [Merge](03-core-algorithms/merge.md)
+13. [Rebase](03-core-algorithms/rebase.md)
+14. [Trees](03-core-algorithms/trees.md)
+15. [History graph](03-core-algorithms/history-graph.md)
+16. [Change builder](03-core-algorithms/change-builder.md)
 
 **04 Workflow**
 
-16. [Workspaces](04-workflow/workspaces.md)
-17. [Checkouts](04-workflow/checkouts.md)
-18. [Changes and stacks](04-workflow/changes-and-stacks.md)
-19. [Review](04-workflow/review.md)
-20. [Review agents](04-workflow/review-agents.md)
-21. [Landing](04-workflow/landing.md)
-22. [Post-land verification](04-workflow/post-land-verification.md)
-23. [Intents](04-workflow/intents.md)
+17. [Workspaces](04-workflow/workspaces.md)
+18. [Checkouts](04-workflow/checkouts.md)
+19. [Changes and stacks](04-workflow/changes-and-stacks.md)
+20. [Review](04-workflow/review.md)
+21. [Review agents](04-workflow/review-agents.md)
+22. [Landing](04-workflow/landing.md)
+23. [Post-land verification](04-workflow/post-land-verification.md)
+24. [Intents](04-workflow/intents.md)
 
 **05 Policy**
 
-24. [Identity and authentication](05-policy/identity-and-auth.md)
-25. [Capability tokens](05-policy/capability-tokens.md)
-26. [Permissions](05-policy/permissions.md)
-27. [Risk classification](05-policy/risk-classification.md)
-28. [Submit policy](05-policy/submit-policy.md)
-29. [Signing](05-policy/signing.md)
-30. [Threat model](05-policy/threat-model.md)
+25. [Identity and authentication](05-policy/identity-and-auth.md)
+26. [Capability tokens](05-policy/capability-tokens.md)
+27. [Permissions](05-policy/permissions.md)
+28. [Risk classification](05-policy/risk-classification.md)
+29. [Submit policy](05-policy/submit-policy.md)
+30. [Signing](05-policy/signing.md)
+31. [Threat model](05-policy/threat-model.md)
 
 **06 Services**
 
-31. [Search](06-services/search.md)
-32. [Exec](06-services/exec.md)
-33. [Git import](06-services/git-import.md)
+32. [Search](06-services/search.md)
+33. [Exec](06-services/exec.md)
+34. [Git import](06-services/git-import.md)
 
 **07 Runtime**
 
-34. [Server](07-runtime/server.md)
-35. [API surface](07-runtime/api-surface.md)
-36. [Events and workers](07-runtime/events-and-workers.md)
-37. [Configuration](07-runtime/configuration.md)
+35. [Server](07-runtime/server.md)
+36. [API surface](07-runtime/api-surface.md)
+37. [Events and workers](07-runtime/events-and-workers.md)
+38. [Configuration](07-runtime/configuration.md)
 
 **08 Clients**
 
-38. [SDK](08-clients/sdk.md)
-39. [CLI](08-clients/cli.md)
-40. [MCP server](08-clients/mcp.md)
+39. [SDK](08-clients/sdk.md)
+40. [CLI](08-clients/cli.md)
+41. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-41. [Development](09-engineering/development.md)
-42. [Testing](09-engineering/testing.md)
-43. [Simulation](09-engineering/simulation.md)
-44. [Performance](09-engineering/performance.md)
+42. [Development](09-engineering/development.md)
+43. [Testing](09-engineering/testing.md)
+44. [Simulation](09-engineering/simulation.md)
+45. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-45. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
+46. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -104,6 +105,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | What a term means | [Glossary](01-overview/glossary.md) |
 | How ids and hashes are computed, what a `ChangeVersion` holds | [Objects and ids](02-data/objects-and-ids.md) |
 | Where a record is stored, which backends exist | [Storage and keyspace](02-data/storage-and-keyspace.md) |
+| How memory, redb and FoundationDB implement the metadata store | [Metadata engines](02-data/metadata-engines.md) |
 | How a conflict is represented | [Merge algebra](02-data/merge-algebra.md) |
 | How large files are split | [Content and chunking](02-data/content-and-chunking.md) |
 | Root trees, blame, path history, caching | [Derived data](02-data/derived-data.md) |

@@ -105,7 +105,7 @@ There is no background worker. Every value is computed by its first reader.
 * `dd/` rows and `Derived` objects are never deleted; only the in-process
   cache is bounded.
 * `PutChange` stores the version before deriving its root tree; a version
-  that fails to materialise stays in `ci/`, `log/` and `chv/`.
+  that fails to materialise stays in `ci`, `log` and `chv`.
 * The `in_flight` lock covers the requested key only; concurrent requests
   for different descendants of one missing ancestor can both derive it
   (values are equal, the last write wins).

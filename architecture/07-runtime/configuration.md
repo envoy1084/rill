@@ -50,13 +50,24 @@ this file. They are stored in the repository and set with `SetPolicy`
 
 ## Storage backends
 
-`open_stores` (`state/app.rs`) maps `StorageConfig` to `Stores`:
+`open_stores` (`state/stores.rs`) builds `Stores` from `[storage]`, which
+picks the objects and a default for metadata, and `[metadata]`, which can
+move metadata elsewhere:
 
-| `kind` | Fields | Objects | Metadata |
+| `[storage] kind` | Fields | Objects | Metadata by default |
 | --- | --- | --- | --- |
 | `memory` | none | in memory | in memory, lost on exit |
-| `local` | `dir` | files under `dir` (`LocalStores::open`) | redb file in `dir` |
-| `s3` | `url`, `prefix`, `meta_dir`, `allow_unconditional_put` | `ObjectStoreBackend::from_url` (for example `s3://bucket`) | redb file `LocalStores::META_FILE` in `meta_dir`, created if missing |
+| `local` | `dir` | files under `dir/objects` | redb file in `dir` |
+| `s3` | `url`, `prefix`, `meta_dir`, `allow_unconditional_put` | `ObjectStoreBackend::from_url` (for example `s3://bucket`) | redb file `LocalStores::META_FILE` in `meta_dir`, created if missing; `meta_dir` is required unless metadata is in FoundationDB |
+
+| `[metadata] kind` | Fields | Metadata |
+| --- | --- | --- |
+| `storage` (default) | none | beside the objects, as above |
+| `fdb` | `cluster_file` (optional, platform default), `root` (default `rill`) | FoundationDB, every key under the subspace `(root,)`, so one cluster can hold several deployments |
+
+`fdb` needs a server built with the `fdb` feature (`cargo build -p
+rill-cli --features fdb`), which links the FoundationDB client library;
+other builds refuse the setting at start-up.
 
 See [storage and keyspace](../02-data/storage-and-keyspace.md) for what the
 stores hold.
@@ -83,8 +94,9 @@ server always trusts its own issuer, whatever the mode. See
 | `RILL_LISTEN_GRPC`, `RILL_LISTEN_HTTP` | socket addresses |
 | `RILL_DEV_MODE` | boolean (`1/0`, `true/false`, `yes/no`, `on/off`) |
 | `RILL_STORAGE` | `memory`, `local:<dir>` or `s3:<url>` |
-| `RILL_S3_PREFIX`, `RILL_S3_META_DIR` | details for `s3:`; `RILL_S3_META_DIR` is required with it |
-| `RILL_S3_ALLOW_UNCONDITIONAL_PUT` | boolean; start even when the service ignores conditional puts (see [storage](../02-data/storage-and-keyspace.md#backends)) |
+| `RILL_S3_PREFIX`, `RILL_S3_META_DIR` | details for `s3:` |
+| `RILL_S3_ALLOW_UNCONDITIONAL_PUT` | boolean; start even when the service ignores conditional puts (see [storage](../02-data/storage-and-keyspace.md#object-backends)) |
+| `RILL_FDB_CLUSTER_FILE`, `RILL_FDB_ROOT` | metadata in FoundationDB; an empty cluster file means the platform default |
 | `RILL_STATIC_TOKENS` | `token=name[:kind[:team,team]];...`; replaces auth with that static list |
 | `RILL_ROOT_PUBLIC_KEY`, `RILL_ROOT_PRIVATE_KEY` | hex keys; switch auth to `biscuit` |
 | `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED` | booleans |
@@ -121,7 +133,7 @@ startup. In dev mode:
 
 ## Code
 
-* [rill-server/src/config.rs](../../crates/rill-server/src/config.rs), [state/app.rs](../../crates/rill-server/src/state/app.rs), [auth/authenticator.rs](../../crates/rill-server/src/auth/authenticator.rs)
+* [rill-server/src/config/](../../crates/rill-server/src/config/mod.rs), [state/stores.rs](../../crates/rill-server/src/state/stores.rs), [auth/authenticator.rs](../../crates/rill-server/src/auth/authenticator.rs)
 * [rill-cli/src/server/mod.rs](../../crates/rill-cli/src/server/mod.rs), [rill-cli/src/server/template.rs](../../crates/rill-cli/src/server/template.rs), [rill-cli/src/bin/rill_server.rs](../../crates/rill-cli/src/bin/rill_server.rs)
 * [rill-lander/src/config.rs](../../crates/rill-lander/src/config.rs)
 

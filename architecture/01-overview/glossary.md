@@ -53,9 +53,12 @@ flowchart LR
 
 - **ObjectStore**: trait for immutable, hash-verified objects. Backends:
   memory, local files, S3. See [storage and keyspace](../02-data/storage-and-keyspace.md).
-- **MetaStore**: trait for small mutable keys with transactions (expect,
-  expect-absent, set). Backends: memory, redb. See
-  [storage and keyspace](../02-data/storage-and-keyspace.md).
+- **MetaStore**: trait for small mutable keys with transactions
+  (conditions, writes, logs, counters). Backends: memory, redb,
+  FoundationDB, all on one keyspace layer. See
+  [metadata engines](../02-data/metadata-engines.md).
+- **Versionstamp**: a 12-byte commit-order position assigned by the
+  metadata store; the cursor of stamped logs such as the version log.
 - **RepoStore**: typed view of one repository's keyspace over both stores:
   refs, trunk, change info, review, workspace and derived records. See
   [storage and keyspace](../02-data/storage-and-keyspace.md).

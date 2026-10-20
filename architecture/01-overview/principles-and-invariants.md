@@ -116,7 +116,7 @@ flowchart LR
 - [Merge::simplify](../../crates/rill-types/src/merge.rs)
 - [ChangeVersion](../../crates/rill-types/src/objects/change.rs)
 - [Object verification](../../crates/rill-store/src/object.rs)
-- [land_on_trunk](../../crates/rill-store/src/repo.rs)
+- [land_on_trunk](../../crates/rill-store/src/repo/trunk.rs)
 - [Landing record lock](../../crates/rill-lander/src/land/pipeline.rs)
 - [Lander traits](../../crates/rill-lander/src/traits.rs)
 - [ReviewHooksAdapter](../../crates/rill-server/src/workers/hooks.rs)

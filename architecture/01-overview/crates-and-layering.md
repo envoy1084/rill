@@ -9,7 +9,7 @@ and policy crates stay free of RPC and storage-layout concerns.
 | Crate | Owns | Does not own |
 | --- | --- | --- |
 | `rill-types` | Object model, ids, BLAKE3 hashing, canonical encoding, `Merge<T>` | I/O, policy decisions |
-| `rill-store` | `ObjectStore` / `MetaStore` traits, keyspace, backends, typed `RepoStore`, trunk CAS | Diff, merge, authorization |
+| `rill-store` | `ObjectStore` / `MetaStore` traits, the keyspace layer, object backends (memory, files, S3) and metadata engines (memory, redb, FoundationDB), typed `RepoStore`, trunk CAS | Diff, merge, authorization |
 | `rill-core` | Diff, three-way merge, trees, rebase, ancestry graph, derived data, blob chunking, `ChangeBuilder` | Storage layout, RPC |
 | `rill-policy` | Risk classification, Cedar submit rules, ReBAC, Biscuit capability tokens, signing | Enforcement points (the server owns those) |
 | `rill-review` | Labels, votes, threads, interdiff, stacks, submit evaluation, review agents | Landing |

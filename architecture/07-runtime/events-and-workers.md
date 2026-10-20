@@ -45,8 +45,9 @@ Each watch RPC subscribes to the bus and spawns a task that feeds an
 on the context's shutdown token, on bus close, or when a send fails because
 the client went away. Lag handling differs per RPC:
 
-* `WatchTrunk` and `WatchLog` keep a cursor (`after_seq`, or the current
-  head when it is absent). They use bus events only as wake-ups. On each
+* `WatchTrunk` and `WatchLog` keep a cursor (`after_seq` for trunk; for
+  the log, the `after` versionstamp from an earlier `LogEntry`, empty to
+  replay from the start; the current head when absent). They use bus events only as wake-ups. On each
   wake-up they read the store (`trunk_range`, or `log_after` in pages of
   `REPLAY_PAGE` = 512) from the cursor. They subscribe before the first
   read, so their output is exact even when the bus lags.

@@ -4,20 +4,16 @@
 immutable byte store keyed by `(ObjectKind, ObjectHash)`. `MetaStore` is an
 ordered key-value space with conditional, atomic transactions for everything
 mutable or sequenced. `RepoStore` puts a typed keyspace for one repository
-over the pair, so services never build raw keys.
+over the pair, so services never build raw keys. How each metadata backend
+implements `MetaStore` is on the next page, [metadata engines](metadata-engines.md).
 
 ```mermaid
 flowchart TD
-    SVC["rill-core, rill-review, rill-lander, rill-server"] --> RS["RepoStore<br/>typed accessors over keys.rs"]
+    SVC["rill-core, rill-review, rill-lander, rill-server"] --> RS["RepoStore<br/>typed accessors over RepoKeys"]
     RS --> OS["ObjectStore<br/>get / has / put / has_many / get_many"]
-    RS --> MS["MetaStore<br/>get / get_many / scan / transact"]
-    OS --> MO["MemoryObjectStore"]
-    OS --> LO["LocalObjectStore (files)"]
-    OS --> S3["ObjectStoreBackend (object_store crate)"]
-    MS --> MM["MemoryMetaStore"]
-    MS --> RM["RedbMetaStore"]
-    LO --> CODEC["codec.rs: RILZ frame"]
-    S3 --> CODEC
+    RS --> MS["MetaStore<br/>get / scan / counter / transact"]
+    OS --> V["VerifiedObjectStore"] --> MO["memory / local files / object_store"]
+    MS --> KS["Keyspace layer"] --> EN["memory / redb / FoundationDB engines"]
 ```
 
 ## ObjectStore
@@ -40,44 +36,63 @@ flowchart TD
 
 ## MetaStore
 
-A `Transaction` is a list of `Condition`s (`Equals { key, value }` where
-`None` means absent, `Absent`, `Present`) and `Mutation`s (`Set`, `Delete`,
-`AppendLog { prefix, value }`). `transact` checks every condition against
-one snapshot before applying anything. If one fails it returns
-`Error::Conflict` and writes nothing.
+A `Transaction` is a list of `Condition`s and `Mutation`s. `transact`
+checks every condition in the same transaction as its writes and either
+applies everything or nothing; a failed condition returns `Error::Conflict`.
 
-`AppendLog` writes `prefix ++ be64(seq)` where `seq` is one more than the
-highest existing sequence under the prefix (1 for an empty log). Sequences
-are dense and byte order equals numeric order. `TxOutcome.appended` returns
-the assigned sequences in order. `scan(KeyRange)` supports bounds, `limit`
-and `reverse`; `KeyRange::prefix` uses `prefix_end` (increment the last
-non-`0xFF` byte; an all-`0xFF` prefix is unbounded).
+| Condition | Holds when |
+| --- | --- |
+| `Equals { key, value }` | the value equals `value` (`None`: absent) |
+| `Absent { key }` / `Present { key }` | the key is absent / present |
+
+| Mutation | Effect |
+| --- | --- |
+| `Set`, `Delete` | write or remove one value of any size |
+| `AppendLog { prefix, value }` | write at `seq_key(prefix, n)`, `n` one more than the highest existing (1 for an empty log); dense, so concurrent appenders to one prefix conflict |
+| `AppendStamped { prefix, value }` | write at `stamp_key(prefix, stamp)`, where the stamp is the commit's versionstamp; appenders never conflict |
+| `Add { key, delta }` | add to a 64-bit counter without reading it; read with `counter(key)` |
+
+`TxOutcome` reports the sequences `appended` and the `stamped`
+`Versionstamp`s in mutation order. A `Versionstamp` is 12 bytes: 10 of
+commit order, 2 of order within the transaction. Byte order is commit
+order, and a stamp is a resumable cursor: once a reader has seen a stamp,
+no entry with a smaller stamp can appear later.
+
+`scan(KeyRange)` supports bounds, `limit` and `reverse`; `KeyRange::prefix`
+uses `prefix_end` (increment the last non-`0xFF` byte; an all-`0xFF` prefix
+is unbounded). Reads outside a transaction always see a whole value, never
+part of one being rewritten.
 
 ## Keyspace
 
-Every key is `<table>/<repo-id>/...` joined with `/`. Ids and hashes are raw
-bytes (16 and 32), not hex, so one prefix scan covers a repository's rows in
-a table.
+Every key is a FoundationDB tuple. Repository rows are
+`(table, namespace, repo, ...)`, built by `RepoKeys`; ids and hashes are
+byte elements, names and kinds string elements, sequences integer
+elements. Tuple elements are self-delimiting, so no name is a prefix of a
+longer name's rows (`dir:/src` never matches `dir:/src/x`), one
+repository's rows in a table are one range, and a namespace (today always
+`DEFAULT_NAMESPACE`, `"default"`) is a larger one.
 
-| Table | Key suffix | Value |
+| Table | Key after `(table, ns, repo)` | Value |
 | --- | --- | --- |
-| `ci` | `<hash>` | `ChangeInfo` record |
-| `sig` | `<hash>` | `Vec<Signature>` record |
-| `log` | `<be64 seq>` | version hash; every stored version, in order |
-| `chv` | `<change-id>/<be64 seq>` | version hash; versions of one change |
-| `ch` | `<change-id>` | `ReviewState` record |
-| `trunk` | `<be64 seq>` | version hash landed at that sequence |
-| `trunkh` | `<hash>` | be64 trunk sequence (reverse index) |
-| `ref` | `<name>` | version hash |
-| `ws` | `<workspace-id>` | `Workspace` record |
-| `op` | `<workspace-id>/<be64 seq>` | `Operation` record |
-| `opi` | `<operation-id>` | be64 sequence; idempotency lookup |
-| `in` | `<intent-id>` | `Intent` record |
-| `dd` | `<kind@version>/<hash>` | derived value record |
-| `rebac` | `<object>/<relation>/<subject>` | empty |
-| `misc` | `<name>` | small values such as policy text |
-| `repo` | `repo/<repo-id>` (no repo prefix) | `RepoConfig` record |
-| `repon` | `repon/<name>` (no repo prefix) | repo id |
+| `ci` | `hash` | `ChangeInfo` record |
+| `sig` | `hash` | signatures, tagged `signatures` |
+| `log` | `stamp` | version hash; every stored version, in commit order |
+| `chv` | `change, seq` | version hash; versions of one change |
+| `ch` | `change` | `ReviewState` record |
+| `trunk` | `seq` | version hash landed at that sequence |
+| `trunkh` | `hash` | be64 trunk sequence (reverse index) |
+| `ref` | `name` | version hash |
+| `ws` | `workspace` | `Workspace` record |
+| `op` | `workspace, seq` | `Operation` record |
+| `opi` | `operation` | empty; idempotency marker |
+| `in` | `intent` | `Intent` record |
+| `dd` | `kind, hash` | derived value (see below) |
+| `rebac` | `object, relation, subject` | empty |
+| `misc` | `name` | named value (see below) |
+| `repo` | `(repo, ns, id)` | `RepoConfig` record |
+| `repon` | `(repon, ns, name)` | repo id |
+| `meta` | `(meta, "format")` | store format |
 
 Change versions themselves live in the object store. A record is framed
 as `[schema u16][tag len u8][tag][postcard]`. Typed records implement
@@ -88,7 +103,13 @@ values use `encode_tagged(tag, value)` with their storage kind as the tag
 the tag, so a row read as the wrong type fails with `Error::Codec` rather
 than decoding garbage.
 
-`meta/format` holds the store format, `STORE_FORMAT = 1`.
+Derived and misc values can grow large (search postings, the import map,
+landing rings). Above `OFFLOAD_BYTES` (64 KiB) `RepoStore` stores the
+value as a `Derived` object and keeps only its hash in the row; a marker
+byte (`0` inline, `1` object) tells the two apart. Callers see plain
+bytes either way.
+
+`(meta, "format")` holds the store format, `STORE_FORMAT = 1`.
 `Stores::check_format` stamps it on a new store and fails with
 `Error::IncompatibleFormat { found, expected }` on any other value; the
 server calls it at start-up, so a store from an incompatible build is
@@ -100,37 +121,36 @@ recreated.
 
 ## Transaction boundaries
 
-* `put_change_version` returns early if `ci/` exists. Otherwise it puts the
-  object, then commits one transaction: set `ci/`, `AppendLog` to `log/` and
-  to `chv/`.
+* `put_change_version` returns early if `ci` exists. Otherwise it puts the
+  object, then commits one transaction: `Absent(ci)`, set `ci`, a stamped
+  append to `log` and a dense append to `chv`. If the condition fails
+  because a concurrent put won, it returns the hash; a version is logged
+  once however many writers store it.
 * `update_ref` is `Equals(expected)` plus set or delete.
 * `land_on_trunk(expected, hash)` reads the trunk head, fails with
-  `Conflict("trunk moved")` if it differs, then commits `Equals(ref/trunk)`,
-  `Absent(trunk/<seq>)`, and sets `ref/trunk`, `trunk/<seq>` and
-  `trunkh/<hash>`. Sequences are gap-free. See
-  [landing](../04-workflow/landing.md).
+  `Conflict("trunk moved")` if it differs, then commits `Equals(ref trunk)`,
+  `Absent(trunk seq)`, and sets the ref, `trunk` and `trunkh` rows.
+  Sequences are gap-free. See [landing](../04-workflow/landing.md).
 * `put_review(state, expected)` adds an optional `Equals` on the previous
   record encoding.
-* `append_operation` commits `Absent(opi/<op>)`, `AppendLog op/` and the
-  `ws/` record, then sets `opi/<op>` in a second write.
-* `put_derived`, `put_signatures`, `put_intent`, `set_misc` are plain sets;
-  `add_signatures` appends to the existing list.
-* `Stores::create_repo` uses `Absent(repon/<name>)` so names are unique.
+* `append_operation` commits `Absent(opi)`, a dense append to `op`, the
+  `ws` record and the `opi` marker in one transaction.
+* `add_signatures` is a read and an `Equals` on what it read.
+* `put_derived`, `put_signatures`, `put_intent`, `set_misc` are plain sets.
+* `Stores::create_repo` uses `Absent(repon)` so names are unique.
 
-## Backends
+## Object backends
 
 | Backend | Feature | Storage |
 | --- | --- | --- |
 | `MemoryObjectStore` | always | `HashMap`, unframed bytes; reference semantics |
-| `MemoryMetaStore` | always | `BTreeMap`; `transact` holds the write lock across check and apply |
 | `LocalObjectStore` | `local` (default) | `<root>/<namespace>/<kind>/<hh>/<hex>`, each file a codec frame |
-| `RedbMetaStore` | `local` (default) | one redb file, one table `kv`; one `Transaction` is one redb write transaction |
 | `ObjectStoreBackend` | `s3` | `<prefix>/<namespace>/<kind>/<hh>/<hex>` on any `object_store` store (`s3://`, `file://`, `memory://` via `from_url`) |
 
-`LocalStores::open(dir)` creates `<dir>/objects` and `<dir>/meta.redb`. The
-server's `open_stores` maps `StorageConfig::Memory`, `Local { dir }` and
-`S3 { url, prefix, meta_dir }` (S3 objects with a local redb for metadata).
-See [configuration](../07-runtime/configuration.md).
+`LocalStores::open(dir)` creates `<dir>/objects` and `<dir>/meta.redb`.
+The server's `open_stores` picks objects from `[storage]` and metadata from
+`[metadata]` (beside the objects by default, or FoundationDB). See
+[configuration](../07-runtime/configuration.md).
 
 The local object store runs all file work on `spawn_blocking`. It writes a
 `.tmp-*` file with `create_new`, fsyncs it, re-checks for a concurrent
@@ -142,11 +162,10 @@ second create also succeeds, the service ignores conditional puts and the
 server refuses to start unless `allow_unconditional_put` is set, in which
 case the backend falls back to check-then-put (`PutStrategy::CheckThenPut`).
 
-Object paths include a namespace, `DEFAULT_NAMESPACE = "default"`, the
-seam for per-tenant isolation. Both persistent backends pass each frame
-through a `Sealer` (`seal` on write, `open` on read); the default
-`Plaintext` sealer is the identity, and an encrypting sealer can be
-plugged in without touching the layout.
+Object paths include a namespace, the seam for per-tenant isolation. Both
+persistent backends pass each frame through a `Sealer` (`seal` on write,
+`open` on read); the default `Plaintext` sealer is the identity, and an
+encrypting sealer can be plugged in without touching the layout.
 
 ## Codec
 
@@ -159,14 +178,14 @@ version or method.
 
 ## Limitations
 
-* No backend deletes objects or rows; there is no garbage collection.
-* `put_change_version` is idempotent by a read before the transaction, not
-  a condition in it; two concurrent first puts of one version can append
-  two `log/` and `chv/` entries.
-* `append_operation` writes `opi/` after its transaction; a crash in between
-  leaves an operation without its idempotency index.
+* No backend deletes objects or rows; there is no garbage collection, and
+  an offloaded derived value that is overwritten leaves its old object.
 * The object put and meta transaction in `put_change_version` are not
   atomic; a failure between them leaves an unreferenced object.
+* The trunk head is found by a reverse scan of `trunk`, not a single
+  head key, and landing records are separate writes (phase 6).
+* `op` and `chv` are dense logs: appenders to one workspace or one change
+  conflict, which is fine for their one writer at a time.
 * The `object_store` backend is tested only against in-process stores,
   never a real S3 endpoint.
 * Only one namespace is used and no encrypting sealer ships yet.
@@ -174,10 +193,10 @@ version or method.
 ## Code
 
 * [lib.rs](../../crates/rill-store/src/lib.rs), [error.rs](../../crates/rill-store/src/error.rs), [object.rs](../../crates/rill-store/src/object.rs), [meta.rs](../../crates/rill-store/src/meta.rs)
-* [keys.rs](../../crates/rill-store/src/keys.rs), [repo.rs](../../crates/rill-store/src/repo.rs), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal.rs](../../crates/rill-store/src/seal.rs)
-* [memory.rs](../../crates/rill-store/src/memory.rs), [local/mod.rs](../../crates/rill-store/src/local/mod.rs), [local/objects.rs](../../crates/rill-store/src/local/objects.rs), [local/meta.rs](../../crates/rill-store/src/local/meta.rs), [s3.rs](../../crates/rill-store/src/s3.rs)
-* [tests/conformance.rs](../../crates/rill-store/tests/conformance.rs): one scenario run against every backend
-* [rill-server state/app.rs](../../crates/rill-server/src/state/app.rs): `open_stores`
+* [keys.rs](../../crates/rill-store/src/keys.rs), [repo/](../../crates/rill-store/src/repo/mod.rs), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal.rs](../../crates/rill-store/src/seal.rs)
+* [memory.rs](../../crates/rill-store/src/memory.rs), [local/objects.rs](../../crates/rill-store/src/local/objects.rs), [s3.rs](../../crates/rill-store/src/s3.rs)
+* [tests/conformance/](../../crates/rill-store/tests/conformance/main.rs): every scenario on every backend
+* [rill-server state/stores.rs](../../crates/rill-server/src/state/stores.rs): `open_stores`
 
 ---
-← Previous: [Objects and ids](objects-and-ids.md) · [Index](../index.md) · Next: [Merge algebra](merge-algebra.md) →
+← Previous: [Objects and ids](objects-and-ids.md) · [Index](../index.md) · Next: [Metadata engines](metadata-engines.md) →

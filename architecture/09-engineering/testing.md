@@ -23,7 +23,7 @@ flowchart TD
 | Unit | one module: encodings, parsers, policy evaluation, hash framing, exit codes | `src/**`; most in `rill-policy`, `rill-core`, `rill-proto`, `rill-search`, `rill-store` |
 | Crate integration | a crate's public API over memory stores | `tests/` in `rill-store`, `rill-core`, `rill-review`, `rill-lander`, `rill-search` |
 | Mock server | SDK and MCP against hand-written tonic services | `rill-sdk/tests`, `rill-mcp/tests` |
-| gRPC smoke | the real server through generated clients and raw HTTP | `rill-server/tests/grpc_smoke.rs` |
+| gRPC end to end | the real server through generated clients and raw HTTP | `rill-server/tests/grpc/` |
 | CLI | the real server driven through the CLI library; clap parsing alone | `rill-cli/tests/cli_e2e.rs`, `rill-cli/tests/landing.rs`, `rill-cli/tests/parse.rs` |
 | External | import from a repository built with `git` | `rill-git-import/tests/real_git.rs` |
 
@@ -33,11 +33,19 @@ round trips in `src/convert/roundtrip_tests.rs`.
 
 ## Fixtures
 
-- **Store conformance** (`rill-store/tests/conformance.rs`): `fixtures()`
-  always includes memory. It adds `local` (tempdir redb plus files) under
-  feature `local`, and `object_store::memory::InMemory` under feature `s3`.
-  The same object, metadata and repo scenarios run against each backend. A
-  difference from memory is a bug.
+- **Store conformance** (`rill-store/tests/conformance/`): `fixtures()`
+  always includes memory. It adds `local` (tempdir redb plus files) and an
+  in-memory redb under feature `local`, `object_store::memory::InMemory`
+  under feature `s3`, and FoundationDB under feature `fdb` (cluster file
+  from `RILL_FDB_CLUSTER_FILE` or the default, a fresh root subspace per
+  fixture, cleared afterwards). Every backend runs the same scenarios:
+  objects, conditions, logs and scans (`meta.rs`), stamps, counters, split
+  values at the row boundaries and the transaction budget (`layer.rs`),
+  typed repository access (`repo.rs`), and 32 concurrent writers
+  (`race.rs`): compare-and-swap with no lost or doubled update, landers
+  racing for trunk at gap-free sequences, conflict-free adds and stamped
+  appends, and one version stored by every writer at once logged once. A
+  difference between backends is a bug.
 - **Per-crate `Fixture` / `Harness` structs** in `rill-core`, `rill-review`,
   `rill-lander` and `rill-search` tests build a repository over
   `Stores::memory()`. The lander fixture takes pluggable `ReviewHooks` and
@@ -54,7 +62,7 @@ round trips in `src/convert/roundtrip_tests.rs`.
 - **MCP mock** (`rill-mcp/tests/common/mod.rs`): a smaller `MockRepo` in the
   same style. Its `Grep` answers `Unimplemented`, so the MCP tests exercise
   the tree-walk fallback.
-- **Server harness** (`grpc_smoke.rs`): `TestServer` calls `Listeners::bind`
+- **Server harness** (`rill-server/tests/grpc/main.rs`): `TestServer` calls `Listeners::bind`
   on port 0, then `build_state` and `serve_with_state`
   ([server](../07-runtime/server.md)). `rill-cli/tests/common/mod.rs`
   embeds a dev-mode memory server the same way for every CLI test, on a
@@ -69,7 +77,7 @@ round trips in `src/convert/roundtrip_tests.rs`.
   operations surviving rebase without clobbering (`rebase.rs`).
 - **Formats and limits**: golden fixtures pin the bytes of every encoded
   object (`rill-types/tests/golden.rs`); every store backend refuses a
-  store with another format marker (`rill-store/tests/conformance.rs`); a
+  store with another format marker (`rill-store/tests/conformance/`); a
   flipped byte on disk is reported as corrupt; a blob-stored symlink that
   escapes the repository is rejected and an existing case collision does
   not block unrelated edits (`rill-core/tests/validation.rs`).
@@ -95,7 +103,7 @@ round trips in `src/convert/roundtrip_tests.rs`.
 - **MCP**: `initialize`, `tools/list` schemas, unknown tool as a JSON-RPC
   error, bad input never stopping the loop, and the read, list, log and grep
   tools.
-- **Server**: `dev_mode_end_to_end` covers repo create, `WatchTrunk`, edits,
+- **Server**: `dev_mode_end_to_end` (and, with `fdb`, `end_to_end_on_foundationdb`, the same flow with metadata in FoundationDB) covers repo create, `WatchTrunk`, edits,
   submit, vote, land, log, diff, grep, object `GET` with `ETag`, a malformed
   object path (400), `/healthz`, `WhoAmI`, `Health` and `AddRelation`.
   `static_auth_denies_unrelated_principal` checks `PERMISSION_DENIED`.
@@ -111,9 +119,10 @@ round trips in `src/convert/roundtrip_tests.rs`.
 ## Running
 
 ```
-cargo test --workspace                       # what CI runs
-cargo test -p rill-store --features s3       # object_store fixture for one crate
-cargo test -p rill-server --test grpc_smoke
+cargo test --workspace                       # the check job in CI
+cargo test -p rill-store --features fdb,s3   # conformance on FoundationDB too
+cargo test -p rill-server --features fdb --test grpc
+cargo test -p rill-server --test grpc
 cargo test -p rill-cli --test cli_e2e
 RUST_LOG=debug cargo test -p rill-lander -- --nocapture
 ```
@@ -182,11 +191,11 @@ added.
 
 ## Code
 
-- [rill-store/tests/conformance.rs](../../crates/rill-store/tests/conformance.rs), [rill-core/tests/workflow.rs](../../crates/rill-core/tests/workflow.rs), [rill-review/tests/review_flow.rs](../../crates/rill-review/tests/review_flow.rs), [rill-review/src/testing.rs](../../crates/rill-review/src/testing.rs)
+- [rill-store/tests/conformance/](../../crates/rill-store/tests/conformance/main.rs), [rill-core/tests/workflow.rs](../../crates/rill-core/tests/workflow.rs), [rill-review/tests/review_flow.rs](../../crates/rill-review/tests/review_flow.rs), [rill-review/src/testing.rs](../../crates/rill-review/src/testing.rs)
 - [rill-lander/tests/landing.rs](../../crates/rill-lander/tests/landing.rs), [rill-search/tests/end_to_end.rs](../../crates/rill-search/tests/end_to_end.rs)
 - [rill-sdk/tests/common/mod.rs](../../crates/rill-sdk/tests/common/mod.rs), [rill-sdk/tests/repo_rpc.rs](../../crates/rill-sdk/tests/repo_rpc.rs), [rill-sdk/tests/stack.rs](../../crates/rill-sdk/tests/stack.rs), [rill-sdk/tests/checkout.rs](../../crates/rill-sdk/tests/checkout.rs)
 - [rill-mcp/tests/common/mod.rs](../../crates/rill-mcp/tests/common/mod.rs), [rill-mcp/tests/protocol.rs](../../crates/rill-mcp/tests/protocol.rs)
-- [rill-server/tests/grpc_smoke.rs](../../crates/rill-server/tests/grpc_smoke.rs), [rill-cli/tests/cli_e2e.rs](../../crates/rill-cli/tests/cli_e2e.rs), [rill-cli/tests/parse.rs](../../crates/rill-cli/tests/parse.rs)
+- [rill-server/tests/grpc/](../../crates/rill-server/tests/grpc/main.rs), [rill-cli/tests/cli_e2e.rs](../../crates/rill-cli/tests/cli_e2e.rs), [rill-cli/tests/parse.rs](../../crates/rill-cli/tests/parse.rs)
 - [rill-git-import/tests/real_git.rs](../../crates/rill-git-import/tests/real_git.rs), [rill-proto/src/convert/roundtrip_tests.rs](../../crates/rill-proto/src/convert/roundtrip_tests.rs)
 
 ---

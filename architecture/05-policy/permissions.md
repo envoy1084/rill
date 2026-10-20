@@ -42,14 +42,15 @@ Subjects, parsed by `Subject::from_str`:
 
 Tuples are keys with empty values in the repository's metadata store
 ([`keys.rs`](../../crates/rill-store/src/keys.rs)):
-`rebac/<repo>/<object>/<relation>/<subject>`. `RepoStore::add_relation` sets
-the key, `remove_relation` deletes it, and `relations_of(object)` scans one
-object's prefix.
+`(rebac, ns, repo, object, relation, subject)`, each a tuple element, so an
+object id containing `/` is stored and read back exactly.
+`RepoStore::add_relation` sets the key, `remove_relation` deletes it,
+`relations_of(object)` scans one object's rows and `list_relations` all of
+them.
 
-`Snapshot::load` scans the whole `rebac/<repo>/` prefix. It parses each key
-from the right, because object ids contain `/` but relations and subjects do
-not. A row that fails to parse is logged with `warn` and skipped, so one bad
-row does not fail every check in the repository.
+`Snapshot::load` reads `list_relations`. A tuple whose relation or subject
+does not parse is logged with `warn` and skipped, so one bad row does not
+fail every check in the repository.
 
 ## Snapshot and authorizer
 
@@ -136,7 +137,7 @@ repository inside the object string. The object is `repo:<name>` or
 * [`rebac/snapshot.rs`](../../crates/rill-policy/src/rebac/snapshot.rs): `Tuple`, `Snapshot`, `SnapshotCache`.
 * [`rebac/authorizer.rs`](../../crates/rill-policy/src/rebac/authorizer.rs): `Authorizer`, `PathFilter`, `DEFAULT_SNAPSHOT_TTL`.
 * [`rebac/tests.rs`](../../crates/rill-policy/src/rebac/tests.rs): rewrite, inheritance and filter cases.
-* [`rill-store/src/repo.rs`](../../crates/rill-store/src/repo.rs): `add_relation`, `remove_relation`, `relations_of`.
+* [`rill-store/src/repo/relations.rs`](../../crates/rill-store/src/repo/relations.rs): `add_relation`, `remove_relation`, `relations_of`, `list_relations`.
 * [`auth/permit.rs`](../../crates/rill-server/src/auth/permit.rs): `Permit`.
 * [`services/admin.rs`](../../crates/rill-server/src/services/admin.rs): relation RPCs.
 

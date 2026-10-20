@@ -50,6 +50,9 @@ and optional `token` and `timeout_secs`. The path is
 `path_history`, `blame`), trees and files (`list_dir`, `read_file`), blobs,
 diff and ancestry, refs and trunk, `grep`, derived data and `watch_*`
 streams. Each module under `repo/` wraps one group of RPCs.
+`watch_log(WatchStart)` starts `Now`, from the `Beginning` or `After` a
+`Versionstamp` cursor, and yields `LogEntry { cursor, info }`, so a client
+can stop and resume without missing or repeating a version.
 
 `Root` (`types/root.rs`) names a point in history: `Ref`, `Version`, `Tree`
 or `Seq`. It parses from `trunk`, `trunk@N`, `tree:<hex>`, a 64-hex version

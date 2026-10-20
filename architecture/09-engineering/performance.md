@@ -29,7 +29,12 @@ corpus takes about a minute and 4.5 GB of memory.
 ```
 cargo bench -p rill-bench --bench core
 RILL_BENCH_FILES=1000000 cargo bench -p rill-bench --bench core
+cargo bench -p rill-bench --bench meta
 ```
+
+`benches/meta.rs` times metadata round trips (conditional write, point
+read, 100-row scan) on the memory and redb engines; the numbers are in
+[metadata engines](../02-data/metadata-engines.md#performance).
 
 ## Load
 
@@ -83,7 +88,7 @@ Land latency is dominated by the lander's 2-second batch window.
 
 ## Code
 
-- [rill-bench/src/lib.rs](../../crates/rill-bench/src/lib.rs), [rill-bench/benches/core.rs](../../crates/rill-bench/benches/core.rs)
+- [rill-bench/src/lib.rs](../../crates/rill-bench/src/lib.rs), [rill-bench/benches/core.rs](../../crates/rill-bench/benches/core.rs), [rill-bench/benches/meta.rs](../../crates/rill-bench/benches/meta.rs)
 - [rill-load/src/run.rs](../../crates/rill-load/src/run.rs), [workload.rs](../../crates/rill-load/src/workload.rs), [profile.rs](../../crates/rill-load/src/profile.rs), [stats.rs](../../crates/rill-load/src/stats.rs)
 
 ---

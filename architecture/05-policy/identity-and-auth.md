@@ -142,7 +142,7 @@ rejects every bearer token.
 * [`auth/layer.rs`](../../crates/rill-server/src/auth/layer.rs), [`auth/http.rs`](../../crates/rill-server/src/auth/http.rs): gRPC and HTTP middleware.
 * [`auth/permit.rs`](../../crates/rill-server/src/auth/permit.rs): `Permit`.
 * [`services/common.rs`](../../crates/rill-server/src/services/common.rs): `Opened`, `open`.
-* [`config.rs`](../../crates/rill-server/src/config.rs): `AuthConfig`, `StaticToken`, env overrides.
+* [`config/auth.rs`](../../crates/rill-server/src/config/auth.rs), [`config/env.rs`](../../crates/rill-server/src/config/env.rs): `AuthConfig`, `StaticToken`, env overrides.
 
 ---
 ← Previous: [Intents](../04-workflow/intents.md) · [Index](../index.md) · Next: [Capability tokens](capability-tokens.md) →

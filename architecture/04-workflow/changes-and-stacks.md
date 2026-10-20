@@ -29,9 +29,10 @@ flowchart LR
 | `predecessor` | Set by amend, rebase and resolve | `None` for the first version of a change. |
 
 `RepoStore::put_change_version` is idempotent on the hash. It puts the
-object in the object store. Then, in one metadata transaction, it writes
-the `ChangeInfo` row (`ci/`) and appends the hash to the
-repository log (`log/`) and to `chv/<repo>/<change_id>/` (creation order).
+object in the object store. Then, in one metadata transaction conditioned
+on the `ci` row being absent, it writes the `ChangeInfo` row and appends
+the hash to the repository's stamped version log (`log`) and to the
+change's dense version list (`chv`, creation order).
 `change_versions(id).last()` is the *current* version everywhere the
 server needs one: `edit_base`, `NewChange`'s predecessor, review submit,
 and the SDK's `current_version`. `ChangeInfo.trunk_seq` is filled in at
@@ -140,7 +141,7 @@ rebases those dependents automatically.
 ## Code
 
 * [rill-types/src/objects/change.rs](../../crates/rill-types/src/objects/change.rs), [ids.rs](../../crates/rill-types/src/ids.rs)
-* [rill-store/src/repo.rs](../../crates/rill-store/src/repo.rs) (`put_change_version`, `change_versions`)
+* [rill-store/src/repo/versions.rs](../../crates/rill-store/src/repo/versions.rs) (`put_change_version`, `change_versions`)
 * [rill-server/src/services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs)
 * [rill-core/src/rebase.rs](../../crates/rill-core/src/rebase.rs), [builder.rs](../../crates/rill-core/src/builder.rs)
 * [rill-review/src/stacks.rs](../../crates/rill-review/src/stacks.rs)

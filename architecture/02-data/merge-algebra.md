@@ -130,4 +130,4 @@ conflicts; the conflict lives only in the change.
 * [rill-core tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs): first add wins when building a tree
 
 ---
-← Previous: [Storage and keyspace](storage-and-keyspace.md) · [Index](../index.md) · Next: [Content and chunking](content-and-chunking.md) →
+← Previous: [Metadata engines](metadata-engines.md) · [Index](../index.md) · Next: [Content and chunking](content-and-chunking.md) →

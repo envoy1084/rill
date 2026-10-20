@@ -42,7 +42,8 @@ The server registers all six services behind `AuthLayer`
 
 `types.proto` holds the shared object model. The streaming RPCs are
 `GetBlob` (server stream of `BlobChunk`), `PutBlob` (client stream: one
-`PutBlobHeader`, then `data`), and `WatchRefs`, `WatchTrunk`, `WatchLog` and
+`PutBlobHeader`, then `data`), and `WatchRefs`, `WatchTrunk`, `WatchLog`
+(a stream of `LogEntry { cursor, info }`, resumable by cursor) and
 `WatchReview`. [Events and workers](events-and-workers.md) describes how the
 watches behave.
 

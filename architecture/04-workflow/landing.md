@@ -155,7 +155,7 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 
 * [rill-lander/src/land/lander.rs](../../crates/rill-lander/src/land/lander.rs), [pipeline.rs](../../crates/rill-lander/src/land/pipeline.rs), [record.rs](../../crates/rill-lander/src/land/record.rs)
 * [rill-lander/src/queue.rs](../../crates/rill-lander/src/queue.rs), [conflict_graph.rs](../../crates/rill-lander/src/conflict_graph.rs), [config.rs](../../crates/rill-lander/src/config.rs), [events.rs](../../crates/rill-lander/src/events.rs), [traits.rs](../../crates/rill-lander/src/traits.rs)
-* [rill-store/src/repo.rs](../../crates/rill-store/src/repo.rs) (`land_on_trunk`, `trunk_head`, `trunk_seq_of`)
+* [rill-store/src/repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`land_on_trunk`, `trunk_head`, `trunk_seq_of`)
 * [rill-server/src/services/review.rs](../../crates/rill-server/src/services/review.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-server/src/services/common.rs) (`ticket_status`), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs)
 
 ---

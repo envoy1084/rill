@@ -50,7 +50,7 @@ flowchart LR
   Lander --> Core
   OBJ --> Store
   Core --> Store[(rill-store)]
-  Store --> Backend[(memory, local redb+files, S3)]
+  Store --> Backend[(objects: memory, files, S3<br/>metadata: memory, redb, FoundationDB)]
 ```
 
 The crate map and dependency rules are in
@@ -141,7 +141,7 @@ The rules these mechanisms must keep are listed in
 - [Request opening](../../crates/rill-server/src/services/common.rs)
 - [Permission checks](../../crates/rill-server/src/auth/permit.rs)
 - [Event bus](../../crates/rill-server/src/state/events.rs)
-- [Trunk CAS](../../crates/rill-store/src/repo.rs)
+- [Trunk CAS](../../crates/rill-store/src/repo/trunk.rs)
 - [Landing pipeline](../../crates/rill-lander/src/land/pipeline.rs)
 - [Object model](../../crates/rill-types/src/objects/mod.rs)
 
