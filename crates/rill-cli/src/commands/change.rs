@@ -69,6 +69,9 @@ pub struct ResolveArgs {
     /// Mark every conflicted path resolved.
     #[arg(long)]
     pub all: bool,
+    /// Skip the check that no conflict markers remain.
+    #[arg(long)]
+    pub force: bool,
     /// Paths to mark resolved.
     pub paths: Vec<String>,
 }
@@ -344,7 +347,7 @@ pub async fn resolve(ctx: &mut Ctx<'_>, args: ResolveArgs) -> Result<()> {
             return Err(CliError::usage(format!("{p} is not conflicted")));
         }
     }
-    checkout.mark_resolved(&paths).await?;
+    checkout.mark_resolved(&paths, args.force).await?;
     let remaining = conflicted.len() - paths.len();
     ctx.emit(
         j!({

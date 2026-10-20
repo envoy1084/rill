@@ -178,7 +178,19 @@ impl Checkout {
     }
 
     /// Clear the conflict flag on paths the user has resolved by hand.
-    pub async fn mark_resolved(&mut self, paths: &[RepoPathBuf]) -> Result<()> {
+    ///
+    /// Each file is parsed for conflict markers first and refused if any
+    /// conflict is still present or the markers are malformed, so marker
+    /// text is never committed as content. `force` skips the check for
+    /// files whose real content looks like markers.
+    pub async fn mark_resolved(&mut self, paths: &[RepoPathBuf], force: bool) -> Result<()> {
+        if !force {
+            let root = self.root.clone();
+            let paths = paths.to_vec();
+            tokio::task::spawn_blocking(move || check_resolved(&root, &paths))
+                .await
+                .map_err(|e| Error::checkout(format!("resolve task failed: {e}")))??;
+        }
         for path in paths {
             if let Some(entry) = self.manifest.get_mut(path) {
                 entry.conflict = false;
@@ -203,6 +215,28 @@ impl Checkout {
             .await
             .map_err(|e| Error::checkout(format!("save task failed: {e}")))?
     }
+}
+
+fn check_resolved(root: &Path, paths: &[RepoPathBuf]) -> Result<()> {
+    for path in paths {
+        let fs_path = to_fs_path(root, path);
+        let bytes = std::fs::read(&fs_path)
+            .map_err(|e| Error::checkout(format!("read {}: {e}", fs_path.display())))?;
+        match rill_core::parse_materialized(&bytes) {
+            Some(terms) if terms.is_resolved() => {}
+            Some(_) => {
+                return Err(Error::checkout(format!(
+                    "{path} still contains conflict markers"
+                )))
+            }
+            None => {
+                return Err(Error::checkout(format!(
+                    "{path} has malformed conflict markers"
+                )))
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Fetch a remote file, write it and build its manifest entry.

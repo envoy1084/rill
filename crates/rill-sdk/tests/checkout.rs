@@ -220,8 +220,28 @@ async fn update_preserves_local_work_and_merges() {
     );
     assert!(co.edits().await.is_err());
 
+    let err = co
+        .mark_resolved(&[p("src/util.rs")], false)
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("still contains conflict markers"),
+        "{err}"
+    );
+    let truncated = conflicted.lines().take(2).collect::<Vec<_>>().join("\n");
+    std::fs::write(dir.path().join("src/util.rs"), truncated).unwrap();
+    let err = co
+        .mark_resolved(&[p("src/util.rs")], false)
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("malformed"), "{err}");
+    assert_eq!(
+        co.status().await.unwrap()[2].kind,
+        LocalChangeKind::Conflict
+    );
+
     std::fs::write(dir.path().join("src/util.rs"), "fn u() { both }\n").unwrap();
-    co.mark_resolved(&[p("src/util.rs")]).await.unwrap();
+    co.mark_resolved(&[p("src/util.rs")], false).await.unwrap();
     let status = co.status().await.unwrap();
     assert_eq!(status[2].kind, LocalChangeKind::Modified);
     assert_eq!(co.edits().await.unwrap().len(), 3);
