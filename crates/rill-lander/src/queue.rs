@@ -8,6 +8,7 @@
 use std::collections::VecDeque;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use rill_types::{
@@ -93,10 +94,15 @@ pub struct QueuedRequest {
     pub request: LandRequest,
 }
 
+/// How long a finished ticket's outcome stays queryable, so a client that
+/// polls after the request completed still sees why it failed.
+pub const TERMINAL_RETENTION: Duration = Duration::from_secs(600);
+
 /// FIFO of pending requests plus per-ticket status.
 pub struct LandQueue {
     pending: Mutex<VecDeque<QueuedRequest>>,
     status: DashMap<LandTicket, watch::Sender<LandStatus>>,
+    finished: DashMap<LandTicket, Instant>,
     next_ticket: AtomicU64,
 }
 
@@ -112,6 +118,7 @@ impl LandQueue {
         LandQueue {
             pending: Mutex::new(VecDeque::new()),
             status: DashMap::new(),
+            finished: DashMap::new(),
             next_ticket: AtomicU64::new(1),
         }
     }
@@ -141,6 +148,9 @@ impl LandQueue {
     /// Record a new status. Unknown tickets are ignored.
     pub fn set_status(&self, ticket: LandTicket, status: LandStatus) {
         if let Some(tx) = self.status.get(&ticket) {
+            if status.is_terminal() {
+                self.finished.entry(ticket).or_insert_with(Instant::now);
+            }
             // `send` fails when no receiver exists; the status must be
             // recorded whether or not anyone is watching.
             tx.send_replace(status);
@@ -162,10 +172,16 @@ impl LandQueue {
         self.len().await == 0
     }
 
-    /// Forget tickets whose status is terminal, keeping memory bounded in
-    /// long-running servers.
-    pub fn forget_terminal(&self) {
-        self.status.retain(|_, tx| !tx.borrow().is_terminal());
+    /// Forget tickets that finished more than `retention` ago, keeping
+    /// memory bounded in long-running servers.
+    pub fn forget_terminal(&self, retention: Duration) {
+        self.finished.retain(|ticket, at| {
+            let keep = at.elapsed() < retention;
+            if !keep {
+                self.status.remove(ticket);
+            }
+            keep
+        });
     }
 }
 
@@ -192,7 +208,12 @@ mod tests {
         assert_eq!(*rx.borrow(), LandStatus::Landed { seq: TrunkSeq(1) });
         assert_eq!(queue.drain().await.len(), 1);
         assert!(queue.is_empty().await);
-        queue.forget_terminal();
+        queue.forget_terminal(TERMINAL_RETENTION);
+        assert_eq!(
+            queue.status(ticket),
+            Some(LandStatus::Landed { seq: TrunkSeq(1) })
+        );
+        queue.forget_terminal(Duration::ZERO);
         assert!(queue.status(ticket).is_none());
     }
 }

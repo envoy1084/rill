@@ -184,7 +184,7 @@ impl Lander {
                     if let Err(e) = self.run_once().await {
                         tracing::error!(error = %e, "landing sweep failed");
                     }
-                    self.queue.forget_terminal();
+                    self.queue.forget_terminal(crate::queue::TERMINAL_RETENTION);
                 }
             }
         }
