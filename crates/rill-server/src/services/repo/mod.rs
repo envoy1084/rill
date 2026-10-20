@@ -220,7 +220,7 @@ impl RepoService for RepoSvc {
         Ok(Response::new(self.watch_trunk_impl(request).await?))
     }
 
-    type WatchLogStream = EventStream<pb::ChangeInfo>;
+    type WatchLogStream = EventStream<pb::LogEntry>;
 
     async fn watch_log(
         &self,

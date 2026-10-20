@@ -27,6 +27,7 @@ use crate::workspace::WorkspaceClient;
 pub use blobs::PUT_BLOB_CHUNK_SIZE;
 pub use tree::DirListing;
 pub(crate) use watch::convert_stream as watch_stream;
+pub use watch::WatchStart;
 
 /// Operations on one repository. Every request carries the repository
 /// name or id this client was built with.

@@ -1,14 +1,15 @@
 //! Server-streamed watches over trunk, refs and the log.
 
+use bytes::Bytes;
 use futures::StreamExt;
 use rill_proto::rill::v1 as pb;
-use rill_types::{ChangeInfo, TrunkSeq};
+use rill_types::{TrunkSeq, Versionstamp};
 use tonic::Streaming;
 
 use super::RepoClient;
 use crate::error::{Error, Result};
 use crate::stream::EventStream;
-use crate::types::{LandEvent, RefEvent};
+use crate::types::{LandEvent, LogEntry, RefEvent};
 
 impl RepoClient {
     /// Landings as they happen, optionally resuming after a sequence.
@@ -37,13 +38,18 @@ impl RepoClient {
         Ok(convert_stream(stream))
     }
 
-    /// Change metadata for every landing after a sequence.
-    pub async fn watch_log(&self, after_seq: Option<TrunkSeq>) -> Result<EventStream<ChangeInfo>> {
+    /// Every version stored from `after` on.
+    pub async fn watch_log(&self, after: WatchStart) -> Result<EventStream<LogEntry>> {
+        let after = match after {
+            WatchStart::Now => None,
+            WatchStart::Beginning => Some(Bytes::new()),
+            WatchStart::After(cursor) => Some(Bytes::copy_from_slice(cursor.as_bytes())),
+        };
         let stream = self
             .svc()
             .watch_log(pb::WatchLogRequest {
                 repo: self.repo.clone(),
-                after_seq: after_seq.map(TrunkSeq::get),
+                after,
             })
             .await?
             .into_inner();
@@ -64,4 +70,15 @@ where
             Err(status) => Err(status.into()),
         })
         .boxed()
+}
+
+/// Where a version-log watch starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchStart {
+    /// Only versions stored from now on.
+    Now,
+    /// The whole log.
+    Beginning,
+    /// After the entry with this cursor.
+    After(Versionstamp),
 }

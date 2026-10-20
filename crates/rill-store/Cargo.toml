@@ -38,4 +38,7 @@ futures = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+foundationdb-tuple = { workspace = true }
 object_store = { workspace = true }

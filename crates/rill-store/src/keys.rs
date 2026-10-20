@@ -1,214 +1,201 @@
 //! Key layout of the metadata store.
 //!
-//! Every key is `<table>/<repo-id>/<...>`. Tables are short ASCII tags so a
-//! prefix scan over a repo's rows in one table is cheap, and deleting a repo
-//! is a prefix delete per table.
+//! Every key is a FoundationDB tuple. Repository rows are
+//! `(table, namespace, repo, ...)`, so a repository's rows in one table form
+//! one range and a namespace's rows a larger one. Tuple elements are
+//! self-delimiting: no name or id is ever a prefix of a longer one's key.
 
 use bytes::Bytes;
-use rill_types::{ChangeId, IntentId, ObjectHash, OperationId, RefName, RepoId, WorkspaceId};
+use foundationdb_tuple::{pack, unpack, TuplePack, TupleUnpack};
+use rill_types::{
+    ChangeId, IntentId, ObjectHash, OperationId, RefName, RepoId, Versionstamp, WorkspaceId,
+};
 
-use crate::meta::seq_key;
+use crate::error::{Error, Result};
+use crate::meta::{seq_key, stamp_key};
 
-/// Record tables.
+/// Table names, the first element of every key.
 pub mod table {
-    /// `ci/<repo>/<hash>` → encoded ChangeInfo
+    /// `(ci, ns, repo, hash)` → ChangeInfo
     pub const CHANGE_INFO: &str = "ci";
-    /// `sig/<repo>/<hash>` → encoded Vec<Signature>
+    /// `(sig, ns, repo, hash)` → signatures
     pub const SIGNATURES: &str = "sig";
-    /// `ch/<repo>/<change-id>` → encoded ReviewState
+    /// `(ch, ns, repo, change)` → ReviewState
     pub const CHANGE: &str = "ch";
-    /// `log/<repo>/<be64 seq>` → version hash (the write-ahead log)
+    /// `(log, ns, repo, stamp)` → version hash, every stored version
     pub const LOG: &str = "log";
-    /// `trunk/<repo>/<be64 seq>` → version hash
+    /// `(trunk, ns, repo, seq)` → version hash
     pub const TRUNK: &str = "trunk";
-    /// `trunkh/<repo>/<hash>` → be64 seq
+    /// `(trunkh, ns, repo, hash)` → be64 seq
     pub const TRUNK_BY_HASH: &str = "trunkh";
-    /// `ref/<repo>/<name>` → version hash
+    /// `(ref, ns, repo, name)` → version hash
     pub const REF: &str = "ref";
-    /// `ws/<repo>/<workspace-id>` → encoded Workspace
+    /// `(ws, ns, repo, workspace)` → Workspace
     pub const WORKSPACE: &str = "ws";
-    /// `op/<repo>/<workspace-id>/<be64 seq>` → encoded Operation
+    /// `(op, ns, repo, workspace, seq)` → Operation
     pub const OPERATION: &str = "op";
-    /// `opi/<repo>/<operation-id>` → be64 seq (idempotency lookup)
+    /// `(opi, ns, repo, operation)` → empty; idempotency lookup
     pub const OPERATION_INDEX: &str = "opi";
-    /// `in/<repo>/<intent-id>` → encoded Intent
+    /// `(in, ns, repo, intent)` → Intent
     pub const INTENT: &str = "in";
-    /// `dd/<repo>/<type>/<hash>` → derived data bytes
+    /// `(dd, ns, repo, kind, hash)` → derived value
     pub const DERIVED: &str = "dd";
-    /// `chv/<repo>/<change-id>/<be64 seq>` → version hash, versions in order
+    /// `(chv, ns, repo, change, seq)` → version hash, versions in order
     pub const CHANGE_VERSIONS: &str = "chv";
-    /// `repo/<repo-id>` → encoded RepoConfig
+    /// `(repo, ns, repo)` → RepoConfig
     pub const REPO: &str = "repo";
-    /// `repon/<name>` → repo id
+    /// `(repon, ns, name)` → repo id
     pub const REPO_BY_NAME: &str = "repon";
-    /// `rebac/<repo>/<object>/<relation>/<subject>` → empty
+    /// `(rebac, ns, repo, object, relation, subject)` → empty
     pub const REBAC: &str = "rebac";
-    /// `misc/<repo>/<name>` → arbitrary small values (policy, settings)
+    /// `(misc, ns, repo, name)` → small values (policy, rings, cursors)
     pub const MISC: &str = "misc";
+    /// `(meta, "format")` → store format
+    pub const META: &str = "meta";
 }
 
-fn join(parts: &[&[u8]]) -> Bytes {
-    let len: usize = parts.iter().map(|p| p.len() + 1).sum();
-    let mut out = Vec::with_capacity(len);
-    for (i, p) in parts.iter().enumerate() {
-        if i > 0 {
-            out.push(b'/');
-        }
-        out.extend_from_slice(p);
-    }
-    Bytes::from(out)
+fn key<T: TuplePack>(t: &T) -> Bytes {
+    Bytes::from(pack(t))
 }
 
-/// Prefix of a repo's rows in a table, including the trailing slash.
-pub fn repo_prefix(table: &str, repo: &RepoId) -> Bytes {
-    let mut out = join(&[table.as_bytes(), repo.as_bytes()]).to_vec();
-    out.push(b'/');
-    Bytes::from(out)
-}
-
-pub fn change_info(repo: &RepoId, hash: &ObjectHash) -> Bytes {
-    join(&[
-        table::CHANGE_INFO.as_bytes(),
-        repo.as_bytes(),
-        hash.as_bytes(),
-    ])
-}
-
-pub fn signatures(repo: &RepoId, hash: &ObjectHash) -> Bytes {
-    join(&[
-        table::SIGNATURES.as_bytes(),
-        repo.as_bytes(),
-        hash.as_bytes(),
-    ])
-}
-
-pub fn change(repo: &RepoId, id: &ChangeId) -> Bytes {
-    join(&[table::CHANGE.as_bytes(), repo.as_bytes(), id.as_bytes()])
-}
-
-pub fn change_versions_prefix(repo: &RepoId, id: &ChangeId) -> Bytes {
-    let mut out = join(&[
-        table::CHANGE_VERSIONS.as_bytes(),
-        repo.as_bytes(),
-        id.as_bytes(),
-    ])
-    .to_vec();
-    out.push(b'/');
-    Bytes::from(out)
-}
-
-pub fn log_prefix(repo: &RepoId) -> Bytes {
-    repo_prefix(table::LOG, repo)
-}
-
-pub fn trunk_prefix(repo: &RepoId) -> Bytes {
-    repo_prefix(table::TRUNK, repo)
-}
-
-pub fn trunk(repo: &RepoId, seq: u64) -> Bytes {
-    seq_key(&trunk_prefix(repo), seq)
-}
-
-pub fn trunk_by_hash(repo: &RepoId, hash: &ObjectHash) -> Bytes {
-    join(&[
-        table::TRUNK_BY_HASH.as_bytes(),
-        repo.as_bytes(),
-        hash.as_bytes(),
-    ])
-}
-
-pub fn reference(repo: &RepoId, name: &RefName) -> Bytes {
-    join(&[
-        table::REF.as_bytes(),
-        repo.as_bytes(),
-        name.as_str().as_bytes(),
-    ])
-}
-
-pub fn ref_prefix(repo: &RepoId) -> Bytes {
-    repo_prefix(table::REF, repo)
-}
-
-pub fn workspace(repo: &RepoId, id: &WorkspaceId) -> Bytes {
-    join(&[table::WORKSPACE.as_bytes(), repo.as_bytes(), id.as_bytes()])
-}
-
-pub fn workspace_prefix(repo: &RepoId) -> Bytes {
-    repo_prefix(table::WORKSPACE, repo)
-}
-
-pub fn operation_prefix(repo: &RepoId, ws: &WorkspaceId) -> Bytes {
-    let mut out = join(&[table::OPERATION.as_bytes(), repo.as_bytes(), ws.as_bytes()]).to_vec();
-    out.push(b'/');
-    Bytes::from(out)
-}
-
-pub fn operation_index(repo: &RepoId, op: &OperationId) -> Bytes {
-    join(&[
-        table::OPERATION_INDEX.as_bytes(),
-        repo.as_bytes(),
-        op.as_bytes(),
-    ])
-}
-
-pub fn intent(repo: &RepoId, id: &IntentId) -> Bytes {
-    join(&[table::INTENT.as_bytes(), repo.as_bytes(), id.as_bytes()])
-}
-
-pub fn intent_prefix(repo: &RepoId) -> Bytes {
-    repo_prefix(table::INTENT, repo)
-}
-
-pub fn derived(repo: &RepoId, kind: &str, hash: &ObjectHash) -> Bytes {
-    join(&[
-        table::DERIVED.as_bytes(),
-        repo.as_bytes(),
-        kind.as_bytes(),
-        hash.as_bytes(),
-    ])
+/// Decode the tuple that follows `prefix` in `key`.
+pub fn tail<'de, T: TupleUnpack<'de>>(prefix: &[u8], key: &'de [u8]) -> Result<T> {
+    let rest = key
+        .strip_prefix(prefix)
+        .ok_or_else(|| Error::Codec("key outside its table".into()))?;
+    unpack(rest).map_err(|e| Error::Codec(format!("malformed key: {e}")))
 }
 
 /// The store-wide format marker.
 pub fn store_format() -> Bytes {
-    Bytes::from_static(b"meta/format")
+    key(&(table::META, "format"))
 }
 
-pub fn repo(id: &RepoId) -> Bytes {
-    join(&[table::REPO.as_bytes(), id.as_bytes()])
+pub fn repo(ns: &str, id: &RepoId) -> Bytes {
+    key(&(table::REPO, ns, id.as_bytes().as_slice()))
 }
 
-pub fn repo_by_name(name: &str) -> Bytes {
-    join(&[table::REPO_BY_NAME.as_bytes(), name.as_bytes()])
+pub fn repo_list(ns: &str) -> Bytes {
+    key(&(table::REPO, ns))
 }
 
-pub fn repo_list_prefix() -> Bytes {
-    Bytes::from(format!("{}/", table::REPO))
+pub fn repo_by_name(ns: &str, name: &str) -> Bytes {
+    key(&(table::REPO_BY_NAME, ns, name))
 }
 
-pub fn rebac(repo: &RepoId, object: &str, relation: &str, subject: &str) -> Bytes {
-    join(&[
-        table::REBAC.as_bytes(),
-        repo.as_bytes(),
-        object.as_bytes(),
-        relation.as_bytes(),
-        subject.as_bytes(),
-    ])
+/// The keys of one repository.
+#[derive(Debug, Clone)]
+pub struct RepoKeys {
+    ns: String,
+    repo: RepoId,
 }
 
-pub fn rebac_object_prefix(repo: &RepoId, object: &str) -> Bytes {
-    let mut out = join(&[table::REBAC.as_bytes(), repo.as_bytes(), object.as_bytes()]).to_vec();
-    out.push(b'/');
-    Bytes::from(out)
-}
-
-pub fn misc(repo: &RepoId, name: &str) -> Bytes {
-    join(&[table::MISC.as_bytes(), repo.as_bytes(), name.as_bytes()])
-}
-
-/// Extract the trailing object hash from a key like `cv/<repo>/<hash>`.
-pub fn hash_suffix(key: &[u8]) -> Option<ObjectHash> {
-    if key.len() < 32 {
-        return None;
+impl RepoKeys {
+    pub fn new(ns: &str, repo: RepoId) -> Self {
+        RepoKeys {
+            ns: ns.to_string(),
+            repo,
+        }
     }
-    ObjectHash::from_slice(&key[key.len() - 32..]).ok()
+
+    /// The prefix of this repository's rows in `table`.
+    pub fn table(&self, table: &str) -> Bytes {
+        key(&(table, self.ns.as_str(), self.repo.as_bytes().as_slice()))
+    }
+
+    fn row<T: TuplePack>(&self, table: &str, rest: &T) -> Bytes {
+        let mut out = self.table(table).to_vec();
+        foundationdb_tuple::pack_into(rest, &mut out);
+        Bytes::from(out)
+    }
+
+    pub fn change_info(&self, hash: &ObjectHash) -> Bytes {
+        self.row(table::CHANGE_INFO, &hash.as_bytes().as_slice())
+    }
+
+    pub fn signatures(&self, hash: &ObjectHash) -> Bytes {
+        self.row(table::SIGNATURES, &hash.as_bytes().as_slice())
+    }
+
+    pub fn change(&self, id: &ChangeId) -> Bytes {
+        self.row(table::CHANGE, &id.as_bytes().as_slice())
+    }
+
+    pub fn change_versions(&self, id: &ChangeId) -> Bytes {
+        self.row(table::CHANGE_VERSIONS, &id.as_bytes().as_slice())
+    }
+
+    pub fn log(&self) -> Bytes {
+        self.table(table::LOG)
+    }
+
+    pub fn log_entry(&self, stamp: &Versionstamp) -> Bytes {
+        stamp_key(&self.log(), stamp)
+    }
+
+    pub fn trunk_table(&self) -> Bytes {
+        self.table(table::TRUNK)
+    }
+
+    pub fn trunk(&self, seq: u64) -> Bytes {
+        seq_key(&self.trunk_table(), seq)
+    }
+
+    pub fn trunk_by_hash(&self, hash: &ObjectHash) -> Bytes {
+        self.row(table::TRUNK_BY_HASH, &hash.as_bytes().as_slice())
+    }
+
+    pub fn reference(&self, name: &RefName) -> Bytes {
+        self.row(table::REF, &name.as_str())
+    }
+
+    pub fn workspace(&self, id: &WorkspaceId) -> Bytes {
+        self.row(table::WORKSPACE, &id.as_bytes().as_slice())
+    }
+
+    pub fn operations(&self, ws: &WorkspaceId) -> Bytes {
+        self.row(table::OPERATION, &ws.as_bytes().as_slice())
+    }
+
+    pub fn operation_index(&self, op: &OperationId) -> Bytes {
+        self.row(table::OPERATION_INDEX, &op.as_bytes().as_slice())
+    }
+
+    pub fn intent(&self, id: &IntentId) -> Bytes {
+        self.row(table::INTENT, &id.as_bytes().as_slice())
+    }
+
+    pub fn derived(&self, kind: &str, hash: &ObjectHash) -> Bytes {
+        self.row(table::DERIVED, &(kind, hash.as_bytes().as_slice()))
+    }
+
+    pub fn relation(&self, object: &str, relation: &str, subject: &str) -> Bytes {
+        self.row(table::REBAC, &(object, relation, subject))
+    }
+
+    pub fn relations_of(&self, object: &str) -> Bytes {
+        self.row(table::REBAC, &object)
+    }
+
+    pub fn misc(&self, name: &str) -> Bytes {
+        self.row(table::MISC, &name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::meta::KeyRange;
+
+    #[test]
+    fn a_name_never_prefixes_a_longer_names_rows() {
+        let keys = RepoKeys::new("default", RepoId::from_bytes([7; 16]));
+        let short = KeyRange::prefix(keys.relations_of("dir:/src"));
+        assert!(short.contains(&keys.relation("dir:/src", "owner", "alice")));
+        assert!(!short.contains(&keys.relation("dir:/src/x", "owner", "alice")));
+        let other = RepoKeys::new("default", RepoId::from_bytes([8; 16]));
+        assert!(
+            !KeyRange::prefix(keys.table(table::REF)).contains(&other.reference(&RefName::trunk()))
+        );
+    }
 }

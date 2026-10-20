@@ -18,6 +18,7 @@
 //!   metadata in a redb database. One directory, no services.
 //! * [`s3`] (feature `s3`): objects on S3-compatible storage via
 //!   `object_store`.
+//! * [`fdb`] (feature `fdb`): metadata in FoundationDB.
 
 pub mod codec;
 pub mod error;
@@ -36,7 +37,12 @@ pub mod local;
 #[cfg(feature = "s3")]
 pub mod s3;
 
+#[cfg(feature = "fdb")]
+pub mod fdb;
+
 pub use error::{Error, Result};
+#[cfg(feature = "fdb")]
+pub use fdb::FdbMetaStore;
 pub use keyspace::Keyspace;
 #[cfg(feature = "local")]
 pub use local::{LocalObjectStore, LocalOptions, LocalStores, RedbMetaStore};

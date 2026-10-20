@@ -45,7 +45,7 @@ pub use error::{Error, Result};
 pub use intent::IntentClient;
 pub use lander::LanderClient;
 pub use local::{Checkout, LocalChange, LocalChangeKind};
-pub use repo::RepoClient;
+pub use repo::{RepoClient, WatchStart};
 pub use review::ReviewClient;
 pub use stack::{Backoff, StackClient};
 pub use stream::EventStream;

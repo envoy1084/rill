@@ -9,17 +9,18 @@
 use std::pin::Pin;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use futures::Stream;
 use rill_proto::convert::{hash_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
-use rill_types::{RepoPathBuf, TrunkSeq};
+use rill_types::{RepoPathBuf, TrunkSeq, Versionstamp};
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
 
 use super::RepoSvc;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::services::common::{self, open};
 use crate::state::{RepoContext, RepoEvent};
 
@@ -112,14 +113,18 @@ impl RepoSvc {
     pub(super) async fn watch_log_impl(
         &self,
         request: tonic::Request<pb::WatchLogRequest>,
-    ) -> Result<EventStream<pb::ChangeInfo>> {
+    ) -> Result<EventStream<pb::LogEntry>> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
         let ctx = opened.repo.clone();
         let mut rx = ctx.events.subscribe();
-        let mut cursor = match request.get_ref().after_seq {
-            Some(seq) => seq,
+        let mut cursor = match &request.get_ref().after {
             None => ctx.repo.log_head().await?,
+            Some(bytes) if bytes.is_empty() => None,
+            Some(bytes) => Some(
+                Versionstamp::from_slice(bytes)
+                    .map_err(|e| Error::InvalidArgument(format!("after: {e}")))?,
+            ),
         };
         let (tx, out) = mpsc::channel(STREAM_BUFFER);
         tokio::spawn(async move {
@@ -165,20 +170,23 @@ async fn drain_trunk(
 
 async fn drain_log(
     ctx: &Arc<RepoContext>,
-    cursor: &mut u64,
-    tx: &mpsc::Sender<std::result::Result<pb::ChangeInfo, Status>>,
+    cursor: &mut Option<Versionstamp>,
+    tx: &mpsc::Sender<std::result::Result<pb::LogEntry, Status>>,
 ) -> Result<()> {
     loop {
         let page = ctx.repo.log_after(*cursor, REPLAY_PAGE).await?;
         if page.is_empty() {
             return Ok(());
         }
-        for (seq, hash) in page {
-            let info = common::change_info(ctx, &hash).await?;
-            if tx.send(Ok(info)).await.is_err() {
+        for (stamp, hash) in page {
+            let entry = pb::LogEntry {
+                cursor: Bytes::copy_from_slice(stamp.as_bytes()),
+                info: Some(common::change_info(ctx, &hash).await?),
+            };
+            if tx.send(Ok(entry)).await.is_err() {
                 return Ok(());
             }
-            *cursor = seq;
+            *cursor = Some(stamp);
         }
     }
 }

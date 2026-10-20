@@ -3,13 +3,11 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rill_store::keys::{self, table};
-use rill_store::meta::KeyRange;
 use rill_store::RepoStore;
 use rill_types::{Principal, RepoPathBuf};
 
 use super::model::{dir_of_object, inheritance_chain, Relation, Subject};
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 /// One relationship tuple.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,22 +36,17 @@ impl Snapshot {
         }
     }
 
-    /// Scan the repository's relationship table.
-    ///
-    /// Keys are `rebac/<repo>/<object>/<relation>/<subject>`. Object ids may
-    /// contain `/` (`dir:/src/x`) but relations and subjects never do, so
-    /// the tail is parsed from the right. Rows that do not parse are logged
-    /// and skipped rather than failing every check in the repository.
+    /// Read every relationship tuple of the repository. Tuples that do
+    /// not parse are logged and skipped rather than failing every check in
+    /// the repository.
     pub async fn load(repo: &RepoStore) -> Result<Self> {
-        let prefix = keys::repo_prefix(table::REBAC, &repo.id());
-        let rows = repo.meta().scan(KeyRange::prefix(prefix.clone())).await?;
+        let rows = repo.list_relations().await?;
         let mut tuples = Vec::with_capacity(rows.len());
-        for (key, _) in &rows {
-            let tail = &key[prefix.len()..];
-            match parse_tail(tail) {
+        for (object, relation, subject) in rows {
+            match parse_tuple(&object, &relation, &subject) {
                 Ok(t) => tuples.push(t),
                 Err(e) => {
-                    tracing::warn!(error = %e, key = %String::from_utf8_lossy(tail), "skipping malformed relation tuple")
+                    tracing::warn!(error = %e, %object, %relation, %subject, "skipping malformed relation tuple")
                 }
             }
         }
@@ -110,15 +103,7 @@ impl Snapshot {
     }
 }
 
-fn parse_tail(tail: &[u8]) -> Result<Tuple> {
-    let text = std::str::from_utf8(tail)
-        .map_err(|e| Error::PolicyEvaluation(format!("relation key is not UTF-8: {e}")))?;
-    let (rest, subject) = text
-        .rsplit_once('/')
-        .ok_or_else(|| Error::PolicyEvaluation("relation key has no subject".into()))?;
-    let (object, relation) = rest
-        .rsplit_once('/')
-        .ok_or_else(|| Error::PolicyEvaluation("relation key has no relation".into()))?;
+fn parse_tuple(object: &str, relation: &str, subject: &str) -> Result<Tuple> {
     Ok(Tuple {
         object: object.to_string(),
         relation: relation.parse()?,
@@ -176,16 +161,32 @@ impl SnapshotCache {
 mod tests {
     use super::*;
 
-    #[test]
-    fn parses_object_ids_with_slashes() {
-        let t = parse_tail(b"dir:/src/billing/owner/team:core").unwrap();
-        assert_eq!(t.object, "dir:/src/billing");
-        assert_eq!(t.relation, Relation::Owner);
-        assert_eq!(t.subject, Subject::Team("core".into()));
-        let t = parse_tail(b"repo/reader/*").unwrap();
-        assert_eq!(t.object, "repo");
-        assert_eq!(t.subject, Subject::Any);
-        assert!(parse_tail(b"repo/reader").is_err());
-        assert!(parse_tail(b"repo/boss/*").is_err());
+    #[tokio::test]
+    async fn objects_with_slashes_load_exactly() {
+        let stores = rill_store::Stores::memory();
+        let repo = stores.repo(stores.create_repo("r", "").await.unwrap().id);
+        repo.add_relation("dir:/src/billing", "owner", "team:core")
+            .await
+            .unwrap();
+        repo.add_relation("dir:/src", "reader", "*").await.unwrap();
+        repo.add_relation("repo", "boss", "*").await.unwrap();
+        let snapshot = Snapshot::load(&repo).await.unwrap();
+        let mut tuples: Vec<_> = snapshot
+            .tuples()
+            .iter()
+            .map(|t| (t.object.as_str(), t.relation, t.subject.clone()))
+            .collect();
+        tuples.sort_by(|a, b| a.0.cmp(b.0));
+        assert_eq!(
+            tuples,
+            vec![
+                ("dir:/src", Relation::Reader, Subject::Any),
+                (
+                    "dir:/src/billing",
+                    Relation::Owner,
+                    Subject::Team("core".into())
+                ),
+            ]
+        );
     }
 }

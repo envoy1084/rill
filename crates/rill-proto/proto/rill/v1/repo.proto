@@ -54,7 +54,7 @@ service RepoService {
   // Watches.
   rpc WatchRefs(WatchRefsRequest) returns (stream RefEvent);
   rpc WatchTrunk(WatchTrunkRequest) returns (stream LandEvent);
-  rpc WatchLog(WatchLogRequest) returns (stream ChangeInfo);
+  rpc WatchLog(WatchLogRequest) returns (stream LogEntry);
 
   // Derived data.
   rpc GetDerived(GetDerivedRequest) returns (GetDerivedResponse);
@@ -474,7 +474,16 @@ message LandEvent {
 
 message WatchLogRequest {
   string repo = 1;
-  optional uint64 after_seq = 2;
+  // Absent: start at the current head, so only new versions are sent.
+  // Empty: replay the log from its start. Otherwise resume after this
+  // cursor, taken from an earlier LogEntry.
+  optional bytes after = 2;
+}
+// One version in the repository's version log.
+message LogEntry {
+  // Pass as WatchLogRequest.after to resume after this entry.
+  bytes cursor = 1;
+  ChangeInfo info = 2;
 }
 
 // --- Derived data ---------------------------------------------------------

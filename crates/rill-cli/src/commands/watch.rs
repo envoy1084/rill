@@ -4,6 +4,8 @@
 use clap::{Args, Subcommand};
 use futures::StreamExt;
 use rill_mcp::json;
+use rill_sdk::{LogEntry, WatchStart};
+use rill_types::Versionstamp;
 use serde_json::Value;
 
 use crate::commands::seq_arg;
@@ -19,15 +21,26 @@ pub enum WatchCmd {
     /// Ref creations, moves and deletions.
     Refs(RefsArgs),
     /// New change versions as they are created.
-    Log(TrunkArgs),
+    Log(LogArgs),
 }
 
-/// `rill watch trunk` / `rill watch log`.
+/// `rill watch trunk`.
 #[derive(Args, Debug)]
 pub struct TrunkArgs {
     /// Start after this sequence (default: now).
     #[arg(long)]
     pub after: Option<String>,
+}
+
+/// `rill watch log`.
+#[derive(Args, Debug)]
+pub struct LogArgs {
+    /// Resume after this cursor, printed with every entry (default: now).
+    #[arg(long, conflicts_with = "from_start")]
+    pub after: Option<Versionstamp>,
+    /// Replay the whole log first.
+    #[arg(long)]
+    pub from_start: bool,
 }
 
 /// `rill watch refs`.
@@ -77,12 +90,18 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: WatchCmd) -> Result<()> {
             }
         }
         WatchCmd::Log(args) => {
-            let after = args.after.as_deref().map(seq_arg).transpose()?;
-            let mut stream = repo.watch_log(after).await?;
+            let start = match (args.after, args.from_start) {
+                (Some(cursor), _) => WatchStart::After(cursor),
+                (None, true) => WatchStart::Beginning,
+                (None, false) => WatchStart::Now,
+            };
+            let mut stream = repo.watch_log(start).await?;
             while let Some(event) = stream.next().await {
-                let e = event?;
-                emit(ctx, json::change_info(&e), || {
-                    format!("{} {} {}", short(&e.hash), e.author, e.summary())
+                let LogEntry { cursor, info: e } = event?;
+                let mut value = json::change_info(&e);
+                value["cursor"] = Value::String(cursor.to_string());
+                emit(ctx, value, || {
+                    format!("{cursor} {} {} {}", short(&e.hash), e.author, e.summary())
                 })?;
             }
         }

@@ -9,7 +9,7 @@ use rill_proto::convert::{
 use rill_proto::rill::v1 as pb;
 use rill_types::{
     ChangeId, ChangeInfo, ChangeVersionHash, FileChange, Principal, RefName, RepoId, RepoPathBuf,
-    Timestamp, TrunkSeq,
+    Timestamp, TrunkSeq, Versionstamp,
 };
 
 use crate::error::Result;
@@ -53,6 +53,26 @@ pub struct LogPage {
     pub entries: Vec<ChangeInfo>,
     /// Pass as the next start to continue, if more history exists.
     pub next_start: Option<ChangeVersionHash>,
+}
+
+/// One version in the version log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogEntry {
+    /// Pass to `watch_log` to resume after this entry.
+    pub cursor: Versionstamp,
+    /// The version.
+    pub info: ChangeInfo,
+}
+
+impl TryFrom<pb::LogEntry> for LogEntry {
+    type Error = crate::error::Error;
+
+    fn try_from(e: pb::LogEntry) -> Result<Self> {
+        Ok(LogEntry {
+            cursor: Versionstamp::from_slice(&e.cursor)?,
+            info: rill_proto::convert::required("log_entry.info", e.info)?.try_into()?,
+        })
+    }
 }
 
 /// One version in a path's history.

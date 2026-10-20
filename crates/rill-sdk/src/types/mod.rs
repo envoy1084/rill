@@ -26,8 +26,8 @@ pub use lander::{
 };
 pub use page::Page;
 pub use repo::{
-    BlameLine, Derived, LandEvent, LogPage, PathHistoryEntry, PathHistoryPage, RefEvent, RefInfo,
-    RepoInfo,
+    BlameLine, Derived, LandEvent, LogEntry, LogPage, PathHistoryEntry, PathHistoryPage, RefEvent,
+    RefInfo, RepoInfo,
 };
 pub use review::{
     LandProgress, LandStatus, LandTicket, NewComment, NewThread, Reply, ReviewEvent,
