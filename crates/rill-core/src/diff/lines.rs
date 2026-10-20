@@ -57,15 +57,17 @@ fn group_hunks(
         // Extend the group while the next edit's leading context overlaps
         // this group's trailing context.
         let mut j = i;
-        while j + 1 < edits.len() && edits[j + 1].0.start <= edits[j].0.end + 2 * context {
+        while j + 1 < edits.len()
+            && edits[j + 1].0.start <= edits[j].0.end.saturating_add(context.saturating_mul(2))
+        {
             j += 1;
         }
         let first = &edits[i];
         let last = &edits[j];
         let old_begin = first.0.start.saturating_sub(context);
         let new_begin = first.1.start.saturating_sub(context);
-        let old_end = (last.0.end + context).min(old.len());
-        let new_end = (last.1.end + context).min(new.len());
+        let old_end = last.0.end.saturating_add(context).min(old.len());
+        let new_end = last.1.end.saturating_add(context).min(new.len());
 
         let mut lines = Vec::new();
         let mut old_pos = old_begin;

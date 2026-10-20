@@ -25,3 +25,5 @@ dashmap = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+proptest = { workspace = true }
+rill-types = { workspace = true, features = ["testing"] }

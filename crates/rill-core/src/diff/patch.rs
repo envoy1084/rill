@@ -21,7 +21,8 @@ enum Line {
 
 #[derive(Debug)]
 struct Hunk {
-    old_start: usize,
+    /// 0-based index of the first old line the hunk covers.
+    at: usize,
     lines: Vec<Line>,
 }
 
@@ -40,11 +41,11 @@ pub fn apply_unified(old: &[u8], patch: &[u8]) -> Result<Vec<u8>> {
                 Line::Add(_) => None,
             })
             .collect();
-        let stated = hunk.old_start.saturating_sub(1).max(cursor);
+        let stated = hunk.at.max(cursor);
         let at = locate(&old_lines, &expected, stated, cursor).ok_or_else(|| {
             invalid(format!(
                 "hunk at line {} does not match the base content",
-                hunk.old_start
+                hunk.at + 1
             ))
         })?;
         old_lines[cursor..at]
@@ -104,7 +105,7 @@ fn parse(patch: &[u8]) -> Result<Vec<Hunk>> {
         }
         if let Some(rest) = line.strip_prefix(b"@@ ") {
             hunks.push(Hunk {
-                old_start: parse_header(rest)?,
+                at: parse_header(rest)?,
                 lines: Vec::new(),
             });
             continue;
@@ -150,18 +151,24 @@ fn parse(patch: &[u8]) -> Result<Vec<Hunk>> {
     Ok(hunks)
 }
 
-/// Parse `-a[,b] +c[,d] @@...` and return the old start line.
+/// Parse `-a[,b] +c[,d] @@...` into the 0-based index of the hunk's first
+/// old line. With `b == 0` the hunk only inserts, and `a` is the line the
+/// insertion follows, so the index is `a` rather than `a - 1`.
 fn parse_header(rest: &[u8]) -> Result<usize> {
     let text = String::from_utf8_lossy(rest);
     let bad = || invalid(format!("malformed hunk header @@ {text}"));
     let old = text.split_whitespace().next().ok_or_else(bad)?;
-    let start = old.strip_prefix('-').ok_or_else(bad)?;
-    start
-        .split(',')
-        .next()
-        .ok_or_else(bad)?
-        .parse()
-        .map_err(|_| bad())
+    let range = old.strip_prefix('-').ok_or_else(bad)?;
+    let (start, len) = match range.split_once(',') {
+        Some((start, len)) => (start, len.parse::<usize>().map_err(|_| bad())?),
+        None => (range, 1),
+    };
+    let start: usize = start.parse().map_err(|_| bad())?;
+    Ok(if len == 0 {
+        start
+    } else {
+        start.saturating_sub(1)
+    })
 }
 
 fn invalid(reason: String) -> Error {
