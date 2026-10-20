@@ -23,6 +23,12 @@ and policy crates stay free of RPC and storage-layout concerns.
 | `rill-mcp` | stdio JSON-RPC tool surface over the SDK for agents; `rill-mcp` binary | Anything the SDK cannot do |
 | `rill-cli` | `rill` and `rill-server` binaries, output formats, exit codes | Business rules |
 
+Tooling crates, never depended on by product crates: `rill-sim` (seeded
+fault simulation, [simulation](../09-engineering/simulation.md)),
+`rill-bench` and `rill-load` (benchmarks and load generation,
+[performance](../09-engineering/performance.md)), and `fuzz/` (a separate
+`cargo-fuzz` workspace).
+
 ## Dependency graph
 
 Arrows point from a crate to what it depends on, as declared in each
@@ -70,6 +76,10 @@ depend on higher ones. The manifests refine that order in a few places:
   `rill-server` binary), `rill-store` and `rill-git-import` (for
   `rill import git`), and `rill-mcp` (shared JSON encoding, error codes,
   grep helper). No library crate links those.
+- The tooling crates `rill-sim` and `rill-load` link `rill-server` to reuse
+  its wiring; they sit above every product crate and nothing depends on
+  them. `rill-types` exposes its test strategies and clock overrides only
+  under the `testing` feature.
 
 RPC and HTTP dependencies:
 

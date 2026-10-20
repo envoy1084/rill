@@ -1,0 +1,47 @@
+[package]
+name = "rill-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+# A separate workspace: fuzzing needs nightly and libFuzzer, which the
+# main workspace must not depend on.
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+arbitrary = { version = "1.5.0", features = ["derive"] }
+bytes = "1.12.1"
+rill-types = { path = "../crates/rill-types" }
+rill-core = { path = "../crates/rill-core" }
+
+[[bin]]
+name = "decode_objects"
+path = "fuzz_targets/decode_objects.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "conflict_markers"
+path = "fuzz_targets/conflict_markers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "apply_patch"
+path = "fuzz_targets/apply_patch.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "repo_path"
+path = "fuzz_targets/repo_path.rs"
+test = false
+doc = false
+bench = false

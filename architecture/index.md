@@ -86,10 +86,12 @@ Read in this order the first time; each page ends with Previous / Next links.
 
 41. [Development](09-engineering/development.md)
 42. [Testing](09-engineering/testing.md)
+43. [Simulation](09-engineering/simulation.md)
+44. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-43. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
+45. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -123,6 +125,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Server flags, config file, dev mode | [Configuration](07-runtime/configuration.md) |
 | Client library, `rill` commands, agent tools | [SDK](08-clients/sdk.md), [CLI](08-clients/cli.md), [MCP server](08-clients/mcp.md) |
 | Building, CI, tests | [Development](09-engineering/development.md), [Testing](09-engineering/testing.md) |
+| Seeded fault simulation, benchmarks, load | [Simulation](09-engineering/simulation.md), [Performance](09-engineering/performance.md) |
 | Fixed design decisions for v2 | [Architecture decisions](10-decisions/README.md) |
 
 Gaps before production and the v2 plan are kept as planning notes in the

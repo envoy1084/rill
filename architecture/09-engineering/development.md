@@ -19,6 +19,7 @@ it builds, and what CI checks. The crate dependency rules are on
 | `crates/<name>/tests` | cross-module tests ([testing](testing.md)) |
 | `crates/rill-proto/proto/rill/v1` | the `.proto` sources |
 | `.github/workflows/ci.yml` | the CI pipeline |
+| `fuzz/` | `cargo-fuzz` targets, a separate workspace excluded from the main one |
 
 `.gitignore` excludes `/target`, `.rill/` checkouts, `*.redb` files and the
 local `research/` notes.

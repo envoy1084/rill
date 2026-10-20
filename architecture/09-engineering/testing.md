@@ -93,6 +93,8 @@ round trips in `src/convert/roundtrip_tests.rs`.
 - **CLI**: `create_checkout_land_and_sync` and
   `conflicting_sync_exits_three` check exit codes and `--json` output.
   `parse.rs` parses every command group without a server.
+- **Workflow under faults**: [simulation](simulation.md) covers review and
+  landing across thousands of seeded runs.
 
 ## Running
 
@@ -108,25 +110,44 @@ The test profile builds with line-table debuginfo to keep binaries small
 ([development](development.md)). The git importer test needs `git` on
 `PATH`.
 
-## Benchmarks
+## Properties
 
-`rill-bench` generates a deterministic repository (`Shape`: file count,
-fan-out 32, 16 lines per file, fixed seed) and runs criterion benchmarks
-over it: `cargo bench -p rill-bench --bench core`, with `RILL_BENCH_FILES`
-setting the size (default 100,000). Baselines on an Apple M-series laptop
-(release, memory stores):
+`rill-types::testing` (feature `testing`) has `proptest` strategies:
+- paths, including dots, spaces, mixed case and non-ASCII names, plus
+  invalid components
+- line-structured text with CRLF endings, a missing final newline and
+  non-UTF-8 bytes, plus related edits
+- content refs, file changes, merges and change versions
 
-| Benchmark | 100k files | 1M files |
-| --- | --- | --- |
-| `commit_10_files` (build, store, derive root) | 0.58 ms | 0.84 ms |
-| `diff_adjacent_roots` (10 files changed) | 0.18 ms | 0.27 ms |
-| `rebase_10_files_over_20` | 0.20 ms | 0.29 ms |
-| `diff_lines_2000` | 58 µs | 60 µs |
-| `merge_file_2000` | 127 µs | 183 µs |
+The properties they drive:
 
-Ten times the files costs one more directory level, not ten times the
-work: commits, diffs and rebases are O(size of change). Building the 1M-file
-corpus takes about a minute and 4.5 GB of memory.
+| Property | Where |
+| --- | --- |
+| `Merge` laws: simplify keeps the value and leaves no cancellable pair; flatten agrees with nested evaluation | `rill-types/tests/merge_laws.rs` |
+| Change versions round-trip and re-encode byte-identically; a changed field changes the hash | `rill-types/tests/encoding.rs` |
+| Valid paths round-trip; any invalid component is rejected | `rill-types/tests/paths.rs` |
+| A rendered patch reproduces the edit at any context width; hunks rebuild both sides | `rill-core/tests/diff_properties.rs` |
+| Materialized conflict markers parse back and re-materialize identically | `rill-core/tests/marker_properties.rs` |
+| A tree diff reports exactly the paths that differ | `rill-core/tests/tree_properties.rs` |
+
+## Fuzzing
+
+`fuzz/` is a separate `cargo-fuzz` workspace (it needs nightly and
+libFuzzer) with four targets for code that parses untrusted bytes:
+
+| Target | Checks |
+| --- | --- |
+| `decode_objects` | `ChangeVersion`, `Tree` and `BlobManifest` decoding never panics; decoded values survive re-encoding |
+| `conflict_markers` | Marker parsing never panics; parsed output re-materializes stably |
+| `apply_patch` | Applying an arbitrary patch to arbitrary content never panics or grows unboundedly |
+| `repo_path` | Accepted paths have no empty, `.`, `..`, `\` or NUL components and round-trip |
+
+```
+cd fuzz && cargo +nightly fuzz run decode_objects -- -max_total_time=600
+```
+
+Fuzzing is not part of CI. Each target ran 10 minutes without a crash when
+added.
 
 ## Limitations
 
@@ -139,8 +160,8 @@ corpus takes about a minute and 4.5 GB of memory.
   and static tokens.
 - Object `PUT`, `HEAD`, the batch route and `/readyz` have no test beyond a
   unit test of the batch frame encoding.
-- Property tests cover only the `Merge` algebra; there are no benchmarks or
-  fuzzing.
+- No property tests yet for rebase, derived data or review state
+  transitions; the simulator covers those only through workflows.
 - No test covers `Lagged` recovery in `Watch*` streams.
 - MCP tools run only against a mock. Their JSON encoding is also exercised
   through the CLI e2e, which shares `rill_mcp::json`.
@@ -155,4 +176,4 @@ corpus takes about a minute and 4.5 GB of memory.
 - [rill-git-import/tests/real_git.rs](../../crates/rill-git-import/tests/real_git.rs), [rill-proto/src/convert/roundtrip_tests.rs](../../crates/rill-proto/src/convert/roundtrip_tests.rs)
 
 ---
-← Previous: [Development](development.md) · [Index](../index.md) · Next: [Architecture decisions](../10-decisions/README.md) →
+← Previous: [Development](development.md) · [Index](../index.md) · Next: [Simulation](simulation.md) →
