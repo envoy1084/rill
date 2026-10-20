@@ -24,6 +24,7 @@ parking_lot = { workspace = true }
 dashmap = { workspace = true }
 
 [dev-dependencies]
+libc = { workspace = true }
 tokio = { workspace = true }
 proptest = { workspace = true }
 rill-types = { workspace = true, features = ["testing"] }

@@ -34,6 +34,9 @@ pub enum Error {
     #[error("content size mismatch: expected {expected} bytes, got {actual}")]
     ContentSize { expected: u64, actual: u64 },
 
+    #[error("upload interrupted: {0}")]
+    Upload(String),
+
     #[error("invalid patch: {0}")]
     InvalidPatch(String),
 

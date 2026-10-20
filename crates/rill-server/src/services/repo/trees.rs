@@ -3,12 +3,12 @@
 use std::pin::Pin;
 
 use bytes::Bytes;
-use futures::Stream;
-use rill_core::{read_content, store_content};
+use futures::{Stream, StreamExt};
+use rill_core::{content_parts, read_content, store_content_stream};
 use rill_proto::convert::{hash_from_proto, hash_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_store::ObjectStore;
-use rill_types::{ContentRef, ObjectHash, ObjectKind, RepoPathBuf};
+use rill_types::{ContentRef, ObjectKind, RepoPathBuf};
 use tonic::{Status, Streaming};
 
 use super::RepoSvc;
@@ -102,22 +102,27 @@ impl RepoSvc {
                 .clone()
                 .ok_or_else(|| Error::invalid("content is required"))?,
         )?;
-        let bytes = read_content(opened.repo.repo.objects().as_ref(), &content).await?;
-        let offset = req.offset.unwrap_or(0).min(bytes.len() as u64) as usize;
-        let end = match req.length {
-            Some(len) => (offset as u64 + len).min(bytes.len() as u64) as usize,
-            None => bytes.len(),
-        };
-        let slice = bytes.slice(offset..end);
-        let chunks: Vec<_> = (0..slice.len())
-            .step_by(BLOB_CHUNK)
-            .map(|start| {
-                Ok(pb::BlobChunk {
-                    data: slice.slice(start..(start + BLOB_CHUNK).min(slice.len())),
-                })
-            })
-            .collect();
-        Ok(Box::pin(futures::stream::iter(chunks)))
+        let objects = opened.repo.repo.objects().clone();
+        let offset = req.offset.unwrap_or(0);
+        let length = req.length.unwrap_or(u64::MAX);
+        // Each stored chunk is sent as it is read, split to the wire size,
+        // so a large file is never held whole.
+        let parts = content_parts(objects, &content, offset, length).await?;
+        let chunks = parts.flat_map(|part| {
+            let pieces: Vec<std::result::Result<pb::BlobChunk, Status>> = match part {
+                Ok(part) => (0..part.len())
+                    .step_by(BLOB_CHUNK)
+                    .map(|start| {
+                        Ok(pb::BlobChunk {
+                            data: part.slice(start..(start + BLOB_CHUNK).min(part.len())),
+                        })
+                    })
+                    .collect(),
+                Err(e) => vec![Err(Status::from(Error::from(e)))],
+            };
+            futures::stream::iter(pieces)
+        });
+        Ok(Box::pin(chunks))
     }
 
     pub(super) async fn put_blob_impl(
@@ -126,38 +131,44 @@ impl RepoSvc {
     ) -> Result<pb::PutBlobResponse> {
         let ctx = crate::auth::caller(&request)?;
         let mut stream = request.into_inner();
-        let mut header: Option<pb::PutBlobHeader> = None;
-        let mut data = bytes::BytesMut::new();
-        while let Some(msg) = stream.message().await? {
-            match msg.msg {
-                Some(pb::put_blob_request::Msg::Header(h)) => {
-                    if header.is_some() {
-                        return Err(Error::invalid("duplicate PutBlob header"));
-                    }
-                    if let Some(size) = h.size {
-                        data.reserve(size.min(64 * 1024 * 1024) as usize);
-                    }
-                    header = Some(h);
-                }
-                Some(pb::put_blob_request::Msg::Data(chunk)) => {
-                    if header.is_none() {
-                        return Err(Error::invalid("PutBlob data before header"));
-                    }
-                    data.extend_from_slice(&chunk);
-                }
-                None => {}
-            }
-        }
-        let header = header.ok_or_else(|| Error::invalid("PutBlob stream had no header"))?;
+        // The header comes first, so permission is checked before any data
+        // is accepted.
+        let header = match stream.message().await? {
+            Some(pb::PutBlobRequest {
+                msg: Some(pb::put_blob_request::Msg::Header(h)),
+            }) => h,
+            _ => return Err(Error::invalid("PutBlob must start with a header")),
+        };
         let repo = self.state.repos.resolve(&header.repo).await?;
         let opened = crate::services::common::opened(&self.state, ctx, repo);
         opened.permit().write(&RepoPathBuf::root()).await?;
-        let bytes = data.freeze();
+
+        let parts = futures::stream::unfold(stream, |mut stream| async move {
+            match stream.message().await {
+                Ok(Some(pb::PutBlobRequest {
+                    msg: Some(pb::put_blob_request::Msg::Data(data)),
+                })) => Some((Ok(data), stream)),
+                Ok(Some(pb::PutBlobRequest {
+                    msg: Some(pb::put_blob_request::Msg::Header(_)),
+                })) => Some((
+                    Err(rill_core::Error::Upload("duplicate PutBlob header".into())),
+                    stream,
+                )),
+                Ok(Some(pb::PutBlobRequest { msg: None })) => Some((Ok(Bytes::new()), stream)),
+                Ok(None) => None,
+                Err(status) => Some((
+                    Err(rill_core::Error::Upload(status.message().to_string())),
+                    stream,
+                )),
+            }
+        });
+        let stored =
+            store_content_stream(opened.repo.repo.objects().as_ref(), Box::pin(parts)).await?;
         if let Some(size) = header.size {
-            if size != bytes.len() as u64 {
+            if size != stored.size {
                 return Err(Error::invalid(format!(
                     "PutBlob header announced {size} bytes but {} arrived",
-                    bytes.len()
+                    stored.size
                 )));
             }
         }
@@ -165,16 +176,15 @@ impl RepoSvc {
         // storage form (inline, blob, chunked) the server picks.
         if let Some(expected) = &header.expected_hash {
             let expected = hash_from_proto("expected_hash", expected)?;
-            let actual = ObjectHash::digest(ObjectKind::Blob, &bytes);
-            if expected != actual {
+            if expected != stored.blob_hash {
                 return Err(Error::invalid(format!(
-                    "content hash mismatch: expected {expected}, got {actual}"
+                    "content hash mismatch: expected {expected}, got {}",
+                    stored.blob_hash
                 )));
             }
         }
-        let content = store_content(opened.repo.repo.objects().as_ref(), bytes).await?;
         Ok(pb::PutBlobResponse {
-            content: Some(pb::ContentRef::from(content)),
+            content: Some(pb::ContentRef::from(stored.content)),
         })
     }
 

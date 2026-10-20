@@ -16,7 +16,10 @@ pub mod tree;
 mod util;
 pub mod validate;
 
-pub use blobs::{read_content, store_content, BlobReader};
+pub use blobs::{
+    content_parts, read_content, read_content_range, store_content, store_content_stream,
+    BlobReader, StoredContent,
+};
 pub use builder::ChangeBuilder;
 pub use derive::{
     Blame, BlameLine, ChangeSummary, Derivable, DeriveCtx, DeriveManager, Generation, PathHistory,
