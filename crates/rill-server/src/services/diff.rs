@@ -144,7 +144,7 @@ fn render(
     match options.format {
         pb::DiffFormat::Unified => (
             Vec::new(),
-            Some(to_unified(path.as_str(), &hunks, options.context)),
+            Some(String::from_utf8_lossy(&to_unified(path.as_str(), &hunks)).into_owned()),
             false,
         ),
         _ => (hunks.iter().map(hunk_proto).collect(), None, false),

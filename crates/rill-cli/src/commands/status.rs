@@ -199,7 +199,7 @@ struct LocalFileDiff {
     path: RepoPathBuf,
     kind: LocalChangeKind,
     binary: bool,
-    unified: String,
+    unified: Vec<u8>,
 }
 
 async fn local_diff(
@@ -230,7 +230,7 @@ async fn local_diff(
                 "path": f.path.as_str(),
                 "status": json::enum_name(&f.kind),
                 "binary": f.binary,
-                "unified": f.unified,
+                "unified": String::from_utf8_lossy(&f.unified),
             })).collect::<Vec<_>>(),
         }),
         |out| {
@@ -245,7 +245,7 @@ async fn local_diff(
                     f.kind == LocalChangeKind::Deleted,
                     f.binary,
                 )?;
-                out.raw(f.unified.as_bytes())?;
+                out.raw(&f.unified)?;
             }
             Ok(())
         },
@@ -284,10 +284,10 @@ async fn diff_one(
     };
     let binary = rill_core::diff::is_binary(&before) || rill_core::diff::is_binary(&after);
     let unified = if binary {
-        String::new()
+        Vec::new()
     } else {
         let hunks = rill_core::diff::diff_lines_with_context(&before, &after, context as usize);
-        rill_core::diff::to_unified(change.path.as_str(), &hunks, context as usize)
+        rill_core::diff::to_unified(change.path.as_str(), &hunks)
     };
     Ok(LocalFileDiff {
         path: change.path.clone(),

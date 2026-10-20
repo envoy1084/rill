@@ -157,6 +157,7 @@ fn core_code(e: &rill_core::Error) -> Code {
         | E::NotAFile(_)
         | E::BinaryContent(_)
         | E::InvalidChange(_)
+        | E::InvalidPatch(_)
         | E::Types(_) => Code::InvalidArgument,
         E::ContentSize { .. } | E::Codec(_) => Code::DataLoss,
         E::Derive { .. } | E::Join(_) => Code::Internal,

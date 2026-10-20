@@ -21,7 +21,9 @@ pub use derive::{
     Blame, BlameLine, ChangeSummary, Derivable, DeriveCtx, DeriveManager, Generation, PathHistory,
     RootTree,
 };
-pub use diff::{diff_lines, diff_trees, is_binary, to_unified, Hunk, LineTag, TreeDiffEntry};
+pub use diff::{
+    apply_unified, diff_lines, diff_trees, is_binary, to_unified, Hunk, LineTag, TreeDiffEntry,
+};
 pub use error::{Error, Result};
 pub use graph::{CommitGraph, LogEntry};
 pub use merge::{

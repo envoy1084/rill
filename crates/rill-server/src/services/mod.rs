@@ -6,7 +6,6 @@ pub mod common;
 pub mod diff;
 pub mod intent;
 pub mod lander;
-pub mod patch;
 pub mod repo;
 pub mod review;
 pub mod workspace;

@@ -17,7 +17,6 @@ use super::trees::{check_content_exists, content_bytes};
 use super::RepoSvc;
 use crate::error::{Error, Result};
 use crate::services::common::{self, hash, open, path, provenance, resolve_root, Opened};
-use crate::services::patch::apply_unified;
 use crate::state::RepoEvent;
 
 impl RepoSvc {
@@ -96,7 +95,7 @@ impl RepoSvc {
                         }
                         None => (Bytes::new(), FileKind::Regular),
                     };
-                    let new = apply_unified(&old, &patch)
+                    let new = rill_core::apply_unified(&old, patch.as_bytes())
                         .map_err(|e| Error::invalid(format!("patch for {path:?}: {e}")))?;
                     FileChange::set(
                         store_content(objects.as_ref(), Bytes::from(new)).await?,
