@@ -83,7 +83,7 @@ sequenceDiagram
 
 A `RepoContext` holds everything handlers need for one repository: the
 `RepoStore`, tree cache, derived-data manager, commit graph, lander, review
-service, search index, authorizer and the bus for land-ticket progress. The `RepoRegistry` builds it
+service, search index and authorizer. The `RepoRegistry` builds it
 on first use and caches it for the life of the process. The request-scoped
 value is `Opened` (the caller's `AuthContext` plus an `Arc<RepoContext>`),
 which does not outlive the handler. See [server](../07-runtime/server.md).
@@ -127,10 +127,8 @@ The rules these mechanisms must keep are listed in
 
 ## Limitations
 
-- One server process per repository. Land requests and tickets are
-  process-local, so a restart loses queued requests.
-- Workers run inside the server process; there are no separate worker
-  processes.
+- Several servers can share only a FoundationDB metadata store; redb is
+  opened by one process.
 - No identity provider: authentication is static tokens or self-issued
   Biscuits.
 
@@ -140,7 +138,7 @@ The rules these mechanisms must keep are listed in
 - [RepoContext and registry](../../crates/rill-api/src/state/registry.rs)
 - [Request opening](../../crates/rill-api/src/services/common.rs)
 - [Permission checks](../../crates/rill-api/src/auth/permit.rs)
-- [Event bus](../../crates/rill-api/src/state/events.rs)
+- [Event log readers](../../crates/rill-events/src/lib.rs)
 - [Trunk CAS](../../crates/rill-store/src/repo/trunk.rs)
 - [Landing pipeline](../../crates/rill-lander/src/land/pipeline.rs)
 - [Object model](../../crates/rill-types/src/objects/mod.rs)

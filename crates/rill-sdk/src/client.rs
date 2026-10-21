@@ -45,6 +45,14 @@ impl Interceptor for AuthInterceptor {
         if let Some(h) = &self.header {
             request.metadata_mut().insert("authorization", h.clone());
         }
+        // An id per request, so a failure here and the server's log lines
+        // for it can be matched.
+        if !request.metadata().contains_key("x-request-id") {
+            let id = hex::encode(&rill_types::ids::random_id()[..8]);
+            if let Ok(value) = id.parse() {
+                request.metadata_mut().insert("x-request-id", value);
+            }
+        }
         Ok(request)
     }
 }
@@ -190,7 +198,8 @@ impl Client {
 /// CA, and a client certificate when one is configured.
 fn tls_config(tls: &crate::config::TlsOptions) -> Result<tonic::transport::ClientTlsConfig> {
     let read = |path: &std::path::Path| {
-        std::fs::read(path).map_err(|e| Error::config(format!("tls: reading {}: {e}", path.display())))
+        std::fs::read(path)
+            .map_err(|e| Error::config(format!("tls: reading {}: {e}", path.display())))
     };
     let mut config = tonic::transport::ClientTlsConfig::new().with_native_roots();
     if let Some(ca) = &tls.ca_file {
@@ -198,7 +207,10 @@ fn tls_config(tls: &crate::config::TlsOptions) -> Result<tonic::transport::Clien
     }
     match (&tls.client_cert, &tls.client_key) {
         (Some(cert), Some(key)) => {
-            config = config.identity(tonic::transport::Identity::from_pem(read(cert)?, read(key)?));
+            config = config.identity(tonic::transport::Identity::from_pem(
+                read(cert)?,
+                read(key)?,
+            ));
         }
         (None, None) => {}
         _ => {

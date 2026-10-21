@@ -6,6 +6,7 @@ mod deriver;
 mod follower;
 mod hooks;
 mod indexer;
+pub use indexer::SEARCH_LEASE;
 mod leader;
 mod verifier;
 

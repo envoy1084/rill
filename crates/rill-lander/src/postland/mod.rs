@@ -7,4 +7,4 @@ pub use record::{
     load_cursor, recent_records, record_at, record_of, VerificationRecord, VerificationStatus,
     POSTLAND_CURSOR_MISC, POSTLAND_INDEX_MISC, POSTLAND_KIND, POSTLAND_RING,
 };
-pub use worker::{PostLandVerifier, Sweep, DEFAULT_BATCH_SIZE};
+pub use worker::{PostLandVerifier, Sweep, DEFAULT_BATCH_SIZE, POSTLAND_LEASE};

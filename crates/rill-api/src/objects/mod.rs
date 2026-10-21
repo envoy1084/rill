@@ -101,8 +101,9 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
         .layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .layer(axum::extract::DefaultBodyLimit::max(MAX_PUT_BYTES));
     let health = Router::new()
-        .route("/healthz", get(healthz))
-        .route("/readyz", get(readyz));
+        .route("/livez", get(livez))
+        .route("/readyz", get(readyz))
+        .route("/metrics", get(metrics));
     let router = if serve_objects {
         health.merge(objects)
     } else {
@@ -114,8 +115,21 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
 /// Largest object accepted by `PUT`.
 pub const MAX_PUT_BYTES: usize = 256 * 1024 * 1024;
 
-async fn healthz() -> &'static str {
+/// The process is up and serving HTTP.
+async fn livez() -> &'static str {
     "ok"
+}
+
+/// Every metric, in the Prometheus text format.
+async fn metrics(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
+    (
+        [(
+            http::header::CONTENT_TYPE,
+            "application/openmetrics-text; version=1.0.0; charset=utf-8",
+        )],
+        state.metrics.encode(),
+    )
+        .into_response()
 }
 
 async fn readyz(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {

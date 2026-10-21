@@ -36,6 +36,7 @@ defaults with a comment header that lists every alternative.
 | `roles.api`, `roles.workers` | `true`, `true` | serve the gRPC API and object protocol; run landers, post-land, job workers, retention and repository discovery. Every process follows policy and relation changes. `RILL_ROLES=api,workers` |
 | `shutdown.drain_secs`, `shutdown.grace_secs` | `5`, `30` | seconds unready before refusing requests; seconds for requests and jobs to finish before running jobs are given back ([server](server.md#startup-and-shutdown)) |
 | `tls.cert`, `tls.key`, `tls.client_ca` | none (plain text) | PEM files for TLS on both listeners; `client_ca` makes it mutual: every connection must present a certificate that CA signed. `RILL_TLS_CERT`, `RILL_TLS_KEY`, `RILL_TLS_CLIENT_CA` |
+| `telemetry.log_format`, `telemetry.otlp_endpoint`, `telemetry.service_name` | `text`, none, `rill` | log lines as text or JSON; OTLP/HTTP trace export ([observability](observability.md)). `RILL_LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` |
 | `dev_mode` | `false` | anonymous requests act as `dev`; ReBAC checks pass |
 | `attestation_key` | none | path to an Ed25519 key file the server signs every stored version with; without it a per-process key is generated (warned outside dev mode). Its public half is in `Health` |
 | `[storage] kind` | `memory` | backend, see below |
@@ -137,8 +138,8 @@ startup. In dev mode:
 ## Code
 
 * [rill-api/src/config/](../../crates/rill-api/src/config/mod.rs), [state/stores.rs](../../crates/rill-api/src/state/stores.rs), [auth/authenticator.rs](../../crates/rill-api/src/auth/authenticator.rs)
-* [rill-cli/src/server/mod.rs](../../crates/rill-cli/src/server/mod.rs), [rill-cli/src/server/template.rs](../../crates/rill-cli/src/server/template.rs), [rill-cli/src/bin/rill_server.rs](../../crates/rill-cli/src/bin/rill_server.rs)
+* [rill-cli/src/server/mod.rs](../../crates/rill-cli/src/server/mod.rs), [rill-cli/src/server/template.rs](../../crates/rill-cli/src/server/template.rs)
 * [rill-lander/src/config.rs](../../crates/rill-lander/src/config.rs)
 
 ---
-← Previous: [Events and workers](events-and-workers.md) · [Index](../index.md) · Next: [SDK](../08-clients/sdk.md) →
+← Previous: [Events and workers](events-and-workers.md) · [Index](../index.md) · Next: [Observability](observability.md) →

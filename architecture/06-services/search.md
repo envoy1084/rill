@@ -88,17 +88,23 @@ Patterns are Rust `regex` over bytes, multi-line; globs use `globset`.
 paths the caller can read; a failed relation load denies all), resolves the
 root (trunk head by default), and asks for `max + 1` hits so `truncated` is
 exact. `max_results` of 0 means 200 and is capped at 5000; `context_lines`
-is capped at 20. `RepoContext::grep` indexes a root on demand when it has no
-manifest, so any tree is searchable at the cost of a full walk.
+is capped at 20. A root without a manifest is not indexed by the server
+that was asked: `RepoContext::grep` queues a high-priority `index_root`
+job and waits up to 30 s for the manifest (then `RootNotIndexed`), so any
+tree is searchable at the cost of a full walk by the index writer.
 
 Error mapping: `InvalidPattern` and `InvalidGlob` are `InvalidArgument`,
 `RootNotIndexed` is `Unavailable`, `Codec` and `Join` are `Internal`.
 
-Indexing runs as jobs. Each landing enqueues an `index_version` job for
-the new trunk head on the repository's `index` queue, in the land
-transaction. The index worker (`workers::indexer::run`) queues the current
-head once at start (trunk can move without a landing, by import), then
-runs jobs: `index_version` and `flush`. A failure is retried with backoff
+Indexing runs as jobs, written by one server per repository. Document ids
+are allocated in memory, so two writers would corrupt the index: index
+jobs run only on the server holding the repository's `search` lease, which
+loads the stored index when it takes the lease, and every index write is
+fenced on that lease. Each landing enqueues an `index_version` job for the
+new trunk head on the repository's `index` queue, in the land transaction.
+The index worker (`workers::indexer::run`) queues the current head once at
+start (trunk can move without a landing, by import), then runs
+`index_version` and `index_root` jobs. A failure is retried with backoff
 and a job whose worker died reruns when its claim expires (see
 [events and workers](../07-runtime/events-and-workers.md#jobs)). It
 flushes once more on shutdown. The server always uses
@@ -117,12 +123,22 @@ All records live in the repository's derived keyspace (see
 | `idx:post@1` | `shard_key(trigram >> 16)`, 256 shards | `ShardRecord` of encoded lists |
 | `idx:sym@1` | root `TreeHash` | symbol table (see below) |
 
-`flush` writes dirty shards whole, then the document table, then pending
-blob markers, in that order. A crash between steps never leaves a blob
-marked indexed without its postings. On read, a marker whose `DocId` does
-not map back to the same hash in the loaded table is treated as unknown
-and the blob is re-indexed. `open` loads every shard and the document table
-into memory.
+| `idx:state@1` | `ObjectHash::ZERO` | `IndexState`: a generation per shard and for the table |
+
+`index_root` tokenizes, flushes, and only then writes the root's manifest,
+so a manifest is never visible without the postings behind it. `flush`
+writes dirty shards whole, then the document table, then pending blob
+markers, then the new generations, in that order; a crash between steps
+never leaves a blob marked indexed without its postings. On read, a marker
+whose `DocId` does not map back to the same hash in the loaded table is
+treated as unknown and the blob is re-indexed. `open` loads every shard and
+the document table into memory.
+
+Every other server keeps a read-only copy. `search` calls `refresh` after
+reading the root's manifest: it compares the stored `IndexState` with the
+one it loaded (one read) and reloads only the shards, and the table, whose
+generation moved. A process with unflushed writes of its own is the writer
+and skips refreshing.
 
 ## Symbols
 

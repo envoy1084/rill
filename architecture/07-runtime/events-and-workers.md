@@ -7,8 +7,8 @@ once, whichever server made it. Work that a change makes necessary
 (deriving and indexing a landing) is a durable job enqueued in the same
 transaction and run by workers that claim it under a lease. Roles that must
 have one holder at a time (the lander, the post-land verifier) hold a
-renewed, fenced lease. The in-process bus remains only for state that is
-not stored: land-ticket progress.
+renewed, fenced lease. Nothing a client can observe lives only in one
+process's memory, so any number of servers can share one store.
 
 ## Event log
 
@@ -62,7 +62,7 @@ away.
 | `WatchEvents` | the event log through `tail`, with the request's kinds, change and ref prefix | `after`: absent is now, empty is the beginning, otherwise a cursor from an earlier `EventEnvelope` |
 | `WatchRefs` | `RefMoved` and `Landed` events; a landing is reported as a `trunk` move with the previous trunk entry as `old` | now |
 | `WatchTrunk`, `WatchLog` | the trunk and version log from a cursor (`trunk_range`, `log_after` in pages of 512), re-read whenever the event counter moves | `after_seq` / `after` as before |
-| `WatchReview` | the log, filtered to one change; plus land-ticket `Queued` and `Failed` updates from the lander's bus | now |
+| `WatchReview` | the log, filtered to one change, including its land requests' `LandRequested` and `LandStatusChanged` events | now |
 
 ## Jobs
 
@@ -119,16 +119,21 @@ lease. A standby lander or verifier does nothing until the lease is free.
 
 ## Workers
 
-`workers::spawn_repo_workers` runs once per repository context.
+`workers::spawn_repo_workers` runs once per repository context. The
+follower runs in every process; the rest only with the `workers` role
+([configuration](configuration.md)). `workers::discover_repos` builds the
+context of every repository every 5 s, including ones other servers
+created, so the remaining servers take over all background work when one
+dies.
 
 | Worker | Trigger | After a restart |
 | --- | --- | --- |
-| Lander loop, `Lander::run_forever` | every `batch_window`, while holding the `lander` lease | queued requests live in memory and are lost |
+| Follower, `workers/follower.rs` | `PolicyChanged` and `RelationChanged` in the log | reloads the review policy, drops the cached relation snapshot |
+| Lander loop, `Lander::run_forever` | a new request (wake counter) or every `batch_window`, while holding the `lander` lease | a lander that takes the lease serves every stored request |
 | Post-land verifier | every `postland.interval_secs`, while holding the `postland` lease | resumes from its fenced cursor |
 | Derive worker, `workers/deriver.rs` | the `derive` queue, 2 at a time | unfinished jobs are reaped and rerun |
-| Index worker, `workers/indexer.rs` | the `index` queue; queues the trunk head once at start, for trunk moved without a landing (imports) | unfinished jobs are reaped and rerun |
+| Index worker, `workers/indexer.rs` | the `index` queue, while holding the `search` lease (`workers/leader.rs`); queues the trunk head once at start, for trunk moved without a landing (imports) | the next holder reloads the index and reruns unfinished jobs |
 | Event retention | hourly | stateless |
-| Review and land forwarders | broadcast receive | feed the in-process bus |
 
 One server-wide task, `workers::sweep_idempotency`, deletes expired
 idempotency records every 10 minutes.
@@ -141,14 +146,12 @@ time, not tasks.
 
 ## Limitations
 
-* Workers run inside the server process, one set per repository context;
-  there are no separate worker processes.
+* Workers are tasks in a server process (`--roles workers` makes a
+  process that only runs them); there are no separate fleets per queue.
 * Waiting for events or jobs polls the counter (every 20 ms) on every
   engine; the FoundationDB engine does not use watches yet.
 * A cursor older than the retention window resumes at the oldest retained
   event without saying events were dropped.
-* Land tickets are in memory, so `WatchReview` land updates other than
-  `Landed` come from the local lander only.
 * A job's claim scan reads each shard and priority separately; with many
   shards and empty queues an idle claim costs `shards × 3` range reads.
 
@@ -157,8 +160,8 @@ time, not tasks.
 * [rill-events](../../crates/rill-events/src/lib.rs), [rill-jobs](../../crates/rill-jobs/src/lib.rs)
 * [rill-store repo/events.rs](../../crates/rill-store/src/repo/events.rs), [repo/leases.rs](../../crates/rill-store/src/repo/leases.rs), [repo/reviews.rs](../../crates/rill-store/src/repo/reviews.rs)
 * [rill-lander land/followups.rs](../../crates/rill-lander/src/land/followups.rs)
-* [workers/mod.rs](../../crates/rill-api/src/workers/mod.rs), [workers/deriver.rs](../../crates/rill-api/src/workers/deriver.rs), [workers/indexer.rs](../../crates/rill-api/src/workers/indexer.rs)
-* [services/repo/watch/](../../crates/rill-api/src/services/repo/watch/mod.rs), [services/review/watch.rs](../../crates/rill-api/src/services/review/watch.rs), [state/events.rs](../../crates/rill-api/src/state/events.rs)
+* [workers/mod.rs](../../crates/rill-api/src/workers/mod.rs), [workers/deriver.rs](../../crates/rill-api/src/workers/deriver.rs), [workers/indexer.rs](../../crates/rill-api/src/workers/indexer.rs), [workers/leader.rs](../../crates/rill-api/src/workers/leader.rs), [workers/follower.rs](../../crates/rill-api/src/workers/follower.rs)
+* [services/repo/watch/](../../crates/rill-api/src/services/repo/watch/mod.rs), [services/review/watch.rs](../../crates/rill-api/src/services/review/watch.rs)
 
 ---
 ← Previous: [API surface](api-surface.md) · [Index](../index.md) · Next: [Configuration](configuration.md) →

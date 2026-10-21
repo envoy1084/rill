@@ -23,8 +23,9 @@ pub mod objects;
 mod serve;
 pub mod services;
 mod shutdown;
-mod tls;
 pub mod state;
+pub mod telemetry;
+mod tls;
 pub mod workers;
 
 use std::sync::Arc;

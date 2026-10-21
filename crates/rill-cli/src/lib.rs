@@ -95,10 +95,9 @@ fn color_enabled() -> bool {
 }
 
 /// Logging to stderr controlled by `-v`/`-q` and `RUST_LOG`.
-fn init_logging(verbose: u8, quiet: bool, serving: bool) {
+fn init_logging(verbose: u8, quiet: bool) {
     let default = match (quiet, verbose) {
         (true, _) => "off",
-        (false, 0) if serving => "info",
         (false, 0) => "warn",
         (false, 1) => "info",
         (false, 2) => "debug",
@@ -130,13 +129,15 @@ pub fn run_cli() -> std::process::ExitCode {
         .map(|a| a.to_string_lossy().matches('v').count() as u8)
         .sum();
     let quiet = args.iter().any(|a| a == "-q" || a == "--quiet");
-    // The service logs what it does by default; client commands stay quiet.
+    // The service installs its own telemetry (`rill dev`, `rill api`).
     let serving = args
         .iter()
         .skip(1)
         .find(|a| !a.to_string_lossy().starts_with('-'))
         .is_some_and(|a| a == "dev" || a == "api");
-    init_logging(verbose, quiet, serving);
+    if !serving {
+        init_logging(verbose, quiet);
+    }
 
     let runtime = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,

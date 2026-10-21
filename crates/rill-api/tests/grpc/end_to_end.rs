@@ -347,7 +347,7 @@ async fn end_to_end(config: ServerConfig) {
     assert!(headers
         .iter()
         .any(|(k, v)| k == "cache-control" && v.contains("immutable")));
-    let (status, _, _) = http_get(server.http, "/healthz").await;
+    let (status, _, _) = http_get(server.http, "/livez").await;
     assert_eq!(status, 200);
     let (status, _, _) = http_get(server.http, "/o/main/blob/zz").await;
     assert_eq!(status, 400);

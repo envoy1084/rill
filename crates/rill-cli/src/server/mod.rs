@@ -143,7 +143,6 @@ pub fn parse_storage(spec: &str) -> Result<StorageConfig> {
 /// Run `rill dev` until ctrl-c.
 pub async fn dev(args: DevArgs) -> Result<()> {
     let config = dev_config(&args)?;
-    tracing::warn!(storage = ?config.storage, "dev mode: no authentication, every request is permitted");
     serve(config).await
 }
 
@@ -153,13 +152,14 @@ pub async fn api(args: ApiArgs) -> Result<()> {
         return write_template(out.as_deref(), *force);
     }
     let config = api_config(&args)?;
-    if config.dev_mode {
-        tracing::warn!("dev mode: no authentication, every request is permitted");
-    }
     serve(config).await
 }
 
 async fn serve(config: ServerConfig) -> Result<()> {
+    let _telemetry = rill_api::telemetry::init(&config.telemetry)?;
+    if config.dev_mode {
+        tracing::warn!(storage = ?config.storage, "dev mode: no authentication, every request is permitted");
+    }
     let shutdown = CancellationToken::new();
     let signal = shutdown.clone();
     tokio::spawn(async move {

@@ -31,6 +31,8 @@ pub struct ServerConfig {
     pub shutdown: ShutdownConfig,
     /// TLS for both listeners; plain text when absent.
     pub tls: Option<TlsConfig>,
+    /// Logs and traces.
+    pub telemetry: TelemetryConfig,
     /// Where objects and metadata live.
     pub storage: StorageConfig,
     /// Where metadata lives, when not beside the objects.
@@ -69,6 +71,7 @@ impl Default for ServerConfig {
             roles: Roles::default(),
             shutdown: ShutdownConfig::default(),
             tls: None,
+            telemetry: TelemetryConfig::default(),
             storage: StorageConfig::Memory,
             metadata: MetadataConfig::Storage,
             auth: AuthConfig::default(),
@@ -126,6 +129,37 @@ impl Roles {
             return Err(Error::Config("at least one role is needed".into()));
         }
         Ok(roles)
+    }
+}
+
+/// How log lines are written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LogFormat {
+    #[default]
+    Text,
+    /// One JSON object per line, with the request's span fields.
+    Json,
+}
+
+/// Logs and traces.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TelemetryConfig {
+    pub log_format: LogFormat,
+    /// OTLP/HTTP endpoint spans are exported to; none when absent.
+    pub otlp_endpoint: Option<String>,
+    /// The `service.name` traces carry.
+    pub service_name: String,
+}
+
+impl Default for TelemetryConfig {
+    fn default() -> Self {
+        TelemetryConfig {
+            log_format: LogFormat::Text,
+            otlp_endpoint: None,
+            service_name: "rill".into(),
+        }
     }
 }
 

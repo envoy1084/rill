@@ -35,7 +35,11 @@ pub struct TlsOptions {
 impl TlsOptions {
     /// Read `RILL_CA_FILE`, `RILL_CLIENT_CERT` and `RILL_CLIENT_KEY`.
     pub fn from_env() -> Self {
-        let path = |name| std::env::var_os(name).filter(|v| !v.is_empty()).map(PathBuf::from);
+        let path = |name| {
+            std::env::var_os(name)
+                .filter(|v| !v.is_empty())
+                .map(PathBuf::from)
+        };
         TlsOptions {
             ca_file: path(CA_FILE_ENV),
             client_cert: path(CLIENT_CERT_ENV),

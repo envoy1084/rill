@@ -61,6 +61,10 @@ pub async fn serve_with_state(
     tracing::info!(%grpc_addr, %http_addr, dev_mode = state.dev_mode(), "rill server listening");
 
     let roles = state.config.roles;
+    tokio::spawn(crate::telemetry::sample_forever(
+        state.clone(),
+        shutdown.clone(),
+    ));
     if roles.workers {
         tokio::spawn(crate::workers::sweep_idempotency(
             state.stores.clone(),
@@ -111,7 +115,8 @@ async fn serve_grpc(
         set_health(&reporter, false).await;
     });
 
-    let mut builder = tonic::transport::Server::builder();
+    let mut builder = tonic::transport::Server::builder()
+        .layer(crate::telemetry::TelemetryLayer::new(state.metrics.clone()));
     if let Some(tls) = &state.config.tls {
         builder = builder
             .tls_config(crate::tls::grpc(tls)?)

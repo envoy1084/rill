@@ -76,23 +76,24 @@ Read in this order the first time; each page ends with Previous / Next links.
 36. [API surface](07-runtime/api-surface.md)
 37. [Events and workers](07-runtime/events-and-workers.md)
 38. [Configuration](07-runtime/configuration.md)
+39. [Observability](07-runtime/observability.md)
 
 **08 Clients**
 
-39. [SDK](08-clients/sdk.md)
-40. [CLI](08-clients/cli.md)
-41. [MCP server](08-clients/mcp.md)
+40. [SDK](08-clients/sdk.md)
+41. [CLI](08-clients/cli.md)
+42. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-42. [Development](09-engineering/development.md)
-43. [Testing](09-engineering/testing.md)
-44. [Simulation](09-engineering/simulation.md)
-45. [Performance](09-engineering/performance.md)
+43. [Development](09-engineering/development.md)
+44. [Testing](09-engineering/testing.md)
+45. [Simulation](09-engineering/simulation.md)
+46. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-46. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
+47. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -125,6 +126,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Which RPCs exist | [API surface](07-runtime/api-surface.md) |
 | Events, background workers | [Events and workers](07-runtime/events-and-workers.md) |
 | Server flags, config file, dev mode | [Configuration](07-runtime/configuration.md) |
+| Metrics, logs, traces, health endpoints, dashboards | [Observability](07-runtime/observability.md) |
 | Client library, `rill` commands, agent tools | [SDK](08-clients/sdk.md), [CLI](08-clients/cli.md), [MCP server](08-clients/mcp.md) |
 | Building, CI, tests | [Development](09-engineering/development.md), [Testing](09-engineering/testing.md) |
 | Seeded fault simulation, benchmarks, load | [Simulation](09-engineering/simulation.md), [Performance](09-engineering/performance.md) |

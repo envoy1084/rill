@@ -11,34 +11,48 @@ land transaction.
 
 ```mermaid
 flowchart LR
-    RL[RequestLand] -->|enqueue| Q[LandQueue]
-    Q -->|drain every batch_window| P[partition by touched paths]
+    RL[RequestLand, any server] -->|queue_land tx| Q[(stored requests)]
+    Q -->|lease holder reads pending| P[partition by touched paths]
     P --> G1[group: overlapping, in order]
     P --> G2[group ...]
     G1 --> A[attempt: rebase, verify, CAS]
     A -->|trunk moved| A
     A --> F[land transaction: positions, records, reviews, events]
-    F --> N[announce: ticket, hooks, bus]
+    F --> N[announce: hooks, lander events]
     A -.->|conflict / failure| H[ReviewHooks.return_to_owner]
 ```
 
 ## Queue and tickets
 
-`LandQueue` is process memory: a `VecDeque<QueuedRequest>` of pending
-requests and a `DashMap<LandTicket, watch::Sender<LandStatus>>`. `enqueue`
-assigns `LandTicket(n)` (shown as `land#n`) from a counter starting at 1
-and publishes `LandEvent::Queued`. `Lander::run_forever` sleeps
-`batch_window`, calls `run_once` (drain all pending, partition, process),
-then `forget_terminal` drops tickets that finished more than
-`TERMINAL_RETENTION` (10 minutes) ago, so a client polling after the
-request completed still sees its outcome. `land_now`, used by reverts,
-enqueues, runs one sweep inline and waits on the ticket's watch channel.
+Land requests live in the store (`repo/land_queue.rs`), so any server can
+accept one, any server can report its status, and they survive restarts:
 
-The server also remembers each ticket in `RepoContext.tickets` so
-`GetLandStatus` can answer after the queue forgot it (after the retention
-window or a restart): it falls back to the review state (`landed_seq` set
-means `Landed`, otherwise `Returned { "ticket expired ..." }`). The lander
-itself never sets `Returned`.
+* `queue_land(request)` writes, in one transaction, the record
+  `(lrt, ..., ticket)` (`LandRequestRecord`: ticket, request, status,
+  updated_at), a row in the pending index `(lrq, ..., lane, requested_at,
+  ticket)`, the index `(lrc, ..., change) → ticket`, a `LandRequested`
+  event and a bump of the wake counter. A change with an unfinished
+  request gets that request's ticket back instead, so asking twice is
+  harmless. Tickets are random 64-bit numbers, shown as `land#n`.
+* Requests are served by lane (`emergency`, `human`, `agent`, `bulk`; the
+  requester's kind picks `human` or `agent`, reverts use `emergency`), then
+  oldest first.
+* Every status change is a transaction that writes the record and a
+  `LandStatusChanged` event, conditioned on the record as read and fenced
+  by the lander's lease. A terminal status (`Landed`, `Failed`,
+  `Conflict`, `Returned`, `Ejected`) drops the pending and change rows,
+  and never changes again. `Landed` is written by the land transaction
+  itself.
+* Finished requests stay queryable for `TERMINAL_RETENTION` (7 days) and
+  are then swept.
+
+`Lander::run_forever` serves the queue while it holds the lease: it reads
+up to 256 pending requests, partitions and processes them, then waits for
+the wake counter to move or `batch_window`, whichever is first.
+`land_now` (reverts, CLI) queues a request and serves until it finishes,
+or until `max_wait` while another process holds the lease.
+`GetLandStatus`, `GetTrunkStatus` and `WatchReview` read the stored
+records.
 
 | Lander `LandStatus` | Wire `LandStatus` |
 | --- | --- |
@@ -46,7 +60,7 @@ itself never sets `Returned`.
 | `Verifying`, `Landing` | `Rebasing` |
 | `Landed { seq }` | `Landed` |
 | `Failed { reason }`, `Conflict { paths }` | `Failed` |
-| `Returned { reason }` | `Cancelled` |
+| `Returned { reason }`, `Ejected { reason }` | `Cancelled` |
 
 ## Conflict graph
 
@@ -63,12 +77,13 @@ the CAS. A request whose touched paths cannot be computed fails at once.
 
 ## Attempt loop
 
-`process` never returns an error; every outcome becomes a ticket status.
-It first calls `hooks.mark_landing`. If review refuses (the change was
-abandoned or returned after `RequestLand`, or another request for it is
-already landing), the ticket fails with `change is no longer landable`
-and nothing lands; this is what stops a change requested twice from landing
-twice. Otherwise it picks
+`process` never returns an error; every outcome becomes a request
+status. It first calls `hooks.mark_landing`, which accepts a `Landable`
+change, or one already `Landing` when a lander that took over resumes a
+request. If review refuses (the change was abandoned or returned after
+`RequestLand`), the request fails with `change is no longer landable` and
+nothing lands. A change cannot land twice: it has at most one unfinished
+request, and the land transaction checks its review snapshot. Otherwise it picks
 the verify mode (`verify_override`, else `LandPolicy.modes` for the
 request's risk), and runs up to `max_retries + 1` attempts with `tip`
 starting at the requested version:
@@ -135,7 +150,7 @@ land with `Fenced` even while it still believes it holds the lease. See
 
 ## Announcing and land records
 
-After the transaction, `announce` sets the ticket to `Landed`, calls
+After the transaction (which also set the request `Landed`), `announce` calls
 `hooks.mark_landed` (a notification: the review service publishes its
 events, the record is already written), publishes `LandEvent::Landed`, and
 publishes `DependentsReady` when `hooks.dependents_of` returns stack
@@ -163,10 +178,6 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 
 ## Limitations
 
-* Queue and tickets are process-local; a restart loses queued requests
-  and ticket status (phase 9). A standby lander does not see the active
-  one's queue.
-* `RepoContext.tickets` is never pruned.
 * `VerifyMode::Affected` and `Full` call the same verifier; the mode is not
   passed through.
 * A request keeps the risk class it was enqueued with.
@@ -183,7 +194,7 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 * [rill-lander/src/queue.rs](../../crates/rill-lander/src/queue.rs), [conflict_graph.rs](../../crates/rill-lander/src/conflict_graph.rs), [config.rs](../../crates/rill-lander/src/config.rs), [events.rs](../../crates/rill-lander/src/events.rs), [traits.rs](../../crates/rill-lander/src/traits.rs)
 * [rill-lander/src/land/followups.rs](../../crates/rill-lander/src/land/followups.rs) (jobs a landing enqueues)
 * [rill-store/src/repo/landing.rs](../../crates/rill-store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records), [repo/leases.rs](../../crates/rill-store/src/repo/leases.rs), [repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)
-* [rill-api/src/services/review/mod.rs](../../crates/rill-api/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-api/src/services/common.rs) (`ticket_status`), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [workers/mod.rs](../../crates/rill-api/src/workers/mod.rs)
+* [rill-api/src/services/review/mod.rs](../../crates/rill-api/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-api/src/services/common.rs) (`ticket_status`), [repo/land_queue.rs](../../crates/rill-store/src/repo/land_queue.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [workers/mod.rs](../../crates/rill-api/src/workers/mod.rs)
 
 ---
 ← Previous: [Review agents](review-agents.md) · [Index](../index.md) · Next: [Post-land verification](post-land-verification.md) →

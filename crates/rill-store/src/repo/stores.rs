@@ -76,6 +76,16 @@ impl Stores {
         &self.namespace
     }
 
+    /// The same stores with `meta` in place of the metadata store, for a
+    /// wrapper (metrics, fault injection) around it.
+    pub fn with_meta(&self, meta: Arc<dyn MetaStore>) -> Stores {
+        Stores {
+            objects: self.objects.clone(),
+            meta,
+            namespace: self.namespace.clone(),
+        }
+    }
+
     /// The same stores scoped to the org `name`.
     pub fn org(&self, name: &str) -> Stores {
         Stores {

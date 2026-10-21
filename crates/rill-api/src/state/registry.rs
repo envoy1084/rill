@@ -204,6 +204,11 @@ impl RepoRegistry {
         }
     }
 
+    /// Every repository context built so far.
+    pub fn loaded(&self) -> Vec<Arc<RepoContext>> {
+        self.contexts.iter().map(|e| e.value().clone()).collect()
+    }
+
     /// The underlying stores.
     pub fn stores(&self) -> &Stores {
         &self.stores

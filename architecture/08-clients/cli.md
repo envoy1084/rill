@@ -134,7 +134,7 @@ the root `CancellationToken`. See
 - [commands/mod.rs](../../crates/rill-cli/src/commands/mod.rs), [commands/parse.rs](../../crates/rill-cli/src/commands/parse.rs), [commands/change.rs](../../crates/rill-cli/src/commands/change.rs), [commands/import.rs](../../crates/rill-cli/src/commands/import.rs)
 - [output/mod.rs](../../crates/rill-cli/src/output/mod.rs), [output/table.rs](../../crates/rill-cli/src/output/table.rs), [output/format.rs](../../crates/rill-cli/src/output/format.rs)
 - [server/mod.rs](../../crates/rill-cli/src/server/mod.rs), [server/template.rs](../../crates/rill-cli/src/server/template.rs)
-- [bin/rill.rs](../../crates/rill-cli/src/bin/rill.rs), [bin/rill_server.rs](../../crates/rill-cli/src/bin/rill_server.rs)
+- [bin/rill.rs](../../crates/rill-cli/src/bin/rill.rs)
 
 ---
 ← Previous: [SDK](sdk.md) · [Index](../index.md) · Next: [MCP server](mcp.md) →

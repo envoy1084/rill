@@ -118,9 +118,6 @@ flowchart LR
 
 ## Limitations
 
-- The single-lander invariant is a deployment assumption. Nothing stops two
-  processes from opening the same store; the lease fences all but the
-  newest lander off trunk, but queued requests and tickets are not shared.
 - No test or lint enforces the postcard and layering rules mechanically.
 
 ## Code

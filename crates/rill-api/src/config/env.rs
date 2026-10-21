@@ -14,6 +14,8 @@ impl ServerConfig {
     /// * `RILL_LISTEN_GRPC`, `RILL_LISTEN_HTTP`: socket addresses;
     /// * `RILL_DEV_MODE`: `true`/`false`;
     /// * `RILL_ROLES`: `api`, `workers` or `api,workers`;
+    /// * `RILL_LOG_FORMAT`: `text` or `json`;
+    /// * `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`: trace export;
     /// * `RILL_TLS_CERT`, `RILL_TLS_KEY`, `RILL_TLS_CLIENT_CA`: PEM files
     ///   for TLS on both listeners (the CA makes it mutual);
     /// * `RILL_STORAGE`: `memory`, `local:<dir>` or `s3:<url>`;
@@ -34,14 +36,30 @@ impl ServerConfig {
             self.listen_http = parse_env("RILL_LISTEN_HTTP", &v)?;
         }
         if let Some(cert) = lookup("RILL_TLS_CERT") {
-            let key = lookup("RILL_TLS_KEY").ok_or_else(|| {
-                Error::Config("RILL_TLS_CERT needs RILL_TLS_KEY".into())
-            })?;
+            let key = lookup("RILL_TLS_KEY")
+                .ok_or_else(|| Error::Config("RILL_TLS_CERT needs RILL_TLS_KEY".into()))?;
             self.tls = Some(super::TlsConfig {
                 cert: PathBuf::from(cert),
                 key: PathBuf::from(key),
                 client_ca: lookup("RILL_TLS_CLIENT_CA").map(PathBuf::from),
             });
+        }
+        if let Some(v) = lookup("RILL_LOG_FORMAT") {
+            self.telemetry.log_format = match v.as_str() {
+                "text" => super::LogFormat::Text,
+                "json" => super::LogFormat::Json,
+                other => {
+                    return Err(Error::Config(format!(
+                        "RILL_LOG_FORMAT: expected text or json, got {other:?}"
+                    )))
+                }
+            };
+        }
+        if let Some(v) = lookup("OTEL_EXPORTER_OTLP_ENDPOINT").filter(|v| !v.is_empty()) {
+            self.telemetry.otlp_endpoint = Some(v);
+        }
+        if let Some(v) = lookup("OTEL_SERVICE_NAME").filter(|v| !v.is_empty()) {
+            self.telemetry.service_name = v;
         }
         if let Some(v) = lookup("RILL_ROLES") {
             self.roles = super::Roles::parse(&v)?;

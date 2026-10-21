@@ -30,6 +30,8 @@ pub struct AppState {
     pub shutdown: CancellationToken,
     /// Draining, stopping and aborting.
     pub lifecycle: Arc<super::Lifecycle>,
+    /// Every metric the server keeps.
+    pub metrics: Arc<crate::telemetry::Metrics>,
     /// Process start time, for health reporting.
     pub started_at: std::time::Instant,
 }
@@ -49,6 +51,11 @@ impl AppState {
         shutdown: CancellationToken,
     ) -> Result<Arc<Self>> {
         let config = Arc::new(config);
+        let metrics = Arc::new(crate::telemetry::Metrics::new());
+        let stores = stores.with_meta(Arc::new(crate::telemetry::InstrumentedMetaStore::new(
+            stores.meta.clone(),
+            metrics.clone(),
+        )));
         let issuer = Arc::new(auth::build_issuer(&config.auth)?);
         let auth = auth::build_authenticator(&config.auth, &issuer)?;
         let attestor = Arc::new(load_attestor(&config)?);
@@ -68,6 +75,7 @@ impl AppState {
             attestor,
             shutdown,
             lifecycle,
+            metrics,
             started_at: std::time::Instant::now(),
         }))
     }

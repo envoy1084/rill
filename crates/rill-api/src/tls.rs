@@ -52,7 +52,9 @@ pub fn http(config: &TlsConfig) -> Result<axum_server::tls_rustls::RustlsConfig>
         .with_single_cert(certs, key)
         .map_err(|e| Error::Config(format!("tls: {e}")))?;
     server.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-    Ok(axum_server::tls_rustls::RustlsConfig::from_config(Arc::new(server)))
+    Ok(axum_server::tls_rustls::RustlsConfig::from_config(
+        Arc::new(server),
+    ))
 }
 
 fn read(path: &Path) -> Result<Vec<u8>> {

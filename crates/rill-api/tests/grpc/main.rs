@@ -9,6 +9,7 @@ mod orgs;
 mod replicas;
 mod retries;
 mod shutdown;
+mod telemetry;
 mod workspaces;
 
 use std::sync::Arc;

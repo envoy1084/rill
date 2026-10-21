@@ -81,6 +81,7 @@ where
                 .map(str::to_owned);
             match authenticate(&state, header.as_deref()).await {
                 Ok(ctx) => {
+                    tracing::Span::current().record("principal", ctx.principal.name.as_str());
                     request.extensions_mut().insert::<AuthContext>(ctx);
                     inner.call(request).await
                 }

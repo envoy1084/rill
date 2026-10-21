@@ -74,9 +74,12 @@ async fn serve(tls: TlsConfig) -> Server {
         ..ServerConfig::default()
     };
     let signal = CancellationToken::new();
-    let state =
-        AppState::with_stores(config, rill_store::Stores::memory(), CancellationToken::new())
-            .unwrap();
+    let state = AppState::with_stores(
+        config,
+        rill_store::Stores::memory(),
+        CancellationToken::new(),
+    )
+    .unwrap();
     let listeners = Listeners::bind(
         "127.0.0.1:0".parse().unwrap(),
         "127.0.0.1:0".parse().unwrap(),
@@ -84,7 +87,11 @@ async fn serve(tls: TlsConfig) -> Server {
     .await
     .unwrap();
     let (grpc, http) = listeners.addrs().unwrap();
-    tokio::spawn(rill_api::serve_until(state.clone(), listeners, signal.clone()));
+    tokio::spawn(rill_api::serve_until(
+        state.clone(),
+        listeners,
+        signal.clone(),
+    ));
     Server {
         grpc: grpc.port(),
         http: http.port(),
@@ -107,15 +114,21 @@ async fn clients_check_the_server_certificate() {
     let server = serve(pki.server_tls(false)).await;
     let https = format!("https://localhost:{}", server.grpc);
 
-    assert_eq!(whoami(https.clone(), pki.client_tls(false)).await.unwrap(), "dev");
+    assert_eq!(
+        whoami(https.clone(), pki.client_tls(false)).await.unwrap(),
+        "dev"
+    );
     assert!(
         whoami(https, TlsOptions::default()).await.is_err(),
         "a server signed by an unknown CA is refused"
     );
     assert!(
-        whoami(format!("http://localhost:{}", server.grpc), TlsOptions::default())
-            .await
-            .is_err(),
+        whoami(
+            format!("http://localhost:{}", server.grpc),
+            TlsOptions::default()
+        )
+        .await
+        .is_err(),
         "plain text gets nowhere"
     );
     server.signal.cancel();

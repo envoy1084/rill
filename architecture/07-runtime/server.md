@@ -43,9 +43,8 @@ the life of the process.
 `RepoRegistry::build` wires the lower crates for one repository: `RepoStore`,
 `TreeOps` (with `DEFAULT_TREE_CACHE`), `DeriveManager` (`DERIVE_CACHE` = 8192),
 `CommitGraph`, the `ReviewService`, `Lander`, the optional `PostLandVerifier`
-and `Runner`, `SearchIndex`, the ReBAC `Authorizer`, the `EventBus` (land-ticket
-progress for `WatchReview`), the land
-`tickets` map, the `LabelSet` and a child shutdown token.
+and `Runner`, `SearchIndex`, the ReBAC `Authorizer`, the `LabelSet`, a child
+shutdown token and the process `Lifecycle`.
 
 The review service sits behind an `ArcSwap`. It is built from the stored
 `policy:submit` and `policy:risk` records (`state/policy.rs`), falling back to
@@ -148,8 +147,6 @@ HTTP until the signal (ctrl-c in the binary). Shutdown follows `[shutdown]`
 
 * The `RepoContext` cache never evicts. There is no path to unload a
   repository.
-* Land tickets (`RepoContext::tickets`) and the lander queue are in memory,
-  so pending landings and ticket lookups are lost on restart.
 * `PutBlob` buffers the whole upload before it resolves the repository and
   checks write permission.
 * `GetBlob` reads the whole blob into memory before it slices and streams it.
