@@ -4,7 +4,8 @@
 //! and reports what happened. The runner owns materialization, caching and
 //! output capture, so a backend only needs to run a process.
 
-mod firecracker;
+#[cfg(target_os = "linux")]
+mod confine;
 mod local;
 
 use std::path::Path;
@@ -16,8 +17,7 @@ use bytes::Bytes;
 use crate::action::Action;
 use crate::error::Result;
 
-pub use firecracker::FirecrackerSandbox;
-pub use local::LocalSandbox;
+pub use local::{Isolation, LocalSandbox};
 
 /// Raw outcome of running a process, before anything is stored.
 #[derive(Debug, Clone, PartialEq, Eq)]

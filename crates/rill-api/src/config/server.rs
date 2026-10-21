@@ -212,13 +212,17 @@ impl Default for ShutdownConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SandboxKind {
-    /// Run commands directly on the host in a temporary directory.
+    /// Run commands on the host in a private directory, unisolated.
     #[default]
     Local,
+    /// Linux only: Landlock, seccomp and resource limits.
+    Confined,
+    /// Each command under gVisor's `runsc do`.
+    Gvisor,
 }
 
 /// Pre-land verification configuration.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct VerifyConfig {
     /// Run `.rill/verify.toml` before landing. When false every landing
@@ -229,6 +233,19 @@ pub struct VerifyConfig {
     /// Whether sandboxed commands may use the network (advisory for the
     /// local sandbox).
     pub network: bool,
+    /// The `runsc` binary for the `gvisor` sandbox.
+    pub runsc: String,
+}
+
+impl Default for VerifyConfig {
+    fn default() -> Self {
+        VerifyConfig {
+            enabled: false,
+            sandbox: SandboxKind::Local,
+            network: false,
+            runsc: "runsc".into(),
+        }
+    }
 }
 
 /// Post-land verification worker configuration.

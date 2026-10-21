@@ -146,6 +146,8 @@ ignore = "0.4.33"
 globset = "0.4.20"
 regex = "1.13.1"
 aho-corasick = "1.1"
+landlock = "0.4.7"
+seccompiler = "0.5.0"
 openidconnect = { version = "4.0.1", default-features = false }
 # Official MCP SDK; pinned, upgraded deliberately.
 rmcp = { version = "=3.6.0", default-features = false, features = ["server", "transport-io", "macros"] }

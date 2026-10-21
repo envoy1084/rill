@@ -81,9 +81,28 @@ owns materialization, caching and output capture.
   and the child gets its own process group on Unix. stdout and stderr are
   drained while waiting, so a chatty process cannot deadlock. On timeout it
   `killpg`s the group with `SIGKILL` and waits at most `DRAIN_GRACE` (2 s)
-  for the pipes. `network` is recorded, not enforced.
-* `FirecrackerSandbox` is a stub: `run` always returns
-  `Error::NotSupported`.
+  for the pipes.
+* Its `Isolation` picks how far the process is fenced in:
+  * `None`: the above and nothing more. `network` is advisory. This is the
+    only choice on macOS and is for trusted single-tenant servers, tests
+    and development.
+  * `Confined` (Linux only; refused elsewhere with `NotSupported`):
+    `sandbox/confine.rs` prepares, before `fork`, a Landlock ruleset
+    (`landlock` crate) that allows read and execute on system directories
+    and the host `PATH`, read and write on `/dev`, and everything inside
+    the step's directory; when `network` is false it also handles TCP bind
+    and connect, which refuses them. A seccomp filter (`seccompiler`)
+    returns `EPERM` for `ptrace`, `mount`, `unshare`, `setns`, `bpf`,
+    `kexec_load`, module loading, key management and clock changes. The
+    child applies `RLIMIT_FSIZE` (4 GiB), `RLIMIT_CORE` (0), the ruleset
+    and the filter in `pre_exec`; a kernel that does not enforce Landlock
+    fails the step rather than running it unconfined. `TMPDIR` points at
+    `.rill-tmp` inside the step directory.
+  * `Gvisor { runsc }`: the command runs as
+    `runsc --network=none|host --overlay2=none do --cwd=<dir> -- <cmd>`, a
+    user-space kernel for untrusted multi-tenant work. `runsc` must be
+    installed and allowed to create sandboxes (root or `--rootless`
+    setups).
 
 ## Verify plans
 
@@ -110,7 +129,8 @@ and whether it was cached.
 ## Server wiring
 
 `RepoContext` builds a `Runner` with `LocalSandbox::new(verify.network)`
-only when `[verify] enabled` (or `RILL_VERIFY_ENABLED`) is true; otherwise
+and the `Isolation` for `[verify] sandbox` (`local`, `confined`, `gvisor`
+with `runsc`) only when `[verify] enabled` (or `RILL_VERIFY_ENABLED`) is true; otherwise
 the lander gets `AlwaysGreen`. `ExecVerifier` calls `verify_tree`, maps any
 `rill_exec::Error` to `rill_lander::Error::Verifier`, and returns green or
 red with a one-line detail such as `step "unit" failed with exit code 1`.
@@ -124,10 +144,13 @@ The lander picks a `VerifyMode` per risk class: `None` skips verification;
 
 ## Limitations
 
-* `LocalSandbox` gives no isolation beyond a cleared environment and a
-  private working directory. Commands run as the server's user with its
-  network and filesystem. It is only safe for trusted, single-tenant use.
-* No VM backend exists, and `SandboxKind` has only `Local`.
+* `Isolation::None` commands run as the server's user with its network
+  and filesystem; only safe for trusted, single-tenant use.
+* `Confined` does not limit reads of system directories, UDP, memory or
+  process count, and runs as the server's user. Use `gvisor` for
+  untrusted code.
+* The confinement test runs only on Linux (in CI, or locally in a Linux
+  container); the gVisor wiring has no automated test.
 * The cache key's platform is `os` and `arch` only. A toolchain upgrade
   does not invalidate cached results.
 * Failed results stay cached until the digest changes; there is no
@@ -143,7 +166,7 @@ The lander picks a `VerifyMode` per risk class: `None` skips verification;
 
 * [lib.rs](../../crates/rill-exec/src/lib.rs), [error.rs](../../crates/rill-exec/src/error.rs)
 * [action.rs](../../crates/rill-exec/src/action.rs), [cache.rs](../../crates/rill-exec/src/cache.rs), [runner.rs](../../crates/rill-exec/src/runner.rs), [materialize.rs](../../crates/rill-exec/src/materialize.rs)
-* [sandbox/mod.rs](../../crates/rill-exec/src/sandbox/mod.rs), [sandbox/local.rs](../../crates/rill-exec/src/sandbox/local.rs), [sandbox/firecracker.rs](../../crates/rill-exec/src/sandbox/firecracker.rs)
+* [sandbox/mod.rs](../../crates/rill-exec/src/sandbox/mod.rs), [sandbox/local.rs](../../crates/rill-exec/src/sandbox/local.rs), [sandbox/confine.rs](../../crates/rill-exec/src/sandbox/confine.rs)
 * [verify.rs](../../crates/rill-exec/src/verify.rs)
 * Server: [workers/verifier.rs](../../crates/rill-api/src/workers/verifier.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [config/server.rs](../../crates/rill-api/src/config/server.rs)
 * Lander: [config.rs](../../crates/rill-lander/src/config.rs), [land/sequence.rs](../../crates/rill-lander/src/land/sequence.rs)

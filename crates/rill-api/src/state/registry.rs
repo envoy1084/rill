@@ -11,7 +11,7 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use rill_core::tree::DEFAULT_TREE_CACHE;
 use rill_core::{CommitGraph, DeriveManager, TreeOps};
-use rill_exec::{LocalSandbox, Runner};
+use rill_exec::{Isolation, LocalSandbox, Runner};
 use rill_lander::{AlwaysGreen, Lander, PostLandVerifier, Verifier};
 use rill_policy::Authorizer;
 use rill_review::service::{ReviewEvent, ReviewService};
@@ -24,7 +24,7 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
 use super::policy;
-use crate::config::ServerConfig;
+use crate::config::{SandboxKind, ServerConfig};
 use crate::error::{Error, Result};
 use crate::workers;
 
@@ -354,10 +354,25 @@ impl RepoRegistry {
             .await?,
         ));
 
-        let runner = self.config.verify.enabled.then(|| {
-            let sandbox = LocalSandbox::new(self.config.verify.network);
-            Arc::new(Runner::new(repo.clone(), trees.clone(), Arc::new(sandbox)))
-        });
+        let verify = &self.config.verify;
+        let runner = match verify.enabled {
+            true => {
+                let isolation = match verify.sandbox {
+                    SandboxKind::Local => Isolation::None,
+                    SandboxKind::Confined => Isolation::Confined,
+                    SandboxKind::Gvisor => Isolation::Gvisor {
+                        runsc: verify.runsc.clone().into(),
+                    },
+                };
+                let sandbox = LocalSandbox::new(verify.network).with_isolation(isolation)?;
+                Some(Arc::new(Runner::new(
+                    repo.clone(),
+                    trees.clone(),
+                    Arc::new(sandbox),
+                )))
+            }
+            false => None,
+        };
         let verifier: Arc<dyn Verifier> = match &runner {
             Some(runner) => Arc::new(workers::ExecVerifier::new(runner.clone())),
             None => Arc::new(AlwaysGreen),

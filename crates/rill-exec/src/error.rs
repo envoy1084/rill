@@ -29,6 +29,9 @@ pub enum Error {
         reason: String,
     },
 
+    #[error("sandbox setup failed: {0}")]
+    Sandbox(String),
+
     #[error("failed to spawn {command:?}: {source}")]
     Spawn {
         command: String,

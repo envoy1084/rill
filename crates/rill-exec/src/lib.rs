@@ -23,7 +23,7 @@ pub use cache::{ActionCache, CACHE_KIND};
 pub use error::{Error, Result};
 pub use materialize::{materialize, MaterializeOptions, MaterializedFile};
 pub use runner::{CacheStatus, Runner};
-pub use sandbox::{FirecrackerSandbox, LocalSandbox, RawOutcome, Sandbox};
+pub use sandbox::{Isolation, LocalSandbox, RawOutcome, Sandbox};
 pub use verify::{
     load_plan, verify_plan, verify_tree, PlanStep, StepResult, VerificationOutcome,
     VerificationPlan, PLAN_PATH,

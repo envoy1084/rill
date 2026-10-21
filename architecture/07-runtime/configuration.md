@@ -45,7 +45,7 @@ defaults with a comment header that lists every alternative.
 | `[lander]` | `LandPolicy::default()` | verify mode per risk class, `max_wait`, `batch_window`, `auto_revert`, `revert_grace`, `max_retries` |
 | `[risk]` | `RiskConfig::default()` | risk rules, used when a repository has no stored `risk` policy |
 | `[labels]` | `LabelSet::default()` | vote labels for every repository |
-| `[verify]` | `enabled = false`, `sandbox = "local"`, `network = false` | pre-land `.rill/verify.toml` runs; when disabled the lander uses `AlwaysGreen` |
+| `[verify]` | `enabled = false`, `sandbox = "local"` (or `confined`, `gvisor`), `network = false`, `runsc = "runsc"` | pre-land `.rill/verify.toml` runs; when disabled the lander uses `AlwaysGreen` |
 | `[postland]` | `enabled = false`, `interval_secs = 30`, `batch_size = 8` | post-land verifier loop |
 
 `LandPolicy` durations use serde's default `Duration` form, a table of
@@ -166,10 +166,10 @@ startup. In dev mode:
 
 * The `--storage` flag accepts only `memory` and `local:<dir>`. S3 needs the
   file or `RILL_STORAGE`.
-* `[verify] sandbox` has a single value, `local`, which runs steps on the
-  host. `network = false` is advisory there.
+* `network = false` is advisory under `[verify] sandbox = "local"`;
+  `confined` (Linux only) and `gvisor` enforce it.
 * Some fields have no environment variable: `lander`, `risk`, `labels`,
-  `verify.network`, `postland.batch_size`. They are set only in the file.
+  `verify.sandbox`, `verify.network`, `verify.runsc`, `postland.batch_size`. They are set only in the file.
 * Configuration is read once at startup. There is no reload.
 * `attestation_key` has no environment variable.
 

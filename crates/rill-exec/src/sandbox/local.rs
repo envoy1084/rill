@@ -1,6 +1,6 @@
-//! Running actions as ordinary host processes.
+//! Running actions as host processes, confined on Linux or under gVisor.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
@@ -19,17 +19,29 @@ use crate::materialize::local_path;
 /// action's own environment.
 const PASSTHROUGH_ENV: &[&str] = &["PATH", "HOME"];
 
-/// Runs commands directly on the host with `tokio::process`.
-///
-/// Isolation is limited to a cleared environment and a private working
-/// directory; this backend is for trusted single-tenant deployments and
-/// tests. Multi-tenant servers should use a VM-backed sandbox.
+/// How a [`LocalSandbox`] isolates the processes it starts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Isolation {
+    /// A cleared environment and a private directory, nothing more: for
+    /// trusted single-tenant servers, tests and development on macOS.
+    None,
+    /// Linux only: Landlock, seccomp and resource limits (see `confine`).
+    Confined,
+    /// Each command under gVisor's `runsc do`, a user-space kernel.
+    Gvisor {
+        /// The `runsc` binary.
+        runsc: PathBuf,
+    },
+}
+
+/// Runs commands on the host with `tokio::process`, isolated per
+/// [`Isolation`].
 #[derive(Debug, Clone)]
 pub struct LocalSandbox {
-    /// Whether the command may reach the network. Not enforced here: the
-    /// host process has whatever network the server has. Recorded so
-    /// callers can express the policy that a stronger backend enforces.
+    /// Whether the command may reach the network. Enforced by `Confined`
+    /// (TCP) and `Gvisor`; advisory under `Isolation::None`.
     pub network: bool,
+    isolation: Isolation,
     worker: String,
 }
 
@@ -40,29 +52,79 @@ impl Default for LocalSandbox {
 }
 
 impl LocalSandbox {
-    /// A local sandbox; `network` is advisory (see the field docs).
+    /// An unisolated sandbox; `network` is advisory.
     pub fn new(network: bool) -> Self {
         let worker = std::env::var("HOSTNAME")
             .ok()
             .filter(|h| !h.is_empty())
             .map(|h| format!("local@{h}"))
             .unwrap_or_else(|| "local".to_string());
-        LocalSandbox { network, worker }
+        LocalSandbox {
+            network,
+            isolation: Isolation::None,
+            worker,
+        }
+    }
+
+    /// Isolate commands with `isolation`; `Confined` is refused off Linux.
+    pub fn with_isolation(mut self, isolation: Isolation) -> Result<Self> {
+        if isolation == Isolation::Confined && !cfg!(target_os = "linux") {
+            return Err(Error::NotSupported {
+                backend: "confined",
+                reason: "Landlock and seccomp need Linux".into(),
+            });
+        }
+        self.isolation = isolation;
+        Ok(self)
+    }
+
+    fn command(&self, dir: &Path, cwd: &Path, action: &Action) -> Result<Command> {
+        let program = action
+            .program()
+            .ok_or_else(|| Error::InvalidAction("empty command".into()))?;
+        let mut command = match &self.isolation {
+            Isolation::Gvisor { runsc } => {
+                let mut command = Command::new(runsc);
+                let network = if self.network { "host" } else { "none" };
+                command
+                    .arg(format!("--network={network}"))
+                    .arg("--overlay2=none")
+                    .arg("do")
+                    .arg(format!("--cwd={}", cwd.display()))
+                    .arg("--")
+                    .arg(program);
+                command
+            }
+            _ => Command::new(program),
+        };
+        command.args(&action.command[1..]).current_dir(cwd);
+        #[cfg(target_os = "linux")]
+        if self.isolation == Isolation::Confined {
+            let path: Vec<PathBuf> = std::env::var_os("PATH")
+                .map(|p| std::env::split_paths(&p).collect())
+                .unwrap_or_default();
+            let mut confinement = super::confine::Confinement::prepare(dir, &path, self.network)?;
+            // SAFETY: `apply` only makes system calls (setrlimit,
+            // landlock, prctl/seccomp) on state prepared before the fork;
+            // it does not allocate or take locks.
+            unsafe {
+                command.pre_exec(move || confinement.apply());
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        let _ = dir;
+        Ok(command)
     }
 }
 
 #[async_trait]
 impl Sandbox for LocalSandbox {
     async fn run(&self, dir: &Path, action: &Action) -> Result<RawOutcome> {
-        let program = action
-            .program()
-            .ok_or_else(|| Error::InvalidAction("empty command".into()))?;
+        let program = action.program().unwrap_or_default();
         let cwd = local_path(dir, &action.working_dir)?;
 
-        let mut command = Command::new(program);
+        let mut command = self.command(dir, &cwd, action)?;
         command
-            .args(&action.command[1..])
-            .current_dir(&cwd)
             .env_clear()
             .envs(&action.env)
             .stdin(Stdio::null())
@@ -76,6 +138,11 @@ impl Sandbox for LocalSandbox {
             if let Ok(value) = std::env::var(name) {
                 command.env(name, value);
             }
+        }
+        if self.isolation == Isolation::Confined && !action.env.contains_key("TMPDIR") {
+            let tmp = dir.join(".rill-tmp");
+            tokio::fs::create_dir_all(&tmp).await?;
+            command.env("TMPDIR", tmp);
         }
 
         // The command gets its own process group so a timeout kills its
@@ -217,5 +284,40 @@ mod tests {
         assert_eq!(out.exit_code, TIMEOUT_EXIT_CODE);
         assert!(started.elapsed() < Duration::from_secs(10));
         assert_eq!(out.stdout.as_ref(), b"start\n");
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod confined_tests {
+    use rill_types::ObjectHash;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn a_confined_step_writes_only_inside_its_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir_in(std::env::current_dir().unwrap()).unwrap();
+        let target = outside.path().join("escaped");
+        let script = format!(
+            "echo in > inside && echo t > \"$TMPDIR/t\" && echo out > {} ; \
+             test -e {} && echo LEAKED; cat inside",
+            target.display(),
+            target.display()
+        );
+        let action = Action::new(vec!["sh".into(), "-c".into(), script], ObjectHash::ZERO);
+        let out = LocalSandbox::new(false)
+            .with_isolation(Isolation::Confined)
+            .unwrap()
+            .run(dir.path(), &action)
+            .await
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(
+            stdout,
+            "in\n",
+            "stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(!target.exists());
     }
 }
