@@ -13,6 +13,8 @@ mod service;
 
 pub use error::ScimError;
 pub use filter::Filter;
+pub use patch::patch_user;
+pub use resources::UserFields;
 pub use service::{ListQuery, Scim};
 
 /// The SCIM user schema.

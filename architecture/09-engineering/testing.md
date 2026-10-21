@@ -230,7 +230,7 @@ The properties they drive:
 ## Fuzzing
 
 `fuzz/` is a separate `cargo-fuzz` workspace (it needs nightly and
-libFuzzer) with four targets for code that parses untrusted bytes:
+libFuzzer) with targets for code that parses untrusted bytes:
 
 | Target | Checks |
 | --- | --- |
@@ -240,13 +240,20 @@ libFuzzer) with four targets for code that parses untrusted bytes:
 | `repo_path` | Accepted paths have no empty, `.`, `..`, `\` or control-character components, are NFC, and round-trip |
 | `symlink_target` | An accepted symlink target never resolves above the repository root |
 | `records` | Record decoding never panics; decoded records re-encode to the same value |
+| `proto_convert` | Protobuf decoding and conversion never panic; a converted `ChangeVersion` survives the wire form |
+| `read_grant` | Grant verification never panics, and nothing the key did not sign verifies |
+| `config_files` | `owners.toml`, `.rill/secrets.toml`, Cedar submit policies and the server's TOML never panic the parser |
+| `scim` | SCIM filters, User resources and PatchOp bodies never panic |
+| `batch_body` | `POST /o/{repo}/batch` bodies and their object references never panic |
+| `secret_scan` | The scanner never panics on any content, and a finding carries only a 16-hex fingerprint |
 
 ```
 cd fuzz && cargo +nightly fuzz run decode_objects -- -max_total_time=600
 ```
 
-Fuzzing is not part of CI. Each target ran 10 minutes without a crash when
-added.
+Fuzzing is not part of CI. The first six targets ran 10 minutes without a
+crash when added; the rest ran one minute each (Phase 12), with seeds in
+`fuzz/corpus/`.
 
 ## Limitations
 

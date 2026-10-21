@@ -17,6 +17,12 @@ arbitrary = { version = "1.5.0", features = ["derive"] }
 bytes = "1.12.1"
 rill-types = { path = "../crates/rill-types" }
 rill-core = { path = "../crates/rill-core" }
+rill-proto = { path = "../crates/rill-proto" }
+rill-policy = { path = "../crates/rill-policy" }
+rill-identity = { path = "../crates/rill-identity" }
+rill-api = { path = "../crates/rill-api" }
+prost = "0.14"
+serde_json = "1"
 
 [[bin]]
 name = "decode_objects"
@@ -56,6 +62,48 @@ bench = false
 [[bin]]
 name = "records"
 path = "fuzz_targets/records.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "proto_convert"
+path = "fuzz_targets/proto_convert.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "read_grant"
+path = "fuzz_targets/read_grant.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "config_files"
+path = "fuzz_targets/config_files.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "scim"
+path = "fuzz_targets/scim.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "batch_body"
+path = "fuzz_targets/batch_body.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "secret_scan"
+path = "fuzz_targets/secret_scan.rs"
 test = false
 doc = false
 bench = false
