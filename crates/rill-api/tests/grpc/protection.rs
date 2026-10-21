@@ -441,6 +441,20 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         .await
         .unwrap();
     assert_eq!(http.status().as_u16(), 451);
+    // The batch route answers "missing" for it: kind, hash, then u64::MAX.
+    let batch = reqwest::Client::new()
+        .post(format!("http://{}/o/app/batch", server.http))
+        .bearer_auth(&token)
+        .header("x-rill-grant", &grant)
+        .json(&serde_json::json!([{ "kind": "blob", "hash": hash.to_hex() }]))
+        .send()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
+    assert_eq!(batch.len(), 1 + 32 + 8, "no content in the frame");
+    assert_eq!(&batch[33..], &u64::MAX.to_be_bytes());
     // Its content cannot come back under the same hash.
     let again = apply(
         &mut root,
