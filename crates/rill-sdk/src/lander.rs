@@ -32,28 +32,33 @@ impl LanderClient {
     /// Trunk head, in-flight landings and the `recent_limit` latest
     /// landings.
     pub async fn trunk_status(&self, recent_limit: u32) -> Result<TrunkStatus> {
-        self.svc()
-            .get_trunk_status(pb::GetTrunkStatusRequest {
+        crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetTrunkStatusRequest {
                 repo: self.repo.clone(),
                 recent_limit,
-            })
-            .await?
-            .into_inner()
-            .try_into()
+            };
+            async move { svc.get_trunk_status(request).await }
+        })
+        .await?
+        .into_inner()
+        .try_into()
     }
 
     /// Landings before `before_seq` (the head when `None`), newest first,
     /// each paired with its verification record.
     pub async fn landings(&self, limit: u32, before_seq: Option<TrunkSeq>) -> Result<Vec<Landing>> {
-        let resp = self
-            .svc()
-            .list_landings(pb::ListLandingsRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::ListLandingsRequest {
                 repo: self.repo.clone(),
                 limit,
                 before_seq: before_seq.map(TrunkSeq::get),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.list_landings(request).await }
+        })
+        .await?
+        .into_inner();
         let mut verifications: BTreeMap<TrunkSeq, VerificationRecord> = resp
             .verifications
             .into_iter()
@@ -74,14 +79,16 @@ impl LanderClient {
 
     /// Verification state of one landed sequence.
     pub async fn verification(&self, seq: TrunkSeq) -> Result<VerificationRecord> {
-        let resp = self
-            .svc()
-            .get_verification(pb::GetVerificationRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetVerificationRequest {
                 repo: self.repo.clone(),
                 seq: seq.get(),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_verification(request).await }
+        })
+        .await?
+        .into_inner();
         required("get_verification.result", resp.result)?.try_into()
     }
 

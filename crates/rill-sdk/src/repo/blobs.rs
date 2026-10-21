@@ -36,16 +36,18 @@ impl RepoClient {
                 .unwrap_or(bytes.len());
             return Ok(bytes.slice(start..end));
         }
-        let mut stream = self
-            .svc()
-            .get_blob(pb::GetBlobRequest {
+        let mut stream = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetBlobRequest {
                 repo: self.repo.clone(),
                 content: Some(pb::ContentRef::from(content)),
                 offset,
                 length,
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_blob(request).await }
+        })
+        .await?
+        .into_inner();
         let capacity = length.unwrap_or_else(|| content.size()) as usize;
         let mut out = BytesMut::with_capacity(capacity);
         while let Some(chunk) = stream.next().await {
@@ -100,9 +102,9 @@ impl RepoClient {
 
     /// Which of the given objects the server already has, in order.
     pub async fn has_objects(&self, objects: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {
-        let resp = self
-            .svc()
-            .has_objects(pb::HasObjectsRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::HasObjectsRequest {
                 repo: self.repo.clone(),
                 objects: objects
                     .iter()
@@ -111,9 +113,11 @@ impl RepoClient {
                         hash: hash_to_proto(hash),
                     })
                     .collect(),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.has_objects(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(resp.present)
     }
 }

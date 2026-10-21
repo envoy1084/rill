@@ -19,14 +19,16 @@ impl RepoClient {
         &self,
         hash: ChangeVersionHash,
     ) -> Result<(ChangeVersion, Vec<Signature>)> {
-        let resp = self
-            .svc()
-            .get_change_version(pb::GetChangeVersionRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetChangeVersionRequest {
                 repo: self.repo.clone(),
                 hash: hash_to_proto(&hash),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_change_version(request).await }
+        })
+        .await?
+        .into_inner();
         let version: ChangeVersion =
             required("get_change_version.version", resp.version)?.try_into()?;
         let signatures = resp
@@ -39,27 +41,31 @@ impl RepoClient {
 
     /// Metadata of a change version.
     pub async fn change_info(&self, hash: ChangeVersionHash) -> Result<ChangeInfo> {
-        let resp = self
-            .svc()
-            .get_change_info(pb::GetChangeInfoRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetChangeInfoRequest {
                 repo: self.repo.clone(),
                 hash: hash_to_proto(&hash),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_change_info(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("get_change_info.info", resp.info)?.try_into()?)
     }
 
     /// Every version of a change in creation order; the last is current.
     pub async fn change_versions(&self, change_id: ChangeId) -> Result<Vec<ChangeInfo>> {
-        let resp = self
-            .svc()
-            .get_change_versions(pb::GetChangeVersionsRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetChangeVersionsRequest {
                 repo: self.repo.clone(),
                 change_id: id_to_proto(&change_id),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_change_versions(request).await }
+        })
+        .await?
+        .into_inner();
         convert_infos(resp.versions)
     }
 
@@ -94,17 +100,19 @@ impl RepoClient {
         path: Option<&RepoPath>,
         first_parent: bool,
     ) -> Result<LogPage> {
-        let resp = self
-            .svc()
-            .log(pb::LogRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::LogRequest {
                 repo: self.repo.clone(),
                 start: Some(start.to_proto()),
                 limit,
                 path: path.map(|p| p.to_string()),
                 first_parent,
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.log(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(LogPage {
             entries: convert_infos(resp.entries)?,
             next_start: opt_hash_from_proto("log.next_start", resp.next_start.as_ref())?,
@@ -118,16 +126,18 @@ impl RepoClient {
         start: LogStart,
         limit: u32,
     ) -> Result<PathHistoryPage> {
-        let resp = self
-            .svc()
-            .path_history(pb::PathHistoryRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::PathHistoryRequest {
                 repo: self.repo.clone(),
                 path: path.to_string(),
                 start: Some(start.to_proto()),
                 limit,
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.path_history(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(PathHistoryPage {
             entries: resp
                 .entries
@@ -140,15 +150,17 @@ impl RepoClient {
 
     /// Line-by-line attribution of `path` at `hash`.
     pub async fn blame(&self, hash: ChangeVersionHash, path: &RepoPath) -> Result<Vec<BlameLine>> {
-        let resp = self
-            .svc()
-            .blame(pb::BlameRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::BlameRequest {
                 repo: self.repo.clone(),
                 hash: hash_to_proto(&hash),
                 path: path.to_string(),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.blame(request).await }
+        })
+        .await?
+        .into_inner();
         resp.lines.into_iter().map(BlameLine::try_from).collect()
     }
 }

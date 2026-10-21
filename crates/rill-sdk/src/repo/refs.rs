@@ -17,14 +17,16 @@ impl RepoClient {
         &self,
         name: &RefName,
     ) -> Result<(ChangeVersionHash, Option<TrunkSeq>)> {
-        let resp = self
-            .svc()
-            .resolve_ref(pb::ResolveRefRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::ResolveRefRequest {
                 repo: self.repo.clone(),
                 name: name.to_string(),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.resolve_ref(request).await }
+        })
+        .await?
+        .into_inner();
         Ok((
             hash_from_proto("resolve_ref.hash", &resp.hash)?,
             resp.trunk_seq.map(trunk_seq_from_proto),
@@ -53,14 +55,16 @@ impl RepoClient {
 
     /// Refs whose names start with `prefix` (all refs when `None`).
     pub async fn list_refs(&self, prefix: Option<&str>) -> Result<Vec<RefInfo>> {
-        let resp = self
-            .svc()
-            .list_refs(pb::ListRefsRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::ListRefsRequest {
                 repo: self.repo.clone(),
                 prefix: prefix.map(str::to_string),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.list_refs(request).await }
+        })
+        .await?
+        .into_inner();
         resp.refs.into_iter().map(RefInfo::try_from).collect()
     }
 
@@ -106,13 +110,15 @@ impl RepoClient {
 
     /// The head of trunk, or `None` for an empty repository.
     pub async fn trunk_head(&self) -> Result<Option<(TrunkSeq, ChangeVersionHash)>> {
-        let resp = self
-            .svc()
-            .trunk_head(pb::TrunkHeadRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::TrunkHeadRequest {
                 repo: self.repo.clone(),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.trunk_head(request).await }
+        })
+        .await?
+        .into_inner();
         if resp.hash.is_empty() {
             return Ok(None);
         }
@@ -124,15 +130,17 @@ impl RepoClient {
 
     /// Landings between two sequence numbers, inclusive.
     pub async fn trunk_range(&self, from: TrunkSeq, to: TrunkSeq) -> Result<Vec<LandEvent>> {
-        let resp = self
-            .svc()
-            .trunk_range(pb::TrunkRangeRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::TrunkRangeRequest {
                 repo: self.repo.clone(),
                 from: from.get(),
                 to: to.get(),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.trunk_range(request).await }
+        })
+        .await?
+        .into_inner();
         resp.landings.into_iter().map(LandEvent::try_from).collect()
     }
 }

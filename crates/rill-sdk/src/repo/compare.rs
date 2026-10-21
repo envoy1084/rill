@@ -33,9 +33,9 @@ impl RepoClient {
         target: &Root,
         opts: DiffOptions,
     ) -> Result<DiffResult> {
-        let resp = self
-            .svc()
-            .diff(pb::DiffRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::DiffRequest {
                 repo: self.repo.clone(),
                 base: Some(base.to_proto()),
                 target: Some(target.to_proto()),
@@ -43,9 +43,11 @@ impl RepoClient {
                 format: opts.format.to_proto(),
                 context_lines: opts.context_lines,
                 limit: opts.limit,
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.diff(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(DiffResult {
             files: resp
                 .files
@@ -62,15 +64,17 @@ impl RepoClient {
         a: ChangeVersionHash,
         b: ChangeVersionHash,
     ) -> Result<Vec<ChangeVersionHash>> {
-        let resp = self
-            .svc()
-            .merge_base(pb::MergeBaseRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::MergeBaseRequest {
                 repo: self.repo.clone(),
                 a: hash_to_proto(&a),
                 b: hash_to_proto(&b),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.merge_base(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(hashes_from_proto("merge_base.bases", &resp.bases)?)
     }
 
@@ -80,15 +84,17 @@ impl RepoClient {
         ancestor: ChangeVersionHash,
         descendant: ChangeVersionHash,
     ) -> Result<bool> {
-        let resp = self
-            .svc()
-            .is_ancestor(pb::IsAncestorRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::IsAncestorRequest {
                 repo: self.repo.clone(),
                 ancestor: hash_to_proto(&ancestor),
                 descendant: hash_to_proto(&descendant),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.is_ancestor(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(resp.is_ancestor)
     }
 }

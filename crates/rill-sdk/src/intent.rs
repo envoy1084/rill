@@ -52,14 +52,16 @@ impl IntentClient {
 
     /// An intent by id.
     pub async fn get(&self, id: IntentId) -> Result<Intent> {
-        let resp = self
-            .svc()
-            .get_intent(pb::GetIntentRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetIntentRequest {
                 repo: self.repo.clone(),
                 id: id_to_proto(&id),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_intent(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("get_intent.intent", resp.intent)?.try_into()?)
     }
 
@@ -101,27 +103,29 @@ impl IntentClient {
 
     /// Intents matching a filter.
     pub async fn list(&self, filter: IntentFilter) -> Result<Page<Intent>> {
-        let resp = self
-            .svc()
-            .list_intents(pb::ListIntentsRequest {
-                repo: self.repo.clone(),
-                status: filter
-                    .status
-                    .into_iter()
-                    .map(|s| pb::IntentStatus::from(s) as i32)
-                    .collect(),
-                kind: filter
-                    .kind
-                    .into_iter()
-                    .map(|k| pb::IntentKind::from(k) as i32)
-                    .collect(),
-                owner: filter.owner.as_ref().map(id_to_proto),
-                parent: filter.parent.as_ref().map(id_to_proto),
-                limit: filter.limit,
-                page_token: filter.page_token,
-            })
-            .await?
-            .into_inner();
+        let request = pb::ListIntentsRequest {
+            repo: self.repo.clone(),
+            status: filter
+                .status
+                .into_iter()
+                .map(|s| pb::IntentStatus::from(s) as i32)
+                .collect(),
+            kind: filter
+                .kind
+                .into_iter()
+                .map(|k| pb::IntentKind::from(k) as i32)
+                .collect(),
+            owner: filter.owner.as_ref().map(id_to_proto),
+            parent: filter.parent.as_ref().map(id_to_proto),
+            limit: filter.limit,
+            page_token: filter.page_token,
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.list_intents(request).await }
+        })
+        .await?
+        .into_inner();
         let items = resp
             .intents
             .into_iter()
@@ -165,16 +169,18 @@ impl IntentClient {
         body: &str,
         limit: u32,
     ) -> Result<Vec<ScoredIntent>> {
-        let resp = self
-            .svc()
-            .find_similar_intents(pb::FindSimilarIntentsRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::FindSimilarIntentsRequest {
                 repo: self.repo.clone(),
                 title: title.to_string(),
                 body: body.to_string(),
                 limit,
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.find_similar_intents(request).await }
+        })
+        .await?
+        .into_inner();
         resp.results
             .into_iter()
             .map(ScoredIntent::try_from)

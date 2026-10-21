@@ -31,14 +31,16 @@ impl ReviewClient {
 
     /// The review state of a change with the repository's labels.
     pub async fn get(&self, change_id: ChangeId) -> Result<ReviewInfo> {
-        let resp = self
-            .svc()
-            .get_review(pb::GetReviewRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetReviewRequest {
                 repo: self.repo.clone(),
                 change_id: id_to_proto(&change_id),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_review(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(ReviewInfo {
             review: required("get_review.review", resp.review)?.try_into()?,
             labels: resp
@@ -51,22 +53,24 @@ impl ReviewClient {
 
     /// Reviews matching a filter.
     pub async fn list(&self, filter: ReviewFilter) -> Result<Page<ReviewState>> {
-        let resp = self
-            .svc()
-            .list_reviews(pb::ListReviewsRequest {
-                repo: self.repo.clone(),
-                status: filter
-                    .status
-                    .into_iter()
-                    .map(|s| pb::ReviewStatus::from(s) as i32)
-                    .collect(),
-                owner: filter.owner.as_ref().map(id_to_proto),
-                intent: filter.intent.as_ref().map(id_to_proto),
-                limit: filter.limit,
-                page_token: filter.page_token,
-            })
-            .await?
-            .into_inner();
+        let request = pb::ListReviewsRequest {
+            repo: self.repo.clone(),
+            status: filter
+                .status
+                .into_iter()
+                .map(|s| pb::ReviewStatus::from(s) as i32)
+                .collect(),
+            owner: filter.owner.as_ref().map(id_to_proto),
+            intent: filter.intent.as_ref().map(id_to_proto),
+            limit: filter.limit,
+            page_token: filter.page_token,
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.list_reviews(request).await }
+        })
+        .await?
+        .into_inner();
         let items = convert_states(resp.reviews)?;
         Ok(Page::new(items, resp.next_page_token))
     }
@@ -274,14 +278,16 @@ impl ReviewClient {
 
     /// Evaluate submit rules without landing.
     pub async fn evaluate_submit(&self, change_id: ChangeId) -> Result<SubmitDecision> {
-        let resp = self
-            .svc()
-            .evaluate_submit(pb::EvaluateSubmitRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::EvaluateSubmitRequest {
                 repo: self.repo.clone(),
                 change_id: id_to_proto(&change_id),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.evaluate_submit(request).await }
+        })
+        .await?
+        .into_inner();
         required("evaluate_submit.decision", resp.decision)?.try_into()
     }
 
@@ -345,14 +351,17 @@ impl ReviewClient {
 
     /// Where a landing is, by ticket id.
     pub async fn land_status(&self, ticket: &str) -> Result<LandProgress> {
-        self.svc()
-            .get_land_status(pb::GetLandStatusRequest {
+        crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetLandStatusRequest {
                 repo: self.repo.clone(),
                 ticket: ticket.to_string(),
-            })
-            .await?
-            .into_inner()
-            .try_into()
+            };
+            async move { svc.get_land_status(request).await }
+        })
+        .await?
+        .into_inner()
+        .try_into()
     }
 
     /// Events on one change's review.

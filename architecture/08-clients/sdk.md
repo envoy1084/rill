@@ -163,8 +163,9 @@ cancelled land and `Error::Timeout` when the deadline passes.
 - When `RILL_ENDPOINT` is set, `discover` ignores the config file entirely.
 - The server always returns `next_page_token: None`, so a page holds the
   whole limit-bounded result.
-- Only calls carrying an operation id are retried (`retry_idempotent`:
-  `UNAVAILABLE`, up to 20 s); reads and streams are not.
+- Unary reads and calls carrying an operation id are retried
+  (`retry_idempotent`: `UNAVAILABLE`, up to 20 s); other mutations and
+  `watch_*` streams are not.
 - `RepoClient::grep` has no fallback; the tree walk lives in [mcp](mcp.md).
 
 ## Code

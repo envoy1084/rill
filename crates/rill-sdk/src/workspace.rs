@@ -67,29 +67,33 @@ impl WorkspaceClient {
 
     /// A workspace by id.
     pub async fn get(&self, workspace: WorkspaceId) -> Result<Workspace> {
-        let resp = self
-            .svc()
-            .get_workspace(pb::GetWorkspaceRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetWorkspaceRequest {
                 repo: self.repo.clone(),
                 workspace: id_to_proto(&workspace),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_workspace(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("get_workspace.workspace", resp.workspace)?.try_into()?)
     }
 
     /// Workspaces matching a filter.
     pub async fn list(&self, filter: WorkspaceFilter) -> Result<Page<Workspace>> {
-        let resp = self
-            .svc()
-            .list_workspaces(pb::ListWorkspacesRequest {
-                repo: self.repo.clone(),
-                owner: filter.owner.as_ref().map(id_to_proto),
-                limit: filter.limit,
-                page_token: filter.page_token,
-            })
-            .await?
-            .into_inner();
+        let request = pb::ListWorkspacesRequest {
+            repo: self.repo.clone(),
+            owner: filter.owner.as_ref().map(id_to_proto),
+            limit: filter.limit,
+            page_token: filter.page_token,
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.list_workspaces(request).await }
+        })
+        .await?
+        .into_inner();
         let items = resp
             .workspaces
             .into_iter()
@@ -292,16 +296,18 @@ impl WorkspaceClient {
         limit: u32,
         before: Option<OperationId>,
     ) -> Result<Vec<Operation>> {
-        let resp = self
-            .svc()
-            .list_operations(pb::ListOperationsRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::ListOperationsRequest {
                 repo: self.repo.clone(),
                 workspace: id_to_proto(&workspace),
                 limit,
                 before: before.as_ref().map(id_to_proto),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.list_operations(request).await }
+        })
+        .await?
+        .into_inner();
         resp.operations
             .into_iter()
             .map(|o| Operation::try_from(o).map_err(Into::into))
@@ -336,17 +342,19 @@ impl WorkspaceClient {
         format: DiffFormat,
         context_lines: u32,
     ) -> Result<Vec<FileDiff>> {
-        let resp = self
-            .svc()
-            .workspace_diff(pb::WorkspaceDiffRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::WorkspaceDiffRequest {
                 repo: self.repo.clone(),
                 workspace: id_to_proto(&workspace),
                 paths: paths.iter().map(|p| p.to_string()).collect(),
                 format: format.to_proto(),
                 context_lines,
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.workspace_diff(request).await }
+        })
+        .await?
+        .into_inner();
         resp.files.into_iter().map(FileDiff::try_from).collect()
     }
 }

@@ -15,15 +15,17 @@ impl RepoClient {
     /// Derived data of `kind` for `hash`. Fails with `NotFound` or
     /// `Unavailable` when it has not been computed yet.
     pub async fn derived(&self, kind: &str, hash: ObjectHash) -> Result<Bytes> {
-        let resp = self
-            .svc()
-            .get_derived(pb::GetDerivedRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetDerivedRequest {
                 repo: self.repo.clone(),
                 kind: kind.to_string(),
                 hash: hash_to_proto(&hash),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_derived(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(resp.data)
     }
 
@@ -34,16 +36,18 @@ impl RepoClient {
         hash: ObjectHash,
         timeout: Duration,
     ) -> Result<Derived> {
-        let resp = self
-            .svc()
-            .wait_derived(pb::WaitDerivedRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::WaitDerivedRequest {
                 repo: self.repo.clone(),
                 kind: kind.to_string(),
                 hash: hash_to_proto(&hash),
                 timeout_ms: timeout.as_millis() as u64,
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.wait_derived(request).await }
+        })
+        .await?
+        .into_inner();
         match (resp.ready, resp.data) {
             (true, Some(data)) => Ok(Derived::Ready(data)),
             (true, None) => Ok(Derived::Ready(Bytes::new())),

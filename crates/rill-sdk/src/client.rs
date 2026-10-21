@@ -61,10 +61,11 @@ impl Interceptor for AuthInterceptor {
 /// idempotency claim (15 s on the server).
 const RETRY_BUDGET: Duration = Duration::from_secs(20);
 
-/// Run a call that carries an operation id, retrying while the cluster is
-/// unavailable (a dead or draining server, a cut connection, the claim of a
-/// server that died mid-request). The server runs the operation at most
-/// once, so retrying cannot repeat its effect.
+/// Run a read, or a call that carries an operation id, retrying while the
+/// cluster is unavailable (a dead or draining server, a cut connection, the
+/// claim of a server that died mid-request). Reads have no effect and the
+/// server runs an identified operation at most once, so retrying cannot
+/// repeat an effect.
 pub(crate) async fn retry_idempotent<T, F, Fut>(
     mut call: F,
 ) -> std::result::Result<tonic::Response<T>, Status>

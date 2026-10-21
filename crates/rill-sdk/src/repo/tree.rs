@@ -21,14 +21,16 @@ pub struct DirListing {
 impl RepoClient {
     /// A tree object by hash.
     pub async fn tree(&self, hash: TreeHash) -> Result<Tree> {
-        let resp = self
-            .svc()
-            .get_tree(pb::GetTreeRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetTreeRequest {
                 repo: self.repo.clone(),
                 hash: hash_to_proto(&hash),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.get_tree(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("get_tree.tree", resp.tree)?.try_into()?)
     }
 
@@ -39,15 +41,17 @@ impl RepoClient {
 
     /// [`RepoClient::list_dir`] with the directory's tree hash.
     pub async fn list_dir_full(&self, root: &Root, path: &RepoPath) -> Result<DirListing> {
-        let resp = self
-            .svc()
-            .list_dir(pb::ListDirRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::ListDirRequest {
                 repo: self.repo.clone(),
                 root: Some(root.to_proto()),
                 path: path.to_string(),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.list_dir(request).await }
+        })
+        .await?
+        .into_inner();
         let entries = resp
             .entries
             .into_iter()
@@ -64,15 +68,17 @@ impl RepoClient {
 
     /// The entry at `path` under `root`, or `None` if it does not exist.
     pub async fn resolve_path(&self, root: &Root, path: &RepoPath) -> Result<Option<EntryKind>> {
-        let resp = self
-            .svc()
-            .resolve_path(pb::ResolvePathRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::ResolvePathRequest {
                 repo: self.repo.clone(),
                 root: Some(root.to_proto()),
                 path: path.to_string(),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.resolve_path(request).await }
+        })
+        .await?
+        .into_inner();
         match resp.entry {
             None => Ok(None),
             Some(e) => Ok(Some(TreeEntry::try_from(e)?.kind)),

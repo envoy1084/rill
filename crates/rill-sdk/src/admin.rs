@@ -25,11 +25,14 @@ impl AdminClient {
 
     /// The caller's identity and capabilities.
     pub async fn whoami(&self) -> Result<WhoAmI> {
-        self.svc()
-            .who_am_i(pb::WhoAmIRequest {})
-            .await?
-            .into_inner()
-            .try_into()
+        crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::WhoAmIRequest {};
+            async move { svc.who_am_i(request).await }
+        })
+        .await?
+        .into_inner()
+        .try_into()
     }
 
     /// Mint a token attenuated to a subset of the caller's capabilities.
@@ -111,26 +114,31 @@ impl AdminClient {
         object: &str,
         relation: Option<&str>,
     ) -> Result<Vec<Relation>> {
-        let resp = self
-            .svc()
-            .list_relations(pb::ListRelationsRequest {
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::ListRelationsRequest {
                 object: object.to_string(),
                 relation: relation.map(str::to_string),
-            })
-            .await?
-            .into_inner();
+            };
+            async move { svc.list_relations(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(resp.relations.into_iter().map(Relation::from).collect())
     }
 
     /// A named policy.
     pub async fn policy(&self, name: &str) -> Result<Policy> {
-        self.svc()
-            .get_policy(pb::GetPolicyRequest {
+        crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::GetPolicyRequest {
                 name: name.to_string(),
-            })
-            .await?
-            .into_inner()
-            .try_into()
+            };
+            async move { svc.get_policy(request).await }
+        })
+        .await?
+        .into_inner()
+        .try_into()
     }
 
     /// Replace a named policy's text. Returns the update time.
@@ -201,21 +209,25 @@ impl AdminClient {
 
     /// Every org.
     pub async fn list_orgs(&self) -> Result<Vec<OrgInfo>> {
-        let resp = self
-            .svc()
-            .list_orgs(pb::ListOrgsRequest {})
-            .await?
-            .into_inner();
+        let resp = crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::ListOrgsRequest {};
+            async move { svc.list_orgs(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(resp.orgs.into_iter().map(OrgInfo::from).collect())
     }
 
     /// Server health.
     pub async fn health(&self) -> Result<Health> {
-        Ok(self
-            .svc()
-            .health(pb::HealthRequest {})
-            .await?
-            .into_inner()
-            .into())
+        Ok(crate::client::retry_idempotent(|| {
+            let mut svc = self.svc();
+            let request = pb::HealthRequest {};
+            async move { svc.health(request).await }
+        })
+        .await?
+        .into_inner()
+        .into())
     }
 }
