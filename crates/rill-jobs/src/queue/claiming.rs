@@ -67,6 +67,19 @@ impl Queue {
         self.commit_claimed(claim, self.complete_tx(claim)).await
     }
 
+    /// Give `claim`'s job back unfinished, ready at once and without
+    /// counting the attempt: a worker shutting down hands its jobs on
+    /// instead of making them wait for the claim to expire.
+    pub async fn release(&self, claim: &Claim) -> Result<()> {
+        let mut tx = Transaction::new()
+            .delete(claim.leased_key.clone())
+            .delete(claim.token_key.clone());
+        tx.mutations
+            .extend(self.ready(&claim.job, Timestamp::now())?);
+        tx.conditions.push(claim.fence());
+        self.commit_claimed(claim, tx).await
+    }
+
     /// The transaction finishing `claim`'s job, to commit together with
     /// the job's own writes.
     pub fn complete_tx(&self, claim: &Claim) -> Transaction {

@@ -42,6 +42,7 @@ pub struct Worker<H> {
     handler: Arc<H>,
     holder: String,
     concurrency: usize,
+    abort: CancellationToken,
 }
 
 impl<H: Handler> Worker<H> {
@@ -52,7 +53,16 @@ impl<H: Handler> Worker<H> {
             handler,
             holder: rill_store::repo::holder_id(),
             concurrency: 1,
+            abort: CancellationToken::new(),
         }
+    }
+
+    /// Give running jobs back to the queue when `abort` fires. `run`'s
+    /// shutdown only stops new claims; jobs already running finish unless
+    /// this fires first.
+    pub fn abort_on(mut self, abort: CancellationToken) -> Self {
+        self.abort = abort;
+        self
     }
 
     /// Run `n` jobs at a time.
@@ -123,6 +133,10 @@ impl<H: Handler> Worker<H> {
         let outcome = tokio::select! {
             outcome = self.handler.run(&claim.job, &claim) => outcome,
             lost = self.keep(claim.clone()) => return Err(lost),
+            _ = self.abort.cancelled() => {
+                tracing::info!(queue = %self.queue.name(), job = %claim.job.id, "giving an unfinished job back");
+                return self.queue.release(&claim).await;
+            }
         };
         match outcome {
             Ok(()) => self.queue.complete(&claim).await,

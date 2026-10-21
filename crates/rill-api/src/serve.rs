@@ -103,24 +103,13 @@ async fn serve_grpc(
         .build_v1()
         .map_err(|e| Error::Transport(format!("reflection: {e}")))?;
     let (health_reporter, health) = tonic_health::server::health_reporter();
-    health_reporter
-        .set_serving::<RepoServiceServer<RepoSvc>>()
-        .await;
-    health_reporter
-        .set_serving::<WorkspaceServiceServer<WorkspaceSvc>>()
-        .await;
-    health_reporter
-        .set_serving::<ReviewServiceServer<ReviewSvc>>()
-        .await;
-    health_reporter
-        .set_serving::<IntentServiceServer<IntentSvc>>()
-        .await;
-    health_reporter
-        .set_serving::<LanderServiceServer<LanderSvc>>()
-        .await;
-    health_reporter
-        .set_serving::<AdminServiceServer<AdminSvc>>()
-        .await;
+    set_health(&health_reporter, true).await;
+    let reporter = health_reporter.clone();
+    let draining = state.lifecycle.draining.clone();
+    tokio::spawn(async move {
+        draining.cancelled().await;
+        set_health(&reporter, false).await;
+    });
 
     tonic::transport::Server::builder()
         .add_service(reflection)
@@ -148,4 +137,24 @@ async fn serve_http(
         .with_graceful_shutdown(shutdown.cancelled_owned())
         .await
         .map_err(|e| Error::Transport(format!("HTTP server: {e}")))
+}
+
+/// Report every service serving, or not serving once the process drains.
+async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bool) {
+    let status = if serving {
+        tonic_health::ServingStatus::Serving
+    } else {
+        tonic_health::ServingStatus::NotServing
+    };
+    for name in [
+        "",
+        <RepoServiceServer<RepoSvc> as tonic::server::NamedService>::NAME,
+        <WorkspaceServiceServer<WorkspaceSvc> as tonic::server::NamedService>::NAME,
+        <ReviewServiceServer<ReviewSvc> as tonic::server::NamedService>::NAME,
+        <IntentServiceServer<IntentSvc> as tonic::server::NamedService>::NAME,
+        <LanderServiceServer<LanderSvc> as tonic::server::NamedService>::NAME,
+        <AdminServiceServer<AdminSvc> as tonic::server::NamedService>::NAME,
+    ] {
+        reporter.set_service_status(name, status).await;
+    }
 }

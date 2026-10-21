@@ -119,6 +119,9 @@ async fn healthz() -> &'static str {
 }
 
 async fn readyz(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
+    if state.lifecycle.is_draining() {
+        return (StatusCode::SERVICE_UNAVAILABLE, "draining").into_response();
+    }
     let components = crate::services::admin::health_components(&state).await;
     if components.iter().all(|c| c.ok) {
         (StatusCode::OK, "ready").into_response()

@@ -149,3 +149,17 @@ async fn a_job_is_enqueued_with_its_change_or_not_at_all() {
     repo.meta().transact(won).await.unwrap();
     assert!(queue.claim("w").await.unwrap().is_some());
 }
+
+#[tokio::test]
+async fn a_released_job_is_ready_again_without_losing_an_attempt() {
+    let queue =
+        Queue::new(repo().await, "q").with_policy(policy(60_000, Duration::from_secs(3600)));
+    queue.push(JobSpec::new("t", "k", vec![])).await.unwrap();
+    let first = queue.claim("a").await.unwrap().unwrap();
+    queue.release(&first).await.unwrap();
+    let again = queue.claim("b").await.unwrap().expect("ready at once");
+    assert_eq!((again.job.id, again.job.attempt), (first.job.id, 0));
+    assert!(matches!(queue.complete(&first).await, Err(Error::Lost(_))));
+    queue.complete(&again).await.unwrap();
+    assert_eq!(queue.stats().await.unwrap().pending(), 0);
+}

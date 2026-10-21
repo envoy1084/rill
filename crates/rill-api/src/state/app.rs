@@ -28,6 +28,8 @@ pub struct AppState {
     pub attestor: Arc<rill_policy::Signer>,
     /// Cancelled when the server is shutting down; workers watch it.
     pub shutdown: CancellationToken,
+    /// Draining, stopping and aborting.
+    pub lifecycle: Arc<super::Lifecycle>,
     /// Process start time, for health reporting.
     pub started_at: std::time::Instant,
 }
@@ -50,11 +52,12 @@ impl AppState {
         let issuer = Arc::new(auth::build_issuer(&config.auth)?);
         let auth = auth::build_authenticator(&config.auth, &issuer)?;
         let attestor = Arc::new(load_attestor(&config)?);
+        let lifecycle = Arc::new(super::Lifecycle::new(shutdown.clone()));
         let repos = RepoRegistry::new(
             stores.clone(),
             config.clone(),
             attestor.clone(),
-            shutdown.clone(),
+            lifecycle.clone(),
         );
         Ok(Arc::new(AppState {
             stores,
@@ -64,6 +67,7 @@ impl AppState {
             issuer,
             attestor,
             shutdown,
+            lifecycle,
             started_at: std::time::Instant::now(),
         }))
     }

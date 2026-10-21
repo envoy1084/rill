@@ -69,8 +69,9 @@ pub async fn run(ctx: Arc<RepoContext>, shutdown: CancellationToken) {
                 tracing::warn!(error = %e, "loading the search index failed");
                 return;
             }
+            let abort = ctx.lifecycle.abort.clone();
             let handler = Arc::new(IndexHandler { ctx, lease });
-            Worker::new(queue, handler).run(token).await;
+            Worker::new(queue, handler).abort_on(abort).run(token).await;
         }
     })
     .await;

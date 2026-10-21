@@ -27,6 +27,8 @@ pub struct ServerConfig {
     pub listen_http: SocketAddr,
     /// Which parts of the service this process runs.
     pub roles: Roles,
+    /// How the process stops.
+    pub shutdown: ShutdownConfig,
     /// Where objects and metadata live.
     pub storage: StorageConfig,
     /// Where metadata lives, when not beside the objects.
@@ -63,6 +65,7 @@ impl Default for ServerConfig {
                 .parse()
                 .expect("default HTTP address is valid"),
             roles: Roles::default(),
+            shutdown: ShutdownConfig::default(),
             storage: StorageConfig::Memory,
             metadata: MetadataConfig::Storage,
             auth: AuthConfig::default(),
@@ -120,6 +123,27 @@ impl Roles {
             return Err(Error::Config("at least one role is needed".into()));
         }
         Ok(roles)
+    }
+}
+
+/// How a process stops after it is told to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ShutdownConfig {
+    /// Seconds between turning unready and refusing requests, for load
+    /// balancers to stop sending any.
+    pub drain_secs: u64,
+    /// Seconds in-flight requests and running jobs get to finish; jobs
+    /// still running then are given back to their queues.
+    pub grace_secs: u64,
+}
+
+impl Default for ShutdownConfig {
+    fn default() -> Self {
+        ShutdownConfig {
+            drain_secs: 5,
+            grace_secs: 30,
+        }
     }
 }
 

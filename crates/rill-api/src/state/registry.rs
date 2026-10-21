@@ -63,6 +63,8 @@ pub struct RepoContext {
     /// Cancelled when the server shuts down; long-lived streams and
     /// workers over this repository watch it.
     pub shutdown: CancellationToken,
+    /// The process's draining and abort signals and task tracker.
+    pub lifecycle: Arc<super::Lifecycle>,
     review: Arc<ArcSwap<ReviewService>>,
     review_events: broadcast::Sender<ReviewEvent>,
     server_config: Arc<ServerConfig>,
@@ -180,17 +182,17 @@ pub struct RepoRegistry {
     attestor: Arc<rill_policy::Signer>,
     contexts: DashMap<RepoId, Arc<RepoContext>>,
     build_lock: tokio::sync::Mutex<()>,
-    shutdown: CancellationToken,
+    lifecycle: Arc<super::Lifecycle>,
 }
 
 impl RepoRegistry {
     /// A registry over `stores`. Workers spawned for a context stop when
-    /// `shutdown` is cancelled.
+    /// the lifecycle stops.
     pub fn new(
         stores: Stores,
         config: Arc<ServerConfig>,
         attestor: Arc<rill_policy::Signer>,
-        shutdown: CancellationToken,
+        lifecycle: Arc<super::Lifecycle>,
     ) -> Self {
         RepoRegistry {
             stores,
@@ -198,7 +200,7 @@ impl RepoRegistry {
             attestor,
             contexts: DashMap::new(),
             build_lock: tokio::sync::Mutex::new(()),
-            shutdown,
+            lifecycle,
         }
     }
 
@@ -348,7 +350,8 @@ impl RepoRegistry {
             search,
             authorizer,
             labels,
-            shutdown: self.shutdown.child_token(),
+            shutdown: self.lifecycle.stop.child_token(),
+            lifecycle: self.lifecycle.clone(),
             review,
             review_events,
             server_config: self.config.clone(),

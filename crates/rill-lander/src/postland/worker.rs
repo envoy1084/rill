@@ -176,6 +176,7 @@ impl PostLandVerifier {
                 }
             }
         }
+        self.lease.release().await;
         tracing::info!("post-land verifier stopped");
     }
 

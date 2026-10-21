@@ -22,6 +22,7 @@ pub mod error;
 pub mod objects;
 mod serve;
 pub mod services;
+mod shutdown;
 pub mod state;
 pub mod workers;
 
@@ -29,9 +30,10 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-pub use config::{AuthConfig, Roles, ServerConfig, StorageConfig};
+pub use config::{AuthConfig, Roles, ServerConfig, ShutdownConfig, StorageConfig};
 pub use error::{Error, Result};
 pub use serve::{serve_with_state, Listeners};
+pub use shutdown::serve_until;
 pub use state::{AppState, RepoContext};
 
 /// Open storage and build the shared state without binding any sockets.
@@ -46,9 +48,10 @@ pub async fn build_state(
     Ok(state)
 }
 
-/// Run the server on the configured addresses until `shutdown` fires.
-pub async fn run(config: ServerConfig, shutdown: CancellationToken) -> Result<()> {
+/// Run the server on the configured addresses until `signal` fires, then
+/// drain and stop within the configured deadline.
+pub async fn run(config: ServerConfig, signal: CancellationToken) -> Result<()> {
     let listeners = Listeners::bind(config.listen_grpc, config.listen_http).await?;
-    let state = build_state(config, shutdown.clone()).await?;
-    serve_with_state(state, listeners, shutdown).await
+    let state = build_state(config, CancellationToken::new()).await?;
+    shutdown::serve_until(state, listeners, signal).await
 }

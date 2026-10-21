@@ -38,6 +38,7 @@ pub async fn run(ctx: Arc<RepoContext>, shutdown: CancellationToken) {
     let handler = Arc::new(DeriveHandler { ctx: ctx.clone() });
     Worker::new(queue, handler)
         .concurrency(CONCURRENCY)
+        .abort_on(ctx.lifecycle.abort.clone())
         .run(shutdown)
         .await;
     tracing::info!(repo = %ctx.config.name, "derive worker stopped");

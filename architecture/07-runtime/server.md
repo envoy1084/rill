@@ -126,12 +126,23 @@ The object protocol reuses this mapping through `ObjectError`; see
 ## Startup and shutdown
 
 `run` binds both listeners (port 0 picks a free port, reported by
-`Listeners::addrs`), calls `build_state`, then `serve_with_state` runs gRPC
-and HTTP together. On ctrl-c the binary cancels the root token. Both servers
-drain in-flight requests, workers and watches stop on their child tokens,
-and the index worker flushes. The lander releases its lease, so a standby
-takes over at once; claimed jobs left unfinished are taken back when their
-claims expire.
+`Listeners::addrs`), calls `build_state`, then `serve_until` serves gRPC and
+HTTP until the signal (ctrl-c in the binary). Shutdown follows `[shutdown]`
+(`state/lifecycle.rs`, `shutdown.rs`):
+
+1. **Drain.** `/readyz` answers 503 `draining` and gRPC health reports
+   `NOT_SERVING`, so load balancers send traffic elsewhere; requests are
+   still served for `drain_secs` (5; 0 in `rill dev`).
+2. **Stop.** The stop token is cancelled: listeners stop accepting and
+   finish in-flight requests, watch streams end (clients resume from their
+   cursor on another server), workers stop claiming, and the lander,
+   post-land verifier and search writer give up their leases so a standby
+   takes over at once.
+3. **Deadline.** The process waits up to `grace_secs` (30; 5 in `rill dev`)
+   for the servers and every tracked background task. If anything is still
+   running then, the abort token fires and job workers give their running
+   jobs back to the queue (`Queue::release`) instead of letting the claims
+   expire.
 
 ## Limitations
 

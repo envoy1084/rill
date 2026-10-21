@@ -99,6 +99,11 @@ pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
         listen_http: args
             .listen_http
             .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], DEV_HTTP_PORT))),
+        // No load balancer to drain from.
+        shutdown: rill_api::ShutdownConfig {
+            drain_secs: 0,
+            grace_secs: 5,
+        },
         ..ServerConfig::default()
     })
 }
