@@ -136,6 +136,55 @@ async fn a_planted_secret_is_blocked_at_every_write() {
         .unwrap_err();
     assert_eq!(raw.code(), Code::FailedPrecondition);
 
+    let ws = c
+        .workspace
+        .create_workspace(pb::CreateWorkspaceRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            name: "w".into(),
+            base: None,
+            sparse: None,
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .workspace
+        .unwrap();
+    let ctx = server.state.repos.resolve("app").await.unwrap();
+    let mut builder = rill_core::TreeBuilder::new();
+    builder.edit(
+        &rill_types::RepoPathBuf::new("deploy/.env").unwrap(),
+        rill_core::tree::Edit::Set(
+            rill_types::ContentRef::inline(format!("AWS={AWS_KEY}\n").into_bytes()),
+            rill_types::FileKind::Regular,
+        ),
+    );
+    let tree = builder.build(&ctx.trees, None).await.unwrap();
+    // A snapshot only records the working copy; the version is made when
+    // it becomes a change, and that is refused.
+    c.workspace
+        .snapshot(pb::SnapshotRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            workspace: ws.id.clone(),
+            tree_hash: Bytes::copy_from_slice(tree.as_bytes()),
+        })
+        .await
+        .unwrap();
+    let change = c
+        .workspace
+        .new_change(pb::NewChangeRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            workspace: ws.id,
+            message: "from the working copy".into(),
+            intent: None,
+            provenance: None,
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(change.code(), Code::FailedPrecondition, "{change:?}");
+
     // Clean content goes through, and the refusals are audited.
     apply(&mut c, "app", vec![set_edit("README", b"hello\n")])
         .await
@@ -157,7 +206,7 @@ async fn a_planted_secret_is_blocked_at_every_write() {
         .into_iter()
         .filter(|e| e.action == "secret.block")
         .count();
-    assert_eq!(blocked, 3);
+    assert_eq!(blocked, 4);
     server.stop().await;
 }
 
@@ -243,6 +292,30 @@ async fn quarantined_versions_wait_for_an_owner() {
         }
     }
     assert!(refused.expect("refused").contains("quarantined"));
+
+    // Nor can an importer append it to trunk.
+    let head = server
+        .state
+        .repos
+        .resolve("app")
+        .await
+        .unwrap()
+        .repo
+        .trunk_head()
+        .await
+        .unwrap()
+        .map(|(_, h)| Bytes::copy_from_slice(h.as_bytes()));
+    let appended = c
+        .admin
+        .append_trunk(pb::AppendTrunkRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            expected: head,
+            version: version.clone(),
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(appended.code(), Code::FailedPrecondition, "{appended:?}");
 
     c.protection
         .clear_quarantine(pb::ClearQuarantineRequest {

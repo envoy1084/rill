@@ -252,8 +252,8 @@ cd fuzz && cargo +nightly fuzz run decode_objects -- -max_total_time=600
 ```
 
 Fuzzing is not part of CI. The first six targets ran 10 minutes without a
-crash when added; the rest ran one minute each (Phase 12), with seeds in
-`fuzz/corpus/`.
+crash when added; the rest ran one minute each (Phase 12). Corpora under
+`fuzz/corpus/` are local and untracked.
 
 ## Limitations
 

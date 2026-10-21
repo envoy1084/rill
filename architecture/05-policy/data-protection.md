@@ -10,8 +10,8 @@ administrators, and per-org encryption at rest.
 Every version is scanned as it is committed
 ([`services/repo/secrets.rs`](../../crates/rill-api/src/services/repo/secrets.rs)),
 whatever the entry point: `ApplyEdits`, `CreateChangeVersion`, rebases and
-merges, workspace snapshots and imports all store versions through the same
-commit path. Only new content is read: inline bytes, and blobs and manifests
+merges, workspace changes (`NewChange`) and imports all store versions
+through the same commit path. Only new content is read: inline bytes, and blobs and manifests
 streamed part by part with a 4 KiB overlap so a secret split across two
 chunks is still found. Content found clean is remembered per rules digest,
 so a file is scanned once however many versions name it.
@@ -45,7 +45,7 @@ regex = 'acme_dk_[0-9a-f]{40}'
 | --- | --- | --- |
 | `block` (default) | refused with `FailedPrecondition` naming the detector and path | `secret.block`, written even though the version is not |
 | `warn` | stored | `secret.warn`, in the same transaction |
-| `quarantine` | stored, but the lander refuses it until an owner releases it (`ClearQuarantine`, audited `quarantine.clear`) | `secret.quarantine`, in the same transaction |
+| `quarantine` | stored, but neither the lander nor `AppendTrunk` moves trunk to it until an owner releases it (`ClearQuarantine`, audited `quarantine.clear`) | `secret.quarantine`, in the same transaction |
 
 ## Redaction
 
