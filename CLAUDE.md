@@ -69,8 +69,10 @@ do not introduce v2 names or compatibility shims. The roadmap's "v2" means
 ## Commits
 
 * Commit after each meaningful, self-contained change, directly on `main`
-  (no feature branches). Do not push unless asked. The tree builds and
-  tests pass at every commit.
+  (no feature branches). Do not push unless asked. Every commit builds,
+  and the tests and clippy of the crates it touches pass (see "Checks"
+  below); the full sweep runs at the end of a phase, and anything it finds
+  is fixed in a follow-up commit.
 * Message format: `area: what changed` in the imperative
   (`core: honour context lines in unified diff`), with a body when the why
   is not obvious.
@@ -100,6 +102,24 @@ do not introduce v2 names or compatibility shims. The roadmap's "v2" means
 crates (`rill-sim`, `rill-bench`, `rill-load`, `fuzz/`) may depend on
 anything; nothing depends on them. Test-only hooks in library crates live
 behind a `testing` feature.
+
+## Checks
+
+Tiered, so a phase spends its time on work rather than rebuilds:
+
+* **Per commit:** `cargo build --workspace --all-targets`, then
+  `cargo nextest run -p <touched crates>` (or the touched test binary,
+  e.g. `-p rill-api --test grpc access`) and
+  `cargo clippy -p <touched crates> --all-targets -- -D warnings`.
+* **End of a work item:** `cargo clippy --workspace --all-targets -- -D warnings`.
+* **End of a phase (the full sweep):** `cargo fmt --check`,
+  `cargo nextest run --workspace`, `cargo test --workspace --doc`, clippy
+  with the deployment features (`-p rill-cli --features fdb,aws,gcp,saml`),
+  and the FoundationDB suites below.
+* Build feature combinations (`fdb`, `saml`, cloud key services) and
+  `--release` only in the full sweep or for load runs. Run long gates
+  (image builds, staging, load runs) in the background while other work
+  continues.
 
 ## CI
 
