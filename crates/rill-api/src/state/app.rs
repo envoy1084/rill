@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use rill_policy::{Authenticator, Issuer};
+use rill_policy::StaticTokenAuthenticator;
 use rill_store::Stores;
 use tokio_util::sync::CancellationToken;
 
@@ -18,12 +18,12 @@ pub struct AppState {
     pub stores: Stores,
     /// The configuration the server started with.
     pub config: Arc<ServerConfig>,
-    /// Maps bearer tokens to principals.
-    pub auth: Arc<dyn Authenticator>,
+    /// Static tokens (dev mode only).
+    pub static_tokens: Option<StaticTokenAuthenticator>,
+    /// Token keys and revocations as this server last read them.
+    pub identity: Arc<crate::identity::IdentityView>,
     /// Per-repository service graphs.
     pub repos: RepoRegistry,
-    /// Signs capability tokens handed out by `IssueToken`.
-    pub issuer: Arc<Issuer>,
     /// Signs commit attestations.
     pub attestor: Arc<rill_policy::Signer>,
     /// Cancelled when the server is shutting down; workers watch it.
@@ -41,11 +41,11 @@ impl AppState {
     /// spawned lazily per repository (or eagerly via [`RepoRegistry::warm`]).
     pub async fn new(config: ServerConfig, shutdown: CancellationToken) -> Result<Arc<Self>> {
         let stores = open_stores(&config.storage, &config.metadata).await?;
-        Self::with_stores(config, stores, shutdown)
+        Self::with_stores(config, stores, shutdown).await
     }
 
     /// Build the state over already-open stores.
-    pub fn with_stores(
+    pub async fn with_stores(
         config: ServerConfig,
         stores: Stores,
         shutdown: CancellationToken,
@@ -56,8 +56,8 @@ impl AppState {
             stores.meta.clone(),
             metrics.clone(),
         )));
-        let issuer = Arc::new(auth::build_issuer(&config.auth)?);
-        let auth = auth::build_authenticator(&config.auth, &issuer)?;
+        let static_tokens = auth::static_tokens(&config)?;
+        let identity = crate::identity::IdentityView::open(&stores, &config.identity).await?;
         let attestor = Arc::new(load_attestor(&config)?);
         let lifecycle = Arc::new(super::Lifecycle::new(shutdown.clone()));
         let repos = RepoRegistry::new(
@@ -69,9 +69,9 @@ impl AppState {
         Ok(Arc::new(AppState {
             stores,
             config,
-            auth,
+            static_tokens,
+            identity,
             repos,
-            issuer,
             attestor,
             shutdown,
             lifecycle,

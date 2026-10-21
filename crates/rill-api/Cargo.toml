@@ -10,6 +10,9 @@ repository.workspace = true
 [features]
 # Keep metadata in FoundationDB. Needs the FoundationDB client library.
 fdb = ["rill-store/fdb"]
+# AWS KMS and Google Cloud KMS as token key services.
+aws = ["rill-identity/aws"]
+gcp = ["rill-identity/gcp"]
 
 [dependencies]
 rill-types = { workspace = true }
@@ -23,6 +26,7 @@ rill-events = { workspace = true }
 rill-jobs = { workspace = true }
 rill-search = { workspace = true }
 rill-exec = { workspace = true }
+rill-identity = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -59,8 +63,8 @@ tower = { workspace = true }
 tower-http = { workspace = true }
 http = { workspace = true }
 http-body-util = { workspace = true }
+parking_lot = { workspace = true }
 
 [dev-dependencies]
-parking_lot = { workspace = true }
 rill-store = { workspace = true, features = ["s3", "testing"] }
 tempfile = { workspace = true }

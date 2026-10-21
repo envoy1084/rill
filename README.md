@@ -91,9 +91,10 @@ rill api --config rill.toml              # --roles api,workers by default
 ```
 
 Storage is `memory`, `local:<dir>` (objects as files, metadata in redb) or
-`s3://bucket/prefix` (objects on S3, metadata in redb). Authentication is
-static bearer tokens or Biscuit capability tokens issued by
-`rill admin token issue`. Per-directory permissions are relationship tuples
+`s3://bucket/prefix` (objects on S3, metadata in redb). Every token is a
+Biscuit signed by the instance's P-256 keys, which a key service (a local
+master key, Vault, AWS KMS or Google Cloud KMS) wraps; the first comes from
+`rill api mint-token`, narrower ones from `rill admin token issue`. Per-directory permissions are relationship tuples
 (`rill admin relation add dir:/billing owner principal:<id>`). Submit rules are
 Cedar policies (`rill admin policy set <repo>/submit`). `RILL_*` environment
 variables override individual keys.
@@ -127,8 +128,7 @@ Dev and test profiles use `debug = "line-tables-only"` to keep `target/` near
 
 Version 1. Every crate above is implemented and tested in-process (357 tests).
 Not production-ready: S3 and FoundationDB backends are untested against real
-services, authentication is static tokens or self-issued Biscuits with no
-identity provider, execution is unsandboxed, there is no web UI, no virtual
+services, there is no identity provider sign-in yet, execution is unsandboxed, there is no web UI, no virtual
 filesystem client, and structural merge is a hook. Rill is being rebuilt as v2
 for large monorepos shared by many agents and humans; the decisions behind it
 are in [architecture/10-decisions](architecture/10-decisions/README.md).

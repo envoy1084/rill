@@ -4,13 +4,12 @@
 //! them to an [`Authenticator`]; this crate never sees tonic or HTTP types.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use async_trait::async_trait;
-use rill_types::{Principal, RepoId, RepoPathBuf, Timestamp};
+use rill_types::{Principal, RepoId, RepoPathBuf};
 
 use crate::error::{Error, Result};
-use crate::tokens::{Capability, TokenClaims, Verb, Verifier};
+use crate::tokens::{Capability, TokenClaims, Verb};
 
 /// Credentials extracted from a request.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -151,70 +150,10 @@ impl TeamResolver for NoTeams {
     }
 }
 
-/// Authenticates Biscuit capability tokens issued by this instance.
-///
-/// Authentication establishes identity and the token's capability; whether
-/// the capability covers a particular operation is checked later by the
-/// server per request via [`Verifier::verify`] or
-/// [`AuthContext::capability_allows`]. The signature chain and expiry are
-/// checked here using a probe request against the capability's own scope.
-pub struct BiscuitAuthenticator {
-    verifier: Verifier,
-    teams: Arc<dyn TeamResolver>,
-}
-
-impl std::fmt::Debug for BiscuitAuthenticator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BiscuitAuthenticator")
-            .finish_non_exhaustive()
-    }
-}
-
-impl BiscuitAuthenticator {
-    /// Authenticator with no team membership.
-    pub fn new(verifier: Verifier) -> Self {
-        Self::with_teams(verifier, Arc::new(NoTeams))
-    }
-
-    /// Authenticator that fills in teams from `teams`.
-    pub fn with_teams(verifier: Verifier, teams: Arc<dyn TeamResolver>) -> Self {
-        BiscuitAuthenticator { verifier, teams }
-    }
-
-    /// The underlying verifier, for per-request capability checks.
-    pub fn verifier(&self) -> &Verifier {
-        &self.verifier
-    }
-}
-
-#[async_trait]
-impl Authenticator for BiscuitAuthenticator {
-    async fn authenticate(&self, headers: &AuthHeaders) -> Result<AuthContext> {
-        let token = headers
-            .bearer
-            .as_deref()
-            .ok_or_else(|| Error::Unauthenticated("missing bearer token".into()))?;
-        let verified = self
-            .verifier
-            .authenticate(token, Timestamp::now())
-            .map_err(|e| match e {
-                Error::TokenExpired { .. } => e,
-                other => Error::Unauthenticated(other.to_string()),
-            })?;
-        let teams = self.teams.teams_of(&verified.principal).await?;
-        Ok(AuthContext {
-            principal: verified.principal,
-            teams,
-            capability: verified.capability,
-            claims: Some(verified.claims),
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tokens::Issuer;
+    use rill_types::Timestamp;
 
     #[tokio::test]
     async fn static_tokens() {
@@ -242,53 +181,24 @@ mod tests {
         ));
     }
 
-    struct FixedTeams;
-
-    #[async_trait]
-    impl TeamResolver for FixedTeams {
-        async fn teams_of(&self, _p: &Principal) -> Result<Vec<String>> {
-            Ok(vec!["agents".into()])
-        }
-    }
-
-    #[tokio::test]
-    async fn biscuit_tokens() {
-        let issuer = Issuer::generate();
-        let auth = BiscuitAuthenticator::with_teams(
-            Verifier::new(issuer.key_ring()),
-            Arc::new(FixedTeams),
-        );
+    #[test]
+    fn a_capability_narrows_what_a_context_allows() {
         let repo = RepoId::derived("t", "r");
-        let bot = Principal::agent("bot");
-        let cap = Capability::repo_wide(
-            repo,
-            [Verb::Read],
-            Timestamp::from_millis(Timestamp::now().millis() + 60_000),
-        )
-        .with_paths([RepoPathBuf::new("src").unwrap()]);
-        let claims = crate::TokenClaims::new("default", Timestamp::now(), 60_000);
-        let token = issuer.issue(&bot, &claims, Some(&cap)).unwrap();
-
-        let ctx = auth
-            .authenticate(&AuthHeaders::bearer(&token))
-            .await
-            .unwrap();
-        assert_eq!(ctx.principal, bot);
-        assert_eq!(ctx.teams, vec!["agents"]);
-        assert_eq!(ctx.capability.as_ref(), Some(&cap));
+        let cap = Capability::repo_wide(repo, [Verb::Read], Timestamp::from_millis(i64::MAX))
+            .with_paths([RepoPathBuf::new("src").unwrap()]);
+        let ctx = AuthContext {
+            principal: Principal::agent("bot"),
+            teams: Vec::new(),
+            capability: Some(cap),
+            claims: None,
+        };
         assert!(ctx.capability_allows(repo, &RepoPathBuf::new("src/x").unwrap(), Verb::Read));
         assert!(!ctx.capability_allows(repo, &RepoPathBuf::new("src/x").unwrap(), Verb::Write));
         assert!(!ctx.capability_allows(repo, &RepoPathBuf::new("docs").unwrap(), Verb::Read));
-
-        let old = crate::TokenClaims::new("default", Timestamp::from_millis(1), 60_000);
-        let expired = issuer.issue(&bot, &old, None).unwrap();
-        assert!(matches!(
-            auth.authenticate(&AuthHeaders::bearer(expired)).await,
-            Err(Error::TokenExpired { .. })
-        ));
-        assert!(matches!(
-            auth.authenticate(&AuthHeaders::bearer("garbage")).await,
-            Err(Error::Unauthenticated(_))
+        assert!(!ctx.capability_allows(
+            RepoId::new(),
+            &RepoPathBuf::new("src/x").unwrap(),
+            Verb::Read
         ));
     }
 }

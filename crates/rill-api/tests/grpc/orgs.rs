@@ -4,29 +4,11 @@ use super::*;
 
 #[tokio::test]
 async fn repositories_are_addressed_within_their_org() {
-    let auth = AuthConfig::Static {
-        tokens: vec![
-            StaticToken {
-                token: "alice-token".into(),
-                principal_name: "alice".into(),
-                kind: PrincipalKind::Human,
-                teams: vec![],
-            },
-            StaticToken {
-                token: "bot-token".into(),
-                principal_name: "bot".into(),
-                kind: PrincipalKind::Agent,
-                teams: vec![],
-            },
-        ],
-    };
-    let server = TestServer::start(ServerConfig {
-        auth,
-        ..ServerConfig::default()
-    })
-    .await;
-    let mut alice = clients(&server, Some("alice-token")).await;
-    let mut bot = clients(&server, Some("bot-token")).await;
+    let server = TestServer::start(ServerConfig::default()).await;
+    let alice_token = server.token_for(&rill_types::Principal::human("alice"));
+    let bot_token = server.token_for(&rill_types::Principal::agent("bot"));
+    let mut alice = clients(&server, Some(&alice_token)).await;
+    let mut bot = clients(&server, Some(&bot_token)).await;
 
     let create_org = |name: &str| pb::CreateOrgRequest {
         operation_id: Bytes::new(),

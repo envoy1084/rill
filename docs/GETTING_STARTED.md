@@ -20,8 +20,9 @@ unauthenticated requests to a `dev` human principal, and listens on
 For a real server:
 
 ```
-rill api init-config > rill.toml         # edit storage, auth, policy
+rill api init-config > rill.toml         # edit storage, identity.keys, identity.admins
 rill api --config rill.toml
+rill api --config rill.toml mint-token human:alice   # the first token
 ```
 
 ## First repository

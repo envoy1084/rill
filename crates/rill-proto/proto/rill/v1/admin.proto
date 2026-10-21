@@ -62,6 +62,13 @@ message WhoAmIResponse {
   repeated string teams = 2;
   repeated Capability capabilities = 3;
   optional int64 token_expires_at = 4;
+  // The caller's token id (`tk_…`), session (`ss_…`) and organization,
+  // when the caller presented an issued token.
+  optional string token_id = 5;
+  optional string session = 6;
+  optional string org = 7;
+  optional string sponsor = 8;
+  optional string model = 9;
 }
 
 message IssueTokenRequest {
@@ -139,6 +146,6 @@ message HealthResponse {
   bool ok = 1;
   string version = 2;
   repeated ComponentHealth components = 3;
-  // Hex Ed25519 public key commit attestations are signed with.
+  // Hex compressed P-256 public key commit attestations are signed with.
   string attestation_key = 4;
 }

@@ -18,7 +18,7 @@ flowchart LR
     Gen --> C[rill-sdk]
 ```
 
-`build.rs` compiles the eight `.proto` files with `protox`, so no `protoc`
+`build.rs` compiles the nine `.proto` files with `protox`, so no `protoc`
 binary is needed. It writes the descriptor set that
 `rill_proto::FILE_DESCRIPTOR_SET` embeds for gRPC reflection. It configures
 `.btree_map(".rill.v1")` and `.bytes(".rill.v1")`, so maps are ordered and
@@ -27,7 +27,7 @@ and client stubs.
 
 ## gRPC services
 
-The server registers all six services behind `AuthLayer`
+The server registers all seven services behind `AuthLayer`
 ([server](server.md#request-path)). It also registers `tonic-reflection` and
 `tonic-health`, which report every service as serving.
 
@@ -39,6 +39,7 @@ The server registers all six services behind `AuthLayer`
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
 | `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
+| `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys` ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
 
 `types.proto` holds the shared object model and `events.proto` the event
 log's messages. The streaming RPCs are `GetBlob` (server stream of

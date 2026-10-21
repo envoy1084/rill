@@ -114,6 +114,11 @@ The service runs from the same binary (`server/mod.rs`):
   `RILL_*` environment through `ServerConfig::load`, then applies the
   flags. `rill api init-config [--out PATH] [--force]` prints an annotated
   `ServerConfig::default()`.
+* `rill api [--config PATH] mint-token <human:|agent:|service:>NAME
+  [--org ORG] [--ttl SECS]` signs a token with the instance's key, reading
+  the store and key service from the configuration like a server would. It
+  is how the first administrator (and staging) gets a token; the lifetime
+  defaults to the longest the kind allows.
 
 Both log at `info` unless `-q` or `RUST_LOG` say otherwise. Ctrl-C cancels
 the root `CancellationToken`. See
@@ -124,7 +129,7 @@ the root `CancellationToken`. See
 - If checkout metadata fails to parse, the CLI logs a warning and acts as if
   it is outside a checkout.
 - `rill import git` prints only its final result, with no progress output.
-- `rill api` has no flags for S3 storage or Biscuit keys. Those come
+- `rill api` has no flags for S3 storage or the key service. Those come
   from the config file or the environment.
 - The `--endpoint` help text gives `~/.config/rill/config.toml` as the config
   path. On macOS the SDK reads `~/Library/Application Support/rill/config.toml`.

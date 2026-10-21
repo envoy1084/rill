@@ -41,6 +41,9 @@ pub enum Error {
     Search(#[from] rill_search::Error),
 
     #[error(transparent)]
+    Identity(#[from] rill_identity::Error),
+
+    #[error(transparent)]
     Types(#[from] rill_types::Error),
 
     #[error(transparent)]
@@ -125,6 +128,12 @@ impl Error {
             Error::Jobs(rill_jobs::Error::Store(e)) => store_code(e),
             Error::Jobs(rill_jobs::Error::Lost(_)) => Code::Aborted,
             Error::Exec(_) => Code::Internal,
+            Error::Identity(e) => match e {
+                rill_identity::Error::Store(e) => store_code(e),
+                rill_identity::Error::Policy(e) => policy_code(e),
+                rill_identity::Error::KeyService { .. } => Code::Unavailable,
+                rill_identity::Error::Config(_) => Code::Internal,
+            },
             Error::Search(e) => match e {
                 rill_search::Error::InvalidPattern(_) | rill_search::Error::InvalidGlob(_) => {
                     Code::InvalidArgument

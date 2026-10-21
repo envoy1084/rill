@@ -91,8 +91,9 @@ which does not outlive the handler. See [server](../07-runtime/server.md).
 ## Authority
 
 The server's authenticator resolves each request to a principal (`human`,
-`agent` or `service`) from a static token, a Biscuit capability token, or the
-fixed `dev` principal in dev mode. Three layers must all allow an action:
+`agent` or `service`) from a token the instance signed (checked against its
+key ring and revocations), a static token on a dev server, or the fixed
+`dev` principal in dev mode. Three layers must all allow an action:
 
 - **Capabilities** on the token: repo, verbs, path prefixes, expiry.
   Attenuation can only narrow a token. Enforced even in dev mode. See
@@ -129,8 +130,8 @@ The rules these mechanisms must keep are listed in
 
 - Several servers can share only a FoundationDB metadata store; redb is
   opened by one process.
-- No identity provider: authentication is static tokens or self-issued
-  Biscuits.
+- No identity provider yet: tokens come from `rill api mint-token` and
+  `IssueToken`.
 
 ## Code
 

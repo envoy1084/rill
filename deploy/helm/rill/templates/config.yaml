@@ -1,4 +1,5 @@
-# The server configuration, as a Secret because it may hold tokens.
+# The server configuration. A Secret, so a complete configuration with
+# credentials can replace it (existingConfigSecret).
 {{- if not .Values.existingConfigSecret }}
 apiVersion: v1
 kind: Secret
@@ -21,15 +22,22 @@ stringData:
     cluster_file = "/etc/foundationdb/fdb.cluster"
     root = {{ .Values.fdb.root | quote }}
 
+    [identity]
+    admins = [{{- range $i, $a := .Values.identity.admins }}{{ if $i }}, {{ end }}{{ $a | quote }}{{- end }}]
 
-    [auth]
-    kind = "static"
-    {{- range .Values.auth.tokens }}
-
-    [[auth.tokens]]
-    token = {{ .token | quote }}
-    principal_name = {{ .principalName | quote }}
-    kind = {{ .kind | default "Human" | quote }}
+    [identity.keys]
+    backend = {{ .Values.identity.keyService | quote }}
+    {{- if eq .Values.identity.keyService "vault" }}
+    address = {{ required "identity.vault.address" .Values.identity.vault.address | quote }}
+    key = {{ .Values.identity.vault.key | quote }}
+    mount = {{ .Values.identity.vault.mount | quote }}
+    {{- else if eq .Values.identity.keyService "aws-kms" }}
+    key_id = {{ required "identity.awsKms.keyId" .Values.identity.awsKms.keyId | quote }}
+    {{- if .Values.identity.awsKms.region }}
+    region = {{ .Values.identity.awsKms.region | quote }}
+    {{- end }}
+    {{- else if eq .Values.identity.keyService "gcp-kms" }}
+    key_name = {{ required "identity.gcpKms.keyName" .Values.identity.gcpKms.keyName | quote }}
     {{- end }}
     {{- if .Values.tls.secret }}
 

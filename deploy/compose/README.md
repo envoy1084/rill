@@ -8,9 +8,15 @@ dashboards from `../grafana`.
 ```sh
 docker build -t rill:dev ../..
 docker compose up -d
-export RILL_ENDPOINT=http://localhost:7470 RILL_TOKEN=staging-admin
+export RILL_ENDPOINT=http://localhost:7470
+export RILL_TOKEN=$(docker compose exec rill1 \
+  rill api --config /etc/rill/rill.toml mint-token service:staging-admin)
 rill repo create demo
 ```
+
+The servers are not in dev mode. `mint-token` signs a 12-hour service token
+with the instance key (it reads the store and the master key like a
+server), and `staging-admin` is listed in `identity.admins`.
 
 | Port | What |
 | --- | --- |
@@ -24,7 +30,7 @@ rill repo create demo
 
 ```sh
 cargo run --release -p rill-load -- --endpoint http://localhost:7470 \
-  --token staging-admin --percent 10 --duration 3600 --watchers 500 \
+  --token "$RILL_TOKEN" --percent 10 --duration 3600 --watchers 500 \
   --report-every 60
 ./chaos.sh 3600        # in another shell: kill servers at random
 ```

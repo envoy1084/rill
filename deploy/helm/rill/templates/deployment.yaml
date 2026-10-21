@@ -46,6 +46,20 @@ spec:
             - name: AWS_ALLOW_HTTP
               value: "true"
             {{- end }}
+            {{- if eq .Values.identity.keyService "local" }}
+            - name: RILL_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "identity.masterKeySecret" .Values.identity.masterKeySecret }}
+                  key: master-key
+            {{- end }}
+            {{- if and (eq .Values.identity.keyService "vault") .Values.identity.vault.tokenSecret }}
+            - name: VAULT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.identity.vault.tokenSecret }}
+                  key: token
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.s3.secret }}

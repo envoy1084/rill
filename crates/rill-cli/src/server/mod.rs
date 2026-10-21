@@ -77,22 +77,59 @@ pub enum ApiCmd {
         #[arg(long)]
         force: bool,
     },
+    /// Sign a token with the instance's key, reading the store and key
+    /// service from the configuration. For bootstrap: the first
+    /// administrator, service accounts, staging.
+    MintToken {
+        /// `human:<name>`, `agent:<name>` or `service:<name>`; a bare name
+        /// is a human.
+        principal: String,
+        /// Organization the token belongs to.
+        #[arg(long, default_value = rill_store::DEFAULT_ORG)]
+        org: String,
+        /// Lifetime in seconds (default: the longest the kind allows).
+        #[arg(long, value_name = "SECS")]
+        ttl: Option<u64>,
+    },
+}
+
+/// Parse `kind:name` or `name`.
+pub fn parse_principal(spec: &str) -> Result<rill_types::Principal> {
+    use rill_types::Principal;
+    match spec.split_once(':') {
+        None => Ok(Principal::human(spec)),
+        Some(("human", name)) => Ok(Principal::human(name)),
+        Some(("agent", name)) => Ok(Principal::agent(name)),
+        Some(("service", name)) => Ok(Principal::service(name)),
+        Some((kind, _)) => Err(CliError::Usage(format!(
+            "principal kind must be human, agent or service, not {kind:?}"
+        ))),
+    }
 }
 
 /// The configuration `rill dev` runs with.
 pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
-    let storage = if args.memory {
-        StorageConfig::Memory
+    let (storage, master_key_file) = if args.memory {
+        (StorageConfig::Memory, None)
     } else {
         let dir = match &args.data {
             Some(dir) => dir.clone(),
             None => default_dev_dir()?,
         };
-        StorageConfig::Local { dir }
+        let key = dir.join("master.key");
+        (StorageConfig::Local { dir }, Some(key))
+    };
+    let identity = rill_api::config::IdentityConfig {
+        keys: rill_identity::keys::KeyServiceConfig::Local {
+            master_key_hex: None,
+            master_key_file,
+        },
+        ..Default::default()
     };
     Ok(ServerConfig {
         dev_mode: true,
         storage,
+        identity,
         listen_grpc: args
             .listen_grpc
             .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], DEV_GRPC_PORT))),
@@ -143,16 +180,53 @@ pub fn parse_storage(spec: &str) -> Result<StorageConfig> {
 /// Run `rill dev` until ctrl-c.
 pub async fn dev(args: DevArgs) -> Result<()> {
     let config = dev_config(&args)?;
+    if let rill_identity::keys::KeyServiceConfig::Local {
+        master_key_file: Some(path),
+        ..
+    } = &config.identity.keys
+    {
+        ensure_master_key(path).await?;
+    }
     serve(config).await
 }
 
-/// Run `rill api` until ctrl-c, or write the configuration template.
-pub async fn api(args: ApiArgs) -> Result<()> {
-    if let Some(ApiCmd::InitConfig { out, force }) = &args.command {
-        return write_template(out.as_deref(), *force);
+/// Create the dev server's master key file the first time, so its token
+/// keys open again after a restart.
+async fn ensure_master_key(path: &std::path::Path) -> Result<()> {
+    if tokio::fs::try_exists(path).await? {
+        return Ok(());
     }
-    let config = api_config(&args)?;
-    serve(config).await
+    if let Some(dir) = path.parent() {
+        tokio::fs::create_dir_all(dir).await?;
+    }
+    let key = hex::encode(rand::random::<[u8; 32]>());
+    let mut options = tokio::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    options.mode(0o600);
+    use tokio::io::AsyncWriteExt;
+    options.open(path).await?.write_all(key.as_bytes()).await?;
+    Ok(())
+}
+
+/// Run `rill api` until ctrl-c, or write the configuration template.
+pub async fn api(ctx: &mut crate::context::Ctx<'_>, args: ApiArgs) -> Result<()> {
+    match &args.command {
+        Some(ApiCmd::InitConfig { out, force }) => write_template(out.as_deref(), *force),
+        Some(ApiCmd::MintToken {
+            principal,
+            org,
+            ttl,
+        }) => {
+            let config = api_config(&args)?;
+            let principal = parse_principal(principal)?;
+            let token = rill_api::identity::mint_token(&config, &principal, org, *ttl).await?;
+            ctx.emit(serde_json::json!({ "token": token }), |out| {
+                out.line(&token)
+            })
+        }
+        None => serve(api_config(&args)?).await,
+    }
 }
 
 async fn serve(config: ServerConfig) -> Result<()> {
@@ -254,6 +328,19 @@ mod tests {
         assert!(parse_storage("s3:bucket").is_err());
         assert!(Roles::parse("gateway").is_err());
         assert!(Roles::parse("").is_err());
+    }
+
+    #[test]
+    fn principals_parse_by_kind() {
+        assert_eq!(
+            parse_principal("alice").unwrap(),
+            rill_types::Principal::human("alice")
+        );
+        assert_eq!(
+            parse_principal("service:load").unwrap(),
+            rill_types::Principal::service("load")
+        );
+        assert!(parse_principal("robot:x").is_err());
     }
 
     #[test]

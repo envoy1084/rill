@@ -21,8 +21,10 @@ project's "Rill User Guide" doc; this is the same content for the repo.
     export PATH="$PWD/target/release:$PATH"
     rill dev                             # data in ~/.rill/dev, no auth, :7470 / :7471
 
-For a real server: `rill api init-config > rill.toml`, set `storage`,
-`auth` and `dev_mode = false`, then `rill api --config rill.toml`.
+For a real server: `rill api init-config > rill.toml`, set `storage`, the
+`[identity.keys]` key service and `identity.admins`, then
+`rill api --config rill.toml`. The first administrator's token:
+`rill api --config rill.toml mint-token human:<name>`.
 Clients: `export RILL_ENDPOINT=http://server:7470 RILL_TOKEN=...`.
 
 ## 2. Create the repo and a checkout

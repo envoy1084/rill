@@ -90,7 +90,7 @@ async fn a_retry_after_a_crash_returns_the_version_already_committed() {
     // The server committed the version, then died before replying.
     let dev = rill_types::Principal::human("dev").id.to_string();
     server
-        ._state
+        .state
         .stores
         .idem_rewind(&dev, &[9; 16], &first.hash)
         .await
@@ -98,7 +98,7 @@ async fn a_retry_after_a_crash_returns_the_version_already_committed() {
     let retried = c.repo.apply_edits(edit).await.unwrap().into_inner();
     assert_eq!(retried.hash, first.hash);
 
-    let stores = &server._state.stores;
+    let stores = &server.state.stores;
     let repo = stores.repo(stores.get_repo_by_name("crash").await.unwrap().unwrap().id);
     assert_eq!(
         repo.log_after(None, 10).await.unwrap().len(),

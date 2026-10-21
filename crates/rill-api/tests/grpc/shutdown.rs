@@ -14,7 +14,9 @@ async fn shutdown_drains_then_stops_and_frees_its_leases() {
         ..dev_config()
     };
     let signal = CancellationToken::new();
-    let state = AppState::with_stores(config, stores.clone(), CancellationToken::new()).unwrap();
+    let state = AppState::with_stores(config, stores.clone(), CancellationToken::new())
+        .await
+        .unwrap();
     let listeners = Listeners::bind(
         "127.0.0.1:0".parse().unwrap(),
         "127.0.0.1:0".parse().unwrap(),

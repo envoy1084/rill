@@ -10,6 +10,8 @@ ARG RUST_VERSION=1.99
 
 FROM rust:${RUST_VERSION}-bookworm AS build
 ARG TARGETARCH
+# Cargo features of the `rill` binary: FoundationDB and the cloud key services.
+ARG FEATURES=fdb,aws,gcp
 ARG FDB_VERSION=7.3.77
 ARG FDB_CLIENTS_SHA256_AMD64=b6c263723009bddbc30b6ae8cf9854340bd35cef14152abb0da8fb5af2b91254
 ARG FDB_CLIENTS_SHA256_ARM64=b3a5dd972ffd37c1d5dc0c29ffa00e2169bcac62c0186571acced8b006af7cc2
@@ -31,7 +33,7 @@ WORKDIR /src
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
-    cargo build --release --locked -p rill-cli --features fdb \
+    cargo build --release --locked -p rill-cli --features "$FEATURES" \
     && cp target/release/rill /usr/local/bin/rill
 
 FROM debian:bookworm-slim

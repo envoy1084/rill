@@ -9,7 +9,7 @@ use rill_policy::RiskConfig;
 use rill_review::votes::LabelSet;
 use serde::{Deserialize, Serialize};
 
-use super::{AuthConfig, MetadataConfig, StorageConfig};
+use super::{AuthConfig, IdentityConfig, MetadataConfig, StorageConfig};
 use crate::error::{Error, Result};
 
 /// Default gRPC listen address.
@@ -37,8 +37,10 @@ pub struct ServerConfig {
     pub storage: StorageConfig,
     /// Where metadata lives, when not beside the objects.
     pub metadata: MetadataConfig,
-    /// How bearer tokens are authenticated.
+    /// Static bearer tokens (dev mode only).
     pub auth: AuthConfig,
+    /// Token keys, lifetimes and instance administrators.
+    pub identity: IdentityConfig,
     /// Landing pipeline policy (verification modes, retries, auto-revert).
     pub lander: LandPolicy,
     /// Risk classification rules applied to every change under review.
@@ -75,6 +77,7 @@ impl Default for ServerConfig {
             storage: StorageConfig::Memory,
             metadata: MetadataConfig::Storage,
             auth: AuthConfig::default(),
+            identity: IdentityConfig::default(),
             lander: LandPolicy::default(),
             risk: RiskConfig::default(),
             labels: LabelSet::default(),
@@ -292,25 +295,33 @@ mod tests {
             [storage]
             kind = "local"
             dir = "/var/lib/rill"
-            [auth]
-            kind = "static"
             [[auth.tokens]]
             token = "t1"
             principal_name = "alice"
             [verify]
             enabled = true
+            [identity]
+            admins = ["alice"]
+            [identity.keys]
+            backend = "vault"
+            address = "https://vault:8200"
+            key = "rill"
+            [identity.lifetimes]
+            agent_secs = 600
         "#;
         let config = ServerConfig::from_toml(text).unwrap();
         assert!(config.dev_mode);
         assert_eq!(config.listen_grpc.port(), 9000);
         assert!(matches!(config.storage, StorageConfig::Local { .. }));
         assert!(config.verify.enabled);
-        match config.auth {
-            AuthConfig::Static { tokens } => {
-                assert_eq!(tokens[0].principal_name, "alice");
-                assert_eq!(tokens[0].kind, PrincipalKind::Human);
-            }
-            _ => panic!("expected static auth"),
-        }
+        assert_eq!(config.auth.tokens[0].principal_name, "alice");
+        assert_eq!(config.auth.tokens[0].kind, PrincipalKind::Human);
+        assert_eq!(config.identity.admins, ["alice"]);
+        assert!(matches!(
+            config.identity.keys,
+            rill_identity::keys::KeyServiceConfig::Vault { ref mount, .. } if mount == "transit"
+        ));
+        assert_eq!(config.identity.lifetimes.agent_secs, 600);
+        assert_eq!(config.identity.lifetimes.human_secs, 3600);
     }
 }

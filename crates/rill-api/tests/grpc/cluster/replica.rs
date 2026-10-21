@@ -33,8 +33,9 @@ impl Replica {
                 .await
                 .unwrap();
                 let bound = listeners.addrs().unwrap();
-                let state =
-                    AppState::with_stores(config, stores, CancellationToken::new()).unwrap();
+                let state = AppState::with_stores(config, stores, CancellationToken::new())
+                    .await
+                    .unwrap();
                 state.repos.warm().await.unwrap();
                 tokio::spawn(rill_api::serve_until(
                     state,

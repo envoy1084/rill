@@ -5,6 +5,7 @@ pub mod admin;
 pub mod common;
 pub mod diff;
 pub mod idem;
+pub mod identity;
 pub mod intent;
 pub mod lander;
 pub mod orgs;
@@ -13,6 +14,7 @@ pub mod review;
 pub mod workspace;
 
 pub use admin::AdminSvc;
+pub use identity::IdentitySvc;
 pub use intent::IntentSvc;
 pub use lander::LanderSvc;
 pub use repo::RepoSvc;

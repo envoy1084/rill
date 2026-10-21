@@ -40,7 +40,8 @@ defaults with a comment header that lists every alternative.
 | `dev_mode` | `false` | anonymous requests act as `dev`; ReBAC checks pass |
 | `attestation_key` | none | path to a P-256 key file (hex secret scalar) the server signs every stored version with; without it a per-process key is generated (warned outside dev mode). Its public half is in `Health` |
 | `[storage] kind` | `memory` | backend, see below |
-| `[auth] kind` | `static` with no tokens | token scheme, see below |
+| `[[auth.tokens]]` | none | static tokens, dev mode only |
+| `[identity]` | local key service, default lifetimes | token keys, lifetimes, rotation and administrators, see below |
 | `[lander]` | `LandPolicy::default()` | verify mode per risk class, `max_wait`, `batch_window`, `auto_revert`, `revert_grace`, `max_retries` |
 | `[risk]` | `RiskConfig::default()` | risk rules, used when a repository has no stored `risk` policy |
 | `[labels]` | `LabelSet::default()` | vote labels for every repository |
@@ -76,18 +77,24 @@ other builds refuse the setting at start-up.
 See [storage and keyspace](../02-data/storage-and-keyspace.md) for what the
 stores hold.
 
-## Authentication
+## Identity
 
-* `static` takes a list of `[[auth.tokens]]` entries: `token`,
-  `principal_name`, `kind` (`human` by default, or `agent` or `service`) and
-  `teams`.
-* `biscuit` takes a `root_public_key_hex` that verifies tokens and an
-  optional `root_private_key_hex`. With the private key, the server issues
-  tokens signed by that root.
+Every token is signed by the instance's P-256 keys, which servers generate,
+wrap with the key service and keep in the metadata store
+([token keys](../05-policy/token-keys.md)).
 
-Without a private key, `build_issuer` generates a process-local key.
-Tokens from `IssueToken` then become invalid when the process restarts. The
-server always trusts its own issuer, whatever the mode. See
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `[identity.keys] backend` | `local` | `local` (`master_key_hex` or `master_key_file`, 64 hex characters; random per process without either), `vault` (`address`, `key`, `mount` = `transit`, `token` or `token_file` or `VAULT_TOKEN`), `aws-kms` (`key_id`, `region`, `endpoint`; `aws` builds), `gcp-kms` (`key_name`, `endpoint`; `gcp` builds) |
+| `[identity.lifetimes]` | `human_secs = 3600`, `agent_secs = 900`, `service_secs = 43200` | longest token per principal kind |
+| `[identity.rotation]` | `rotate_after_days = 30`, `activation_delay_secs = 60`, `grace_secs = 300` | key rotation |
+| `identity.admins` | none | principal names that administer the instance |
+
+Servers sharing a store must share the key service, or each mints its own
+key. `[[auth.tokens]]` (`token`, `principal_name`, `kind` = `Human`,
+`Agent` or `Service`, `teams`) are accepted only with `dev_mode`; a server
+refuses to start with them otherwise. The first token for a production
+instance comes from `rill api mint-token`. See
 [identity and auth](../05-policy/identity-and-auth.md).
 
 ## Environment variables
@@ -101,14 +108,18 @@ server always trusts its own issuer, whatever the mode. See
 | `RILL_S3_PREFIX`, `RILL_S3_META_DIR` | details for `s3:` |
 | `RILL_S3_ALLOW_UNCONDITIONAL_PUT` | boolean; start even when the service ignores conditional puts (see [storage](../02-data/storage-and-keyspace.md#object-backends)) |
 | `RILL_FDB_CLUSTER_FILE`, `RILL_FDB_ROOT` | metadata in FoundationDB; an empty cluster file means the platform default |
-| `RILL_STATIC_TOKENS` | `token=name[:kind[:team,team]];...`; replaces auth with that static list |
-| `RILL_ROOT_PUBLIC_KEY`, `RILL_ROOT_PRIVATE_KEY` | hex keys; switch auth to `biscuit` |
+| `RILL_STATIC_TOKENS` | `token=name[:kind[:team,team]];...`; replaces the static list (dev mode only) |
+| `RILL_MASTER_KEY`, `RILL_MASTER_KEY_FILE` | local key service with that master key |
+| `RILL_VAULT_ADDR`, `RILL_VAULT_KEY`, `RILL_VAULT_MOUNT`, `RILL_VAULT_TOKEN_FILE` | Vault Transit key service (token from `VAULT_TOKEN` otherwise) |
+| `RILL_AWS_KMS_KEY`, `RILL_AWS_KMS_ENDPOINT` | AWS KMS key service (`AWS_REGION` and the default credential chain) |
+| `RILL_GCP_KMS_KEY` | Google Cloud KMS key service (application default credentials) |
+| `RILL_ADMINS` | comma-separated instance administrators |
 | `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED` | booleans |
 | `RILL_POSTLAND_INTERVAL_SECS` | integer seconds |
 | `RUST_LOG` | `tracing` filter for the binary (default `info`, logs to stderr) |
 
-If both `RILL_STATIC_TOKENS` and `RILL_ROOT_PUBLIC_KEY` are set, Biscuit
-wins because it is applied second. Clients use their own variables
+When several key-service variables are set, the last in the order above
+wins. Clients use their own variables
 (`RILL_ENDPOINT`, `RILL_TOKEN`); see [SDK](../08-clients/sdk.md).
 
 ## Dev mode
@@ -116,7 +127,9 @@ wins because it is applied second. Clients use their own variables
 `rill dev` runs with `dev_mode = true`, every role, storage in
 `~/.rill/dev` (`--data DIR`, or `--memory`), and listens on
 `127.0.0.1:7470` (`DEV_GRPC_PORT`) and `127.0.0.1:7471` (`DEV_HTTP_PORT`);
-it reads no configuration file. The server logs a warning at
+it reads no configuration file. Its token keys are wrapped with a master
+key it writes to `master.key` in the data directory on first start (mode
+0600), so keys survive restarts; `--memory` uses a per-process key. The server logs a warning at
 startup. In dev mode:
 
 * a request without a bearer token acts as the human principal `dev`;

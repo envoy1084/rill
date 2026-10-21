@@ -71,6 +71,9 @@ idempotent!(
     AbandonRequest,
     RequestLandRequest,
     AppendTrunkRequest,
+    RevokeTokenRequest,
+    RevokeSessionRequest,
+    RotateTokenKeysRequest,
 );
 
 /// The idempotency key of the request being handled, for work that

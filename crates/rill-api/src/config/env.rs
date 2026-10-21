@@ -23,9 +23,11 @@ impl ServerConfig {
     /// * `RILL_FDB_CLUSTER_FILE` (empty for the default), `RILL_FDB_ROOT`:
     ///   keep metadata in FoundationDB;
     /// * `RILL_STATIC_TOKENS`: `token=name[:kind[:team,team]];...` entries
-    ///   that replace the configured static token list;
-    /// * `RILL_ROOT_PUBLIC_KEY`, `RILL_ROOT_PRIVATE_KEY`: hex keys that
-    ///   switch authentication to Biscuit;
+    ///   that replace the configured static token list (dev mode only);
+    /// * `RILL_MASTER_KEY`, `RILL_MASTER_KEY_FILE`, `RILL_VAULT_ADDR` with
+    ///   `RILL_VAULT_KEY`, `RILL_AWS_KMS_KEY`, `RILL_GCP_KMS_KEY`: the key
+    ///   service that wraps token keys;
+    /// * `RILL_ADMINS`: comma-separated instance administrator names;
     /// * `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED`: `true`/`false`;
     /// * `RILL_POSTLAND_INTERVAL_SECS`.
     pub fn apply_env(&mut self, lookup: impl Fn(&str) -> Option<String>) -> Result<()> {
@@ -94,15 +96,18 @@ impl ServerConfig {
             };
         }
         if let Some(v) = lookup("RILL_STATIC_TOKENS") {
-            self.auth = AuthConfig::Static {
+            self.auth = AuthConfig {
                 tokens: parse_static_tokens(&v)?,
             };
         }
-        if let Some(public) = lookup("RILL_ROOT_PUBLIC_KEY") {
-            self.auth = AuthConfig::Biscuit {
-                root_public_key_hex: public,
-                root_private_key_hex: lookup("RILL_ROOT_PRIVATE_KEY"),
-            };
+        self.apply_key_service_env(&lookup);
+        if let Some(v) = lookup("RILL_ADMINS") {
+            self.identity.admins = v
+                .split(',')
+                .map(str::trim)
+                .filter(|a| !a.is_empty())
+                .map(String::from)
+                .collect();
         }
         if let Some(v) = lookup("RILL_VERIFY_ENABLED") {
             self.verify.enabled = parse_bool("RILL_VERIFY_ENABLED", &v)?;
@@ -114,6 +119,45 @@ impl ServerConfig {
             self.postland.interval_secs = parse_env("RILL_POSTLAND_INTERVAL_SECS", &v)?;
         }
         Ok(())
+    }
+}
+
+impl ServerConfig {
+    /// The key service from `RILL_MASTER_KEY` / `RILL_MASTER_KEY_FILE`
+    /// (local), `RILL_VAULT_ADDR` + `RILL_VAULT_KEY`, `RILL_AWS_KMS_KEY`
+    /// (+ `RILL_AWS_KMS_ENDPOINT`, `AWS_REGION`) or `RILL_GCP_KMS_KEY`.
+    fn apply_key_service_env(&mut self, lookup: &impl Fn(&str) -> Option<String>) {
+        use rill_identity::keys::KeyServiceConfig;
+        let master_hex = lookup("RILL_MASTER_KEY");
+        let master_file = lookup("RILL_MASTER_KEY_FILE").map(PathBuf::from);
+        if master_hex.is_some() || master_file.is_some() {
+            self.identity.keys = KeyServiceConfig::Local {
+                master_key_hex: master_hex,
+                master_key_file: master_file,
+            };
+        }
+        if let (Some(address), Some(key)) = (lookup("RILL_VAULT_ADDR"), lookup("RILL_VAULT_KEY")) {
+            self.identity.keys = KeyServiceConfig::Vault {
+                address,
+                key,
+                mount: lookup("RILL_VAULT_MOUNT").unwrap_or_else(|| "transit".into()),
+                token: None,
+                token_file: lookup("RILL_VAULT_TOKEN_FILE").map(PathBuf::from),
+            };
+        }
+        if let Some(key_id) = lookup("RILL_AWS_KMS_KEY") {
+            self.identity.keys = KeyServiceConfig::AwsKms {
+                key_id,
+                region: lookup("AWS_REGION"),
+                endpoint: lookup("RILL_AWS_KMS_ENDPOINT"),
+            };
+        }
+        if let Some(key_name) = lookup("RILL_GCP_KMS_KEY") {
+            self.identity.keys = KeyServiceConfig::GcpKms {
+                key_name,
+                endpoint: None,
+            };
+        }
     }
 }
 
@@ -198,9 +242,7 @@ mod tests {
                 dir: PathBuf::from("/tmp/x")
             }
         );
-        let AuthConfig::Static { tokens } = config.auth else {
-            panic!()
-        };
+        let tokens = config.auth.tokens;
         assert_eq!(tokens.len(), 2);
         assert_eq!(tokens[0].kind, PrincipalKind::Agent);
         assert_eq!(tokens[0].teams, vec!["infra", "core"]);

@@ -7,6 +7,7 @@ mod commits;
 mod end_to_end;
 mod events;
 mod history;
+mod identity;
 mod orgs;
 mod replicas;
 mod retries;
@@ -19,14 +20,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
-use rill_api::config::{AuthConfig, StaticToken};
 use rill_api::{build_state, serve_with_state, AppState, Listeners, ServerConfig};
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
 use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
 use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
 use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
-use rill_types::{ObjectHash, ObjectKind, PrincipalKind};
+use rill_types::{ObjectHash, ObjectKind};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio_util::sync::CancellationToken;
@@ -41,7 +41,7 @@ struct TestServer {
     grpc: String,
     http: std::net::SocketAddr,
     shutdown: CancellationToken,
-    _state: Arc<AppState>,
+    state: Arc<AppState>,
     task: tokio::task::JoinHandle<rill_api::Result<()>>,
 }
 
@@ -55,7 +55,9 @@ impl TestServer {
     /// A server over `stores`, which other test servers may share.
     async fn start_on(config: ServerConfig, stores: rill_store::Stores) -> Self {
         let shutdown = CancellationToken::new();
-        let state = AppState::with_stores(config, stores, shutdown.clone()).unwrap();
+        let state = AppState::with_stores(config, stores, shutdown.clone())
+            .await
+            .unwrap();
         state.repos.warm().await.unwrap();
         Self::serve(state, shutdown).await
     }
@@ -73,9 +75,17 @@ impl TestServer {
             grpc: format!("http://{grpc_addr}"),
             http,
             shutdown,
-            _state: state,
+            state,
             task,
         }
+    }
+
+    /// A token the server signed for `principal`, as a sign-in would issue.
+    fn token_for(&self, principal: &rill_types::Principal) -> String {
+        let issuer = self.state.identity.issuer().unwrap();
+        let ttl = issuer.lifetimes().max_for(principal.kind);
+        let claims = rill_policy::TokenClaims::new("default", rill_types::Timestamp::now(), ttl);
+        issuer.issue(principal, &claims, None).unwrap()
     }
 
     async fn stop(self) {

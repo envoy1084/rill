@@ -14,18 +14,13 @@ kind = "fdb"
 cluster_file = "/etc/foundationdb/fdb.cluster"
 root = "rill-staging"
 
-[auth]
-kind = "static"
+# Token keys are wrapped with the master key in RILL_MASTER_KEY (set in
+# docker-compose.yml). Tokens come from `rill api mint-token`; see README.
+[identity]
+admins = ["staging-admin"]
 
-[[auth.tokens]]
-token = "staging-admin"
-principal_name = "staging-admin"
-kind = "Human"
-
-[[auth.tokens]]
-token = "staging-agent"
-principal_name = "load-agent"
-kind = "Agent"
+[identity.keys]
+backend = "local"
 
 [shutdown]
 drain_secs = 2

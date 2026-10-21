@@ -21,10 +21,11 @@ flowchart TD
 ```
 
 There is one `AppState` per process. It holds the `Stores` opened from
-`StorageConfig`, the `Arc<ServerConfig>`, the composite `Authenticator`, the
-Biscuit `Issuer`, the `RepoRegistry`, the root `CancellationToken` and
-`started_at`. `AppState::with_stores` builds state over stores that are
-already open; tests use it. `build_state` opens the stores and then calls
+`StorageConfig`, the `Arc<ServerConfig>`, the dev-mode static token table,
+the `IdentityView` (token keys, issuer and revocations; opening it makes
+sure a signing key exists), the `RepoRegistry`, the root `CancellationToken`
+and `started_at`. `AppState::with_stores` (async) builds state over stores
+that are already open; tests use it. `build_state` opens the stores and then calls
 `RepoRegistry::warm`, which builds the context of every existing
 repository. Landers and job workers therefore run before the first request.
 
@@ -75,12 +76,15 @@ sequenceDiagram
 
 `AuthLayer` (`auth/layer.rs`) is a tower layer, not a tonic interceptor,
 because authentication may need the store and interceptors are synchronous.
-It wraps each of the six services; gRPC reflection and `tonic-health` are not
-wrapped. In `authenticate`, a request without a bearer token acts as the
+It wraps each of the seven services; gRPC reflection and `tonic-health` are
+not wrapped. In `authenticate`, a request without a bearer token acts as the
 human `dev` in dev mode and is `UNAUTHENTICATED` otherwise. A token must
-authenticate even in dev mode. The composite authenticator tries the static
-table, then each Biscuit root, and always trusts the server's own `Issuer`
-([identity and auth](../05-policy/identity-and-auth.md)).
+authenticate even in dev mode: a dev server's static table first, then the
+identity view, which verifies the signature against the key ring and
+refuses revoked tokens and sessions
+([identity and auth](../05-policy/identity-and-auth.md)). Every process
+also runs the identity follower; processes with the workers role run
+identity maintenance.
 
 Handlers stay thin. `services::common::open` pairs `auth::caller` with
 `repos.resolve`. Then `Permit` (`auth/permit.rs`) runs two layers before

@@ -14,6 +14,9 @@ path = "src/lib.rs"
 [features]
 # Let `rill api` keep metadata in FoundationDB.
 fdb = ["rill-api/fdb"]
+# AWS KMS and Google Cloud KMS as token key services.
+aws = ["rill-api/aws"]
+gcp = ["rill-api/gcp"]
 
 [[bin]]
 name = "rill"
@@ -28,6 +31,9 @@ rill-core = { workspace = true }
 rill-api = { workspace = true }
 rill-store = { workspace = true }
 rill-git-import = { workspace = true }
+rill-identity = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
 comfy-table = { workspace = true }

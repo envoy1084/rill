@@ -15,8 +15,11 @@ const HEADER: &str = r#"# rill api configuration.
 #   RILL_ROLES                           api | workers | api,workers
 #   RILL_STORAGE                         memory | local:<dir> | s3:<url>
 #   RILL_S3_PREFIX, RILL_S3_META_DIR     details for s3 storage
-#   RILL_STATIC_TOKENS                   token=name[:kind[:team,team]];...
-#   RILL_ROOT_PUBLIC_KEY, RILL_ROOT_PRIVATE_KEY   switch auth to biscuit
+#   RILL_STATIC_TOKENS                   token=name[:kind[:team,team]];... (dev mode)
+#   RILL_MASTER_KEY, RILL_MASTER_KEY_FILE         local key service
+#   RILL_VAULT_ADDR + RILL_VAULT_KEY (VAULT_TOKEN) Vault Transit
+#   RILL_AWS_KMS_KEY, RILL_GCP_KMS_KEY           cloud KMS (aws / gcp builds)
+#   RILL_ADMINS                          instance administrators, comma-separated
 #   RILL_VERIFY_ENABLED, RILL_POSTLAND_ENABLED, RILL_POSTLAND_INTERVAL_SECS
 #
 # Storage alternatives:
@@ -36,19 +39,31 @@ const HEADER: &str = r#"# rill api configuration.
 #   cluster_file = "/etc/foundationdb/fdb.cluster"   # optional
 #   root = "rill"                                     # subspace name
 #
-# Authentication alternatives:
-#   [auth]
-#   kind = "static"
+# Every token is signed by the instance's P-256 keys, which the key
+# service wraps and the metadata store keeps. Key service alternatives:
+#   [identity.keys]
+#   backend = "local"
+#   master_key_file = "/etc/rill/master.key"   # 64 hex characters
+#
+#   [identity.keys]
+#   backend = "vault"
+#   address = "https://vault:8200"
+#   key = "rill"                 # a Transit key; token from VAULT_TOKEN
+#
+#   [identity.keys]
+#   backend = "aws-kms"          # or gcp-kms with key_name = "projects/..."
+#   key_id = "arn:aws:kms:..."
+#
+# The first administrator signs in with a token from
+#   rill api mint-token human:<name> --config rill.toml
+# and is listed in identity.admins.
+#
+# Static tokens are accepted in dev mode only:
 #   [[auth.tokens]]
 #   token = "change-me"
 #   principal_name = "alice"
-#   kind = "human"            # human | agent | service
+#   kind = "Human"            # Human | Agent | Service
 #   teams = ["core"]
-#
-#   [auth]
-#   kind = "biscuit"
-#   root_public_key_hex = "..."
-#   root_private_key_hex = "..."   # optional; lets this server issue tokens
 #
 # dev_mode = true disables authentication and authorization entirely.
 # Only ever use it on a loopback address.

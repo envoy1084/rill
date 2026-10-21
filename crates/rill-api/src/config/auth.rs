@@ -1,4 +1,4 @@
-//! How bearer tokens are authenticated.
+//! Static bearer tokens, for development servers only.
 
 use rill_types::PrincipalKind;
 use serde::{Deserialize, Serialize};
@@ -22,33 +22,11 @@ fn default_kind() -> PrincipalKind {
     PrincipalKind::Human
 }
 
-/// Authentication configuration.
-///
-/// Both variants also accept Biscuit capability tokens minted by this
-/// server's own issuer (see `IssueToken`), so agents can be handed narrow
-/// tokens regardless of how humans sign in.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum AuthConfig {
-    /// A fixed list of tokens.
-    Static {
-        /// The tokens.
-        #[serde(default)]
-        tokens: Vec<StaticToken>,
-    },
-    /// Biscuit tokens signed by a root key.
-    Biscuit {
-        /// Hex-encoded compressed P-256 public key that verifies tokens.
-        root_public_key_hex: String,
-        /// Hex-encoded private key, when this server also issues tokens.
-        /// Without it, `IssueToken` uses a key generated at startup.
-        #[serde(default)]
-        root_private_key_hex: Option<String>,
-    },
-}
-
-impl Default for AuthConfig {
-    fn default() -> Self {
-        AuthConfig::Static { tokens: Vec::new() }
-    }
+/// Static tokens. They let tools act as named principals on a dev-mode
+/// server; outside dev mode the server refuses to start with any, and
+/// every caller presents a token the instance signed.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AuthConfig {
+    pub tokens: Vec<StaticToken>,
 }

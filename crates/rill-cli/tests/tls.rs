@@ -79,6 +79,7 @@ async fn serve(tls: TlsConfig) -> Server {
         rill_store::Stores::memory(),
         CancellationToken::new(),
     )
+    .await
     .unwrap();
     let listeners = Listeners::bind(
         "127.0.0.1:0".parse().unwrap(),

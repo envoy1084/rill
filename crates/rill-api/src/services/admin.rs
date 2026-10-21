@@ -163,11 +163,19 @@ impl AdminService for AdminSvc {
                 }
                 None => (Vec::new(), None),
             };
+            let claims = ctx.claims.as_ref();
+            let token_expires_at =
+                token_expires_at.or_else(|| claims.map(|c| timestamp_to_proto(c.expires_at)));
             Ok(Response::new(pb::WhoAmIResponse {
                 principal: Some(pb::Principal::from(&ctx.principal)),
                 teams: ctx.teams.clone(),
                 capabilities,
                 token_expires_at,
+                token_id: claims.map(|c| c.token_id.to_string()),
+                session: claims.and_then(|c| c.session).map(|s| s.to_string()),
+                org: claims.map(|c| c.org.clone()),
+                sponsor: claims.and_then(|c| c.sponsor.clone()),
+                model: claims.and_then(|c| c.model.clone()),
             }))
         }
         .await;
@@ -217,7 +225,8 @@ impl AdminService for AdminSvc {
                 None => ctx.principal.clone(),
             };
             let now = Timestamp::now();
-            let longest = self.state.issuer.lifetimes().max_for(principal.kind);
+            let issuer = self.state.identity.issuer()?;
+            let longest = issuer.lifetimes().max_for(principal.kind);
             let expires_at = req
                 .expires_at
                 .map(Timestamp::from_millis)
@@ -236,7 +245,7 @@ impl AdminService for AdminSvc {
                 .as_ref()
                 .map_or(rill_store::repo::DEFAULT_ORG, |c| c.org.as_str());
             let claims = rill_policy::TokenClaims::new(org, now, expires_at.millis() - now.millis());
-            let token = self.state.issuer.issue(&principal, &claims, Some(&capability))?;
+            let token = issuer.issue(&principal, &claims, Some(&capability))?;
             tracing::info!(by = %ctx.principal, for_principal = %principal, repo = %repo.config.name, "token issued");
             Ok(Response::new(pb::IssueTokenResponse {
                 token,

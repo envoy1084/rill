@@ -4,7 +4,8 @@
 #
 #   docker build -t rill:dev ../..
 #   docker compose up -d
-#   export RILL_ENDPOINT=http://localhost:7470 RILL_TOKEN=staging-admin
+#   export RILL_ENDPOINT=http://localhost:7470
+#   export RILL_TOKEN=$(docker compose exec rill1 rill api --config /etc/rill/rill.toml mint-token service:staging-admin)
 #
 # gRPC on :7470 and the object protocol on :7471 (both through nginx),
 # Grafana on :3000 (admin/admin), Prometheus on :9090, S3 on :8333.
@@ -19,6 +20,9 @@ x-rill: &rill
     AWS_ACCESS_KEY_ID: rill
     AWS_SECRET_ACCESS_KEY: rill-staging-secret
     RILL_LOG_FORMAT: json
+    # Staging only: production keeps the master key in a secret store or
+    # uses a KMS.
+    RILL_MASTER_KEY: 5a1e57a9e6000000000000000000000000000000000000000000000000000001
   volumes:
     - ./rill.toml:/etc/rill/rill.toml:ro
     - ./fdb.cluster:/etc/foundationdb/fdb.cluster:ro

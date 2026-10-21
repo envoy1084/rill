@@ -3,28 +3,10 @@
 use super::*;
 
 #[tokio::test]
-async fn static_auth_denies_unrelated_principal() {
-    let auth = AuthConfig::Static {
-        tokens: vec![
-            StaticToken {
-                token: "alice-token".into(),
-                principal_name: "alice".into(),
-                kind: PrincipalKind::Human,
-                teams: vec![],
-            },
-            StaticToken {
-                token: "mallory-token".into(),
-                principal_name: "mallory".into(),
-                kind: PrincipalKind::Agent,
-                teams: vec![],
-            },
-        ],
-    };
-    let config = ServerConfig {
-        auth,
-        ..ServerConfig::default()
-    };
-    let server = TestServer::start(config).await;
+async fn issued_tokens_are_bound_by_relations() {
+    let server = TestServer::start(ServerConfig::default()).await;
+    let alice_token = server.token_for(&rill_types::Principal::human("alice"));
+    let mallory_token = server.token_for(&rill_types::Principal::agent("mallory"));
 
     // No token at all: unauthenticated.
     let mut anon = clients(&server, None).await;
@@ -38,7 +20,7 @@ async fn static_auth_denies_unrelated_principal() {
         .unwrap_err();
     assert_eq!(err.code(), Code::Unauthenticated);
 
-    let mut alice = clients(&server, Some("alice-token")).await;
+    let mut alice = clients(&server, Some(&alice_token)).await;
     alice
         .repo
         .create_repo(pb::CreateRepoRequest {
@@ -62,7 +44,7 @@ async fn static_auth_denies_unrelated_principal() {
     assert_eq!(relations.len(), 1);
     assert_eq!(relations[0].relation, "owner");
 
-    let mut mallory = clients(&server, Some("mallory-token")).await;
+    let mut mallory = clients(&server, Some(&mallory_token)).await;
     let err = mallory
         .repo
         .list_dir(pb::ListDirRequest {

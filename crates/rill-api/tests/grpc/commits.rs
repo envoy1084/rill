@@ -141,7 +141,7 @@ async fn server_stamps_authorship_and_attests_commits() {
     assert!(rill_policy::verify_signature(&attestation, &hash));
 
     // Everything landing reads was derived before the reply.
-    let stores = &server._state.stores;
+    let stores = &server.state.stores;
     let repo = stores.repo(stores.get_repo_by_name("auth").await.unwrap().unwrap().id);
     for kind in rill_core::derive::scheduled(rill_core::Schedule::LandCritical) {
         assert!(

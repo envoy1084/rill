@@ -1,0 +1,191 @@
+//! The in-memory identity view every request is authenticated against.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use arc_swap::ArcSwap;
+use parking_lot::{Mutex, RwLock};
+use rill_identity::keys::{key_service, KeyManager, KeySet};
+use rill_policy::{Issuer, TokenLifetimes, Verified, Verifier};
+use rill_store::identity::IdentityStore;
+use rill_store::Stores;
+use rill_types::identity::IdentityChange;
+use rill_types::{Principal, SessionId, Timestamp, TokenId};
+
+use crate::config::IdentityConfig;
+use crate::error::{Error, Result};
+
+/// The fewest seconds between reloads forced by a token naming a key this
+/// server does not know.
+const UNKNOWN_KEY_RELOAD: Duration = Duration::from_secs(1);
+
+/// The principal maintenance and key creation act as.
+pub fn system_actor() -> Principal {
+    Principal::service("rill")
+}
+
+/// Keys and revocations as this server last read them.
+pub struct IdentityView {
+    store: IdentityStore,
+    keys: KeyManager,
+    lifetimes: TokenLifetimes,
+    set: ArcSwap<KeySet>,
+    revoked_tokens: RwLock<HashMap<TokenId, Timestamp>>,
+    revoked_sessions: RwLock<HashMap<SessionId, Timestamp>>,
+    last_forced_reload: Mutex<Option<Instant>>,
+    admins: Vec<String>,
+}
+
+impl IdentityView {
+    /// Open the view: make sure a signing key exists, then load keys and
+    /// revocations.
+    pub async fn open(stores: &Stores, config: &IdentityConfig) -> Result<Arc<Self>> {
+        let wrapper = key_service(&config.keys).await?;
+        let lifetimes = config.lifetimes.lifetimes();
+        let keys = KeyManager::new(
+            stores.identity(),
+            wrapper,
+            config.rotation.policy(),
+            lifetimes,
+        );
+        keys.ensure_key(Timestamp::now(), &system_actor()).await?;
+        let set = keys.load(Timestamp::now()).await?;
+        let view = Arc::new(IdentityView {
+            store: stores.identity(),
+            keys,
+            lifetimes,
+            set: ArcSwap::from_pointee(set),
+            revoked_tokens: RwLock::new(HashMap::new()),
+            revoked_sessions: RwLock::new(HashMap::new()),
+            last_forced_reload: Mutex::new(None),
+            admins: config.admins.clone(),
+        });
+        view.reload_revocations().await?;
+        Ok(view)
+    }
+
+    pub fn store(&self) -> &IdentityStore {
+        &self.store
+    }
+
+    pub fn keys(&self) -> &KeyManager {
+        &self.keys
+    }
+
+    pub fn lifetimes(&self) -> TokenLifetimes {
+        self.lifetimes
+    }
+
+    /// When a stored key next activates, if one is pending.
+    pub fn next_activation(&self) -> Option<Timestamp> {
+        self.set.load().next_activation
+    }
+
+    /// The issuer new tokens are signed with.
+    pub fn issuer(&self) -> Result<Arc<Issuer>> {
+        self.set
+            .load()
+            .issuer
+            .clone()
+            .ok_or_else(|| Error::Unavailable("no token signing key is active".into()))
+    }
+
+    /// Whether `principal` administers the instance by configuration.
+    pub fn is_configured_admin(&self, principal: &Principal) -> bool {
+        self.admins.contains(&principal.name)
+    }
+
+    /// Reread the keys.
+    pub async fn reload_keys(&self) -> Result<()> {
+        let set = self.keys.load(Timestamp::now()).await?;
+        self.set.store(Arc::new(set));
+        Ok(())
+    }
+
+    /// Reread every revocation still in force.
+    pub async fn reload_revocations(&self) -> Result<()> {
+        let now = Timestamp::now();
+        let tokens = self.store.revocations(now).await?;
+        let sessions = self.store.revoked_sessions(now).await?;
+        *self.revoked_tokens.write() = tokens
+            .into_iter()
+            .map(|r| (r.token_id, r.expires_at))
+            .collect();
+        *self.revoked_sessions.write() =
+            sessions.into_iter().map(|s| (s.id, s.expires_at)).collect();
+        Ok(())
+    }
+
+    /// Reread everything.
+    pub async fn reload(&self) -> Result<()> {
+        self.reload_keys().await?;
+        self.reload_revocations().await
+    }
+
+    /// Apply one log entry. Returns whether the keys must be reread.
+    pub fn apply(&self, change: &IdentityChange) -> bool {
+        match change {
+            IdentityChange::KeysChanged => true,
+            IdentityChange::TokenRevoked {
+                token_id,
+                expires_at,
+            } => {
+                self.revoked_tokens.write().insert(*token_id, *expires_at);
+                false
+            }
+            IdentityChange::SessionRevoked { session } => {
+                // The exact end comes with the next full reload; until then
+                // the session stays refused.
+                self.revoked_sessions
+                    .write()
+                    .insert(*session, Timestamp::from_millis(i64::MAX));
+                false
+            }
+        }
+    }
+
+    /// Verify `token` and refuse it when it, or its session, is revoked.
+    pub async fn verify(&self, token: &str) -> Result<Verified> {
+        let now = Timestamp::now();
+        let verified = match self.check_signature(token, now) {
+            Err(rill_policy::Error::Token(msg)) if msg.contains("unknown signing key") => {
+                if self.may_force_reload() {
+                    self.reload_keys().await?;
+                }
+                self.check_signature(token, now)
+            }
+            other => other,
+        }
+        .map_err(|e| match e {
+            rill_policy::Error::TokenExpired { .. } => Error::Policy(e),
+            other => Error::Unauthenticated(other.to_string()),
+        })?;
+        if self
+            .revoked_tokens
+            .read()
+            .contains_key(&verified.claims.token_id)
+        {
+            return Err(Error::Unauthenticated("token revoked".into()));
+        }
+        if let Some(session) = verified.claims.session {
+            if self.revoked_sessions.read().contains_key(&session) {
+                return Err(Error::Unauthenticated("session revoked".into()));
+            }
+        }
+        Ok(verified)
+    }
+
+    fn check_signature(&self, token: &str, now: Timestamp) -> rill_policy::Result<Verified> {
+        Verifier::new(self.set.load().ring.clone()).authenticate(token, now)
+    }
+
+    fn may_force_reload(&self) -> bool {
+        let mut last = self.last_forced_reload.lock();
+        let due = last.is_none_or(|t| t.elapsed() >= UNKNOWN_KEY_RELOAD);
+        if due {
+            *last = Some(Instant::now());
+        }
+        due
+    }
+}

@@ -55,7 +55,7 @@ flowchart LR
 | T7 | Writer edits paths they cannot write | `CreateChangeVersion` checks `file_changes` only; a version made only of `subtree_changes` gets no path check | All write checks inside the commit transaction | 11 |
 | T8 | Spoofed authorship | Fixed: the server stamps `author` and `created_at`, drops client `sponsor` and `resolved_by`, and signs an attestation for every version it stores | — | — |
 | T9 | Impersonation through token issuance | A repository owner can issue a token for any principal name | Issuance bound to the caller; agent registry with sponsors | 10 |
-| T10 | Leaked token stays valid | No revocation; no maximum TTL; ephemeral issuer key by default | Revocation list, max TTLs, KMS-backed keys | 10 |
+| T10 | Leaked token stays valid | Fixed: tokens and sessions are revoked through the identity log and refused by every server within seconds; lifetimes are capped per principal kind (1 h human, 15 min agent, 12 h service); signing keys are wrapped by a key service and rotate | — | 10 (done) |
 | T11 | Agent approves its own swarm's work | Votes from any agent count toward agent quorums | Independence rules (session, sponsor, model) in policy facts | 23 |
 | T12 | Compromised model or session lands bad code at scale | No way to find or revert by provenance | Kill switch and blast-radius revert by provenance | 10, 18 |
 | T13 | Memory exhaustion by one request | Partly fixed: `PutBlob` streams in bounded memory with a 5 GiB cap, chunked reads check manifest sizes, change versions are capped at 8 MiB and 100k paths. Other RPCs have no message-size limits | Input limits on every RPC | 12 |

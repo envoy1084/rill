@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use rill_proto::rill::v1::admin_service_server::AdminServiceServer;
+use rill_proto::rill::v1::identity_service_server::IdentityServiceServer;
 use rill_proto::rill::v1::intent_service_server::IntentServiceServer;
 use rill_proto::rill::v1::lander_service_server::LanderServiceServer;
 use rill_proto::rill::v1::repo_service_server::RepoServiceServer;
@@ -18,7 +19,9 @@ use tower::Layer;
 use crate::auth::{AuthLayer, AuthService};
 use crate::error::{Error, Result};
 use crate::objects;
-use crate::services::{AdminSvc, IntentSvc, LanderSvc, RepoSvc, ReviewSvc, WorkspaceSvc};
+use crate::services::{
+    AdminSvc, IdentitySvc, IntentSvc, LanderSvc, RepoSvc, ReviewSvc, WorkspaceSvc,
+};
 use crate::state::AppState;
 
 // Tonic routes by service name, which the auth wrapper must forward.
@@ -65,7 +68,15 @@ pub async fn serve_with_state(
         state.clone(),
         shutdown.clone(),
     ));
+    tokio::spawn(crate::identity::follow(
+        state.identity.clone(),
+        shutdown.clone(),
+    ));
     if roles.workers {
+        tokio::spawn(crate::identity::maintain_forever(
+            state.identity.clone(),
+            shutdown.clone(),
+        ));
         tokio::spawn(crate::workers::sweep_idempotency(
             state.stores.clone(),
             shutdown.clone(),
@@ -132,6 +143,7 @@ async fn serve_grpc(
         .add_service(auth.layer(ReviewServiceServer::new(ReviewSvc::new(state.clone()))))
         .add_service(auth.layer(IntentServiceServer::new(IntentSvc::new(state.clone()))))
         .add_service(auth.layer(LanderServiceServer::new(LanderSvc::new(state.clone()))))
+        .add_service(auth.layer(IdentityServiceServer::new(IdentitySvc::new(state.clone()))))
         .add_service(auth.layer(AdminServiceServer::new(AdminSvc::new(state))))
         .serve_with_incoming_shutdown(grpc_incoming(listener), shutdown.cancelled_owned())
         .await
@@ -196,6 +208,7 @@ async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bo
         <IntentServiceServer<IntentSvc> as tonic::server::NamedService>::NAME,
         <LanderServiceServer<LanderSvc> as tonic::server::NamedService>::NAME,
         <AdminServiceServer<AdminSvc> as tonic::server::NamedService>::NAME,
+        <IdentityServiceServer<IdentitySvc> as tonic::server::NamedService>::NAME,
     ] {
         reporter.set_service_status(name, status).await;
     }
