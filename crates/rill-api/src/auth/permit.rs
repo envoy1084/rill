@@ -140,6 +140,15 @@ impl<'a> Permit<'a> {
                 .allowed_paths_for(&self.ctx.principal, &self.ctx.teams, Relation::Reader)
                 .await
         };
+        let relations = match self.ctx.capability.clone() {
+            None => relations,
+            Some(cap) => {
+                if cap.repo != self.repo.id() || !cap.allows(Verb::Read) {
+                    return Ok(PathFilter::deny_all());
+                }
+                PathFilter::new(move |p| cap.covers_path(p) && relations.allows(p))
+            }
+        };
         Ok(match self.ctx.scope.clone() {
             None => relations,
             Some(scope) => {

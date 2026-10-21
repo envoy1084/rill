@@ -1,6 +1,7 @@
 //! End-to-end tests: an in-process server on ephemeral ports driven
 //! through the generated tonic clients and a raw HTTP client.
 
+mod access;
 mod agents;
 mod auth;
 mod cluster;
@@ -94,6 +95,18 @@ impl TestServer {
         let ttl = issuer.lifetimes().max_for(principal.kind);
         let claims = rill_policy::TokenClaims::new("default", rill_types::Timestamp::now(), ttl);
         issuer.issue(principal, &claims, None).unwrap()
+    }
+
+    /// A token for `principal` narrowed to `capability`.
+    fn token_with(
+        &self,
+        principal: &rill_types::Principal,
+        capability: &rill_policy::Capability,
+    ) -> String {
+        let issuer = self.state.identity.issuer().unwrap();
+        let ttl = issuer.lifetimes().max_for(principal.kind);
+        let claims = rill_policy::TokenClaims::new("default", rill_types::Timestamp::now(), ttl);
+        issuer.issue(principal, &claims, Some(capability)).unwrap()
     }
 
     async fn stop(self) {

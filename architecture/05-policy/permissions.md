@@ -79,7 +79,9 @@ There are no multi-tuple transactions.
 predicate built once per request. `under(roots)` allows paths at or below any
 root. A root entry means allow all; an empty list means deny all.
 `Permit::read_filter()` returns `allow_all` under dev mode or bootstrap, and
-otherwise the caller's `Reader` directories. Listings and searches use it so
+otherwise the caller's `Reader` directories, narrowed by the token's paths
+(a token for another repository, or without `read`, denies all) and the
+agent's registered scope. Listings and searches use it so
 that names of unreadable directories do not leak: `ListDir` and `Diff`
 (`services/repo/trees.rs`), `WorkspaceDiff`, and `Grep`. Point reads such as
 file content, history and blame call `permit().read(path)` instead.
@@ -92,7 +94,7 @@ a verb, a relation and a path:
 | Method | Verb | Relation | Typical callers |
 | --- | --- | --- | --- |
 | `read(path)` | `Read` | `Reader` | every read RPC, `ListRelations`, `GetPolicy`, `EvaluateSubmit`, object `GET`/`HEAD` |
-| `write(path)` | `Write` | `Writer` | `CreateChangeVersion` per file path, `ApplyEdits`, workspace snapshot per entry |
+| `write(path)` | `Write` | `Writer` | `CreateChangeVersion` per file and subtree path (copy sources need `read`), `ApplyEdits`, workspace snapshot per entry |
 | `write(root)` | `Write` | `Writer` | `Rebase`, `Merge`, workspace and intent changes, `SubmitForReview`, `SetStack`, `Abandon`, object `PUT` |
 | `review()` | `Review` | `Reviewer` | `Vote`, `Comment`, thread reply and resolve |
 | `land()` | `Land` | `Writer` | `RequestLand`, `ReportVerification`, `RevertSeq`, `Bisect` |
@@ -128,8 +130,6 @@ repository inside the object string. The object is `repo:<name>` or
   index by subject.
 * `ListRelations` on `path:<repo>/<dir>` scans the `dir:/<dir>/` prefix, so it
   also returns mis-split rows for nested directories.
-* `CreateChangeVersion` checks only `file_changes` paths. A version whose
-  changes are all in `subtree_changes` gets no write check.
 
 ## Code
 
