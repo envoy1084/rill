@@ -14,6 +14,7 @@ pub mod import;
 pub mod intent;
 pub mod land;
 pub mod org;
+pub mod protection;
 pub mod refs;
 pub mod repo;
 pub mod review;

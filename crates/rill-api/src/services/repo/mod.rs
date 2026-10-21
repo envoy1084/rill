@@ -7,6 +7,7 @@ mod commit;
 mod grep;
 mod history;
 mod refs;
+pub(crate) mod secrets;
 mod stamp;
 mod trees;
 pub(crate) mod visible;

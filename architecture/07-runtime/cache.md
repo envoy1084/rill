@@ -82,6 +82,7 @@ rill cache --origin https://rill.internal:7421 --dir /var/cache/rill \
 | `--dir` | `RILL_CACHE_DIR` | required |
 | `--max-bytes` | `RILL_CACHE_MAX_BYTES` | `10G` (`K`, `M`, `G`, `T` are powers of 1024) |
 | `--listen` | `RILL_CACHE_LISTEN` | `0.0.0.0:7422` |
+| `--redaction-poll` | `RILL_CACHE_REDACTION_POLL` | `10` (seconds) |
 
 ## Limitations
 
@@ -91,6 +92,9 @@ rill cache --origin https://rill.internal:7421 --dir /var/cache/rill \
 * The SDK reads through gRPC (`GetBlob`) and does not use a cache yet.
 * Revocation does not reach the cache: a grant stays usable until it
   expires.
+* Redactions reach it by polling the origin's `GET /redactions` every
+  `--redaction-poll` (10 s): newly redacted hashes are dropped from disk and
+  refused with 451, so one is served for at most one poll interval.
 
 ## Code
 

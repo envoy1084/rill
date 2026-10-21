@@ -60,7 +60,7 @@ flowchart LR
 | T12 | Compromised model or session lands bad code at scale | Partly fixed: the kill switch stops an agent, session, sponsor or model at once and the lander ejects its queued work; provenance (session, sponsor, model) is stamped from the token. No blast-radius revert yet | Blast-radius revert by provenance | 10 (done), 18 |
 | T13 | Memory exhaustion by one request | Partly fixed: `PutBlob` streams in bounded memory with a 5 GiB cap, chunked reads check manifest sizes, change versions are capped at 8 MiB and 100k paths. Other RPCs have no message-size limits | Input limits on every RPC | 12 |
 | T14 | Repository open to everyone | Fixed: a repository with no relation tuples is closed to all but org administrators, who can recover one whose last owner left | — | 11 (done) |
-| T15 | Secret committed to history | Nothing detects it; nothing can remove it | Secret scanning on ingest; audited redaction | 12 |
+| T15 | Secret committed to history | Fixed: every stored version is scanned (block by default, warn or quarantine per repository), and redaction approved by two administrators stops every tier serving an object ([data protection](data-protection.md)) | — | 12 (done) |
 | T16 | Silent tampering by an admin | Fixed: a hash-chained audit log per org built from the logs every change writes, sealed with signed roots and verifiable offline (`rill admin audit verify`); anchoring outside Rill is the operator's (S3 object lock) | — | 12 (done) |
 | T17 | Backdoored release | No release pipeline | Reproducible builds, SBOM, signed releases | 30 |
 | T18 | Stale snapshot overwrites concurrent landings | Fixed: checkouts snapshot against the pinned `base_version` | Workspace-authoritative clients | — |
@@ -87,4 +87,4 @@ flowchart LR
 - [rill-sdk/src/local/](../../crates/rill-sdk/src/local/mod.rs), [rill-policy/src/tokens/](../../crates/rill-policy/src/tokens/mod.rs)
 
 ---
-← Previous: [Audit log](audit.md) · [Index](../index.md) · Next: [Search](../06-services/search.md) →
+← Previous: [Data protection](data-protection.md) · [Index](../index.md) · Next: [Search](../06-services/search.md) →

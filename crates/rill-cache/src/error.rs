@@ -7,6 +7,10 @@ pub enum Error {
     #[error("{0}")]
     Denied(String),
 
+    /// The object was redacted at the origin.
+    #[error("{0} was redacted")]
+    Redacted(String),
+
     /// The origin does not have the object.
     #[error("{0}")]
     NotFound(String),

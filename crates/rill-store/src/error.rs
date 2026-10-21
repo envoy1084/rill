@@ -20,6 +20,13 @@ pub enum Error {
         hash: rill_types::ObjectHash,
     },
 
+    /// The object was redacted: its content is never served again.
+    #[error("{kind} {hash} was redacted")]
+    Redacted {
+        kind: rill_types::ObjectKind,
+        hash: rill_types::ObjectHash,
+    },
+
     #[error("key not found: {0}")]
     KeyNotFound(String),
 

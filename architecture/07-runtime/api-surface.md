@@ -42,6 +42,8 @@ in, without it. It also registers `tonic-reflection` and
 | `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
 | `AccessService` | `access.proto` | `services/access/` | `AddRelation`, `RemoveRelation`, `ListRelations`, `Check`, `Expand`, `LookupPaths` ([permissions](../05-policy/permissions.md#accessservice)) |
 | `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser`, agents (`RegisterAgent`, `UpdateAgent`, `ListAgents`), workload issuers (`Put`/`List`/`DeleteWorkloadIssuer`), `KillSwitch`, SCIM credentials ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
+| `AuditService` | `audit.proto` | `services/audit.rs` | `ListAuditEntries`, `ListAuditRoots`, `SealAudit`, `ListAuditKeys`, `WatchAudit` ([audit log](../05-policy/audit.md)) |
+| `ProtectionService` | `protection.proto` | `services/protection.rs` | `RequestRedaction`, `ApproveRedaction`, `ListRedactions`, `ClearQuarantine` ([data protection](../05-policy/data-protection.md)) |
 | `SessionService` | `identity.proto` | `services/session.rs` | `ListSignInProviders`, `ExchangeToken`, `RefreshSession`; no auth layer ([sign-in](../05-policy/identity-and-auth.md#sign-in)) |
 
 `types.proto` holds the shared object model and `events.proto` the event
@@ -147,10 +149,11 @@ itself ([read grants](../05-policy/permissions.md#read-grants)).
 
 | Route | Permission | Behaviour |
 | --- | --- | --- |
-| `GET`/`HEAD /o/{repo}/{kind}/{hash}` | a read grant naming the object (`x-rill-grant` header or `?grant=`); a chunk is fetched with `?via=<manifest>` and a grant naming the manifest; `derived` needs read on root | raw bytes as `application/octet-stream`; 403 without a covering grant, 404 when absent |
+| `GET`/`HEAD /o/{repo}/{kind}/{hash}` | a read grant naming the object (`x-rill-grant` header or `?grant=`); a chunk is fetched with `?via=<manifest>` and a grant naming the manifest; `derived` needs read on root | raw bytes as `application/octet-stream`; 403 without a covering grant, 404 when absent, 451 when redacted |
 | `PUT /o/{repo}/{kind}/{hash}` | write on root | `rill_store::object::verify` checks the body hashes to `{hash}` (400 otherwise); 201 when new, 200 when it existed; body limit `MAX_PUT_BYTES` (256 MiB) |
 | `POST /o/{repo}/batch` | read on something, and a grant in `x-rill-grant` | JSON `[{"kind","hash","via"?}]`, at most `MAX_BATCH` (10 000), streamed back as `application/vnd.rill.objects`; objects the grant does not name come back missing |
 | `GET /public-keys` | none | the keys derived from each token key, as JSON `{"keys":[{"id","grant_public_key","audit_public_key","not_after"}]}`: grants verify with the first, audit roots with the second |
+| `GET /redactions` | none | `{"hashes":[…]}`: every redacted object, for cache tiers |
 | `GET /healthz` | none | `ok` |
 | `GET /readyz` | none | 200 when every `health_components` entry is ok, else 503 listing the failures |
 

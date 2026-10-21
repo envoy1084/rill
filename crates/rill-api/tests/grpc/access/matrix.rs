@@ -52,6 +52,10 @@ const MATRIX: &[(&str, Class)] = &[
     ("AuditService/SealAudit", Admin),
     ("AuditService/ListAuditKeys", Anyone),
     ("AuditService/WatchAudit", Admin),
+    ("ProtectionService/RequestRedaction", Admin),
+    ("ProtectionService/ApproveRedaction", Admin),
+    ("ProtectionService/ListRedactions", Admin),
+    ("ProtectionService/ClearQuarantine", Owner),
     ("AccessService/AddRelation", Owner),
     ("AccessService/RemoveRelation", Owner),
     ("AccessService/ListRelations", Owner),
@@ -247,6 +251,12 @@ fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
             operation_id: Bytes::new(),
             name: "acl/submit".into(),
             text: "permit(principal, action, resource);".into(),
+        }
+        .encode_to_vec(),
+        "ProtectionService/ClearQuarantine" => pb::ClearQuarantineRequest {
+            operation_id: Bytes::new(),
+            repo: "acl".into(),
+            version: version.clone(),
         }
         .encode_to_vec(),
         "AdminService/CreateOrg" => pb::CreateOrgRequest {

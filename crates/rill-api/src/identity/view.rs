@@ -45,6 +45,8 @@ pub struct IdentityView {
     issuers: Issuers,
     workload_keys: WorkloadKeys,
     config: IdentityConfig,
+    /// Objects redacted in each org; refused by every read.
+    redacted: dashmap::DashSet<(String, rill_types::ObjectHash)>,
 }
 
 impl IdentityView {
@@ -76,8 +78,10 @@ impl IdentityView {
             issuers: issuers.clone(),
             workload_keys: WorkloadKeys::new(issuers),
             config: config.clone(),
+            redacted: dashmap::DashSet::new(),
         });
         view.reload_revocations().await?;
+        view.reload_redactions().await?;
         Ok(view)
     }
 
@@ -172,6 +176,19 @@ impl IdentityView {
         Ok(())
     }
 
+    /// Reread every applied redaction.
+    pub async fn reload_redactions(&self) -> Result<()> {
+        for object in self.store.redacted_objects().await? {
+            self.redacted.insert(object);
+        }
+        Ok(())
+    }
+
+    /// Every redacted object: `(org, hash)`.
+    pub fn redacted_objects(&self) -> Vec<(String, rill_types::ObjectHash)> {
+        self.redacted.iter().map(|e| e.key().clone()).collect()
+    }
+
     /// Reread every revocation still in force.
     pub async fn reload_revocations(&self) -> Result<()> {
         let now = Timestamp::now();
@@ -191,7 +208,8 @@ impl IdentityView {
         self.users.clear();
         self.callers.clear();
         self.reload_keys().await?;
-        self.reload_revocations().await
+        self.reload_revocations().await?;
+        self.reload_redactions().await
     }
 
     /// Apply one log entry. Returns whether the keys must be reread.
@@ -233,7 +251,13 @@ impl IdentityView {
             | IdentityChange::SessionOpened { .. }
             | IdentityChange::TokenIssued { .. }
             | IdentityChange::OrgCreated { .. }
-            | IdentityChange::ScimCredentialChanged { .. } => false,
+            | IdentityChange::ScimCredentialChanged { .. }
+            | IdentityChange::RedactionRequested { .. }
+            | IdentityChange::QuarantineCleared { .. } => false,
+            IdentityChange::RedactionApplied { org, hash, .. } => {
+                self.redacted.insert((org.clone(), *hash));
+                false
+            }
         }
     }
 
@@ -295,5 +319,11 @@ impl IdentityView {
             *last = Some(Instant::now());
         }
         due
+    }
+}
+
+impl rill_store::redact::RedactionSet for IdentityView {
+    fn is_redacted(&self, org: &str, hash: &rill_types::ObjectHash) -> bool {
+        !self.redacted.is_empty() && self.redacted.contains(&(org.to_string(), *hash))
     }
 }

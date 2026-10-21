@@ -86,6 +86,16 @@ impl Stores {
         }
     }
 
+    /// The same stores with `objects` in place of the object store, for a
+    /// wrapper (redaction) around it.
+    pub fn with_objects(&self, objects: Arc<dyn ObjectStore>) -> Stores {
+        Stores {
+            objects,
+            meta: self.meta.clone(),
+            namespace: self.namespace.clone(),
+        }
+    }
+
     /// The same stores scoped to the org `name`: its metadata keys and its
     /// objects.
     pub fn org(&self, name: &str) -> Stores {

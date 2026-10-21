@@ -9,6 +9,7 @@ use rill_proto::rill::v1::audit_service_server::AuditServiceServer;
 use rill_proto::rill::v1::identity_service_server::IdentityServiceServer;
 use rill_proto::rill::v1::intent_service_server::IntentServiceServer;
 use rill_proto::rill::v1::lander_service_server::LanderServiceServer;
+use rill_proto::rill::v1::protection_service_server::ProtectionServiceServer;
 use rill_proto::rill::v1::repo_service_server::RepoServiceServer;
 use rill_proto::rill::v1::review_service_server::ReviewServiceServer;
 use rill_proto::rill::v1::session_service_server::SessionServiceServer;
@@ -23,8 +24,8 @@ use crate::auth::{AuthLayer, AuthService};
 use crate::error::{Error, Result};
 use crate::objects;
 use crate::services::{
-    AccessSvc, AdminSvc, AuditSvc, IdentitySvc, IntentSvc, LanderSvc, RepoSvc, ReviewSvc,
-    SessionSvc, WorkspaceSvc,
+    AccessSvc, AdminSvc, AuditSvc, IdentitySvc, IntentSvc, LanderSvc, ProtectionSvc, RepoSvc,
+    ReviewSvc, SessionSvc, WorkspaceSvc,
 };
 use crate::state::AppState;
 
@@ -188,6 +189,11 @@ async fn serve_grpc(
         .add_service(auth.layer(limits!(AuditServiceServer::new(AuditSvc::new(
             state.clone()
         )))))
+        .add_service(
+            auth.layer(limits!(ProtectionServiceServer::new(ProtectionSvc::new(
+                state.clone()
+            )))),
+        )
         .add_service(auth.layer(limits!(AdminServiceServer::new(AdminSvc::new(state)))))
         .serve_with_incoming_shutdown(grpc_incoming(listener), shutdown.cancelled_owned())
         .await
@@ -254,6 +260,7 @@ async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bo
         <AdminServiceServer<AdminSvc> as tonic::server::NamedService>::NAME,
         <AccessServiceServer<AccessSvc> as tonic::server::NamedService>::NAME,
         <AuditServiceServer<AuditSvc> as tonic::server::NamedService>::NAME,
+        <ProtectionServiceServer<ProtectionSvc> as tonic::server::NamedService>::NAME,
         <IdentityServiceServer<IdentitySvc> as tonic::server::NamedService>::NAME,
         <SessionServiceServer<SessionSvc> as tonic::server::NamedService>::NAME,
     ] {

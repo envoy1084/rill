@@ -101,6 +101,15 @@ impl Error {
     }
 
     /// An `INVALID_ARGUMENT` error with a message.
+    /// Whether the content asked for was redacted.
+    pub fn is_redacted(&self) -> bool {
+        match self {
+            Error::Store(rill_store::Error::Redacted { .. }) => true,
+            Error::Core(e) => e.is_redacted(),
+            _ => false,
+        }
+    }
+
     pub fn invalid(msg: impl Into<String>) -> Self {
         Error::InvalidArgument(msg.into())
     }
@@ -176,7 +185,7 @@ fn store_code(e: &rill_store::Error) -> Code {
         E::Conflict(_) => Code::Aborted,
         E::HashMismatch { .. } | E::Types(_) | E::Invalid(_) => Code::InvalidArgument,
         E::Codec(_) | E::Corrupt { .. } => Code::DataLoss,
-        E::IncompatibleFormat { .. } => Code::FailedPrecondition,
+        E::IncompatibleFormat { .. } | E::Redacted { .. } => Code::FailedPrecondition,
         E::TooLarge(_) => Code::ResourceExhausted,
         E::Backend(_) | E::Io(_) | E::Retryable(_) | E::CommitUnknown(_) => Code::Unavailable,
     }

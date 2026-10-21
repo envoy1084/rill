@@ -73,7 +73,10 @@ pub async fn search<F: PathFilter>(
             let objects = objects.clone();
             let regex = regex.clone();
             async move {
-                let bytes = read_content(objects.as_ref(), &entry.content).await?;
+                let bytes = match read_content(objects.as_ref(), &entry.content).await {
+                    Err(e) if e.is_redacted() => bytes::Bytes::new(),
+                    other => other?,
+                };
                 let hits =
                     tokio::task::spawn_blocking(move || scan_blob(&regex, &bytes, context, max))
                         .await?;

@@ -95,6 +95,8 @@ pub mod table {
     pub const REBAC_BY_SUBJECT: &str = "rebacs";
     /// `(rebacv, ns, repo)` → counter bumped by every relation change
     pub const REBAC_VERSION: &str = "rebacv";
+    /// `(quar, ns, repo, version)` → why a version is quarantined
+    pub const QUARANTINE: &str = "quar";
     /// `(misc, ns, repo, name)` → small values (policy, rings, cursors)
     pub const MISC: &str = "misc";
     /// `(meta, "format")` → store format
@@ -119,6 +121,10 @@ pub mod table {
     pub const AUDIT_CURSOR: &str = "audc";
     /// `(audr, org, last_seq)` → AuditRoot
     pub const AUDIT_ROOT: &str = "audr";
+    /// `(red, org, id)` → Redaction
+    pub const REDACTION: &str = "red";
+    /// `(redh, org, hash)` → id of the applied redaction of an object
+    pub const REDACTED: &str = "redh";
     /// `(idl, stamp)` → IdentityEvent
     pub const IDENT_LOG: &str = "idl";
     /// `(idln)` → identity log counter followers wait on
@@ -380,6 +386,10 @@ impl RepoKeys {
 
     pub fn relations_of_subject(&self, subject: &str) -> Bytes {
         self.row(table::REBAC_BY_SUBJECT, &subject)
+    }
+
+    pub fn quarantine(&self, version: &ObjectHash) -> Bytes {
+        self.row(table::QUARANTINE, &version.as_bytes().as_slice())
     }
 
     pub fn misc(&self, name: &str) -> Bytes {

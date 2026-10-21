@@ -62,6 +62,8 @@ pub struct RepoContext {
     pub identity: Arc<crate::identity::IdentityView>,
     /// Where refused requests are noted.
     pub denials: Arc<crate::audit::denials::Denials>,
+    /// Secret scanning rules and what was found clean.
+    pub secrets: Arc<crate::services::repo::secrets::Scanner>,
     /// Vote labels.
     pub labels: Arc<LabelSet>,
     /// Cancelled when the server shuts down; long-lived streams and
@@ -313,7 +315,13 @@ impl RepoRegistry {
     }
 
     async fn build(&self, config: RepoConfig) -> Result<RepoContext> {
-        let repo = self.stores.org(&config.org).repo(config.id);
+        let org = self.stores.org(&config.org);
+        let redacting = Arc::new(rill_store::redact::RedactingObjectStore::new(
+            org.objects.clone(),
+            &config.org,
+            self.identity.clone(),
+        ));
+        let repo = org.with_objects(redacting).repo(config.id);
         let trees = TreeOps::new(repo.objects().clone(), DEFAULT_TREE_CACHE);
         let derive = DeriveManager::new(repo.clone(), trees.clone(), DERIVE_CACHE);
         let graph = Arc::new(CommitGraph::new(repo.clone(), derive.clone()));
@@ -381,6 +389,7 @@ impl RepoRegistry {
             authorizer,
             identity: self.identity.clone(),
             denials: self.denials.clone(),
+            secrets: Default::default(),
             labels,
             shutdown: self.lifecycle.stop.child_token(),
             lifecycle: self.lifecycle.clone(),

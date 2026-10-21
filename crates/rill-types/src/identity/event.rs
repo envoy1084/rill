@@ -70,6 +70,23 @@ pub enum IdentityChange {
         id: String,
         active: bool,
     },
+    RedactionRequested {
+        org: String,
+        id: String,
+        hash: crate::hash::ObjectHash,
+    },
+    /// Every server stops serving the object from now on.
+    RedactionApplied {
+        org: String,
+        id: String,
+        hash: crate::hash::ObjectHash,
+    },
+    /// A quarantined version was released by an owner.
+    QuarantineCleared {
+        org: String,
+        repo: String,
+        version: crate::hash::ObjectHash,
+    },
 }
 
 /// One entry of the identity change log.

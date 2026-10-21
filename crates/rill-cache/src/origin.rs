@@ -59,6 +59,7 @@ impl Origin {
                     .map_err(|e| Error::Origin(e.to_string()))?,
             )),
             404 => Ok(None),
+            451 => Err(Error::Redacted(format!("{kind} {hash}"))),
             401 | 403 => Err(Error::Denied(
                 response
                     .text()

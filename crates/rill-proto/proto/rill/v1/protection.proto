@@ -1,0 +1,62 @@
+// Protection service: redacting objects (two administrators) and
+// releasing versions secret scanning quarantined.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+service ProtectionService {
+  rpc RequestRedaction(RequestRedactionRequest) returns (RequestRedactionResponse);
+  // Apply a request; the approver must be another administrator.
+  rpc ApproveRedaction(ApproveRedactionRequest) returns (ApproveRedactionResponse);
+  rpc ListRedactions(ListRedactionsRequest) returns (ListRedactionsResponse);
+  // Release a version secret scanning quarantined, so it may land.
+  rpc ClearQuarantine(ClearQuarantineRequest) returns (ClearQuarantineResponse);
+}
+
+message RedactionRecord {
+  string id = 1;
+  string org = 2;
+  ObjectKind kind = 3;
+  bytes hash = 4;
+  string reason = 5;
+  Principal requested_by = 6;
+  int64 requested_at = 7;
+  optional Principal approved_by = 8;
+  optional int64 applied_at = 9;
+}
+
+message RequestRedactionRequest {
+  bytes operation_id = 1;
+  string org = 2;
+  ObjectKind kind = 3;
+  bytes hash = 4;
+  string reason = 5;
+}
+message RequestRedactionResponse {
+  RedactionRecord redaction = 1;
+}
+
+message ApproveRedactionRequest {
+  bytes operation_id = 1;
+  string org = 2;
+  string id = 3;
+}
+message ApproveRedactionResponse {
+  RedactionRecord redaction = 1;
+}
+
+message ListRedactionsRequest {
+  string org = 1;
+}
+message ListRedactionsResponse {
+  repeated RedactionRecord redactions = 1;
+}
+
+message ClearQuarantineRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes version = 3;
+}
+message ClearQuarantineResponse {}

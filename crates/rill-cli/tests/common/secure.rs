@@ -21,6 +21,11 @@ pub struct SecureServer {
 
 impl SecureServer {
     pub async fn start() -> Self {
+        Self::start_with_admins(&[]).await
+    }
+
+    /// A server whose instance administrators are `admins`.
+    pub async fn start_with_admins(admins: &[&str]) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let config = ServerConfig {
             storage: StorageConfig::Local {
@@ -31,6 +36,7 @@ impl SecureServer {
                     master_key_hex: Some("17".repeat(32)),
                     master_key_file: None,
                 },
+                admins: admins.iter().map(|a| a.to_string()).collect(),
                 ..IdentityConfig::default()
             },
             ..ServerConfig::default()

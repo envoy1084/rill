@@ -181,6 +181,29 @@ impl DiskCache {
         Ok(read)
     }
 
+    /// Drop every kind of object with `hash`.
+    pub async fn remove(&self, hash: &ObjectHash) -> Result<()> {
+        let held: Vec<Key> = {
+            let index = self.index.lock();
+            index
+                .entries
+                .keys()
+                .filter(|(_, h)| h == hash)
+                .copied()
+                .collect()
+        };
+        for key in held {
+            self.index.lock().remove(&key);
+            let path = path_for(&self.root, key.0, &key.1);
+            blocking(move || match fs::remove_file(&path) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+                _ => Ok(()),
+            })
+            .await?;
+        }
+        Ok(())
+    }
+
     /// Keep `bytes` as `(kind, hash)`, already verified by the caller, then
     /// evict past the budget. An object larger than the whole budget is not
     /// kept.

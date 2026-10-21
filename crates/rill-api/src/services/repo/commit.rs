@@ -61,6 +61,7 @@ pub async fn commit_version_with(
     }
     validate(opened, &cv).await?;
     let hash = cv.hash();
+    let found = secret_findings(opened, &cv, &hash).await?;
     let staged = ctx.repo.stage_version(&cv).await?;
     // Derive what landing needs now, so a bad change fails the request and
     // the lander never derives it.
@@ -89,6 +90,7 @@ pub async fn commit_version_with(
             at: now,
         };
         let mut tx = staged.clone().merge(extras.tx.clone());
+        tx.mutations.extend(found.clone());
         if !opened.dev_mode() {
             tx = ctx.repo.expect_relations_version(tx, relations);
         }
@@ -144,6 +146,73 @@ pub async fn commit_version_with(
         "change {} kept changing while the version was stored; retry",
         cv.change_id
     )))
+}
+
+/// Scan `cv` for credentials. A finding refuses the version unless the
+/// repository's rules say warn or quarantine, in which case the returned
+/// mutations (the audit record, and the quarantine) commit with it.
+async fn secret_findings(
+    opened: &Opened,
+    cv: &ChangeVersion,
+    hash: &ChangeVersionHash,
+) -> Result<Vec<rill_store::meta::Mutation>> {
+    use rill_policy::secrets::ScanMode;
+    use rill_types::audit::{AuditOutcome, AuditRecord};
+
+    let ctx = &opened.repo;
+    let (rules, findings) = ctx.secrets.version(ctx, cv).await?;
+    if findings.is_empty() {
+        return Ok(Vec::new());
+    }
+    let described = super::secrets::describe(&findings);
+    let audit = ctx.repo.stores().audit();
+    let record = |action: &str, outcome: AuditOutcome| AuditRecord {
+        org: ctx.config.org.clone(),
+        at: Timestamp::now(),
+        actor: opened.principal().clone(),
+        action: action.to_string(),
+        target: format!("repo:{}", ctx.config.name),
+        outcome,
+        detail: findings
+            .iter()
+            .enumerate()
+            .map(|(i, f)| {
+                (
+                    format!("finding.{i}"),
+                    format!("{} {}:{} {}", f.detector, f.path, f.line, f.fingerprint),
+                )
+            })
+            .collect(),
+    };
+    match rules.mode {
+        ScanMode::Block => {
+            if let Err(e) = audit
+                .record(&record(
+                    "secret.block",
+                    AuditOutcome::Denied {
+                        reason: described.clone(),
+                    },
+                ))
+                .await
+            {
+                tracing::warn!(error = %e, "auditing a blocked secret failed");
+            }
+            Err(Error::FailedPrecondition(format!(
+                "a credential was found: {described}. Remove it, or if it is a known fake, \
+                 add its fingerprint to allow_fingerprints in .rill/secrets.toml"
+            )))
+        }
+        ScanMode::Warn => Ok(audit
+            .queue(&record("secret.warn", AuditOutcome::Allowed))?
+            .to_vec()),
+        ScanMode::Quarantine => {
+            let mut out = audit
+                .queue(&record("secret.quarantine", AuditOutcome::Allowed))?
+                .to_vec();
+            out.push(ctx.repo.quarantine_mutation(hash, &described));
+            Ok(out)
+        }
+    }
 }
 
 /// The checks every stored version passes.

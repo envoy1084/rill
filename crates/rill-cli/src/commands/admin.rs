@@ -50,6 +50,9 @@ pub enum AdminCmd {
     /// The org's audit log: list, watch, seal, verify, export.
     #[command(subcommand)]
     Audit(super::audit::AuditCmd),
+    /// Redact objects (two administrators) and release quarantined versions.
+    #[command(subcommand)]
+    Protect(super::protection::ProtectCmd),
     /// Credentials for the org's provisioning system (SCIM).
     #[command(subcommand)]
     Scim(super::identity::ScimCmd),
@@ -144,6 +147,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: AdminCmd) -> Result<()> {
         AdminCmd::Kill(args) => super::identity::agents::kill(ctx, args).await,
         AdminCmd::Scim(cmd) => super::identity::scim::run(ctx, cmd).await,
         AdminCmd::Audit(cmd) => super::audit::run(ctx, cmd).await,
+        AdminCmd::Protect(cmd) => super::protection::run(ctx, cmd).await,
         AdminCmd::Token(TokenCmd::Issue(args)) => issue(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Get(args)) => policy_get(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Set(args)) => policy_set(ctx, args).await,

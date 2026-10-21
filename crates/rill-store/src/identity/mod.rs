@@ -7,6 +7,7 @@ mod budgets;
 mod log;
 mod logins;
 mod providers;
+mod redactions;
 mod revocations;
 mod scim;
 mod sessions;

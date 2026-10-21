@@ -59,6 +59,12 @@ impl ObjectError {
 
 impl From<Error> for ObjectError {
     fn from(err: Error) -> Self {
+        if err.is_redacted() {
+            return ObjectError {
+                status: StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS,
+                message: err.to_string(),
+            };
+        }
         let status = match err.code() {
             Code::NotFound => StatusCode::NOT_FOUND,
             Code::PermissionDenied => StatusCode::FORBIDDEN,
@@ -105,7 +111,8 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
         .route("/livez", get(livez))
         .route("/readyz", get(readyz))
         .route("/metrics", get(metrics))
-        .route("/public-keys", get(public_keys));
+        .route("/public-keys", get(public_keys))
+        .route("/redactions", get(redactions));
     let router = if serve_objects {
         health
             .merge(objects)
@@ -145,6 +152,20 @@ async fn public_keys(axum::extract::State(state): axum::extract::State<Arc<AppSt
         })
         .collect();
     axum::Json(serde_json::json!({ "keys": keys })).into_response()
+}
+
+/// The hashes of every redacted object, for cache tiers to drop and
+/// refuse. Hashes only: they reveal nothing of the content.
+async fn redactions(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
+    let mut hashes: Vec<String> = state
+        .identity
+        .redacted_objects()
+        .into_iter()
+        .map(|(_, h)| h.to_hex())
+        .collect();
+    hashes.sort();
+    hashes.dedup();
+    axum::Json(serde_json::json!({ "hashes": hashes })).into_response()
 }
 
 /// The process is up and serving HTTP.

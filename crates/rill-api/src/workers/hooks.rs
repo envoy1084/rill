@@ -168,6 +168,12 @@ impl ReviewHooks for ReviewHooksAdapter {
             }
             (refusal, _) => refusal,
         };
+        let refusal = match refusal {
+            None => service.repo().quarantined(&version).await?.map(|why| {
+                format!("it is quarantined by secret scanning ({why}); an owner must clear it")
+            }),
+            refusal => refusal,
+        };
         let refusal = match (refusal, &self.rights) {
             (None, Some(rights)) => match service.repo().get_change_version(&version).await? {
                 Some(cv) => rights.refusal(&cv).await,

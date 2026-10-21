@@ -100,6 +100,24 @@ pub fn identity(event: &IdentityEvent) -> AuditRecord {
         IdentityChange::OrgCreated { org } => {
             mine(INSTANCE_AUDIT, "org.create", format!("org:{org}"), &[])
         }
+        IdentityChange::RedactionRequested { org, id, hash } => mine(
+            org,
+            "redaction.request",
+            format!("object:{hash}"),
+            &[("redaction", id.clone())],
+        ),
+        IdentityChange::RedactionApplied { org, id, hash } => mine(
+            org,
+            "redaction.apply",
+            format!("object:{hash}"),
+            &[("redaction", id.clone())],
+        ),
+        IdentityChange::QuarantineCleared { org, repo, version } => mine(
+            org,
+            "quarantine.clear",
+            format!("repo:{repo}"),
+            &[("version", version.to_string())],
+        ),
         IdentityChange::ScimCredentialChanged { org, id, active } => mine(
             org,
             if *active {

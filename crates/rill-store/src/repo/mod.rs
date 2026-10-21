@@ -8,6 +8,7 @@ mod land_queue;
 mod landing;
 mod leases;
 mod orgs;
+mod quarantine;
 mod quota;
 mod records;
 mod relations;

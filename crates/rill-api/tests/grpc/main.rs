@@ -18,6 +18,7 @@ mod killswitch;
 mod kubernetes;
 mod limits;
 mod orgs;
+mod protection;
 mod replicas;
 mod retries;
 mod scim;
@@ -36,6 +37,7 @@ use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::access_service_client::AccessServiceClient;
 use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
 use rill_proto::rill::v1::audit_service_client::AuditServiceClient;
+use rill_proto::rill::v1::protection_service_client::ProtectionServiceClient;
 use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
 use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
 use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
@@ -137,6 +139,7 @@ type Svc = InterceptedService<Channel, Bearer>;
 struct Clients {
     repo: RepoServiceClient<Svc>,
     audit: AuditServiceClient<Svc>,
+    protection: ProtectionServiceClient<Svc>,
     access: AccessServiceClient<Svc>,
     workspace: WorkspaceServiceClient<Svc>,
     review: ReviewServiceClient<Svc>,
@@ -173,6 +176,7 @@ async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
         repo: RepoServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         access: AccessServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         audit: AuditServiceClient::with_interceptor(channel.clone(), bearer.clone()),
+        protection: ProtectionServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         workspace: WorkspaceServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         review: ReviewServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         admin: AdminServiceClient::with_interceptor(channel, bearer),

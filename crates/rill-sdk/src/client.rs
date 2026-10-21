@@ -10,6 +10,7 @@ use rill_proto::rill::v1::audit_service_client::AuditServiceClient;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
 use rill_proto::rill::v1::intent_service_client::IntentServiceClient;
 use rill_proto::rill::v1::lander_service_client::LanderServiceClient;
+use rill_proto::rill::v1::protection_service_client::ProtectionServiceClient;
 use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
 use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
 use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
@@ -141,6 +142,8 @@ pub type LanderSvc = LanderServiceClient<Svc>;
 pub type AdminSvc = AdminServiceClient<Svc>;
 /// Generated audit client over the SDK transport.
 pub type AuditSvc = AuditServiceClient<Svc>;
+/// Generated protection client over the SDK transport.
+pub type ProtectionSvc = ProtectionServiceClient<Svc>;
 /// Generated access client over the SDK transport.
 pub type AccessSvc = AccessServiceClient<Svc>;
 /// Generated identity client over the SDK transport.
@@ -334,6 +337,11 @@ impl Client {
     /// A fresh generated audit client.
     pub fn audit_svc(&self) -> AuditSvc {
         AuditServiceClient::new(self.svc())
+    }
+
+    /// A fresh generated protection client.
+    pub fn protection_svc(&self) -> ProtectionSvc {
+        ProtectionServiceClient::new(self.svc())
     }
 
     /// A fresh generated access client.

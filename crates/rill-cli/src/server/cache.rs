@@ -25,6 +25,9 @@ pub struct CacheArgs {
     /// Listen address.
     #[arg(long, env = "RILL_CACHE_LISTEN", default_value = "0.0.0.0:7422")]
     pub listen: SocketAddr,
+    /// Seconds between checks of the origin's redactions.
+    #[arg(long, env = "RILL_CACHE_REDACTION_POLL", default_value_t = 10)]
+    pub redaction_poll: u64,
 }
 
 /// `500G`, `64M`, `1T`, `4096`.
@@ -53,6 +56,7 @@ pub async fn run(args: CacheArgs) -> Result<()> {
     let _telemetry = rill_api::telemetry::init(&Default::default())?;
     let mut config = CacheConfig::new(args.origin, args.dir, parse_size(&args.max_bytes)?);
     config.listen = args.listen;
+    config.redaction_poll = std::time::Duration::from_secs(args.redaction_poll.max(1));
     let shutdown = CancellationToken::new();
     let signal = shutdown.clone();
     tokio::spawn(async move {

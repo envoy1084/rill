@@ -41,6 +41,7 @@ pub struct CacheStats {
 pub struct Cache {
     disk: Arc<DiskCache>,
     keys: Arc<OriginKeys>,
+    redactions: Arc<crate::redactions::Redactions>,
     origin: Origin,
     inflight: Coalescer<(ObjectKind, ObjectHash), Bytes>,
     stats: CacheStats,
@@ -56,9 +57,17 @@ impl Cache {
         let client = reqwest::Client::new();
         let disk = DiskCache::open(&config.dir, config.max_bytes).await?;
         let keys = OriginKeys::fetch(&config.origin, client.clone()).await?;
+        let redactions = Arc::new(crate::redactions::Redactions::new(
+            &config.origin,
+            client.clone(),
+        ));
+        for hash in redactions.refresh().await? {
+            disk.remove(&hash).await?;
+        }
         Ok(Arc::new(Cache {
             disk,
             keys,
+            redactions,
             origin: Origin::new(&config.origin, client),
             inflight: Coalescer::new(),
             stats: CacheStats::default(),
@@ -84,6 +93,9 @@ impl Cache {
         hash: &ObjectHash,
         via: Option<&ObjectHash>,
     ) -> Result<Bytes> {
+        if self.redactions.contains(hash) {
+            return Err(Error::Redacted(format!("{kind} {hash}")));
+        }
         match kind {
             ObjectKind::Chunk => {
                 let via = via.ok_or_else(|| {
@@ -177,6 +189,10 @@ fn error_response(cache: &Cache, e: Error) -> Response {
             refusal(StatusCode::FORBIDDEN, m)
         }
         Error::NotFound(m) => refusal(StatusCode::NOT_FOUND, m),
+        Error::Redacted(m) => refusal(
+            StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS,
+            format!("{m} was redacted"),
+        ),
         Error::BadRequest(m) => refusal(StatusCode::BAD_REQUEST, m),
         Error::Origin(m) | Error::Corrupt(m) => {
             tracing::warn!(error = %m, "origin fetch failed");
@@ -326,13 +342,34 @@ pub fn router(cache: Arc<Cache>) -> Router {
 }
 
 /// Serve `cache` on `listener` until `shutdown`, rereading the origin's
-/// grant keys every `key_refresh`.
+/// grant keys and redactions as `config` says.
 pub async fn serve_on(
     cache: Arc<Cache>,
     listener: tokio::net::TcpListener,
-    key_refresh: std::time::Duration,
+    config: &CacheConfig,
     shutdown: CancellationToken,
 ) -> Result<()> {
+    let (key_refresh, redaction_poll) = (config.key_refresh, config.redaction_poll);
+    let follower = cache.clone();
+    let stop = shutdown.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = stop.cancelled() => return,
+                _ = tokio::time::sleep(redaction_poll) => {}
+            }
+            match follower.redactions.refresh().await {
+                Ok(new) => {
+                    for hash in new {
+                        if let Err(e) = follower.disk.remove(&hash).await {
+                            tracing::warn!(error = %e, %hash, "dropping a redacted object failed");
+                        }
+                    }
+                }
+                Err(e) => tracing::warn!(error = %e, "rereading redactions failed"),
+            }
+        }
+    });
     let keys = cache.keys.clone();
     let stop = shutdown.clone();
     tokio::spawn(async move {
@@ -358,5 +395,5 @@ pub async fn serve(config: CacheConfig, shutdown: CancellationToken) -> Result<(
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     let addr: SocketAddr = listener.local_addr()?;
     tracing::info!(%addr, origin = %config.origin, dir = %config.dir.display(), max_bytes = config.max_bytes, "cache serving");
-    serve_on(cache, listener, config.key_refresh, shutdown).await
+    serve_on(cache, listener, &config, shutdown).await
 }

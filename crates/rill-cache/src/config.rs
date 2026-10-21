@@ -17,6 +17,8 @@ pub struct CacheConfig {
     pub max_bytes: u64,
     /// How often the origin's grant keys are reread.
     pub key_refresh: Duration,
+    /// How often the origin's redactions are reread.
+    pub redaction_poll: Duration,
 }
 
 impl CacheConfig {
@@ -28,6 +30,7 @@ impl CacheConfig {
             dir: dir.into(),
             max_bytes,
             key_refresh: Duration::from_secs(60),
+            redaction_poll: Duration::from_secs(10),
         }
     }
 }

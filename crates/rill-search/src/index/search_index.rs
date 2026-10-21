@@ -229,7 +229,11 @@ impl SearchIndex {
             .map(|content| {
                 let objects = objects.clone();
                 async move {
-                    let bytes = read_content(objects.as_ref(), &content).await?;
+                    // A redacted file is indexed as empty: it matches nothing.
+                    let bytes = match read_content(objects.as_ref(), &content).await {
+                        Err(e) if e.is_redacted() => bytes::Bytes::new(),
+                        other => other?,
+                    };
                     self.index_blob(content.content_hash(), bytes).await
                 }
             })

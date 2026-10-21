@@ -29,6 +29,7 @@ pub mod keyspace;
 pub mod memory;
 pub mod meta;
 pub mod object;
+pub mod redact;
 pub mod repo;
 pub mod seal;
 pub mod verified;

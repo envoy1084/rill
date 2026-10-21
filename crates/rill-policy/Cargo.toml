@@ -18,6 +18,7 @@ biscuit-auth = { workspace = true }
 p256 = { workspace = true }
 rand = { workspace = true }
 globset = { workspace = true }
+regex = { workspace = true }
 hex = { workspace = true }
 bytes = { workspace = true }
 serde = { workspace = true }

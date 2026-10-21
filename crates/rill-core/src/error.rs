@@ -56,3 +56,10 @@ pub enum Error {
 
 /// Result alias for this crate.
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl Error {
+    /// Whether the content asked for was redacted.
+    pub fn is_redacted(&self) -> bool {
+        matches!(self, Error::Store(rill_store::Error::Redacted { .. }))
+    }
+}

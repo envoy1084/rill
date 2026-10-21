@@ -126,4 +126,4 @@ The CLI is `rill admin audit list/watch/seal/verify/export`. `export
 * Tests: `rill-store/tests/conformance/audit.rs` (racing chainers and projectors), `rill-api/tests/grpc/audit.rs` (end to end, tampering, refusals).
 
 ---
-← Previous: [Signing](signing.md) · [Index](../index.md) · Next: [Threat model](threat-model.md) →
+← Previous: [Signing](signing.md) · [Index](../index.md) · Next: [Data protection](data-protection.md) →

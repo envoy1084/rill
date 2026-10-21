@@ -17,6 +17,7 @@ pub mod disk;
 pub mod error;
 pub mod keys;
 pub mod origin;
+pub mod redactions;
 pub mod server;
 
 pub use config::CacheConfig;
