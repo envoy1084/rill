@@ -99,8 +99,11 @@ flowchart LR
     FClippy --> FTest[conformance + end to end on FoundationDB]
 ```
 
-`.github/workflows/ci.yml` runs two jobs on `ubuntu-latest`. `check` uses
-the stable toolchain with rustfmt and clippy and `Swatinem/rust-cache`.
+`.github/workflows/ci.yml` runs two jobs on Blacksmith Ubuntu 24.04
+runners. `check` uses the stable toolchain with rustfmt and clippy and
+`Swatinem/rust-cache`, and runs `cargo deny check` against `deny.toml`:
+only permissive licences (and MPL-2.0), crates.io sources, no yanked crates
+and no open advisories except the few it lists with their reason.
 `RUSTFLAGS=-D warnings` turns every compiler and clippy warning into an
 error. No feature flags are passed. With `--workspace`, feature unification
 still turns on `s3` for `rill-store`, because `rill-api` requests it. The

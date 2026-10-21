@@ -114,8 +114,9 @@ jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_
 sha2 = "0.10.9"
 keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
 base64 = "0.23.1"
-aws-config = { version = "1.13.0", features = ["behavior-version-latest"] }
-aws-sdk-kms = { version = "1.124.0", features = ["behavior-version-latest"] }
+aws-config = { version = "1.13.0", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio", "credentials-process", "sso"] }
+# Without the default `rustls` feature, which adds the legacy hyper 0.14 client.
+aws-sdk-kms = { version = "1.124.0", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
 gcp_auth = "0.12.7"
 rand = "0.10.3"
 

@@ -131,6 +131,7 @@ Tiered, so a phase spends its time on work rather than rebuilds:
 ## CI
 
 `.github/workflows/ci.yml` has two jobs. `check` runs `cargo fmt --check`,
+`cargo deny check` (licences, advisories, sources per `deny.toml`),
 `cargo clippy -D warnings` and `cargo test --workspace`. `foundationdb`
 installs a pinned FoundationDB (version and package checksums in the job's
 env) and runs the store conformance suite and the end-to-end server test

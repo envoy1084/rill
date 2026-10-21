@@ -119,8 +119,9 @@ for build profiles and features.
 
 ## Limitations
 
-- Layering is enforced by review only; there is no `cargo deny` or
-  dependency-graph check.
+- Layering is enforced by review only. `cargo deny` (`deny.toml`, in CI)
+  checks licences, advisories and sources of third-party crates, not the
+  order of Rill's own.
 
 ## Code
 

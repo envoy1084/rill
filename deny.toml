@@ -1,0 +1,47 @@
+# Dependency policy (ADR 015): permissive licences only, no known
+# vulnerabilities, crates only from crates.io.
+
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+ignore = [
+    # rsa via openidconnect: the timing leak is in private-key operations;
+    # Rill only verifies RS256 signatures with public keys.
+    { id = "RUSTSEC-2023-0071", reason = "public-key verification only" },
+    # Unmaintained, no known vulnerability. proc-macro-error2 runs only at
+    # build time (biscuit-quote); unsafe-libyaml comes with serde_yaml in
+    # sem-core; atomic-polyfill is compiled only for targets without
+    # atomics (heapless 0.7 in postcard).
+    { id = "RUSTSEC-2026-0173", reason = "build-time proc macro" },
+    { id = "RUSTSEC-2024-0449", reason = "unmaintained, no known vulnerability" },
+    { id = "RUSTSEC-2023-0089", reason = "not compiled for supported targets" },
+]
+
+[licenses]
+confidence-threshold = 0.9
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "CC0-1.0",
+    "BSL-1.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
+]
+
+[bans]
+multiple-versions = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
