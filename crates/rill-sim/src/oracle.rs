@@ -38,6 +38,8 @@ pub enum Invariant {
     /// Every landing of a reviewed change was allowed by the policy it
     /// records, on the votes it records.
     LandingsWereAllowed,
+    /// Nothing an agent wrote lands after the agent is suspended.
+    KilledAgentsDoNotLand,
 }
 
 /// One broken invariant with context.
@@ -66,6 +68,8 @@ pub struct Oracle {
     pub fenced_attempts: usize,
     pub partitions: usize,
     pub rival_landings: usize,
+    /// Agents suspended, with the trunk length when they were.
+    kills: Vec<(String, usize)>,
     pub violations: Vec<Violation>,
 }
 
@@ -101,6 +105,15 @@ impl Oracle {
     }
 
     /// Positions observed on trunk so far.
+    /// `agent` was suspended when trunk held `trunk_len` positions.
+    pub fn killed(&mut self, agent: String, trunk_len: usize) {
+        self.kills.push((agent, trunk_len));
+    }
+
+    pub fn kills(&self) -> &[(String, usize)] {
+        &self.kills
+    }
+
     pub fn trunk_len(&self) -> usize {
         self.trunk.len()
     }

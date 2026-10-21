@@ -11,6 +11,7 @@ pub mod approvals;
 pub mod event_log;
 pub mod faults;
 pub mod jobs;
+pub mod kill;
 pub mod known;
 pub mod oracle;
 pub mod processes;

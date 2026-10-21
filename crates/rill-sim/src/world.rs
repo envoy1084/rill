@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
+use rill_api::config::IdentityConfig;
+use rill_api::identity::IdentityView;
 use rill_api::workers::ReviewHooksAdapter;
 use rill_core::derive::RootTree;
 use rill_core::{read_content, CommitGraph, DeriveManager, TreeOps};
@@ -38,6 +40,13 @@ pub struct World {
     /// The lease a lander held when its process was restarted: what a
     /// paused process that wakes up after being replaced still has.
     pub zombie: Option<rill_store::repo::Lease>,
+    /// Instance identity, over stores without faults: landers ask it
+    /// whether a change's author may still land.
+    pub identity: Arc<IdentityView>,
+    /// The repository's org.
+    pub org: String,
+    /// The repository without faults, for the oracle's own reads.
+    pub truth: RepoStore,
 }
 
 impl World {
@@ -61,9 +70,13 @@ impl World {
                 )))
                 .repo(config.id)
         };
+        let identity = IdentityView::open(&clean, &IdentityConfig::default())
+            .await
+            .expect("identity opens before faults are enabled");
+        let standing = (config.org.clone(), identity.clone());
         let repo = view(&cut[0]);
-        let (derive, review, lander) = services(&repo);
-        let (_, _, rival) = services(&view(&cut[1]));
+        let (derive, review, lander) = services(&repo, &standing);
+        let (_, _, rival) = services(&view(&cut[1]), &standing);
         World {
             repo,
             derive,
@@ -74,6 +87,9 @@ impl World {
             cut,
             cut_until: Default::default(),
             zombie: None,
+            identity,
+            org: config.org.clone(),
+            truth: clean.repo(config.id),
         }
     }
 
@@ -103,7 +119,8 @@ impl World {
         if let Some(lease) = self.lander.held_lease().await {
             self.zombie = Some(lease);
         }
-        let (derive, review, lander) = services(&self.repo);
+        let standing = (self.org.clone(), self.identity.clone());
+        let (derive, review, lander) = services(&self.repo, &standing);
         self.derive = derive;
         self.review = review;
         self.lander = lander;
@@ -134,7 +151,10 @@ impl World {
     }
 }
 
-fn services(repo: &RepoStore) -> (Arc<DeriveManager>, Arc<ArcSwap<ReviewService>>, Arc<Lander>) {
+fn services(
+    repo: &RepoStore,
+    standing: &(String, Arc<IdentityView>),
+) -> (Arc<DeriveManager>, Arc<ArcSwap<ReviewService>>, Arc<Lander>) {
     let trees = TreeOps::new(repo.objects().clone(), 256);
     let derive = DeriveManager::new(repo.clone(), trees, 256);
     let graph = Arc::new(CommitGraph::new(repo.clone(), derive.clone()));
@@ -154,7 +174,10 @@ fn services(repo: &RepoStore) -> (Arc<DeriveManager>, Arc<ArcSwap<ReviewService>
         repo.clone(),
         derive.clone(),
         graph,
-        Arc::new(ReviewHooksAdapter::new(review.clone())),
+        Arc::new(
+            ReviewHooksAdapter::new(review.clone())
+                .with_standing(standing.0.clone(), standing.1.clone()),
+        ),
         Arc::new(AlwaysGreen),
         LandPolicy::default(),
     );

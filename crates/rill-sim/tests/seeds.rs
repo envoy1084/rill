@@ -47,7 +47,7 @@ fn contended_runs_keep_every_invariant() {
 #[test]
 fn faulty_runs_break_only_known_invariants() {
     let scenario = Scenario::faulty();
-    let (mut faults, mut killed, mut fenced, mut cut, mut rival) = (0, 0, 0, 0, 0);
+    let (mut faults, mut killed, mut fenced, mut cut, mut rival, mut kills) = (0, 0, 0, 0, 0, 0);
     for seed in seeds(1000) {
         let report = run(seed, &scenario);
         faults += report.faults_injected;
@@ -55,6 +55,7 @@ fn faulty_runs_break_only_known_invariants() {
         fenced += report.fenced_attempts;
         cut += report.partitions;
         rival += report.rival_landings;
+        kills += report.kills;
         for v in &report.violations {
             assert!(
                 known(v.invariant).is_some(),
@@ -67,6 +68,7 @@ fn faulty_runs_break_only_known_invariants() {
     assert!(fenced > 0, "no replaced lander tried to land");
     assert!(cut > 0, "no process was partitioned");
     assert!(rival > 0, "the rival process never landed");
+    assert!(kills > 0, "no agent was killed");
 }
 
 #[test]

@@ -31,6 +31,7 @@ pub enum Action {
     ZombieLand,
     RivalSweep,
     Partition,
+    KillAgent,
 }
 
 impl Action {
@@ -47,6 +48,7 @@ impl Action {
         (Action::ZombieLand, 3),
         (Action::RivalSweep, 6),
         (Action::Partition, 1),
+        (Action::KillAgent, 1),
     ];
 
     /// Draw an action by weight.
@@ -117,6 +119,7 @@ impl Ctx<'_> {
             Action::ZombieLand => self.zombie_land().await,
             Action::RivalSweep => self.rival_sweep().await,
             Action::Partition => self.partition().await,
+            Action::KillAgent => self.kill_agent(agent).await,
         }
     }
 

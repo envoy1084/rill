@@ -13,7 +13,7 @@ and crash bugs that example tests miss show up here first.
 ```mermaid
 flowchart LR
   S[seed] --> R[SimRng]
-  R --> A[agents: new change · amend · submit · vote · request land · sweep · sync · abandon · derive work · zombie land · rival sweep · partition]
+  R --> A[agents: new change · amend · submit · vote · request land · sweep · sync · abandon · derive work · zombie land · rival sweep · partition · kill agent]
   R --> X[restarts]
   S --> F[FaultPlan]
   A --> W[World: RepoStore · ReviewService · Lander · ReviewHooksAdapter]
@@ -44,7 +44,14 @@ flowchart LR
    for 12 to 20 steps (simulated seconds), longer than the 10 s lease: the
    other process takes the lease while the cut one still holds its own
    claim, and must be fenced when it reconnects.
-6. **Settle:** faults stop, partitions heal and both landers sweep until
+6. **Kill switch:** every simulated agent is registered in the instance's
+   identity (over stores without faults), sponsored by one human, and the
+   landers ask that identity view whether a change's author may still land,
+   as `rill-api` wires them. An action suspends an agent at random, as
+   `KillSwitch` does; the trunk length at that moment is read without
+   faults (`World::truth`), since a failed read would date earlier landings
+   after the kill.
+7. **Settle:** faults stop, partitions heal and both landers sweep until
    the queue is empty.
    The clock then jumps past every lease and backoff, expired claims are
    reaped, dead jobs revived, and the derive queue is run dry. Then the
@@ -100,6 +107,7 @@ change ids explicitly. A run's `digest` hashes every action and outcome, and
 | `JobsFinish` | Every derive job finishes once faults stop, including those whose worker died, and every trunk version is derived |
 | `DeposedHolderFenced` | A replaced lander's landing never moves trunk, even when its acknowledgement is lost |
 | `LandingsWereAllowed` | Every landing of a reviewed change records the default policy's digest, and that policy allows it on the votes the landing records |
+| `KilledAgentsDoNotLand` | No trunk position after an agent's suspension holds a version it wrote |
 
 ## Scenarios and known issues
 
@@ -120,9 +128,12 @@ A violation of any other invariant fails the tests. When a phase fixes a
 known issue, its entry is removed. The faulty test also requires that some
 worker died holding a job, some zombie tried to land, some process was
 partitioned and the rival landed something, so the job and lease checks are
-never vacuous. 50,000 faulty seeds hold every invariant: they rerun 27,601
-jobs, refuse 101,483 zombie landings, partition 64,664 times and land
-18,036 requests through the rival.
+never vacuous; it also requires that some agent was killed. 50,000 faulty
+seeds hold every invariant: they rerun 27,601 jobs, refuse 101,483 zombie
+landings, partition 64,664 times and land 18,036 requests through the
+rival. With the kill switch, 20,000 faulty seeds kill 24,052 agents and none
+of their work lands after; without the landers' standing check, 30 of 300
+seeds break `KilledAgentsDoNotLand`.
 
 ## Running
 
@@ -147,7 +158,7 @@ A release build runs about 200 faulty seeds a second.
 
 ## Code
 
-- [rill-sim/src/run.rs](../../crates/rill-sim/src/run.rs), [world.rs](../../crates/rill-sim/src/world.rs), [actors.rs](../../crates/rill-sim/src/actors.rs), [oracle.rs](../../crates/rill-sim/src/oracle.rs), [known.rs](../../crates/rill-sim/src/known.rs), [processes.rs](../../crates/rill-sim/src/processes.rs)
+- [rill-sim/src/run.rs](../../crates/rill-sim/src/run.rs), [world.rs](../../crates/rill-sim/src/world.rs), [actors.rs](../../crates/rill-sim/src/actors.rs), [oracle.rs](../../crates/rill-sim/src/oracle.rs), [known.rs](../../crates/rill-sim/src/known.rs), [processes.rs](../../crates/rill-sim/src/processes.rs), [kill.rs](../../crates/rill-sim/src/kill.rs)
 - [rill-sim/src/faults/](../../crates/rill-sim/src/faults/mod.rs), [rill-sim/tests/seeds.rs](../../crates/rill-sim/tests/seeds.rs)
 - [rill-types/src/testing/](../../crates/rill-types/src/testing/mod.rs)
 

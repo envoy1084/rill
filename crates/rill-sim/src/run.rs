@@ -44,6 +44,8 @@ pub struct Report {
     pub partitions: usize,
     /// Requests the rival process landed during the run.
     pub rival_landings: usize,
+    /// Agents suspended by the kill switch during the run.
+    pub kills: usize,
     pub violations: Vec<Violation>,
     /// Hash of every action and outcome; equal seeds give equal digests.
     pub digest: u64,
@@ -78,6 +80,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
             changes: Vec::new(),
         })
         .collect();
+    crate::kill::register_agents(&world, &agents).await;
     let reviewers = [Principal::human("rev-0"), Principal::human("rev-1")];
     let mut oracle = Oracle::default();
     let mut trace = DefaultHasher::new();
@@ -129,6 +132,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
     oracle.check_settled(&world.repo).await;
     oracle.check_event_log(&world.repo).await;
     oracle.check_landings_allowed(&world).await;
+    oracle.check_killed_agents(&world).await;
     let settle_at = START_MILLIS + scenario.steps as i64 * 1_000 + SETTLE_MILLIS;
     oracle
         .check_jobs(&world, settle_at, settle_at + SETTLE_MILLIS)
@@ -148,6 +152,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
         fenced_attempts: oracle.fenced_attempts,
         partitions: oracle.partitions,
         rival_landings: oracle.rival_landings,
+        kills: oracle.kills().len(),
         violations: oracle.violations,
         digest: trace.finish(),
     }
