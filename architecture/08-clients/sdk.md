@@ -53,6 +53,12 @@ the `CredentialStore` (`KeychainStore`, `FileStore`). The task stops when
 the client is dropped or the server refuses the refresh. `auth::login`
 signs in through an org's provider with the device flow (`DeviceFlow`,
 RFC 8628) and `ExchangeToken`; `sign_in_providers` lists the choices.
+Agents use `WorkloadConfig` (`RILL_WORKLOAD_TOKEN_FILE`, `RILL_ORG`,
+`RILL_AGENT`, `RILL_MODEL`): `Client::connect` exchanges the workload's JWT
+(re-read from the file each time, so rotated tokens are used) for an agent
+token, and a `WorkloadSource` exchanges again a minute before it expires.
+`connect_lazy` refuses a workload credential, since the first request
+needs a token.
 
 For `https://` endpoints the channel uses TLS (`TlsOptions`): the server's
 certificate is checked against the system's roots plus `ca_file`, and

@@ -42,6 +42,14 @@ pub enum AdminCmd {
     /// Revoke tokens and end sessions.
     #[command(subcommand)]
     Revoke(super::identity::RevokeCmd),
+    /// Registered agents.
+    #[command(subcommand)]
+    Agent(super::identity::AgentCmd),
+    /// Issuers whose workload JWTs agents exchange.
+    #[command(subcommand)]
+    Trust(super::identity::TrustCmd),
+    /// Stop an agent, a session, a sponsor's agents or a model at once.
+    Kill(super::identity::KillArgs),
 }
 
 /// `rill admin token <subcommand>`.
@@ -160,6 +168,9 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: AdminCmd) -> Result<()> {
         AdminCmd::User(cmd) => super::identity::users::run(ctx, cmd).await,
         AdminCmd::Key(cmd) => super::identity::keys::run(ctx, cmd).await,
         AdminCmd::Revoke(cmd) => super::identity::revoke(ctx, cmd).await,
+        AdminCmd::Agent(cmd) => super::identity::agents::agent(ctx, cmd).await,
+        AdminCmd::Trust(cmd) => super::identity::agents::trust(ctx, cmd).await,
+        AdminCmd::Kill(args) => super::identity::agents::kill(ctx, args).await,
         AdminCmd::Token(TokenCmd::Issue(args)) => issue(ctx, args).await,
         AdminCmd::Relation(RelationCmd::Add(args)) => relation_add(ctx, args, true).await,
         AdminCmd::Relation(RelationCmd::Remove(args)) => relation_add(ctx, args, false).await,

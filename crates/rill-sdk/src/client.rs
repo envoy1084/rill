@@ -18,7 +18,7 @@ use tonic::transport::{Channel, Endpoint};
 use tonic::{Request, Status};
 
 use crate::admin::AdminClient;
-use crate::auth::{SessionSource, StaticToken, TokenSource};
+use crate::auth::{SessionSource, StaticToken, TokenSource, WorkloadSource};
 use crate::config::ClientConfig;
 use crate::error::{Error, Result};
 use crate::repo::RepoClient;
@@ -136,6 +136,18 @@ impl Client {
     pub async fn connect(config: ClientConfig) -> Result<Self> {
         let endpoint = Self::endpoint(&config)?;
         let channel = endpoint.connect().await?;
+        if config.token.is_none() && config.session.is_none() {
+            if let Some(workload) = config.workload.clone() {
+                let source = WorkloadSource::start(workload, channel.clone()).await?;
+                return Ok(Client {
+                    config,
+                    channel,
+                    auth: AuthInterceptor {
+                        source: Some(source),
+                    },
+                });
+            }
+        }
         Self::with_channel(config, channel)
     }
 
@@ -163,6 +175,11 @@ impl Client {
                 channel.clone(),
                 session.store.clone(),
             )),
+            (None, None) if config.workload.is_some() => {
+                return Err(Error::config(
+                    "a workload credential is exchanged when connecting; use Client::connect",
+                ))
+            }
             (None, None) => None,
         };
         let auth = AuthInterceptor { source };

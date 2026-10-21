@@ -177,6 +177,19 @@ The test profile builds with line-table debuginfo to keep binaries small
 ([development](development.md)). The git importer test needs `git` on
 `PATH`.
 
+Tests against real external services run only when told where the service
+is, so CI skips them:
+
+| Variable | Test | Setup |
+| --- | --- | --- |
+| `RILL_TEST_VAULT_ADDR` (+ `VAULT_TOKEN`) | `rill-identity --test key_services` | `docker run -p 8200:8200 -e VAULT_DEV_ROOT_TOKEN_ID=root hashicorp/vault`, then enable `transit` and create key `rill` |
+| `RILL_TEST_AWS_KMS_ENDPOINT` (`--features aws`) | the same | `docker run -p 4566:4566 -e SERVICES=kms localstack/localstack`, with `AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test` |
+| `RILL_TEST_K8S_DIR` | `rill-api --test grpc kubernetes` | a directory with the cluster's `issuer.txt` and `jwks.json` (`kubectl get --raw /.well-known/openid-configuration`, `/openid/v1/jwks`), `token.jwt` (`kubectl -n rill-test create token builder --audience rill`) and `token-other.jwt` (another audience); a local cluster such as OrbStack's, with `--context` named explicitly |
+
+Identity providers in tests are `rill_identity::testing::MockIdp` (feature
+`testing`): discovery, keys, codes with PKCE, the device flow and JWTs on
+demand.
+
 ## Properties
 
 `rill-types::testing` (feature `testing`) has `proptest` strategies:

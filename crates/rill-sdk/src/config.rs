@@ -75,6 +75,9 @@ pub struct ClientConfig {
     /// A signed-in session, used when `token` is unset; refreshed in the
     /// background.
     pub session: Option<SessionConfig>,
+    /// A workload credential exchanged for an agent token, used when
+    /// neither `token` nor `session` is set. Needs [`crate::Client::connect`].
+    pub workload: Option<crate::auth::WorkloadConfig>,
     /// Per-request timeout; `None` waits indefinitely (streams always do).
     pub timeout: Option<Duration>,
     /// `user-agent` header value.
@@ -92,6 +95,7 @@ impl ClientConfig {
             endpoint: endpoint.into(),
             token: None,
             session: None,
+            workload: None,
             timeout: Some(Duration::from_secs(30)),
             user_agent: default_user_agent(),
             tls: TlsOptions::from_env(),
@@ -126,13 +130,16 @@ impl ClientConfig {
         self
     }
 
-    /// Read `RILL_ENDPOINT` and `RILL_TOKEN`.
+    /// Read `RILL_ENDPOINT`, `RILL_TOKEN` and, for agents, the workload
+    /// variables (`RILL_WORKLOAD_TOKEN_FILE`, `RILL_ORG`, `RILL_AGENT`,
+    /// `RILL_MODEL`).
     pub fn from_env() -> Result<Self> {
         let endpoint = std::env::var(ENDPOINT_ENV)
             .map_err(|_| Error::config(format!("{ENDPOINT_ENV} is not set")))?;
         let token = std::env::var(TOKEN_ENV).ok().filter(|t| !t.is_empty());
         Ok(ClientConfig {
             token,
+            workload: crate::auth::WorkloadConfig::from_env(),
             ..ClientConfig::new(endpoint)
         })
     }

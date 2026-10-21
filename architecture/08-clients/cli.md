@@ -44,7 +44,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Intents | `intent create/list/show/update/link/similar` |
 | Workspaces, refs | `ws create/list/show/handoff/ops/delete`, `ref list/show/set/delete` |
 | Sign-in | `login [--org] [--provider]` (device flow through the org's identity provider), `logout` |
-| Admin | `admin whoami`, `admin token issue`, `admin relation add/remove/list`, `admin policy get/set`, `admin health`, `admin idp add/list/remove`, `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session` |
+| Admin | `admin whoami`, `admin token issue`, `admin relation add/remove/list`, `admin policy get/set`, `admin health`, `admin idp add/list/remove`, `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session`, `admin agent register/list/suspend/activate`, `admin trust add/list/remove` (workload issuers), `admin kill --agent/--session/--sponsor/--model` |
 | Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
 
 Each group lives in `commands/<group>.rs`. `commands/parse.rs` holds the
@@ -74,6 +74,10 @@ Behaviours worth knowing:
   default). Later commands use the stored session, which refreshes itself
   and saves each rotated refresh token. `rill logout` ends the session on
   the server and forgets it.
+- Under `RILL_WORKLOAD_TOKEN_FILE` with no token given, every command except
+  `dev`, `api`, `login`, `logout` and `completions` connects first,
+  exchanging the workload's JWT for an agent token
+  (`Ctx::resolve_workload`).
 
 ## Context resolution
 

@@ -6,8 +6,12 @@ mod device;
 mod login;
 mod source;
 mod store;
+mod workload;
 
 pub use device::{DeviceAuthorization, DeviceFlow};
 pub use login::{login, sign_in_providers, LoginPrompt};
 pub use source::{SessionSource, StaticToken, TokenSource};
 pub use store::{CredentialStore, Credentials, FileStore, KeychainStore};
+pub use workload::{
+    WorkloadConfig, WorkloadSource, AGENT_ENV, MODEL_ENV, ORG_ENV, WORKLOAD_TOKEN_FILE_ENV,
+};

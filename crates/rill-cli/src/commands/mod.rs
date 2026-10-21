@@ -33,6 +33,17 @@ use crate::Result;
 
 /// Dispatch a parsed command.
 pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
+    let local = matches!(
+        command,
+        Command::Dev(_)
+            | Command::Api(_)
+            | Command::Login(_)
+            | Command::Logout
+            | Command::Completions(_)
+    );
+    if !local {
+        ctx.resolve_workload().await?;
+    }
     match command {
         Command::Repo(cmd) => repo::run(ctx, cmd).await,
         Command::Org(cmd) => org::run(ctx, cmd).await,

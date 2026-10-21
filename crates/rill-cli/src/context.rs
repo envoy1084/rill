@@ -158,6 +158,26 @@ impl<'w> Ctx<'w> {
         Ok(config)
     }
 
+    /// Under a workload credential (`RILL_WORKLOAD_TOKEN_FILE`) and with no
+    /// token given, connect now, exchanging it for an agent token, so every
+    /// later call carries one.
+    pub async fn resolve_workload(&mut self) -> Result<()> {
+        let explicit = self.opts.token.is_some()
+            || std::env::var(rill_sdk::config::TOKEN_ENV).is_ok_and(|t| !t.is_empty());
+        if explicit || self.client.is_some() {
+            return Ok(());
+        }
+        let Some(workload) = rill_sdk::auth::WorkloadConfig::from_env() else {
+            return Ok(());
+        };
+        let mut config = self.client_config()?;
+        config.token = None;
+        config.session = None;
+        config.workload = Some(workload);
+        self.client = Some(Client::connect(config).await?);
+        Ok(())
+    }
+
     /// A (lazily connecting) client, built once.
     pub fn client(&mut self) -> Result<Client> {
         if let Some(c) = &self.client {

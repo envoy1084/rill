@@ -1,12 +1,14 @@
 //! `rill admin idp|user|key|revoke`: identity providers, users, token keys
 //! and revocation.
 
+pub mod agents;
 pub mod keys;
 pub mod providers;
 pub mod users;
 
 use clap::{Args, Subcommand};
 
+pub use agents::{AgentCmd, KillArgs, TrustCmd};
 pub use keys::KeyCmd;
 pub use providers::IdpCmd;
 pub use users::UserCmd;

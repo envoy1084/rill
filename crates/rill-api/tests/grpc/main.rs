@@ -10,6 +10,7 @@ mod events;
 mod history;
 mod identity;
 mod killswitch;
+mod kubernetes;
 mod orgs;
 mod replicas;
 mod retries;
