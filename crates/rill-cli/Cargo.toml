@@ -32,6 +32,8 @@ rill-api = { workspace = true }
 rill-store = { workspace = true }
 rill-git-import = { workspace = true }
 rill-identity = { workspace = true }
+rill-proto = { workspace = true }
+dirs = { workspace = true }
 hex = { workspace = true }
 rand = { workspace = true }
 clap = { workspace = true }
@@ -54,6 +56,8 @@ tonic = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
+rill-identity = { workspace = true, features = ["testing"] }
+rill-policy = { workspace = true }
 tempfile = { workspace = true }
 rcgen = { workspace = true }
 reqwest = { workspace = true }

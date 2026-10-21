@@ -30,6 +30,18 @@ pub enum AdminCmd {
     Policy(PolicyCmd),
     /// Server health.
     Health,
+    /// The org's identity providers.
+    #[command(subcommand)]
+    Idp(super::identity::IdpCmd),
+    /// The org's users.
+    #[command(subcommand)]
+    User(super::identity::UserCmd),
+    /// Token signing keys.
+    #[command(subcommand)]
+    Key(super::identity::KeyCmd),
+    /// Revoke tokens and end sessions.
+    #[command(subcommand)]
+    Revoke(super::identity::RevokeCmd),
 }
 
 /// `rill admin token <subcommand>`.
@@ -144,6 +156,10 @@ pub fn parse_expiry(text: &str, now: Timestamp) -> Result<Timestamp> {
 pub async fn run(ctx: &mut Ctx<'_>, cmd: AdminCmd) -> Result<()> {
     match cmd {
         AdminCmd::Whoami => whoami(ctx).await,
+        AdminCmd::Idp(cmd) => super::identity::providers::run(ctx, cmd).await,
+        AdminCmd::User(cmd) => super::identity::users::run(ctx, cmd).await,
+        AdminCmd::Key(cmd) => super::identity::keys::run(ctx, cmd).await,
+        AdminCmd::Revoke(cmd) => super::identity::revoke(ctx, cmd).await,
         AdminCmd::Token(TokenCmd::Issue(args)) => issue(ctx, args).await,
         AdminCmd::Relation(RelationCmd::Add(args)) => relation_add(ctx, args, true).await,
         AdminCmd::Relation(RelationCmd::Remove(args)) => relation_add(ctx, args, false).await,

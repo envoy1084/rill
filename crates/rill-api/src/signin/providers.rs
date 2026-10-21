@@ -23,28 +23,24 @@ fn default_org() -> String {
 }
 
 pub async fn list(State(state): State<Arc<AppState>>, Query(q): Query<ListQuery>) -> Response {
-    let providers = match state.identity.store().providers(&q.org).await {
-        Ok(p) => p,
-        Err(e) => return error_response(crate::error::Error::from(e).into()),
-    };
-    let mut out = Vec::new();
-    for p in providers {
-        // Discovery is best effort: a provider that is down is still listed.
-        let device = state
-            .identity
-            .issuers()
-            .metadata(&p.issuer)
-            .await
-            .ok()
-            .and_then(|m| m.device_authorization_endpoint);
-        out.push(json!({
-            "org": p.org,
-            "name": p.name,
-            "issuer": p.issuer,
-            "cli_client_id": p.cli_client_id,
-            "scopes": p.scopes,
-            "device_authorization_endpoint": device,
-        }));
+    match super::flows::sign_in_providers(&state, &q.org).await {
+        Ok(providers) => {
+            let out: Vec<_> = providers
+                .into_iter()
+                .map(|p| {
+                    json!({
+                        "org": p.org,
+                        "name": p.name,
+                        "issuer": p.issuer,
+                        "cli_client_id": p.cli_client_id,
+                        "scopes": p.scopes,
+                        "device_authorization_endpoint": p.device_authorization_endpoint,
+                        "token_endpoint": p.token_endpoint,
+                    })
+                })
+                .collect();
+            Json(json!({ "providers": out })).into_response()
+        }
+        Err(e) => error_response(e.into()),
     }
-    Json(json!({ "providers": out })).into_response()
 }

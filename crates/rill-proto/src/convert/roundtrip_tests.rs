@@ -451,7 +451,7 @@ fn descriptor_set_is_embedded_and_parses() {
         .iter()
         .flat_map(|f| f.service.iter().map(|s| s.name().to_string()))
         .collect();
-    assert_eq!(services.len(), 7);
+    assert_eq!(services.len(), 8);
 }
 
 #[test]

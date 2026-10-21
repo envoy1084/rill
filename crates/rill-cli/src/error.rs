@@ -78,6 +78,12 @@ impl CliError {
     }
 }
 
+impl From<tonic::Status> for CliError {
+    fn from(status: tonic::Status) -> Self {
+        CliError::Sdk(rill_sdk::Error::from(status))
+    }
+}
+
 impl From<rill_mcp::ToolError> for CliError {
     fn from(e: rill_mcp::ToolError) -> Self {
         match e {

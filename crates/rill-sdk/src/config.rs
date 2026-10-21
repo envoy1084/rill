@@ -48,6 +48,23 @@ impl TlsOptions {
     }
 }
 
+/// A stored sign-in to use when no token is given.
+#[derive(Clone)]
+pub struct SessionConfig {
+    /// The session to use.
+    pub credentials: crate::auth::Credentials,
+    /// Where refreshed credentials are saved.
+    pub store: Option<std::sync::Arc<dyn crate::auth::CredentialStore>>,
+}
+
+impl std::fmt::Debug for SessionConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionConfig")
+            .field("credentials", &self.credentials)
+            .finish_non_exhaustive()
+    }
+}
+
 /// How to reach a Rill server.
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -55,6 +72,9 @@ pub struct ClientConfig {
     pub endpoint: String,
     /// Bearer token sent as `authorization` metadata on every request.
     pub token: Option<String>,
+    /// A signed-in session, used when `token` is unset; refreshed in the
+    /// background.
+    pub session: Option<SessionConfig>,
     /// Per-request timeout; `None` waits indefinitely (streams always do).
     pub timeout: Option<Duration>,
     /// `user-agent` header value.
@@ -71,6 +91,7 @@ impl ClientConfig {
         ClientConfig {
             endpoint: endpoint.into(),
             token: None,
+            session: None,
             timeout: Some(Duration::from_secs(30)),
             user_agent: default_user_agent(),
             tls: TlsOptions::from_env(),
@@ -86,6 +107,16 @@ impl ClientConfig {
     /// Set the bearer token.
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
         self.token = Some(token.into());
+        self
+    }
+
+    /// Use a stored session, saving refreshes to `store`.
+    pub fn with_session(
+        mut self,
+        credentials: crate::auth::Credentials,
+        store: Option<std::sync::Arc<dyn crate::auth::CredentialStore>>,
+    ) -> Self {
+        self.session = Some(SessionConfig { credentials, store });
         self
     }
 

@@ -163,6 +163,12 @@ pub enum Command {
     #[command(subcommand)]
     Ref(refs::RefCmd),
 
+    /// Sign in through the organization's identity provider.
+    Login(crate::commands::session::LoginArgs),
+
+    /// End the stored session for the server.
+    Logout,
+
     /// Identity, tokens, relations, policies and health.
     #[command(subcommand)]
     Admin(admin::AdminCmd),

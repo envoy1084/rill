@@ -5,6 +5,7 @@
 //! given.
 
 mod browser;
+pub mod flows;
 mod oauth;
 mod page;
 mod providers;
@@ -73,34 +74,4 @@ async fn client_secret(state: &AppState, provider: &IdentityProvider) -> Result<
     String::from_utf8(bytes)
         .map(Some)
         .map_err(|_| Error::internal("stored client secret is not text"))
-}
-
-/// Refresh a session, refusing (and ending) it when its user has been
-/// suspended since signing in.
-async fn refresh_live(
-    state: &AppState,
-    token: &rill_identity::signin::RefreshToken,
-) -> Result<rill_identity::signin::SessionTokens> {
-    let issuer = state.identity.issuer()?;
-    let store = state.identity.store();
-    let tokens =
-        rill_identity::signin::refresh_session(store, &issuer, token, rill_types::Timestamp::now())
-            .await?;
-    let session = &tokens.session;
-    if let Some(user) = state
-        .identity
-        .user(&session.org, &session.principal.name)
-        .await?
-    {
-        if !user.is_active() {
-            store
-                .revoke_session(&session.id, &session.principal)
-                .await?;
-            return Err(Error::Unauthenticated(format!(
-                "{} is suspended",
-                session.principal
-            )));
-        }
-    }
-    Ok(tokens)
 }

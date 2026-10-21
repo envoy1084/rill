@@ -157,3 +157,50 @@ message TokenKey {
 message ListTokenKeysResponse {
   repeated TokenKey keys = 1;
 }
+
+// Signing in. Open: callers have no token yet, and each RPC checks what it
+// is given.
+service SessionService {
+  // The organization's providers a client can sign in through, with the
+  // endpoints of their device flow.
+  rpc ListSignInProviders(ListSignInProvidersRequest) returns (ListSignInProvidersResponse);
+  // RFC 8693: a provider's ID token for a session.
+  rpc ExchangeToken(ExchangeTokenRequest) returns (SessionGrant);
+  // A refresh token for a new access token and a new refresh token.
+  rpc RefreshSession(RefreshSessionRequest) returns (SessionGrant);
+}
+
+message ListSignInProvidersRequest {
+  string org = 1;
+}
+message SignInProvider {
+  string org = 1;
+  string name = 2;
+  string issuer = 3;
+  optional string cli_client_id = 4;
+  repeated string scopes = 5;
+  optional string device_authorization_endpoint = 6;
+  optional string token_endpoint = 7;
+}
+message ListSignInProvidersResponse {
+  repeated SignInProvider providers = 1;
+}
+
+message ExchangeTokenRequest {
+  string subject_token = 1;
+  // `urn:ietf:params:oauth:token-type:id_token`.
+  string subject_token_type = 2;
+}
+
+message RefreshSessionRequest {
+  string refresh_token = 1;
+}
+
+message SessionGrant {
+  string access_token = 1;
+  int64 expires_at = 2;
+  optional string refresh_token = 3;
+  string session = 4;
+  Principal principal = 5;
+  string org = 6;
+}

@@ -209,7 +209,7 @@ pub async fn token(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Re
         return unauthorized("not signed in");
     };
     let result = async {
-        let tokens = super::refresh_live(&state, &refresh).await?;
+        let tokens = super::flows::refresh_live(&state, &refresh).await?;
         let remaining = (tokens.session.expires_at.millis() - Timestamp::now().millis()) / 1000;
         let cookie = session_cookie(&state, &tokens.refresh_token.to_string(), remaining.max(0))?;
         Ok::<_, Error>((cookie, tokens))

@@ -67,6 +67,8 @@ struct Idp {
     users: Mutex<HashMap<String, MockUser>>,
     clients: Mutex<HashMap<String, Option<String>>>,
     signed_in: Mutex<Option<String>>,
+    /// Who approves every new device grant at once, if anyone.
+    auto_approve: Mutex<Option<String>>,
     codes: Mutex<HashMap<String, Code>>,
     devices: Mutex<HashMap<String, DeviceGrant>>,
 }
@@ -112,6 +114,7 @@ impl MockIdp {
             users: Mutex::default(),
             clients: Mutex::default(),
             signed_in: Mutex::default(),
+            auto_approve: Mutex::default(),
             codes: Mutex::default(),
             devices: Mutex::default(),
         });
@@ -145,6 +148,12 @@ impl MockIdp {
     /// Who `/authorize` signs in as.
     pub fn sign_in_as(&self, username: &str) {
         *self.idp.signed_in.lock() = Some(username.into());
+    }
+
+    /// Approve every device grant from now on as `username`, as if the
+    /// person did so in a browser.
+    pub fn auto_approve_devices(&self, username: &str) {
+        *self.idp.auto_approve.lock() = Some(username.into());
     }
 
     /// Approve the device grant shown as `user_code`, as `username`.
@@ -332,7 +341,7 @@ async fn device(State(idp): State<Arc<Idp>>, Form(f): Form<DeviceForm>) -> Respo
         DeviceGrant {
             user_code: user_code.clone(),
             client_id: f.client_id,
-            approved: None,
+            approved: idp.auto_approve.lock().clone(),
         },
     );
     let uri = format!("{}/activate", idp.issuer);

@@ -71,9 +71,11 @@ pub async fn resolve_user(
             };
             match store.create_user(&user, &actor).await {
                 Ok(()) => return Ok(user),
-                Err(rill_store::Error::Conflict(_)) => return Err(Error::Denied(format!(
+                Err(rill_store::Error::Conflict(_)) => {
+                    return Err(Error::Denied(format!(
                     "the name {name:?} belongs to another account; an administrator must link it"
-                ))),
+                )))
+                }
                 Err(e) => return Err(e.into()),
             }
         }

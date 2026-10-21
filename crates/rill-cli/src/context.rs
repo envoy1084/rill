@@ -146,6 +146,14 @@ impl<'w> Ctx<'w> {
         if let Some(token) = flag_token {
             config.token = Some(token);
         }
+        if config.token.is_none() {
+            let store = crate::credentials::store();
+            match store.load(&config.endpoint) {
+                Ok(Some(credentials)) => config = config.with_session(credentials, Some(store)),
+                Ok(None) => {}
+                Err(e) => tracing::debug!(error = %e, "reading stored credentials failed"),
+            }
+        }
         config.user_agent = format!("rill-cli/{}", env!("CARGO_PKG_VERSION"));
         Ok(config)
     }

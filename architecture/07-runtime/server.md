@@ -76,7 +76,7 @@ sequenceDiagram
 
 `AuthLayer` (`auth/layer.rs`) is a tower layer, not a tonic interceptor,
 because authentication may need the store and interceptors are synchronous.
-It wraps each of the seven services; gRPC reflection and `tonic-health` are
+It wraps seven services; `SessionService`, gRPC reflection and `tonic-health` are
 not wrapped. In `authenticate`, a request without a bearer token acts as the
 human `dev` in dev mode and is `UNAUTHENTICATED` otherwise. A token must
 authenticate even in dev mode: a dev server's static table first, then the

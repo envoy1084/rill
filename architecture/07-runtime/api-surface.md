@@ -27,8 +27,9 @@ and client stubs.
 
 ## gRPC services
 
-The server registers all seven services behind `AuthLayer`
-([server](server.md#request-path)). It also registers `tonic-reflection` and
+The server registers seven services behind `AuthLayer`
+([server](server.md#request-path)) and `SessionService`, which signs callers
+in, without it. It also registers `tonic-reflection` and
 `tonic-health`, which report every service as serving.
 
 | Service | Proto | Handler | Covers |
@@ -40,6 +41,7 @@ The server registers all seven services behind `AuthLayer`
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
 | `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
 | `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser` ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
+| `SessionService` | `identity.proto` | `services/session.rs` | `ListSignInProviders`, `ExchangeToken`, `RefreshSession`; no auth layer ([sign-in](../05-policy/identity-and-auth.md#sign-in)) |
 
 `types.proto` holds the shared object model and `events.proto` the event
 log's messages. The streaming RPCs are `GetBlob` (server stream of

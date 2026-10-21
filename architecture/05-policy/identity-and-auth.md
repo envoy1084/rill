@@ -152,6 +152,11 @@ object-protocol listener and open:
 | `GET /auth/providers?org` | the org's providers, CLI clients and device endpoints |
 | `POST /oauth/token` | `refresh_token` grants, and RFC 8693 exchange of a provider ID token (`subject_token_type` `…:id_token`, any of the provider's clients) for a device session |
 
+The same exchange and refresh are served over gRPC by `SessionService`
+(`ListSignInProviders`, `ExchangeToken`, `RefreshSession`), registered
+without the auth layer so clients need only the gRPC endpoint; the CLI and
+SDK use it ([CLI](../08-clients/cli.md), [SDK](../08-clients/sdk.md)).
+
 Refreshing refuses and ends the session of a user suspended since signing
 in; every request by a suspended user is refused through the identity view
 (`UserChanged` in the log drops the cached user).

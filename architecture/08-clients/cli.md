@@ -43,7 +43,8 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Landing | `land [--wait] [--timeout 300] [--no-sync]`, `trunk`, `landings`, `verify`, `revert`, `bisect` |
 | Intents | `intent create/list/show/update/link/similar` |
 | Workspaces, refs | `ws create/list/show/handoff/ops/delete`, `ref list/show/set/delete` |
-| Admin | `admin whoami`, `admin token issue`, `admin relation add/remove/list`, `admin policy get/set`, `admin health` |
+| Sign-in | `login [--org] [--provider]` (device flow through the org's identity provider), `logout` |
+| Admin | `admin whoami`, `admin token issue`, `admin relation add/remove/list`, `admin policy get/set`, `admin health`, `admin idp add/list/remove`, `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session` |
 | Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
 
 Each group lives in `commands/<group>.rs`. `commands/parse.rs` holds the
@@ -64,6 +65,15 @@ Behaviours worth knowing:
   `LocalStores` directly instead. `rill export git <dir>` mirrors trunk into
   a git branch. See [git import and export](../06-services/git-import.md).
 - Every change the CLI creates has `Provenance {tool: "rill-cli"}`.
+- `rill login` lists the org's providers through `SessionService`, runs the
+  device flow against the chosen one's CLI client, prints the code and URL
+  on stderr, exchanges the ID token for a Rill session and stores it
+  (`credentials.rs`): in the OS keychain (service `rill`, account = the
+  endpoint), or a 0600 JSON file when the keychain fails or
+  `RILL_CREDENTIALS_FILE` names one (`~/.config/rill/credentials.json` by
+  default). Later commands use the stored session, which refreshes itself
+  and saves each rotated refresh token. `rill logout` ends the session on
+  the server and forgets it.
 
 ## Context resolution
 
@@ -73,7 +83,7 @@ invocation.
 | Setting | Order |
 | --- | --- |
 | endpoint | `--endpoint`, then the checkout's `endpoint`, then `ClientConfig::discover` (`RILL_ENDPOINT`, then the config file) |
-| token | `--token`, then `RILL_TOKEN`, then the config file's token (only when the file also supplied the endpoint) |
+| token | `--token`, then `RILL_TOKEN`, then the config file's token (only when the file also supplied the endpoint), then the session `rill login` stored for the endpoint |
 | repository | `--repo`, then the checkout's `repo`, then `RILL_REPO`, else a usage error |
 | checkout | `Checkout::find` walks up from `-C` or the process cwd to the nearest `.rill/` |
 

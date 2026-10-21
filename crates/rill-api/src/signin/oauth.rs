@@ -8,14 +8,11 @@ use axum::extract::{Form, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use rill_identity::oidc::unverified_issuer;
-use rill_identity::signin::{open_session, resolve_user, RefreshToken, SessionTokens};
-use rill_types::identity::SessionKind;
+use rill_identity::signin::{RefreshToken, SessionTokens};
 use rill_types::Timestamp;
 use serde::Deserialize;
 use serde_json::json;
 
-use super::session_ttl_ms;
 use crate::error::{Error, Result};
 use crate::state::AppState;
 
@@ -58,7 +55,10 @@ pub async fn token(State(state): State<Arc<AppState>>, Form(form): Form<TokenFor
     let result = match form.grant_type.as_str() {
         GRANT_REFRESH => refresh(&state, form.refresh_token.as_deref()).await,
         GRANT_EXCHANGE => match form.subject_token_type.as_deref() {
-            Some(TOKEN_TYPE_ID) => exchange_id_token(&state, form.subject_token.as_deref()).await,
+            Some(TOKEN_TYPE_ID) => match form.subject_token.as_deref() {
+                Some(token) => super::flows::exchange_id_token(&state, token).await,
+                None => Err(Error::invalid("subject_token is required")),
+            },
             other => {
                 return oauth_error(
                     StatusCode::BAD_REQUEST,
@@ -93,40 +93,5 @@ async fn refresh(state: &AppState, token: Option<&str>) -> Result<SessionTokens>
     let token: RefreshToken = token
         .ok_or_else(|| Error::invalid("refresh_token is required"))?
         .parse()?;
-    super::refresh_live(state, &token).await
-}
-
-/// A provider's ID token for one of its clients becomes a device session.
-async fn exchange_id_token(state: &AppState, token: Option<&str>) -> Result<SessionTokens> {
-    let token = token.ok_or_else(|| Error::invalid("subject_token is required"))?;
-    let issuer_url = unverified_issuer(token)?;
-    let provider = state
-        .identity
-        .store()
-        .provider_by_issuer(&issuer_url)
-        .await?
-        .ok_or_else(|| {
-            Error::Unauthenticated(format!("no provider trusts issuer {issuer_url:?}"))
-        })?;
-    let claims = state
-        .identity
-        .issuers()
-        .verifier(&provider.issuer, provider.audiences())
-        .await?
-        .verify(token, None)
-        .await?;
-    let now = Timestamp::now();
-    let user = resolve_user(state.identity.store(), &provider, &claims, now).await?;
-    let issuer = state.identity.issuer()?;
-    let tokens = open_session(
-        state.identity.store(),
-        &issuer,
-        &user,
-        SessionKind::Device,
-        session_ttl_ms(state),
-        now,
-    )
-    .await?;
-    tracing::info!(user = %user.principal, org = %user.org, session = %tokens.session.id, "signed in by token exchange");
-    Ok(tokens)
+    super::flows::refresh_live(state, &token).await
 }

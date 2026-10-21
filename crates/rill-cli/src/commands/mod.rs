@@ -7,6 +7,7 @@ pub mod change;
 pub mod checkout;
 pub mod export;
 pub mod history;
+pub mod identity;
 pub mod import;
 pub mod intent;
 pub mod land;
@@ -14,6 +15,7 @@ pub mod org;
 pub mod refs;
 pub mod repo;
 pub mod review;
+pub mod session;
 pub mod stack;
 pub mod status;
 pub mod watch;
@@ -62,6 +64,8 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Ws(cmd) => ws::run(ctx, cmd).await,
         Command::Ref(cmd) => refs::run(ctx, cmd).await,
         Command::Admin(cmd) => admin::run(ctx, cmd).await,
+        Command::Login(args) => session::login(ctx, args).await,
+        Command::Logout => session::logout(ctx).await,
         Command::Import(cmd) => import::run(ctx, cmd).await,
         Command::Export(cmd) => export::run(ctx, cmd).await,
         Command::Watch(cmd) => watch::run(ctx, cmd).await,

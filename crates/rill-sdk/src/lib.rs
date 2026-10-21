@@ -25,6 +25,7 @@
 #![warn(missing_docs)]
 
 pub mod admin;
+pub mod auth;
 pub mod client;
 pub mod config;
 pub mod error;
@@ -40,7 +41,7 @@ pub mod workspace;
 
 pub use admin::AdminClient;
 pub use client::Client;
-pub use config::{ClientConfig, TlsOptions};
+pub use config::{ClientConfig, SessionConfig, TlsOptions};
 pub use error::{Error, Result};
 pub use intent::IntentClient;
 pub use lander::LanderClient;

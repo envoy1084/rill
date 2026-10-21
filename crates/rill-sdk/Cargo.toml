@@ -24,6 +24,10 @@ http = { workspace = true }
 toml = { workspace = true }
 dirs = { workspace = true }
 ignore = { workspace = true }
+reqwest = { workspace = true }
+keyring = { workspace = true }
+serde_json = { workspace = true }
+parking_lot = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

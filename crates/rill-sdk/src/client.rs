@@ -1,9 +1,11 @@
 //! The connected client: one channel, six generated service clients, and
 //! a bearer-token interceptor.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
+use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
 use rill_proto::rill::v1::intent_service_client::IntentServiceClient;
 use rill_proto::rill::v1::lander_service_client::LanderServiceClient;
 use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
@@ -16,34 +18,34 @@ use tonic::transport::{Channel, Endpoint};
 use tonic::{Request, Status};
 
 use crate::admin::AdminClient;
+use crate::auth::{SessionSource, StaticToken, TokenSource};
 use crate::config::ClientConfig;
 use crate::error::{Error, Result};
 use crate::repo::RepoClient;
 
-/// Attaches `authorization: Bearer <token>` to every outgoing request.
-#[derive(Clone, Debug)]
+/// Attaches `authorization: Bearer <token>` to every outgoing request, the
+/// token read from the client's token source each time.
+#[derive(Clone)]
 pub struct AuthInterceptor {
-    header: Option<MetadataValue<tonic::metadata::Ascii>>,
+    source: Option<Arc<dyn TokenSource>>,
 }
 
-impl AuthInterceptor {
-    fn new(token: Option<&str>) -> Result<Self> {
-        let header = match token {
-            None => None,
-            Some(t) => Some(
-                format!("Bearer {t}")
-                    .parse()
-                    .map_err(|_| Error::config("token contains non-ASCII characters"))?,
-            ),
-        };
-        Ok(AuthInterceptor { header })
+impl std::fmt::Debug for AuthInterceptor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthInterceptor")
+            .field("has_source", &self.source.is_some())
+            .finish()
     }
 }
 
 impl Interceptor for AuthInterceptor {
     fn call(&mut self, mut request: Request<()>) -> std::result::Result<Request<()>, Status> {
-        if let Some(h) = &self.header {
-            request.metadata_mut().insert("authorization", h.clone());
+        if let Some(token) = self.source.as_ref().and_then(|s| s.token()) {
+            let header: MetadataValue<tonic::metadata::Ascii> =
+                format!("Bearer {token}")
+                    .parse()
+                    .map_err(|_| Status::unauthenticated("token contains non-ASCII characters"))?;
+            request.metadata_mut().insert("authorization", header);
         }
         // An id per request, so a failure here and the server's log lines
         // for it can be matched.
@@ -105,6 +107,8 @@ pub type IntentSvc = IntentServiceClient<Svc>;
 pub type LanderSvc = LanderServiceClient<Svc>;
 /// Generated admin client over the SDK transport.
 pub type AdminSvc = AdminServiceClient<Svc>;
+/// Generated identity client over the SDK transport.
+pub type IdentitySvc = IdentityServiceClient<Svc>;
 
 /// A connection to one Rill server.
 ///
@@ -144,8 +148,24 @@ impl Client {
     }
 
     /// Build a client over an existing channel (tests, custom transports).
+    /// A stored session starts refreshing itself here; an explicit token
+    /// wins over it.
     pub fn with_channel(config: ClientConfig, channel: Channel) -> Result<Self> {
-        let auth = AuthInterceptor::new(config.token.as_deref())?;
+        let source: Option<Arc<dyn TokenSource>> = match (&config.token, &config.session) {
+            (Some(token), _) => {
+                if !token.is_ascii() {
+                    return Err(Error::config("token contains non-ASCII characters"));
+                }
+                Some(Arc::new(StaticToken(token.clone())))
+            }
+            (None, Some(session)) => Some(SessionSource::start(
+                session.credentials.clone(),
+                channel.clone(),
+                session.store.clone(),
+            )),
+            (None, None) => None,
+        };
+        let auth = AuthInterceptor { source };
         Ok(Client {
             config,
             channel,
@@ -192,6 +212,11 @@ impl Client {
         AdminClient::new(self.clone())
     }
 
+    /// The underlying channel, for services the SDK does not wrap.
+    pub fn channel(&self) -> Channel {
+        self.channel.clone()
+    }
+
     fn svc(&self) -> Svc {
         InterceptedService::new(self.channel.clone(), self.auth.clone())
     }
@@ -224,6 +249,11 @@ impl Client {
     /// A fresh generated admin client.
     pub fn admin_svc(&self) -> AdminSvc {
         AdminServiceClient::new(self.svc())
+    }
+
+    /// A fresh generated identity client.
+    pub fn identity_svc(&self) -> IdentitySvc {
+        IdentityServiceClient::new(self.svc())
     }
 }
 

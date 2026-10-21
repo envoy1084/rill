@@ -11,6 +11,7 @@ pub mod lander;
 pub mod orgs;
 pub mod repo;
 pub mod review;
+pub mod session;
 pub mod workspace;
 
 pub use admin::AdminSvc;
@@ -19,4 +20,5 @@ pub use intent::IntentSvc;
 pub use lander::LanderSvc;
 pub use repo::RepoSvc;
 pub use review::ReviewSvc;
+pub use session::SessionSvc;
 pub use workspace::WorkspaceSvc;

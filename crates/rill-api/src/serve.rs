@@ -9,6 +9,7 @@ use rill_proto::rill::v1::intent_service_server::IntentServiceServer;
 use rill_proto::rill::v1::lander_service_server::LanderServiceServer;
 use rill_proto::rill::v1::repo_service_server::RepoServiceServer;
 use rill_proto::rill::v1::review_service_server::ReviewServiceServer;
+use rill_proto::rill::v1::session_service_server::SessionServiceServer;
 use rill_proto::rill::v1::workspace_service_server::WorkspaceServiceServer;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
@@ -20,7 +21,7 @@ use crate::auth::{AuthLayer, AuthService};
 use crate::error::{Error, Result};
 use crate::objects;
 use crate::services::{
-    AdminSvc, IdentitySvc, IntentSvc, LanderSvc, RepoSvc, ReviewSvc, WorkspaceSvc,
+    AdminSvc, IdentitySvc, IntentSvc, LanderSvc, RepoSvc, ReviewSvc, SessionSvc, WorkspaceSvc,
 };
 use crate::state::AppState;
 
@@ -136,6 +137,8 @@ async fn serve_grpc(
     builder
         .add_service(reflection)
         .add_service(health)
+        // Signing in needs no token; each RPC checks what it is given.
+        .add_service(SessionServiceServer::new(SessionSvc::new(state.clone())))
         .add_service(auth.layer(RepoServiceServer::new(RepoSvc::new(state.clone()))))
         .add_service(auth.layer(WorkspaceServiceServer::new(WorkspaceSvc::new(
             state.clone(),
@@ -209,6 +212,7 @@ async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bo
         <LanderServiceServer<LanderSvc> as tonic::server::NamedService>::NAME,
         <AdminServiceServer<AdminSvc> as tonic::server::NamedService>::NAME,
         <IdentityServiceServer<IdentitySvc> as tonic::server::NamedService>::NAME,
+        <SessionServiceServer<SessionSvc> as tonic::server::NamedService>::NAME,
     ] {
         reporter.set_service_status(name, status).await;
     }

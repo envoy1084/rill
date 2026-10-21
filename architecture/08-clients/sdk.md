@@ -44,6 +44,16 @@ and optional `token` and `timeout_secs`. The path is
 `dirs::config_dir()/rill/config.toml`: `~/.config` on Linux,
 `~/Library/Application Support` on macOS.
 
+Credentials ([auth/](../../crates/rill-sdk/src/auth/mod.rs)): every request
+reads its bearer token from a `TokenSource`. `ClientConfig::token` gives a
+`StaticToken`; `with_session(credentials, store)` gives a `SessionSource`,
+which a background task refreshes through `SessionService.RefreshSession`
+60 s before the access token expires, saving each rotated refresh token to
+the `CredentialStore` (`KeychainStore`, `FileStore`). The task stops when
+the client is dropped or the server refuses the refresh. `auth::login`
+signs in through an org's provider with the device flow (`DeviceFlow`,
+RFC 8628) and `ExchangeToken`; `sign_in_providers` lists the choices.
+
 For `https://` endpoints the channel uses TLS (`TlsOptions`): the server's
 certificate is checked against the system's roots plus `ca_file`, and
 `client_cert` / `client_key` are presented to servers that require them.

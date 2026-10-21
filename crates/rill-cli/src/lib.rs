@@ -15,6 +15,7 @@ pub mod checkout_meta;
 pub mod cli;
 pub mod commands;
 pub mod context;
+pub mod credentials;
 pub mod error;
 pub mod exit;
 pub mod output;
