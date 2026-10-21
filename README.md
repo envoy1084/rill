@@ -38,7 +38,7 @@ policy or storage.
 cargo build --release --workspace
 export PATH="$PWD/target/release:$PATH"
 
-rill-server --dev                              # in-memory, no auth, :7470 / :7471
+rill dev                                       # every role, no auth, :7470 / :7471
 
 rill repo create app
 rill checkout app ~/app && cd ~/app
@@ -70,9 +70,11 @@ Rust 2021 workspace; `cargo build --workspace` needs Rust 1.85+ and no `protoc`
 | [rill-search](crates/rill-search) | Trigram index and symbol extraction |
 | [rill-exec](crates/rill-exec) | Verification runner with a content-addressed action cache |
 | [rill-proto](crates/rill-proto) | `rill.v1` protobufs and generated tonic services |
-| [rill-server](crates/rill-server) | gRPC API, object HTTP protocol, authentication, event bus, workers |
+| [rill-events](crates/rill-events) | Reading the event log: resumable, filtered tails and retention |
+| [rill-jobs](crates/rill-jobs) | Durable job queues with leased claims and a worker runtime |
+| [rill-api](crates/rill-api) | gRPC API, object HTTP protocol, authentication, watch streams, workers |
 | [rill-sdk](crates/rill-sdk) | Typed client and the local checkout |
-| [rill-cli](crates/rill-cli) | `rill` and `rill-server` binaries |
+| [rill-cli](crates/rill-cli) | The `rill` binary: client commands, `rill dev` and `rill api` |
 | [rill-mcp](crates/rill-mcp) | MCP server exposing the SDK to agents |
 | [rill-git-import](crates/rill-git-import) | One-way importer from git |
 
@@ -84,8 +86,8 @@ The fixed design decisions for v2 are in
 ## Running a server
 
 ```sh
-rill-server init-config > rill.toml      # annotated defaults
-rill-server --config rill.toml
+rill api init-config > rill.toml         # annotated defaults
+rill api --config rill.toml              # --roles api,workers by default
 ```
 
 Storage is `memory`, `local:<dir>` (objects as files, metadata in redb) or

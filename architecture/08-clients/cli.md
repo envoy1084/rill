@@ -1,6 +1,6 @@
 # CLI
 
-`rill-cli` builds two binaries: `rill`, the user command, and `rill-server`,
+`rill-cli` builds two binaries: `rill`, the user command, and `rill-api`,
 the server process. Both are thin `main`s over the `rill_cli` library, so
 tests run the CLI in-process with `run_cli_with_args`. Every command builds
 one JSON value with `rill_mcp::json`, the same encoding the MCP tools return.
@@ -100,24 +100,30 @@ SDK errors it is `rill_mcp::error::sdk_code`, the snake_case gRPC code.
 Scripts and agents can rely on these codes. Exit 3 means "read the output
 and decide".
 
-## rill-server binary
+## Running the service
 
-`server/mod.rs` parses `--config PATH` (or `RILL_CONFIG`), `--dev`,
-`--listen-grpc`, `--listen-http`, `--storage memory|local:<dir>`, and the
-`init-config [--out PATH] [--force]` subcommand. `build_config` loads the
-file and `RILL_*` environment through `ServerConfig::load`, then applies
-the flags. `--dev` sets `dev_mode`, memory storage and ports 7470 / 7471
-(`DEV_GRPC_PORT` / `DEV_HTTP_PORT`). Explicit flags still override those.
-Ctrl-C cancels the root `CancellationToken`. The process exits 0 on clean
-shutdown and 1 on error. `init-config` prints an annotated
-`ServerConfig::default()`. See [configuration](../07-runtime/configuration.md).
+The service runs from the same binary (`server/mod.rs`):
+
+* `rill dev [--data DIR | --memory] [--listen-grpc ADDR] [--listen-http ADDR]`
+  runs every role in one process with `dev_mode` on, storage in
+  `~/.rill/dev` by default, and ports 7470 / 7471 (`DEV_GRPC_PORT` /
+  `DEV_HTTP_PORT`).
+* `rill api [--config PATH] [--listen-grpc ADDR] [--listen-http ADDR]
+  [--storage memory|local:<dir>] [--roles api,workers]` loads the file and
+  `RILL_*` environment through `ServerConfig::load`, then applies the
+  flags. `rill api init-config [--out PATH] [--force]` prints an annotated
+  `ServerConfig::default()`.
+
+Both log at `info` unless `-q` or `RUST_LOG` say otherwise. Ctrl-C cancels
+the root `CancellationToken`. See
+[configuration](../07-runtime/configuration.md).
 
 ## Limitations
 
 - If checkout metadata fails to parse, the CLI logs a warning and acts as if
   it is outside a checkout.
 - `rill import git` prints only its final result, with no progress output.
-- `rill-server` has no flags for S3 storage or Biscuit keys. Those come
+- `rill api` has no flags for S3 storage or Biscuit keys. Those come
   from the config file or the environment.
 - The `--endpoint` help text gives `~/.config/rill/config.toml` as the config
   path. On macOS the SDK reads `~/Library/Application Support/rill/config.toml`.

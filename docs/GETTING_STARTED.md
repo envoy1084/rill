@@ -10,16 +10,18 @@ export PATH="$PWD/target/release:$PATH"
 ## A local server
 
 ```
-rill-server --dev
+rill dev
 ```
 
-`--dev` keeps everything in memory, maps unauthenticated requests to a
-`dev` human principal, and listens on `127.0.0.1:7470` (gRPC) and
-`127.0.0.1:7471` (object protocol and health). For a persistent server:
+`rill dev` runs every role in one process, keeps data in `~/.rill/dev`
+(`--data <dir>` elsewhere, `--memory` for nothing at all), maps
+unauthenticated requests to a `dev` human principal, and listens on
+`127.0.0.1:7470` (gRPC) and `127.0.0.1:7471` (object protocol and health).
+For a real server:
 
 ```
-rill-server init-config > rill.toml      # edit storage, auth, policy
-rill-server --config rill.toml
+rill api init-config > rill.toml         # edit storage, auth, policy
+rill api --config rill.toml
 ```
 
 ## First repository

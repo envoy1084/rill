@@ -42,7 +42,7 @@ The only automatic status move is `Open` to `InProgress` on the first
 
 ## RPCs
 
-`IntentSvc` ([intent.rs](../../crates/rill-server/src/services/intent.rs)):
+`IntentSvc` ([intent.rs](../../crates/rill-api/src/services/intent.rs)):
 
 | RPC | Permit | Effect | Errors |
 | --- | --- | --- | --- |
@@ -117,7 +117,7 @@ contains `trunk@N`, or when its intent's title or body does. See
 ## Code
 
 * [rill-types/src/objects/intent.rs](../../crates/rill-types/src/objects/intent.rs)
-* [rill-server/src/services/intent.rs](../../crates/rill-server/src/services/intent.rs)
+* [rill-api/src/services/intent.rs](../../crates/rill-api/src/services/intent.rs)
 * [rill-review/src/facts.rs](../../crates/rill-review/src/facts.rs) (`version_facts`)
 * [rill-policy/src/submit/entities.rs](../../crates/rill-policy/src/submit/entities.rs) (`intent_kind` attribute)
 * [rill-lander/src/revert.rs](../../crates/rill-lander/src/revert.rs) (`has_forward_fix`)

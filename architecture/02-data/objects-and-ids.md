@@ -151,7 +151,7 @@ the authenticated caller and `created_at` with the server's clock, and
 clears `provenance.sponsor` and `provenance.resolved_by`; the rest of
 `provenance` is recorded as the client's claim. After storing a version the
 server signs its hash with its attestation key (principal
-`service:rill-server`) and appends that signature, so any stored version can
+`service:rill-api`) and appends that signature, so any stored version can
 be traced to the server that accepted it.
 
 ## Change limits

@@ -105,7 +105,7 @@ flowchart LR
   `ArcSwap`). `rill-exec` reaches the lander the same way, through the
   `Verifier` trait (`ExecVerifier`).
 - Layering is strict: lower crates never depend on higher ones, no crate
-  below `rill-proto` depends on tonic, and only `rill-server` depends on
+  below `rill-proto` depends on tonic, and only `rill-api` depends on
   axum. See [crates and layering](crates-and-layering.md).
 
 **Search**
@@ -131,9 +131,9 @@ flowchart LR
 - [land_on_trunk](../../crates/rill-store/src/repo/trunk.rs)
 - [Landing record lock](../../crates/rill-lander/src/land/pipeline.rs)
 - [Lander traits](../../crates/rill-lander/src/traits.rs)
-- [ReviewHooksAdapter](../../crates/rill-server/src/workers/hooks.rs)
-- [Policy hot-swap](../../crates/rill-server/src/state/registry.rs)
-- [SetPolicy handler](../../crates/rill-server/src/services/admin.rs)
+- [ReviewHooksAdapter](../../crates/rill-api/src/workers/hooks.rs)
+- [Policy hot-swap](../../crates/rill-api/src/state/registry.rs)
+- [SetPolicy handler](../../crates/rill-api/src/services/admin.rs)
 - [Rebase](../../crates/rill-core/src/rebase.rs)
 - [Search index](../../crates/rill-search/src/index/search_index.rs)
 

@@ -108,7 +108,7 @@ stops at `limit` or when nothing interesting is queued. Each result is a
 `LogEntry { info, generation }`.
 
 The server's `Log` RPC
-([repo/history.rs](../../crates/rill-server/src/services/repo/history.rs))
+([repo/history.rs](../../crates/rill-api/src/services/repo/history.rs))
 uses `ancestors(start, limit + 1)` for the full walk, so it can detect
 truncation. A `first_parent` log is a plain first-parent loop in the server,
 and a path filter goes to the path-history derivation; neither uses

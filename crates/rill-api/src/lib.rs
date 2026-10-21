@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-pub use config::{AuthConfig, ServerConfig, StorageConfig};
+pub use config::{AuthConfig, Roles, ServerConfig, StorageConfig};
 pub use error::{Error, Result};
 pub use serve::{serve_with_state, Listeners};
 pub use state::{AppState, RepoContext};

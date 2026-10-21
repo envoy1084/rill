@@ -98,7 +98,7 @@ Rust rather than through Datalog, and before the relation check, even in dev
 mode. The effective right is the capability AND the stored relations.
 
 `AdminService.IssueToken`
-([admin.rs](../../crates/rill-server/src/services/admin.rs)) mints tokens:
+([admin.rs](../../crates/rill-api/src/services/admin.rs)) mints tokens:
 
 * Each `pb::Capability.scope` is `repo:<name>[/<dir>][/*]`. All scopes must
   name one repository.
@@ -132,7 +132,7 @@ verb and path, with action `repo.<verb>` and scope `repo:<name>/<path>/*`.
 * [`tokens/issuer.rs`](../../crates/rill-policy/src/tokens/issuer.rs): `Issuer`, `attenuate`, `inspect`.
 * [`tokens/verifier.rs`](../../crates/rill-policy/src/tokens/verifier.rs): `TokenRequest`, `Verified`, `Verifier`.
 * [`tokens/tests.rs`](../../crates/rill-policy/src/tokens/tests.rs): issue, attenuate and reject cases.
-* [`services/admin.rs`](../../crates/rill-server/src/services/admin.rs): `IssueToken`, `WhoAmI`, `parse_scope`, `parse_action`.
+* [`services/admin.rs`](../../crates/rill-api/src/services/admin.rs): `IssueToken`, `WhoAmI`, `parse_scope`, `parse_action`.
 
 ---
 ← Previous: [Identity and authentication](identity-and-auth.md) · [Index](../index.md) · Next: [Permissions](permissions.md) →

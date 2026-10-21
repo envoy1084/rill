@@ -14,13 +14,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
+use rill_api::config::{AuthConfig, StaticToken};
+use rill_api::{build_state, serve_with_state, AppState, Listeners, ServerConfig};
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
 use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
 use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
 use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
-use rill_server::config::{AuthConfig, StaticToken};
-use rill_server::{build_state, serve_with_state, AppState, Listeners, ServerConfig};
 use rill_types::{ObjectHash, ObjectKind, PrincipalKind};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -37,7 +37,7 @@ struct TestServer {
     http: std::net::SocketAddr,
     shutdown: CancellationToken,
     _state: Arc<AppState>,
-    task: tokio::task::JoinHandle<rill_server::Result<()>>,
+    task: tokio::task::JoinHandle<rill_api::Result<()>>,
 }
 
 impl TestServer {

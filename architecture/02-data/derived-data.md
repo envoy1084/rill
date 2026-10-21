@@ -145,9 +145,9 @@ history and blame RPCs, the MCP blame tool and review agent context use
 * [derive/mod.rs](../../crates/rill-core/src/derive/mod.rs), [derive/traits.rs](../../crates/rill-core/src/derive/traits.rs), [derive/ctx.rs](../../crates/rill-core/src/derive/ctx.rs), [derive/manager.rs](../../crates/rill-core/src/derive/manager.rs)
 * [derive/root_tree.rs](../../crates/rill-core/src/derive/root_tree.rs), [derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs), [derive/changed_paths.rs](../../crates/rill-core/src/derive/changed_paths.rs), [derive/registry.rs](../../crates/rill-core/src/derive/registry.rs), [derive/summary.rs](../../crates/rill-core/src/derive/summary.rs), [derive/history.rs](../../crates/rill-core/src/derive/history.rs), [derive/blame.rs](../../crates/rill-core/src/derive/blame.rs)
 * [tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs), [util/lru.rs](../../crates/rill-core/src/util/lru.rs)
-* [rill-server services/repo/refs.rs](../../crates/rill-server/src/services/repo/refs.rs): `GetDerived` compute dispatch
-* [rill-server services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/rill-server/src/workers/deriver.rs): derive jobs
-* [rill-server state/registry.rs](../../crates/rill-server/src/state/registry.rs): manager construction
+* [rill-api services/repo/refs.rs](../../crates/rill-api/src/services/repo/refs.rs): `GetDerived` compute dispatch
+* [rill-api services/repo/write.rs](../../crates/rill-api/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/rill-api/src/workers/deriver.rs): derive jobs
+* [rill-api state/registry.rs](../../crates/rill-api/src/state/registry.rs): manager construction
 
 ---
 ← Previous: [Content and chunking](content-and-chunking.md) · [Index](../index.md) · Next: [Diff](../03-core-algorithms/diff.md) →

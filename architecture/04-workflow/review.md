@@ -176,7 +176,7 @@ service also still broadcasts a `ReviewEvent` per mutation in process.
 * [rill-review/src/service.rs](../../crates/rill-review/src/service.rs), [evaluate.rs](../../crates/rill-review/src/evaluate.rs), [facts.rs](../../crates/rill-review/src/facts.rs), [stacks.rs](../../crates/rill-review/src/stacks.rs)
 * [rill-review/src/lifecycle/](../../crates/rill-review/src/lifecycle/mod.rs): [submit.rs](../../crates/rill-review/src/lifecycle/submit.rs), [versions.rs](../../crates/rill-review/src/lifecycle/versions.rs), [interdiff.rs](../../crates/rill-review/src/lifecycle/interdiff.rs), [status.rs](../../crates/rill-review/src/lifecycle/status.rs), [retry.rs](../../crates/rill-review/src/lifecycle/retry.rs)
 * [rill-review/src/votes/labels.rs](../../crates/rill-review/src/votes/labels.rs), [cast.rs](../../crates/rill-review/src/votes/cast.rs), [threads/comment.rs](../../crates/rill-review/src/threads/comment.rs), [threads/anchor.rs](../../crates/rill-review/src/threads/anchor.rs)
-* [rill-types/src/objects/review.rs](../../crates/rill-types/src/objects/review.rs), [rill-server/src/services/review/](../../crates/rill-server/src/services/review/mod.rs)
+* [rill-types/src/objects/review.rs](../../crates/rill-types/src/objects/review.rs), [rill-api/src/services/review/](../../crates/rill-api/src/services/review/mod.rs)
 
 ---
 ← Previous: [Changes and stacks](changes-and-stacks.md) · [Index](../index.md) · Next: [Review agents](review-agents.md) →

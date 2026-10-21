@@ -93,7 +93,7 @@ server:
 
 ## Storage and hot swap
 
-[`state/policy.rs`](../../crates/rill-server/src/state/policy.rs) stores two
+[`state/policy.rs`](../../crates/rill-api/src/state/policy.rs) stores two
 documents per repository as JSON `StoredPolicy { text, updated_at,
 updated_by }` under `misc/<repo>/policy:<name>`:
 
@@ -146,8 +146,8 @@ sequenceDiagram
 * [`submit/policy.rs`](../../crates/rill-policy/src/submit/policy.rs): `SubmitPolicy`, `SubmitDecision`.
 * [`submit/tests.rs`](../../crates/rill-policy/src/submit/tests.rs): default-policy cases.
 * [`rill-review/src/evaluate.rs`](../../crates/rill-review/src/evaluate.rs): `evaluate_for`, `refresh_status`.
-* [`state/policy.rs`](../../crates/rill-server/src/state/policy.rs), [`state/registry.rs`](../../crates/rill-server/src/state/registry.rs): storage and `reload_policy`.
-* [`services/admin.rs`](../../crates/rill-server/src/services/admin.rs): `GetPolicy`, `SetPolicy`.
+* [`state/policy.rs`](../../crates/rill-api/src/state/policy.rs), [`state/registry.rs`](../../crates/rill-api/src/state/registry.rs): storage and `reload_policy`.
+* [`services/admin.rs`](../../crates/rill-api/src/services/admin.rs): `GetPolicy`, `SetPolicy`.
 
 ---
 ← Previous: [Risk classification](risk-classification.md) · [Index](../index.md) · Next: [Signing](signing.md) →

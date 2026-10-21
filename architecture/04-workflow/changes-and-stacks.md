@@ -41,7 +41,7 @@ read time from the `trunkh/` index.
 ## The single write path
 
 Every RPC that creates a version goes through `commit_version_with`
-([commit.rs](../../crates/rill-server/src/services/repo/commit.rs)). It
+([commit.rs](../../crates/rill-api/src/services/repo/commit.rs)). It
 checks the change limits and path rules, that parents and predecessor
 exist, that no change targets the root path, and that every `Set` content
 and copy source exists. It writes the version object and its
@@ -159,10 +159,10 @@ rebases those dependents automatically.
 
 * [rill-types/src/objects/change.rs](../../crates/rill-types/src/objects/change.rs), [ids.rs](../../crates/rill-types/src/ids.rs)
 * [rill-store/src/repo/versions.rs](../../crates/rill-store/src/repo/versions.rs) (`put_change_version`, `change_versions`)
-* [rill-server/src/services/repo/commit.rs](../../crates/rill-server/src/services/repo/commit.rs), [write.rs](../../crates/rill-server/src/services/repo/write.rs)
+* [rill-api/src/services/repo/commit.rs](../../crates/rill-api/src/services/repo/commit.rs), [write.rs](../../crates/rill-api/src/services/repo/write.rs)
 * [rill-core/src/rebase.rs](../../crates/rill-core/src/rebase.rs), [builder.rs](../../crates/rill-core/src/builder.rs)
 * [rill-review/src/stacks.rs](../../crates/rill-review/src/stacks.rs)
-* [rill-server/src/workers/hooks.rs](../../crates/rill-server/src/workers/hooks.rs) (`dependents_of`)
+* [rill-api/src/workers/hooks.rs](../../crates/rill-api/src/workers/hooks.rs) (`dependents_of`)
 * [rill-sdk/src/stack.rs](../../crates/rill-sdk/src/stack.rs)
 * [rill-cli/src/commands/change.rs](../../crates/rill-cli/src/commands/change.rs), [stack.rs](../../crates/rill-cli/src/commands/stack.rs)
 

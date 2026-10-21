@@ -20,10 +20,10 @@ and policy crates stay free of RPC and storage-layout concerns.
 | `rill-exec` | Action cache, sandbox materialization, verify plans | Scheduling policy |
 | `rill-git-import` | One-way git history import onto trunk | Export, mirroring |
 | `rill-proto` | `rill.v1` protobufs, generated tonic services, domain/wire conversion | Handlers |
-| `rill-server` | Authentication, `RepoContext`, gRPC handlers and watch streams, object HTTP protocol, job handlers and workers, config | Client-side state |
+| `rill-api` | Authentication, `RepoContext`, gRPC handlers and watch streams, object HTTP protocol, job handlers and workers, config | Client-side state |
 | `rill-sdk` | Typed client, blob upload, local checkout (`.rill/`), status, sync, stack helpers | User interface |
 | `rill-mcp` | stdio JSON-RPC tool surface over the SDK for agents; `rill-mcp` binary | Anything the SDK cannot do |
-| `rill-cli` | `rill` and `rill-server` binaries, output formats, exit codes | Business rules |
+| `rill-cli` | `rill` and `rill-api` binaries, output formats, exit codes | Business rules |
 
 Tooling crates, never depended on by product crates: `rill-sim` (seeded
 fault simulation, [simulation](../09-engineering/simulation.md)),
@@ -50,7 +50,7 @@ flowchart BT
   exec[rill-exec] --> core
   import[rill-git-import] --> core
   proto[rill-proto] --> types
-  server[rill-server] --> review & lander & search & exec & proto & events & jobs
+  server[rill-api] --> review & lander & search & exec & proto & events & jobs
   sdk[rill-sdk] --> proto & core
   mcp[rill-mcp] --> sdk & core
   cli[rill-cli] --> sdk & mcp & server & store & import
@@ -60,7 +60,7 @@ flowchart BT
 
 The declared order is `rill-types` <- `rill-store` <- `rill-events` /
 `rill-jobs` / `rill-core` <- `rill-policy` / `rill-review` / `rill-lander` /
-`rill-search` / `rill-exec` <- `rill-server` <- `rill-sdk` <- `rill-cli` /
+`rill-search` / `rill-exec` <- `rill-api` <- `rill-sdk` <- `rill-cli` /
 `rill-mcp`. Lower crates never depend on higher ones. The manifests refine
 that order in a few places:
 
@@ -77,24 +77,24 @@ that order in a few places:
   the domain crates and anything that speaks gRPC.
 - `rill-git-import` sits beside the other `rill-core` consumers. It writes
   through `RepoStore` directly and needs no server.
-- `rill-sdk` depends on `rill-proto` and `rill-core`, not on `rill-server`.
+- `rill-sdk` depends on `rill-proto` and `rill-core`, not on `rill-api`.
   It is a client of the wire surface, not of the server crate.
 - `rill-mcp` depends on `rill-sdk` (and `rill-types`, `rill-core`). It uses
   `rill-proto` and `tonic` only as dev-dependencies for tests.
-- The binary crate `rill-cli` additionally links `rill-server` (for the
-  `rill-server` binary), `rill-store` and `rill-git-import` (for
+- The binary crate `rill-cli` additionally links `rill-api` (for `rill dev`
+  and `rill api`), `rill-store` and `rill-git-import` (for
   `rill import git`), and `rill-mcp` (shared JSON encoding, error codes,
   grep helper). No library crate links those.
-- The tooling crates `rill-sim` and `rill-load` link `rill-server` to reuse
+- The tooling crates `rill-sim` and `rill-load` link `rill-api` to reuse
   its wiring; they sit above every product crate and nothing depends on
   them. `rill-types` exposes its test strategies and clock overrides only
   under the `testing` feature.
 
 RPC and HTTP dependencies:
 
-- `tonic` appears in `rill-proto`, `rill-server`, `rill-sdk` and `rill-cli`.
+- `tonic` appears in `rill-proto`, `rill-api`, `rill-sdk` and `rill-cli`.
   No crate below `rill-proto` depends on it.
-- `axum` appears only in `rill-server`, which serves the object protocol and
+- `axum` appears only in `rill-api`, which serves the object protocol and
   health endpoints.
 - The library crates `rill-core`, `rill-policy`, `rill-review`,
   `rill-lander`, `rill-exec` and `rill-search` have no RPC dependency.
@@ -114,11 +114,11 @@ for build profiles and features.
 - [Workspace manifest](../../Cargo.toml)
 - [rill-policy/Cargo.toml](../../crates/rill-policy/Cargo.toml)
 - [rill-lander/Cargo.toml](../../crates/rill-lander/Cargo.toml)
-- [rill-server/Cargo.toml](../../crates/rill-server/Cargo.toml)
+- [rill-api/Cargo.toml](../../crates/rill-api/Cargo.toml)
 - [rill-sdk/Cargo.toml](../../crates/rill-sdk/Cargo.toml)
 - [rill-mcp/Cargo.toml](../../crates/rill-mcp/Cargo.toml)
 - [rill-cli/Cargo.toml](../../crates/rill-cli/Cargo.toml)
-- [Lander adapters](../../crates/rill-server/src/workers/mod.rs)
+- [Lander adapters](../../crates/rill-api/src/workers/mod.rs)
 
 ---
 ← Previous: [Principles and invariants](principles-and-invariants.md) · [Index](../index.md) · Next: [Glossary](glossary.md) →

@@ -82,8 +82,8 @@ flowchart LR
 
 ## Code
 
-- [rill-server/src/auth/](../../crates/rill-server/src/auth/mod.rs), [rill-server/src/services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs)
-- [rill-server/src/objects/](../../crates/rill-server/src/objects/mod.rs), [rill-exec/src/sandbox/](../../crates/rill-exec/src/sandbox/mod.rs)
+- [rill-api/src/auth/](../../crates/rill-api/src/auth/mod.rs), [rill-api/src/services/repo/write.rs](../../crates/rill-api/src/services/repo/write.rs)
+- [rill-api/src/objects/](../../crates/rill-api/src/objects/mod.rs), [rill-exec/src/sandbox/](../../crates/rill-exec/src/sandbox/mod.rs)
 - [rill-sdk/src/local/](../../crates/rill-sdk/src/local/mod.rs), [rill-policy/src/tokens/](../../crates/rill-policy/src/tokens/mod.rs)
 
 ---

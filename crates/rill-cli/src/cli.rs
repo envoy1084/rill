@@ -177,6 +177,12 @@ pub enum Command {
 
     /// Print a shell completion script.
     Completions(CompletionsArgs),
+
+    /// Run every role in one process for development: no authentication.
+    Dev(crate::server::DevArgs),
+
+    /// Run the service from a configuration file.
+    Api(crate::server::ApiArgs),
 }
 
 /// `rill completions`.

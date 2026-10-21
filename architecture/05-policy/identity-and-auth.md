@@ -3,7 +3,7 @@
 Every request runs as a `Principal`, resolved from its `Authorization` header
 before any handler executes. `rill-policy` defines the credential model
 (`AuthHeaders` to `Authenticator` to `AuthContext`) without seeing tonic or
-axum. `rill-server/src/auth/` adapts both transports onto it and wraps the
+axum. `rill-api/src/auth/` adapts both transports onto it and wraps the
 result in `Permit`, the check every handler runs before touching a repository.
 
 ## Principals
@@ -74,7 +74,7 @@ empty token.
 
 ## Transport layers
 
-[`AuthLayer`](../../crates/rill-server/src/auth/layer.rs) is a tower layer,
+[`AuthLayer`](../../crates/rill-api/src/auth/layer.rs) is a tower layer,
 not a tonic `Interceptor`, because interceptors are synchronous and team lookup
 may need the store. `serve_grpc` wraps the Repo, Workspace, Review, Intent,
 Lander and Admin services. Reflection and gRPC health are not wrapped. The
@@ -83,7 +83,7 @@ the error status. Handlers read it with `caller(&request)`. A missing
 extension is a wiring bug and is still reported as `UNAUTHENTICATED`, so
 nothing proceeds without a caller.
 
-[`require_auth`](../../crates/rill-server/src/auth/http.rs) is the axum
+[`require_auth`](../../crates/rill-api/src/auth/http.rs) is the axum
 equivalent for the object protocol. It guards `/o/{repo}/{kind}/{hash}` and
 `/o/{repo}/batch` and replies `401` with the error text. `/healthz` and
 `/readyz` are open.
@@ -91,7 +91,7 @@ equivalent for the object protocol. It guards `/o/{repo}/{kind}/{hash}` and
 ## Permit
 
 Handlers never check relations directly. `Opened::permit()` builds a
-[`Permit`](../../crates/rill-server/src/auth/permit.rs) for the caller, the
+[`Permit`](../../crates/rill-api/src/auth/permit.rs) for the caller, the
 repository and `dev_mode`. `Permit::check(verb, relation, path)` runs two
 layers:
 
@@ -137,12 +137,12 @@ rejects every bearer token.
 
 * [`rill-policy/src/identity.rs`](../../crates/rill-policy/src/identity.rs): `AuthHeaders`, `AuthContext`, `Authenticator`, `StaticTokenAuthenticator`, `BiscuitAuthenticator`, `TeamResolver`.
 * [`rill-types/src/principal.rs`](../../crates/rill-types/src/principal.rs): `Principal`, `PrincipalKind`.
-* [`auth/authenticator.rs`](../../crates/rill-server/src/auth/authenticator.rs): `build_issuer`, `build_authenticator`, `CompositeAuthenticator`, `authenticate`.
-* [`auth/context.rs`](../../crates/rill-server/src/auth/context.rs): `caller`, `bearer_token`, `dev_context`.
-* [`auth/layer.rs`](../../crates/rill-server/src/auth/layer.rs), [`auth/http.rs`](../../crates/rill-server/src/auth/http.rs): gRPC and HTTP middleware.
-* [`auth/permit.rs`](../../crates/rill-server/src/auth/permit.rs): `Permit`.
-* [`services/common.rs`](../../crates/rill-server/src/services/common.rs): `Opened`, `open`.
-* [`config/auth.rs`](../../crates/rill-server/src/config/auth.rs), [`config/env.rs`](../../crates/rill-server/src/config/env.rs): `AuthConfig`, `StaticToken`, env overrides.
+* [`auth/authenticator.rs`](../../crates/rill-api/src/auth/authenticator.rs): `build_issuer`, `build_authenticator`, `CompositeAuthenticator`, `authenticate`.
+* [`auth/context.rs`](../../crates/rill-api/src/auth/context.rs): `caller`, `bearer_token`, `dev_context`.
+* [`auth/layer.rs`](../../crates/rill-api/src/auth/layer.rs), [`auth/http.rs`](../../crates/rill-api/src/auth/http.rs): gRPC and HTTP middleware.
+* [`auth/permit.rs`](../../crates/rill-api/src/auth/permit.rs): `Permit`.
+* [`services/common.rs`](../../crates/rill-api/src/services/common.rs): `Opened`, `open`.
+* [`config/auth.rs`](../../crates/rill-api/src/config/auth.rs), [`config/env.rs`](../../crates/rill-api/src/config/env.rs): `AuthConfig`, `StaticToken`, env overrides.
 
 ---
 ← Previous: [Intents](../04-workflow/intents.md) · [Index](../index.md) · Next: [Capability tokens](capability-tokens.md) →

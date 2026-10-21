@@ -242,7 +242,7 @@ impl RepoRegistry {
             .await?
             .ok_or_else(|| Error::not_found(format!("repository {id}")))?;
         let ctx = Arc::new(self.build(config).await?);
-        workers::spawn_repo_workers(&ctx);
+        workers::spawn_repo_workers(&ctx, self.config.roles);
         self.contexts.insert(id, ctx.clone());
         Ok(ctx)
     }

@@ -63,6 +63,8 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Admin(cmd) => admin::run(ctx, cmd).await,
         Command::Import(cmd) => import::run(ctx, cmd).await,
         Command::Watch(cmd) => watch::run(ctx, cmd).await,
+        Command::Dev(args) => crate::server::dev(args).await,
+        Command::Api(args) => crate::server::api(args).await,
         Command::Completions(args) => {
             let mut cmd = Cli::command();
             let mut buf = Vec::new();

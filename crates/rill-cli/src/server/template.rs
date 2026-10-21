@@ -1,17 +1,18 @@
-//! The annotated configuration file `rill-server init-config` writes.
+//! The annotated configuration file `rill api init-config` writes.
 //!
 //! The body is the serialized default configuration, so every key and
 //! default is exactly what the server would use; the comments explain the
 //! sections and the alternatives that the defaults do not show.
 
-use rill_server::ServerConfig;
+use rill_api::ServerConfig;
 
-const HEADER: &str = r#"# rill-server configuration.
+const HEADER: &str = r#"# rill api configuration.
 #
 # Every key is optional; a missing key takes the default shown here. The
 # RILL_* environment variables override individual keys:
 #   RILL_LISTEN_GRPC, RILL_LISTEN_HTTP   socket addresses
 #   RILL_DEV_MODE                        true/false
+#   RILL_ROLES                           api | workers | api,workers
 #   RILL_STORAGE                         memory | local:<dir> | s3:<url>
 #   RILL_S3_PREFIX, RILL_S3_META_DIR     details for s3 storage
 #   RILL_STATIC_TOKENS                   token=name[:kind[:team,team]];...

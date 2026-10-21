@@ -157,8 +157,8 @@ time, not tasks.
 * [rill-events](../../crates/rill-events/src/lib.rs), [rill-jobs](../../crates/rill-jobs/src/lib.rs)
 * [rill-store repo/events.rs](../../crates/rill-store/src/repo/events.rs), [repo/leases.rs](../../crates/rill-store/src/repo/leases.rs), [repo/reviews.rs](../../crates/rill-store/src/repo/reviews.rs)
 * [rill-lander land/followups.rs](../../crates/rill-lander/src/land/followups.rs)
-* [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs), [workers/deriver.rs](../../crates/rill-server/src/workers/deriver.rs), [workers/indexer.rs](../../crates/rill-server/src/workers/indexer.rs)
-* [services/repo/watch/](../../crates/rill-server/src/services/repo/watch/mod.rs), [services/review/watch.rs](../../crates/rill-server/src/services/review/watch.rs), [state/events.rs](../../crates/rill-server/src/state/events.rs)
+* [workers/mod.rs](../../crates/rill-api/src/workers/mod.rs), [workers/deriver.rs](../../crates/rill-api/src/workers/deriver.rs), [workers/indexer.rs](../../crates/rill-api/src/workers/indexer.rs)
+* [services/repo/watch/](../../crates/rill-api/src/services/repo/watch/mod.rs), [services/review/watch.rs](../../crates/rill-api/src/services/review/watch.rs), [state/events.rs](../../crates/rill-api/src/state/events.rs)
 
 ---
 ← Previous: [API surface](api-surface.md) · [Index](../index.md) · Next: [Configuration](configuration.md) →

@@ -1,7 +1,7 @@
 //! `rill import git`: one-way import of a git repository.
 //!
 //! Import runs directly against a storage directory (the same layout
-//! `rill-server --storage local:<dir>` uses), not through the API: it
+//! `rill api --storage local:<dir>` uses), not through the API: it
 //! writes thousands of objects and needs the importer's sha map, neither of
 //! which the client API exposes. Run it while the server is stopped, or
 //! against a directory the server will be started on afterwards. Passing

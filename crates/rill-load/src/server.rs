@@ -2,7 +2,7 @@
 
 use std::net::SocketAddr;
 
-use rill_server::{Listeners, ServerConfig, StorageConfig};
+use rill_api::{Listeners, ServerConfig, StorageConfig};
 use tokio_util::sync::CancellationToken;
 
 /// A dev-mode server in this process; stops when dropped.
@@ -23,10 +23,10 @@ impl EmbeddedServer {
             ..ServerConfig::default()
         };
         let shutdown = CancellationToken::new();
-        let state = rill_server::build_state(config, shutdown.clone()).await?;
+        let state = rill_api::build_state(config, shutdown.clone()).await?;
         let token = shutdown.clone();
         tokio::spawn(async move {
-            if let Err(e) = rill_server::serve_with_state(state, listeners, token).await {
+            if let Err(e) = rill_api::serve_with_state(state, listeners, token).await {
                 eprintln!("embedded server stopped: {e}");
             }
         });

@@ -89,7 +89,7 @@ pub fn error_response(err: ObjectError) -> Response {
 }
 
 /// Build the HTTP router.
-pub fn router(state: Arc<AppState>) -> Router {
+pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
     let objects = Router::new()
         .route(
             "/o/{repo}/{kind}/{hash}",
@@ -100,11 +100,15 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/o/{repo}/batch", post(batch::batch))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .layer(axum::extract::DefaultBodyLimit::max(MAX_PUT_BYTES));
-    Router::new()
+    let health = Router::new()
         .route("/healthz", get(healthz))
-        .route("/readyz", get(readyz))
-        .merge(objects)
-        .with_state(state)
+        .route("/readyz", get(readyz));
+    let router = if serve_objects {
+        health.merge(objects)
+    } else {
+        health
+    };
+    router.with_state(state)
 }
 
 /// Largest object accepted by `PUT`.

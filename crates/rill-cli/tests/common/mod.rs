@@ -5,7 +5,7 @@
 use std::net::SocketAddr;
 use std::path::Path;
 
-use rill_server::{Listeners, ServerConfig, StorageConfig};
+use rill_api::{Listeners, ServerConfig, StorageConfig};
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
@@ -26,12 +26,12 @@ impl Server {
             ..ServerConfig::default()
         };
         let shutdown = CancellationToken::new();
-        let state = rill_server::build_state(config, shutdown.clone())
+        let state = rill_api::build_state(config, shutdown.clone())
             .await
             .unwrap();
         let token = shutdown.clone();
         tokio::spawn(async move {
-            rill_server::serve_with_state(state, listeners, token)
+            rill_api::serve_with_state(state, listeners, token)
                 .await
                 .unwrap();
         });

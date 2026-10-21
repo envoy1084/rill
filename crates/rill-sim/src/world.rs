@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
+use rill_api::workers::ReviewHooksAdapter;
 use rill_core::derive::RootTree;
 use rill_core::{read_content, CommitGraph, DeriveManager, TreeOps};
 use rill_lander::{AlwaysGreen, LandPolicy, Lander};
 use rill_policy::{RiskConfig, SubmitPolicy};
 use rill_review::{LabelSet, ReviewService};
-use rill_server::workers::ReviewHooksAdapter;
 use rill_store::{RepoStore, Stores};
 use rill_types::{ChangeVersionHash, EntryKind, RepoPath};
 

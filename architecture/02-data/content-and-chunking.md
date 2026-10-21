@@ -71,7 +71,7 @@ checks the announced `size` and optional `expected_hash` (the `Blob`-kind
 hash of the bytes, whatever form is chosen) against the result. The SDK's
 `store_content` inlines at or below `INLINE_THRESHOLD` and otherwise sends
 `PutBlob`, so chunking is always decided on the server. The change builder,
-text merge and patch paths in `rill-core` and `rill-server` call
+text merge and patch paths in `rill-core` and `rill-api` call
 `store_content` directly.
 
 On `PutChange` the server checks each `Set` content with
@@ -121,7 +121,7 @@ range of any file needs memory for a few chunks, not the file.
 * [rill-core blobs/](../../crates/rill-core/src/blobs/mod.rs): `store.rs` (`store_content`, `chunk_boundaries`), `stream.rs` (`store_content_stream`), `read.rs` (`read_content`, `read_content_range`, `content_parts`)
 * [rill-types objects/blob.rs](../../crates/rill-types/src/objects/blob.rs): `ContentRef`, `ChunkRef`, `BlobManifest`, thresholds
 * [rill-store object.rs](../../crates/rill-store/src/object.rs): `put_blob`, `get_many`, `verify`
-* [rill-server services/repo/trees.rs](../../crates/rill-server/src/services/repo/trees.rs): `PutBlob`, `GetBlob`, `check_content_exists`, `MAX_INLINE`
+* [rill-api services/repo/trees.rs](../../crates/rill-api/src/services/repo/trees.rs): `PutBlob`, `GetBlob`, `check_content_exists`, `MAX_INLINE`
 * [rill-sdk repo/blobs.rs](../../crates/rill-sdk/src/repo/blobs.rs): client-side `store_content` and `put_blob`
 
 ---

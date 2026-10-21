@@ -1,6 +1,6 @@
 [package]
-name = "rill-server"
-description = "The Rill services: gRPC API, object HTTP protocol, event bus and background workers"
+name = "rill-api"
+description = "The Rill services: gRPC API, object HTTP protocol and background workers"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -37,8 +37,8 @@ stateDiagram-v2
 flowchart LR
   CLI[rill CLI] --> SDK[rill-sdk]
   MCP[rill-mcp] --> SDK
-  SDK -->|gRPC rill.v1| GRPC[rill-server: auth + handlers]
-  SDK -->|HTTP /o/repo/...| OBJ[rill-server: object protocol]
+  SDK -->|gRPC rill.v1| GRPC[rill-api: auth + handlers]
+  SDK -->|HTTP /o/repo/...| OBJ[rill-api: object protocol]
   GRPC --> Review[rill-review]
   GRPC --> Lander[rill-lander]
   GRPC --> Policy[rill-policy]
@@ -136,11 +136,11 @@ The rules these mechanisms must keep are listed in
 
 ## Code
 
-- [Server composition](../../crates/rill-server/src/lib.rs)
-- [RepoContext and registry](../../crates/rill-server/src/state/registry.rs)
-- [Request opening](../../crates/rill-server/src/services/common.rs)
-- [Permission checks](../../crates/rill-server/src/auth/permit.rs)
-- [Event bus](../../crates/rill-server/src/state/events.rs)
+- [Server composition](../../crates/rill-api/src/lib.rs)
+- [RepoContext and registry](../../crates/rill-api/src/state/registry.rs)
+- [Request opening](../../crates/rill-api/src/services/common.rs)
+- [Permission checks](../../crates/rill-api/src/auth/permit.rs)
+- [Event bus](../../crates/rill-api/src/state/events.rs)
 - [Trunk CAS](../../crates/rill-store/src/repo/trunk.rs)
 - [Landing pipeline](../../crates/rill-lander/src/land/pipeline.rs)
 - [Object model](../../crates/rill-types/src/objects/mod.rs)

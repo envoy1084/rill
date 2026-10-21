@@ -9,7 +9,7 @@ implements `MetaStore` is on the next page, [metadata engines](metadata-engines.
 
 ```mermaid
 flowchart TD
-    SVC["rill-core, rill-review, rill-lander, rill-server"] --> RS["RepoStore<br/>typed accessors over RepoKeys"]
+    SVC["rill-core, rill-review, rill-lander, rill-api"] --> RS["RepoStore<br/>typed accessors over RepoKeys"]
     RS --> OS["ObjectStore<br/>get / has / put / has_many / get_many"]
     RS --> MS["MetaStore<br/>get / scan / counter / transact"]
     OS --> V["VerifiedObjectStore"] --> MO["memory / local files / object_store"]
@@ -237,7 +237,7 @@ version or method.
 * [keys.rs](../../crates/rill-store/src/keys.rs), [repo/](../../crates/rill-store/src/repo/mod.rs) ([landing.rs](../../crates/rill-store/src/repo/landing.rs), [reviews.rs](../../crates/rill-store/src/repo/reviews.rs), [idem.rs](../../crates/rill-store/src/repo/idem.rs), [orgs.rs](../../crates/rill-store/src/repo/orgs.rs), [events.rs](../../crates/rill-store/src/repo/events.rs)), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal.rs](../../crates/rill-store/src/seal.rs)
 * [memory.rs](../../crates/rill-store/src/memory.rs), [local/objects.rs](../../crates/rill-store/src/local/objects.rs), [s3.rs](../../crates/rill-store/src/s3.rs)
 * [tests/conformance/](../../crates/rill-store/tests/conformance/main.rs): every scenario on every backend
-* [rill-server state/stores.rs](../../crates/rill-server/src/state/stores.rs): `open_stores`
+* [rill-api state/stores.rs](../../crates/rill-api/src/state/stores.rs): `open_stores`
 
 ---
 ← Previous: [Objects and ids](objects-and-ids.md) · [Index](../index.md) · Next: [Metadata engines](metadata-engines.md) →

@@ -11,7 +11,7 @@ publish = false
 [dependencies]
 rill-types = { workspace = true }
 rill-sdk = { workspace = true }
-rill-server = { workspace = true }
+rill-api = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 bytes = { workspace = true }

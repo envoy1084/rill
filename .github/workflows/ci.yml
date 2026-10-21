@@ -57,6 +57,6 @@ jobs:
           done
           fdbcli --exec status
           exit 1
-      - run: cargo clippy -p rill-store -p rill-server -p rill-cli --all-targets --features rill-store/fdb,rill-store/s3,rill-server/fdb
+      - run: cargo clippy -p rill-store -p rill-api -p rill-cli --all-targets --features rill-store/fdb,rill-store/s3,rill-api/fdb
       - run: cargo test -p rill-store --features fdb,s3
-      - run: cargo test -p rill-server --features fdb --test grpc
+      - run: cargo test -p rill-api --features fdb --test grpc

@@ -4261,6 +4261,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "rill-api"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "axum",
+ "blake3",
+ "bytes",
+ "dashmap",
+ "futures",
+ "hex",
+ "http",
+ "http-body-util",
+ "prost 0.14.4",
+ "rill-core",
+ "rill-events",
+ "rill-exec",
+ "rill-jobs",
+ "rill-lander",
+ "rill-policy",
+ "rill-proto",
+ "rill-review",
+ "rill-search",
+ "rill-store",
+ "rill-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "toml",
+ "tonic",
+ "tonic-health",
+ "tonic-prost",
+ "tonic-reflection",
+ "tower",
+ "tower-http 0.7.1",
+ "tracing",
+]
+
+[[package]]
 name = "rill-bench"
 version = "0.1.0"
 dependencies = [
@@ -4283,11 +4326,11 @@ dependencies = [
  "comfy-table",
  "futures",
  "owo-colors",
+ "rill-api",
  "rill-core",
  "rill-git-import",
  "rill-mcp",
  "rill-sdk",
- "rill-server",
  "rill-store",
  "rill-types",
  "serde",
@@ -4423,8 +4466,8 @@ dependencies = [
  "hdrhistogram",
  "parking_lot",
  "rand 0.10.3",
+ "rill-api",
  "rill-sdk",
- "rill-server",
  "rill-types",
  "serde_json",
  "tokio",
@@ -4557,49 +4600,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rill-server"
-version = "0.1.0"
-dependencies = [
- "arc-swap",
- "async-trait",
- "axum",
- "blake3",
- "bytes",
- "dashmap",
- "futures",
- "hex",
- "http",
- "http-body-util",
- "prost 0.14.4",
- "rill-core",
- "rill-events",
- "rill-exec",
- "rill-jobs",
- "rill-lander",
- "rill-policy",
- "rill-proto",
- "rill-review",
- "rill-search",
- "rill-store",
- "rill-types",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "toml",
- "tonic",
- "tonic-health",
- "tonic-prost",
- "tonic-reflection",
- "tower",
- "tower-http 0.7.1",
- "tracing",
-]
-
-[[package]]
 name = "rill-sim"
 version = "0.1.0"
 dependencies = [
@@ -4608,12 +4608,12 @@ dependencies = [
  "bytes",
  "clap",
  "parking_lot",
+ "rill-api",
  "rill-core",
  "rill-jobs",
  "rill-lander",
  "rill-policy",
  "rill-review",
- "rill-server",
  "rill-store",
  "rill-types",
  "tokio",

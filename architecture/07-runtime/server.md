@@ -1,15 +1,15 @@
 # Server
 
-`rill-server` is the one process that owns every repository. It serves the
+`rill-api` is the one process that owns every repository. It serves the
 `rill.v1` gRPC API and the HTTP object protocol, and runs the background
-workers for each repository. The crate is a library; the `rill-server`
-binary in `rill-cli` builds a `ServerConfig` and calls `rill_server::run`.
+workers for each repository. The crate is a library; `rill dev` and
+`rill api` in `rill-cli` build a `ServerConfig` and call `rill_api::run`.
 
 ## Composition
 
 ```mermaid
 flowchart TD
-    Bin[rill-server binary] -->|ServerConfig| Run[rill_server::run]
+    Bin[rill dev / rill api] -->|ServerConfig| Run[rill_api::run]
     Run --> L[Listeners::bind]
     Run --> BS[build_state]
     BS --> AS[AppState]
@@ -104,7 +104,7 @@ change fails the request, updates review and publishes `VersionCreated`.
 
 ## Error mapping
 
-Every lower crate's error converts into `rill_server::Error` (`error.rs`).
+Every lower crate's error converts into `rill_api::Error` (`error.rs`).
 `Error::code()` picks the gRPC code from the meaning of the variant, not from
 the crate that produced it. The status message is the error's `Display`
 text, and `INTERNAL` errors are logged at error level.
@@ -147,10 +147,10 @@ claims expire.
 
 ## Code
 
-* [lib.rs](../../crates/rill-server/src/lib.rs), [serve.rs](../../crates/rill-server/src/serve.rs), [error.rs](../../crates/rill-server/src/error.rs)
-* [state/app.rs](../../crates/rill-server/src/state/app.rs), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [state/policy.rs](../../crates/rill-server/src/state/policy.rs)
-* [auth/layer.rs](../../crates/rill-server/src/auth/layer.rs), [auth/authenticator.rs](../../crates/rill-server/src/auth/authenticator.rs), [auth/permit.rs](../../crates/rill-server/src/auth/permit.rs), [auth/context.rs](../../crates/rill-server/src/auth/context.rs)
-* [services/common.rs](../../crates/rill-server/src/services/common.rs), [services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs)
+* [lib.rs](../../crates/rill-api/src/lib.rs), [serve.rs](../../crates/rill-api/src/serve.rs), [error.rs](../../crates/rill-api/src/error.rs)
+* [state/app.rs](../../crates/rill-api/src/state/app.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [state/policy.rs](../../crates/rill-api/src/state/policy.rs)
+* [auth/layer.rs](../../crates/rill-api/src/auth/layer.rs), [auth/authenticator.rs](../../crates/rill-api/src/auth/authenticator.rs), [auth/permit.rs](../../crates/rill-api/src/auth/permit.rs), [auth/context.rs](../../crates/rill-api/src/auth/context.rs)
+* [services/common.rs](../../crates/rill-api/src/services/common.rs), [services/repo/write.rs](../../crates/rill-api/src/services/repo/write.rs)
 
 ---
 ← Previous: [Git import](../06-services/git-import.md) · [Index](../index.md) · Next: [API surface](api-surface.md) →

@@ -183,7 +183,7 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 * [rill-lander/src/queue.rs](../../crates/rill-lander/src/queue.rs), [conflict_graph.rs](../../crates/rill-lander/src/conflict_graph.rs), [config.rs](../../crates/rill-lander/src/config.rs), [events.rs](../../crates/rill-lander/src/events.rs), [traits.rs](../../crates/rill-lander/src/traits.rs)
 * [rill-lander/src/land/followups.rs](../../crates/rill-lander/src/land/followups.rs) (jobs a landing enqueues)
 * [rill-store/src/repo/landing.rs](../../crates/rill-store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records), [repo/leases.rs](../../crates/rill-store/src/repo/leases.rs), [repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)
-* [rill-server/src/services/review/mod.rs](../../crates/rill-server/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-server/src/services/common.rs) (`ticket_status`), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs)
+* [rill-api/src/services/review/mod.rs](../../crates/rill-api/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-api/src/services/common.rs) (`ticket_status`), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [workers/mod.rs](../../crates/rill-api/src/workers/mod.rs)
 
 ---
 ← Previous: [Review agents](review-agents.md) · [Index](../index.md) · Next: [Post-land verification](post-land-verification.md) →

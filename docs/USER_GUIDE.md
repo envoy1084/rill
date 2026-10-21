@@ -19,10 +19,10 @@ project's "Rill User Guide" doc; this is the same content for the repo.
 
     cargo build --release --workspace
     export PATH="$PWD/target/release:$PATH"
-    rill-server --dev                    # memory, no auth, :7470 / :7471
+    rill dev                             # data in ~/.rill/dev, no auth, :7470 / :7471
 
-For a persistent server: `rill-server init-config > rill.toml`, set
-`storage`, `auth` and `dev_mode = false`, then `rill-server --config rill.toml`.
+For a real server: `rill api init-config > rill.toml`, set `storage`,
+`auth` and `dev_mode = false`, then `rill api --config rill.toml`.
 Clients: `export RILL_ENDPOINT=http://server:7470 RILL_TOKEN=...`.
 
 ## 2. Create the repo and a checkout

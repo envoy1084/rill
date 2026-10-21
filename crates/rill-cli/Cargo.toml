@@ -1,6 +1,6 @@
 [package]
 name = "rill-cli"
-description = "The `rill` user command and the `rill-server` binary"
+description = "The `rill` command: the client, `rill dev` and `rill api`"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,23 +12,20 @@ name = "rill_cli"
 path = "src/lib.rs"
 
 [features]
-# Let `rill-server` keep metadata in FoundationDB.
-fdb = ["rill-server/fdb"]
+# Let `rill api` keep metadata in FoundationDB.
+fdb = ["rill-api/fdb"]
 
 [[bin]]
 name = "rill"
 path = "src/bin/rill.rs"
 
-[[bin]]
-name = "rill-server"
-path = "src/bin/rill_server.rs"
 
 [dependencies]
 rill-sdk = { workspace = true }
 rill-mcp = { workspace = true }
 rill-types = { workspace = true }
 rill-core = { workspace = true }
-rill-server = { workspace = true }
+rill-api = { workspace = true }
 rill-store = { workspace = true }
 rill-git-import = { workspace = true }
 clap = { workspace = true }

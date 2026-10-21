@@ -13,6 +13,7 @@ impl ServerConfig {
     ///
     /// * `RILL_LISTEN_GRPC`, `RILL_LISTEN_HTTP`: socket addresses;
     /// * `RILL_DEV_MODE`: `true`/`false`;
+    /// * `RILL_ROLES`: `api`, `workers` or `api,workers`;
     /// * `RILL_STORAGE`: `memory`, `local:<dir>` or `s3:<url>`;
     /// * `RILL_S3_PREFIX`, `RILL_S3_META_DIR`: details for `s3:` storage;
     /// * `RILL_FDB_CLUSTER_FILE` (empty for the default), `RILL_FDB_ROOT`:
@@ -29,6 +30,9 @@ impl ServerConfig {
         }
         if let Some(v) = lookup("RILL_LISTEN_HTTP") {
             self.listen_http = parse_env("RILL_LISTEN_HTTP", &v)?;
+        }
+        if let Some(v) = lookup("RILL_ROLES") {
+            self.roles = super::Roles::parse(&v)?;
         }
         if let Some(v) = lookup("RILL_DEV_MODE") {
             self.dev_mode = parse_bool("RILL_DEV_MODE", &v)?;

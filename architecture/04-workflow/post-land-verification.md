@@ -131,9 +131,9 @@ record (target `postland`) with external reports, worst wins: `Failed` or
 
 * [rill-lander/src/postland/worker.rs](../../crates/rill-lander/src/postland/worker.rs), [record.rs](../../crates/rill-lander/src/postland/record.rs)
 * [rill-lander/src/revert.rs](../../crates/rill-lander/src/revert.rs), [traits.rs](../../crates/rill-lander/src/traits.rs)
-* [rill-server/src/workers/hooks.rs](../../crates/rill-server/src/workers/hooks.rs), [verifier.rs](../../crates/rill-server/src/workers/verifier.rs), [mod.rs](../../crates/rill-server/src/workers/mod.rs)
-* [rill-server/src/services/lander.rs](../../crates/rill-server/src/services/lander.rs)
-* [rill-server/src/config/server.rs](../../crates/rill-server/src/config/server.rs) (`PostLandConfig`)
+* [rill-api/src/workers/hooks.rs](../../crates/rill-api/src/workers/hooks.rs), [verifier.rs](../../crates/rill-api/src/workers/verifier.rs), [mod.rs](../../crates/rill-api/src/workers/mod.rs)
+* [rill-api/src/services/lander.rs](../../crates/rill-api/src/services/lander.rs)
+* [rill-api/src/config/server.rs](../../crates/rill-api/src/config/server.rs) (`PostLandConfig`)
 
 ---
 ← Previous: [Landing](landing.md) · [Index](../index.md) · Next: [Intents](intents.md) →

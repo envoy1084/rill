@@ -19,7 +19,7 @@ flowchart LR
 ```
 
 The server's `Diff` RPC
-([services/diff.rs](../../crates/rill-server/src/services/diff.rs)) drives
+([services/diff.rs](../../crates/rill-api/src/services/diff.rs)) drives
 this pipeline. It treats an absent side as empty, reports content larger
 than `MAX_DIFF_BYTES` (4 MiB) as binary, and returns either structured hunks
 or unified text depending on `DiffFormat`.
@@ -131,7 +131,7 @@ path.
 - [diff/patch.rs](../../crates/rill-core/src/diff/patch.rs)
 - [diff/binary.rs](../../crates/rill-core/src/diff/binary.rs)
 - [diff/tree.rs](../../crates/rill-core/src/diff/tree.rs)
-- [rill-server services/diff.rs](../../crates/rill-server/src/services/diff.rs)
+- [rill-api services/diff.rs](../../crates/rill-api/src/services/diff.rs)
 
 ---
 ← Previous: [Derived data](../02-data/derived-data.md) · [Index](../index.md) · Next: [Merge](merge.md) →

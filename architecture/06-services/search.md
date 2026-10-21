@@ -8,7 +8,7 @@ land on trunk.
 
 ```mermaid
 flowchart LR
-  subgraph server[rill-server]
+  subgraph server[rill-api]
     grep[RepoSvc::grep_impl] --> ctx[RepoContext::grep]
     idx[workers::indexer index jobs]
   end
@@ -153,7 +153,7 @@ constructs one and there is no RPC.
 * [index/search_index.rs](../../crates/rill-search/src/index/search_index.rs), [index/persist.rs](../../crates/rill-search/src/index/persist.rs), [index/docs.rs](../../crates/rill-search/src/index/docs.rs), [index/manifest.rs](../../crates/rill-search/src/index/manifest.rs), [index/config.rs](../../crates/rill-search/src/index/config.rs)
 * [query/search.rs](../../crates/rill-search/src/query/search.rs), [query/request.rs](../../crates/rill-search/src/query/request.rs), [query/lines.rs](../../crates/rill-search/src/query/lines.rs)
 * [symbols/index.rs](../../crates/rill-search/src/symbols/index.rs), [symbols/extract.rs](../../crates/rill-search/src/symbols/extract.rs), [symbols/lang.rs](../../crates/rill-search/src/symbols/lang.rs)
-* Server: [workers/indexer.rs](../../crates/rill-server/src/workers/indexer.rs), [services/repo/grep.rs](../../crates/rill-server/src/services/repo/grep.rs), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [repo.proto](../../crates/rill-proto/proto/rill/v1/repo.proto)
+* Server: [workers/indexer.rs](../../crates/rill-api/src/workers/indexer.rs), [services/repo/grep.rs](../../crates/rill-api/src/services/repo/grep.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [repo.proto](../../crates/rill-proto/proto/rill/v1/repo.proto)
 
 ---
 ← Previous: [Threat model](../05-policy/threat-model.md) · [Index](../index.md) · Next: [Exec](exec.md) →

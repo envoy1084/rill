@@ -13,7 +13,7 @@ the other backends must match.
 flowchart TD
     U[Unit<br/>src/** in every crate] --> I[Crate integration<br/>tests/*.rs over Stores::memory]
     I --> M[Mock server<br/>rill-sdk, rill-mcp vs hand-written tonic services]
-    I --> G[gRPC smoke<br/>real rill-server on ephemeral ports]
+    I --> G[gRPC smoke<br/>real rill-api on ephemeral ports]
     G --> E[CLI end-to-end<br/>server + run_cli_with_args]
     I --> X[External<br/>rill-git-import with a real git repo]
 ```
@@ -23,7 +23,7 @@ flowchart TD
 | Unit | one module: encodings, parsers, policy evaluation, hash framing, exit codes | `src/**`; most in `rill-policy`, `rill-core`, `rill-proto`, `rill-search`, `rill-store` |
 | Crate integration | a crate's public API over memory stores | `tests/` in `rill-store`, `rill-core`, `rill-review`, `rill-lander`, `rill-search` |
 | Mock server | SDK and MCP against hand-written tonic services | `rill-sdk/tests`, `rill-mcp/tests` |
-| gRPC end to end | the real server through generated clients and raw HTTP | `rill-server/tests/grpc/` |
+| gRPC end to end | the real server through generated clients and raw HTTP | `rill-api/tests/grpc/` |
 | CLI | the real server driven through the CLI library; clap parsing alone | `rill-cli/tests/cli_e2e.rs`, `rill-cli/tests/landing.rs`, `rill-cli/tests/parse.rs` |
 | External | import from a repository built with `git` | `rill-git-import/tests/real_git.rs` |
 
@@ -62,7 +62,7 @@ round trips in `src/convert/roundtrip_tests.rs`.
 - **MCP mock** (`rill-mcp/tests/common/mod.rs`): a smaller `MockRepo` in the
   same style. Its `Grep` answers `Unimplemented`, so the MCP tests exercise
   the tree-walk fallback.
-- **Server harness** (`rill-server/tests/grpc/main.rs`): `TestServer` calls `Listeners::bind`
+- **Server harness** (`rill-api/tests/grpc/main.rs`): `TestServer` calls `Listeners::bind`
   on port 0, then `build_state` and `serve_with_state`
   ([server](../07-runtime/server.md)). `rill-cli/tests/common/mod.rs`
   embeds a dev-mode memory server the same way for every CLI test, on a
@@ -87,7 +87,7 @@ round trips in `src/convert/roundtrip_tests.rs`.
   concurrency.rs`, which fails without the post-vote re-check); a retried
   mutation returns its first response, a reused id with another request
   is refused, and a retry after a simulated crash between commit and reply
-  returns the version already committed (`rill-server/tests/grpc/
+  returns the version already committed (`rill-api/tests/grpc/
   retries.rs`); undo restores the sparse profile and undoing the undo
   redoes (`grpc/workspaces.rs`); repositories are addressed within their
   org (`grpc/orgs.rs`); the land transaction lands batches at gap-free
@@ -109,7 +109,7 @@ round trips in `src/convert/roundtrip_tests.rs`.
   write records one event, and tails resume after a cursor and wake on new
   events on every backend (`rill-store/tests/conformance/events.rs`,
   `rill-events`); `WatchEvents` delivers each change once over gRPC
-  (`rill-server/tests/grpc/events.rs`). A one-file commit writes one node per directory
+  (`rill-api/tests/grpc/events.rs`). A one-file commit writes one node per directory
   level (`rill-bench/tests/node_writes.rs`). The server stores every
   land-critical value before replying to a commit.
 - **Content**: streamed storage equals whole-content storage; a 4 KiB range
@@ -152,8 +152,8 @@ round trips in `src/convert/roundtrip_tests.rs`.
 ```
 cargo test --workspace                       # the check job in CI
 cargo test -p rill-store --features fdb,s3   # conformance on FoundationDB too
-cargo test -p rill-server --features fdb --test grpc
-cargo test -p rill-server --test grpc
+cargo test -p rill-api --features fdb --test grpc
+cargo test -p rill-api --test grpc
 cargo test -p rill-cli --test cli_e2e
 RUST_LOG=debug cargo test -p rill-lander -- --nocapture
 ```
@@ -226,7 +226,7 @@ added.
 - [rill-lander/tests/landing.rs](../../crates/rill-lander/tests/landing.rs), [rill-search/tests/end_to_end.rs](../../crates/rill-search/tests/end_to_end.rs)
 - [rill-sdk/tests/common/mod.rs](../../crates/rill-sdk/tests/common/mod.rs), [rill-sdk/tests/repo_rpc.rs](../../crates/rill-sdk/tests/repo_rpc.rs), [rill-sdk/tests/stack.rs](../../crates/rill-sdk/tests/stack.rs), [rill-sdk/tests/checkout.rs](../../crates/rill-sdk/tests/checkout.rs)
 - [rill-mcp/tests/common/mod.rs](../../crates/rill-mcp/tests/common/mod.rs), [rill-mcp/tests/protocol.rs](../../crates/rill-mcp/tests/protocol.rs)
-- [rill-server/tests/grpc/](../../crates/rill-server/tests/grpc/main.rs), [rill-cli/tests/cli_e2e.rs](../../crates/rill-cli/tests/cli_e2e.rs), [rill-cli/tests/parse.rs](../../crates/rill-cli/tests/parse.rs)
+- [rill-api/tests/grpc/](../../crates/rill-api/tests/grpc/main.rs), [rill-cli/tests/cli_e2e.rs](../../crates/rill-cli/tests/cli_e2e.rs), [rill-cli/tests/parse.rs](../../crates/rill-cli/tests/parse.rs)
 - [rill-git-import/tests/real_git.rs](../../crates/rill-git-import/tests/real_git.rs), [rill-proto/src/convert/roundtrip_tests.rs](../../crates/rill-proto/src/convert/roundtrip_tests.rs)
 
 ---

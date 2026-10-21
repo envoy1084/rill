@@ -25,6 +25,8 @@ pub struct ServerConfig {
     pub listen_grpc: SocketAddr,
     /// Address the object protocol and health endpoints listen on.
     pub listen_http: SocketAddr,
+    /// Which parts of the service this process runs.
+    pub roles: Roles,
     /// Where objects and metadata live.
     pub storage: StorageConfig,
     /// Where metadata lives, when not beside the objects.
@@ -60,6 +62,7 @@ impl Default for ServerConfig {
             listen_http: DEFAULT_HTTP_ADDR
                 .parse()
                 .expect("default HTTP address is valid"),
+            roles: Roles::default(),
             storage: StorageConfig::Memory,
             metadata: MetadataConfig::Storage,
             auth: AuthConfig::default(),
@@ -71,6 +74,52 @@ impl Default for ServerConfig {
             attestation_key: None,
             dev_mode: false,
         }
+    }
+}
+
+/// Which parts of the service a process runs. Any number of processes may
+/// run either role: API servers are stateless, and background work is
+/// shared through leases and job claims.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Roles {
+    /// Serve the gRPC API and the object protocol.
+    pub api: bool,
+    /// Run landers, post-land verification, job workers and retention.
+    pub workers: bool,
+}
+
+impl Default for Roles {
+    fn default() -> Self {
+        Roles {
+            api: true,
+            workers: true,
+        }
+    }
+}
+
+impl Roles {
+    /// Parse `api`, `workers` or `api,workers`.
+    pub fn parse(spec: &str) -> Result<Self> {
+        let mut roles = Roles {
+            api: false,
+            workers: false,
+        };
+        for role in spec.split(',').map(str::trim).filter(|r| !r.is_empty()) {
+            match role {
+                "api" => roles.api = true,
+                "workers" => roles.workers = true,
+                other => {
+                    return Err(Error::Config(format!(
+                        "unknown role {other:?}; expected api or workers"
+                    )))
+                }
+            }
+        }
+        if !roles.api && !roles.workers {
+            return Err(Error::Config("at least one role is needed".into()));
+        }
+        Ok(roles)
     }
 }
 

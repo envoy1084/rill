@@ -109,7 +109,7 @@ unchanged ref reports every commit as skipped and lands nothing.
 
 `rill import git <path> --repo <name> [--ref HEAD] --storage-dir <dir>
 [--no-land]` opens `LocalStores` at `--storage-dir` (or `RILL_STORAGE_DIR`,
-the layout `rill-server --storage local:<dir>` uses), creates the repository
+the layout `rill api --storage local:<dir>` uses), creates the repository
 if missing, and runs the importer with a `GixSource`. It refuses
 `--endpoint` with a usage error: import writes objects and the map
 directly, which the API does not expose. Run it while no server uses that

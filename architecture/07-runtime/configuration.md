@@ -12,27 +12,28 @@ off.
 flowchart LR
     D[ServerConfig::default] --> F[TOML file --config / RILL_CONFIG]
     F --> E[apply_env: RILL_* variables]
-    E --> Dev[--dev]
-    Dev --> Fl[--listen-grpc, --listen-http, --storage]
-    Fl --> Run[rill_server::run]
+    E --> Fl[--listen-grpc, --listen-http, --storage, --roles]
+    Fl --> Run[rill_api::run]
 ```
 
 `ServerConfig::load(path)` reads the file, or uses the defaults when no
-path is given, and then calls `apply_env`. `build_config` in
-`rill-cli/src/server/mod.rs` then applies `--dev` and the individual flags.
+path is given, and then calls `apply_env`. `api_config` in
+`rill-cli/src/server/mod.rs` then applies the individual flags of
+`rill api`. (`rill dev` builds its own configuration; see below.)
 A later step overrides an earlier one. A malformed file or variable is an
 `Error::Config`, and the binary exits non-zero.
 
 ## The file
 
 `ServerConfig` is `#[serde(default)]`, so any key may be omitted.
-`rill-server init-config [--out FILE] [--force]` writes the serialized
+`rill api init-config [--out FILE] [--force]` writes the serialized
 defaults with a comment header that lists every alternative.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `listen_grpc` | `127.0.0.1:7420` (`DEFAULT_GRPC_ADDR`) | gRPC API |
 | `listen_http` | `127.0.0.1:7421` (`DEFAULT_HTTP_ADDR`) | object protocol and health |
+| `roles.api`, `roles.workers` | `true`, `true` | serve the gRPC API and object protocol; run landers, post-land, job workers, retention and repository discovery. Every process follows policy and relation changes. `RILL_ROLES=api,workers` |
 | `dev_mode` | `false` | anonymous requests act as `dev`; ReBAC checks pass |
 | `attestation_key` | none | path to an Ed25519 key file the server signs every stored version with; without it a per-process key is generated (warned outside dev mode). Its public half is in `Health` |
 | `[storage] kind` | `memory` | backend, see below |
@@ -109,10 +110,10 @@ wins because it is applied second. Clients use their own variables
 
 ## Dev mode
 
-`rill-server --dev` sets `dev_mode = true`, forces `memory` storage, and
-listens on `127.0.0.1:7470` (`DEV_GRPC_PORT`) and `127.0.0.1:7471`
-(`DEV_HTTP_PORT`). It overrides the file and environment for those fields.
-The explicit flags still override `--dev`. The server logs a warning at
+`rill dev` runs with `dev_mode = true`, every role, storage in
+`~/.rill/dev` (`--data DIR`, or `--memory`), and listens on
+`127.0.0.1:7470` (`DEV_GRPC_PORT`) and `127.0.0.1:7471` (`DEV_HTTP_PORT`);
+it reads no configuration file. The server logs a warning at
 startup. In dev mode:
 
 * a request without a bearer token acts as the human principal `dev`;
@@ -133,7 +134,7 @@ startup. In dev mode:
 
 ## Code
 
-* [rill-server/src/config/](../../crates/rill-server/src/config/mod.rs), [state/stores.rs](../../crates/rill-server/src/state/stores.rs), [auth/authenticator.rs](../../crates/rill-server/src/auth/authenticator.rs)
+* [rill-api/src/config/](../../crates/rill-api/src/config/mod.rs), [state/stores.rs](../../crates/rill-api/src/state/stores.rs), [auth/authenticator.rs](../../crates/rill-api/src/auth/authenticator.rs)
 * [rill-cli/src/server/mod.rs](../../crates/rill-cli/src/server/mod.rs), [rill-cli/src/server/template.rs](../../crates/rill-cli/src/server/template.rs), [rill-cli/src/bin/rill_server.rs](../../crates/rill-cli/src/bin/rill_server.rs)
 * [rill-lander/src/config.rs](../../crates/rill-lander/src/config.rs)
 

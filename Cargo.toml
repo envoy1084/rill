@@ -13,7 +13,7 @@ members = [
     "crates/rill-jobs",
     "crates/rill-search",
     "crates/rill-exec",
-    "crates/rill-server",
+    "crates/rill-api",
     "crates/rill-sdk",
     "crates/rill-cli",
     "crates/rill-mcp",
@@ -44,7 +44,7 @@ rill-events = { path = "crates/rill-events" }
 rill-jobs = { path = "crates/rill-jobs" }
 rill-search = { path = "crates/rill-search" }
 rill-exec = { path = "crates/rill-exec" }
-rill-server = { path = "crates/rill-server" }
+rill-api = { path = "crates/rill-api" }
 rill-sdk = { path = "crates/rill-sdk" }
 rill-git-import = { path = "crates/rill-git-import" }
 rill-mcp = { path = "crates/rill-mcp" }

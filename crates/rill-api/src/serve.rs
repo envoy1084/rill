@@ -60,22 +60,31 @@ pub async fn serve_with_state(
     let (grpc_addr, http_addr) = listeners.addrs()?;
     tracing::info!(%grpc_addr, %http_addr, dev_mode = state.dev_mode(), "rill server listening");
 
-    tokio::spawn(crate::workers::sweep_idempotency(
-        state.stores.clone(),
-        shutdown.clone(),
-    ));
-    tokio::spawn(crate::workers::discover_repos(
-        state.clone(),
-        shutdown.clone(),
-    ));
-    let grpc = tokio::spawn(serve_grpc(state.clone(), listeners.grpc, shutdown.clone()));
+    let roles = state.config.roles;
+    if roles.workers {
+        tokio::spawn(crate::workers::sweep_idempotency(
+            state.stores.clone(),
+            shutdown.clone(),
+        ));
+        tokio::spawn(crate::workers::discover_repos(
+            state.clone(),
+            shutdown.clone(),
+        ));
+    }
+    let grpc = roles
+        .api
+        .then(|| tokio::spawn(serve_grpc(state.clone(), listeners.grpc, shutdown.clone())));
     let http = tokio::spawn(serve_http(state, listeners.http, shutdown.clone()));
 
-    let (grpc, http) = tokio::join!(grpc, http);
-    let outcomes = [
-        grpc.map_err(|e| Error::Transport(format!("gRPC task: {e}")))?,
-        http.map_err(|e| Error::Transport(format!("HTTP task: {e}")))?,
-    ];
+    let mut outcomes = vec![http
+        .await
+        .map_err(|e| Error::Transport(format!("HTTP task: {e}")))?];
+    if let Some(grpc) = grpc {
+        outcomes.push(
+            grpc.await
+                .map_err(|e| Error::Transport(format!("gRPC task: {e}")))?,
+        );
+    }
     for outcome in outcomes {
         outcome?;
     }
@@ -134,7 +143,7 @@ async fn serve_http(
     listener: TcpListener,
     shutdown: CancellationToken,
 ) -> Result<()> {
-    let router = objects::router(state);
+    let router = objects::router(state.clone(), state.config.roles.api);
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown.cancelled_owned())
         .await

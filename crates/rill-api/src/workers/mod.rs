@@ -19,10 +19,15 @@ use crate::state::RepoContext;
 /// How often expired events are swept.
 const EVENT_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3600);
 
-/// Spawn every worker for `ctx`. They run until the context's shutdown
-/// token is cancelled.
-pub fn spawn_repo_workers(ctx: &Arc<RepoContext>) {
+/// Spawn the tasks `roles` call for over `ctx`. They run until the
+/// context's shutdown token is cancelled. Every process follows shared
+/// state; background work runs only in processes with the workers role.
+pub fn spawn_repo_workers(ctx: &Arc<RepoContext>, roles: crate::config::Roles) {
     let shutdown = ctx.shutdown.clone();
+    tokio::spawn(follower::run(ctx.clone(), shutdown.clone()));
+    if !roles.workers {
+        return;
+    }
 
     tokio::spawn(ctx.lander.clone().run_forever(shutdown.clone()));
     if let Some(postland) = &ctx.postland {
@@ -38,7 +43,6 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>) {
         EVENT_SWEEP_INTERVAL,
         shutdown.clone(),
     ));
-    tokio::spawn(follower::run(ctx.clone(), shutdown.clone()));
     tokio::spawn(indexer::run(ctx.clone(), shutdown));
     tracing::info!(repo = %ctx.config.name, "repository workers started");
 }

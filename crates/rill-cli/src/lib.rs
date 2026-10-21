@@ -1,8 +1,9 @@
-//! The `rill` command line and the `rill-server` binary.
+//! The `rill` command line, including `rill dev` and `rill api`, which run
+//! the service.
 //!
-//! The binaries are thin: `rill` calls [`run_cli`], `rill-server` calls
-//! [`run_server`]. Everything else lives here so tests can drive the CLI
-//! as a library with [`run_cli_with_args`] and capture its output.
+//! The binary is thin: it calls [`run_cli`]. Everything else lives here so
+//! tests can drive the CLI as a library with [`run_cli_with_args`] and
+//! capture its output.
 //!
 //! Every command renders one JSON value (the same encoding the MCP server
 //! uses, from [`rill_mcp::json`]) or a human view of it; `--json` picks
@@ -94,9 +95,10 @@ fn color_enabled() -> bool {
 }
 
 /// Logging to stderr controlled by `-v`/`-q` and `RUST_LOG`.
-fn init_logging(verbose: u8, quiet: bool) {
+fn init_logging(verbose: u8, quiet: bool, serving: bool) {
     let default = match (quiet, verbose) {
         (true, _) => "off",
+        (false, 0) if serving => "info",
         (false, 0) => "warn",
         (false, 1) => "info",
         (false, 2) => "debug",
@@ -128,7 +130,13 @@ pub fn run_cli() -> std::process::ExitCode {
         .map(|a| a.to_string_lossy().matches('v').count() as u8)
         .sum();
     let quiet = args.iter().any(|a| a == "-q" || a == "--quiet");
-    init_logging(verbose, quiet);
+    // The service logs what it does by default; client commands stay quiet.
+    let serving = args
+        .iter()
+        .skip(1)
+        .find(|a| !a.to_string_lossy().starts_with('-'))
+        .is_some_and(|a| a == "dev" || a == "api");
+    init_logging(verbose, quiet, serving);
 
     let runtime = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
@@ -142,9 +150,4 @@ pub fn run_cli() -> std::process::ExitCode {
     let code = runtime.block_on(run_cli_with_args(args, &mut lock));
     let _ = lock.flush();
     std::process::ExitCode::from(code as u8)
-}
-
-/// Entry point of the `rill-server` binary.
-pub fn run_server() -> std::process::ExitCode {
-    server::main()
 }

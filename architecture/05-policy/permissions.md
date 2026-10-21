@@ -86,7 +86,7 @@ file content, history and blame call `permit().read(path)` instead.
 
 ## Enforcement
 
-[`Permit`](../../crates/rill-server/src/auth/permit.rs) maps each operation to
+[`Permit`](../../crates/rill-api/src/auth/permit.rs) maps each operation to
 a verb, a relation and a path:
 
 | Method | Verb | Relation | Typical callers |
@@ -107,7 +107,7 @@ repositories created through the API leave that state immediately.
 
 ## Admin RPCs
 
-[`AdminService`](../../crates/rill-server/src/services/admin.rs) names the
+[`AdminService`](../../crates/rill-api/src/services/admin.rs) names the
 repository inside the object string. The object is `repo:<name>` or
 `path:<name>/<dir>`. `AddRelation` and `RemoveRelation` require `admin()`;
 `ListRelations` requires `read(root)` and takes an optional relation filter.
@@ -138,8 +138,8 @@ repository inside the object string. The object is `repo:<name>` or
 * [`rebac/authorizer.rs`](../../crates/rill-policy/src/rebac/authorizer.rs): `Authorizer`, `PathFilter`, `DEFAULT_SNAPSHOT_TTL`.
 * [`rebac/tests.rs`](../../crates/rill-policy/src/rebac/tests.rs): rewrite, inheritance and filter cases.
 * [`rill-store/src/repo/relations.rs`](../../crates/rill-store/src/repo/relations.rs): `add_relation`, `remove_relation`, `relations_of`, `list_relations`.
-* [`auth/permit.rs`](../../crates/rill-server/src/auth/permit.rs): `Permit`.
-* [`services/admin.rs`](../../crates/rill-server/src/services/admin.rs): relation RPCs.
+* [`auth/permit.rs`](../../crates/rill-api/src/auth/permit.rs): `Permit`.
+* [`services/admin.rs`](../../crates/rill-api/src/services/admin.rs): relation RPCs.
 
 ---
 ← Previous: [Capability tokens](capability-tokens.md) · [Index](../index.md) · Next: [Risk classification](risk-classification.md) →

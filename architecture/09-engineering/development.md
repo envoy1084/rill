@@ -50,7 +50,7 @@ works without installing buf). It is not part of CI.
 
 `rill-store` features: `local` (default, redb plus files), `s3`
 (`object_store`) and `fdb` (the FoundationDB metadata store).
-`rill-server` enables `s3`; `rill-server/fdb` and `rill-cli/fdb` forward
+`rill-api` enables `s3`; `rill-api/fdb` and `rill-cli/fdb` forward
 `fdb`. Without `fdb` nothing needs the FoundationDB client library.
 
 ## FoundationDB locally
@@ -68,19 +68,19 @@ unconfigured, run `fdbcli --exec "configure new single ssd"`.
 
 ```
 cargo test -p rill-store --features fdb,s3              # conformance on FoundationDB
-cargo test -p rill-server --features fdb --test grpc    # end to end on FoundationDB
-RILL_FDB_CLUSTER_FILE= cargo run -p rill-cli --features fdb --bin rill-server -- \
-    --dev --storage local:/tmp/rill-dev                 # objects on disk, metadata in FoundationDB
+cargo test -p rill-api --features fdb --test grpc    # end to end on FoundationDB
+RILL_FDB_CLUSTER_FILE= RILL_DEV_MODE=true cargo run -p rill-cli --features fdb -- \
+    api --storage local:/tmp/rill-dev                   # objects on disk, metadata in FoundationDB
 ```
 
-Keep objects persistent when metadata is: `--dev` alone keeps objects in
+Keep objects persistent when metadata is: `memory` storage keeps objects in
 memory, so after a restart the metadata would point at objects that are
 gone. Tests use a fresh `rill-test-<random>` root subspace each and clear
 it afterwards, so they never touch a deployment's data.
 
 The macOS package installs `libfdb_c.dylib` as `@rpath/libfdb_c.dylib`.
 `rill-cli`'s build script adds an rpath to `/usr/local/lib` (or
-`FDB_LIB_DIR`) for `fdb` builds, so `rill-server` starts outside `cargo
+`FDB_LIB_DIR`) for `fdb` builds, so `rill-api` starts outside `cargo
 run`.
 
 ## CI
@@ -99,7 +99,7 @@ flowchart LR
 the stable toolchain with rustfmt and clippy and `Swatinem/rust-cache`.
 `RUSTFLAGS=-D warnings` turns every compiler and clippy warning into an
 error. No feature flags are passed. With `--workspace`, feature unification
-still turns on `s3` for `rill-store`, because `rill-server` requests it. The
+still turns on `s3` for `rill-store`, because `rill-api` requests it. The
 git importer test uses the runner's `git` binary.
 
 `foundationdb` installs the FoundationDB client and server packages, whose
@@ -128,7 +128,7 @@ the store conformance suite and the server's end-to-end test against it.
 ## Running locally
 
 ```
-cargo run -p rill-cli --bin rill-server -- --dev     # memory storage, gRPC :7470, HTTP :7471
+cargo run -p rill-cli --bin rill -- dev --memory   # every role, gRPC :7470, HTTP :7471
 cargo run -p rill-cli --bin rill -- --endpoint http://127.0.0.1:7470 repo create demo
 cargo run -p rill-cli --bin rill -- --endpoint http://127.0.0.1:7470 checkout demo ./demo
 cd demo && echo 'fn main() {}' > main.rs
@@ -136,7 +136,7 @@ rill new -m "initial" && rill submit && rill land --wait
 ```
 
 Inside a checkout, `.rill/checkout.toml` supplies the endpoint and
-repository ([cli](../08-clients/cli.md)). `rill-server init-config` prints
+repository ([cli](../08-clients/cli.md)). `rill api init-config` prints
 an annotated default config ([configuration](../07-runtime/configuration.md)).
 `rill-mcp --list-tools` prints the MCP tool schemas. `RUST_LOG` controls
 logging in all three binaries.

@@ -41,7 +41,7 @@ flowchart LR
    reaped, dead jobs revived, and the derive queue is run dry. Then the
    final checks run.
 
-`World` wires the services exactly as `rill-server` does, including its
+`World` wires the services exactly as `rill-api` does, including its
 `ReviewHooksAdapter`, so the simulator tests the production wiring rather
 than a model of it.
 

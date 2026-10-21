@@ -87,7 +87,7 @@ Land latency is dominated by the lander's 2-second batch window.
 
 ### On FoundationDB
 
-A release `rill-server` with metadata in a local single-node
+A release `rill-api` with metadata in a local single-node
 FoundationDB and `rill-load --percent 10` (3.5 commits, 5,000 reads a
 second) on one laptop:
 

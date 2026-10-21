@@ -94,8 +94,8 @@ versions.
 * [`signing.rs`](../../crates/rill-policy/src/signing.rs): `Signer`, `verify`, `KeyFile`.
 * [`objects/change.rs`](../../crates/rill-types/src/objects/change.rs): `Signature`, `Provenance`.
 * [`rill-store/src/repo/versions.rs`](../../crates/rill-store/src/repo/versions.rs): `put_signatures`, `add_signatures`, `get_signatures`.
-* [`services/repo/write.rs`](../../crates/rill-server/src/services/repo/write.rs): `create_change_version_impl`, provenance handling.
-* [`services/repo/history.rs`](../../crates/rill-server/src/services/repo/history.rs): signatures on read.
+* [`services/repo/write.rs`](../../crates/rill-api/src/services/repo/write.rs): `create_change_version_impl`, provenance handling.
+* [`services/repo/history.rs`](../../crates/rill-api/src/services/repo/history.rs): signatures on read.
 * [`rill-sdk/src/repo/write.rs`](../../crates/rill-sdk/src/repo/write.rs), [`rill-sdk/src/repo/history.rs`](../../crates/rill-sdk/src/repo/history.rs): client surface.
 
 ---
