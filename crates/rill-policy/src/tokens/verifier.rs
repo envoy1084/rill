@@ -3,11 +3,13 @@
 use std::collections::HashMap;
 
 use biscuit_auth::builder::{AuthorizerBuilder, Term};
-use biscuit_auth::{Biscuit, PublicKey};
+use biscuit_auth::Biscuit;
 use rill_types::{Principal, RepoId, RepoPathBuf, Timestamp, WorkspaceId};
 
 use super::capability::{Capability, Verb};
-use super::datalog::{effective_capability, principal_from_fact, PRINCIPAL_FACT};
+use super::claims::TokenClaims;
+use super::datalog::{effective_scope, principal_from_fact, PRINCIPAL_FACT, TOKEN_FACT};
+use super::keyring::KeyRing;
 use crate::error::{Error, Result};
 
 /// The request a token is checked against.
@@ -30,32 +32,26 @@ pub struct TokenRequest {
 pub struct Verified {
     /// The principal the token was issued to.
     pub principal: Principal,
-    /// The token's effective capability.
-    pub capability: Capability,
+    /// The signed claims of the authority block.
+    pub claims: TokenClaims,
+    /// The token's effective capability; `None` when it is not narrowed.
+    pub capability: Option<Capability>,
 }
 
-/// Checks tokens against the issuer's root public key.
+/// Checks tokens against the trusted signing keys.
 #[derive(Debug, Clone)]
 pub struct Verifier {
-    root: PublicKey,
+    keys: KeyRing,
 }
 
 impl Verifier {
-    /// Verifier for tokens signed by `root`.
-    pub fn new(root: PublicKey) -> Self {
-        Verifier { root }
+    /// Verifier trusting `keys`.
+    pub fn new(keys: KeyRing) -> Self {
+        Verifier { keys }
     }
 
-    /// Verifier from a compressed P-256 public key.
-    pub fn from_public_key_bytes(bytes: &[u8]) -> Result<Self> {
-        PublicKey::from_bytes(bytes, biscuit_auth::builder::Algorithm::Secp256r1)
-            .map(Self::new)
-            .map_err(|e| Error::InvalidKey(e.to_string()))
-    }
-
-    /// The root public key.
-    pub fn root(&self) -> &PublicKey {
-        &self.root
+    pub fn keys(&self) -> &KeyRing {
+        &self.keys
     }
 
     /// Verify the signature chain and every block's checks against
@@ -64,38 +60,59 @@ impl Verifier {
         self.verify_full(token, request).map(|v| v.principal)
     }
 
-    /// Like [`Verifier::verify`] but also returns the effective capability.
+    /// Verify a token without a concrete request: the signature chain, the
+    /// expiry and a consistent block chain, probing the capability with
+    /// something it claims to allow. Per-request checks happen when the
+    /// request runs, against the returned capability.
+    pub fn authenticate(&self, token: &str, now: Timestamp) -> Result<Verified> {
+        let (_, capability) = super::issuer::inspect_at(token, &self.keys, now)?;
+        let probe = capability.as_ref().map(|cap| TokenRequest {
+            repo: cap.repo,
+            workspace: cap.workspace,
+            path: cap.paths.first().cloned().unwrap_or_else(RepoPathBuf::root),
+            verb: cap.verbs.first().copied().unwrap_or(Verb::Read),
+            now,
+        });
+        self.check(token, probe.as_ref(), now)
+    }
+
+    /// Like [`Verifier::verify`] but also returns the claims and capability.
     pub fn verify_full(&self, token: &str, request: &TokenRequest) -> Result<Verified> {
-        let token =
-            Biscuit::from_base64(token, self.root).map_err(|e| Error::Token(e.to_string()))?;
-        let capability = effective_capability(&token)?;
-        if capability.is_expired_at(request.now) {
-            return Err(Error::TokenExpired {
-                expires_at: capability.expires_at,
-            });
+        self.check(token, Some(request), request.now)
+    }
+
+    fn check(
+        &self,
+        token: &str,
+        request: Option<&TokenRequest>,
+        now: Timestamp,
+    ) -> Result<Verified> {
+        let token = Biscuit::from_base64(token, |id| {
+            self.keys.key_at(id, now).map_err(super::issuer::key_err)
+        })
+        .map_err(|e| Error::Token(e.to_string()))?;
+        let (claims, capability) = effective_scope(&token)?;
+        let expires_at = capability.as_ref().map_or(claims.expires_at, |cap| {
+            cap.expires_at.min(claims.expires_at)
+        });
+        if now >= expires_at {
+            return Err(Error::TokenExpired { expires_at });
         }
 
-        let mut params: HashMap<String, Term> = HashMap::from([
-            ("repo".to_string(), Term::Str(request.repo.to_string())),
-            (
-                "path".to_string(),
-                Term::Str(request.path.as_str().to_string()),
-            ),
-            (
-                "verb".to_string(),
-                Term::Str(request.verb.as_str().to_string()),
-            ),
-            (
-                "now".to_string(),
-                Term::Date(request.now.millis().div_euclid(1000).max(0) as u64),
-            ),
-        ]);
-        let mut code = String::from(
-            "request_repo({repo});\nrequest_path({path});\nrequest_verb({verb});\ntime({now});\n",
-        );
-        if let Some(ws) = request.workspace {
-            params.insert("ws".into(), Term::Str(ws.to_string()));
-            code.push_str("request_workspace({ws});\n");
+        let mut params: HashMap<String, Term> = HashMap::from([(
+            "now".to_string(),
+            Term::Date(now.millis().div_euclid(1000).max(0) as u64),
+        )]);
+        let mut code = String::from("time({now});\n");
+        if let Some(request) = request {
+            params.insert("repo".into(), Term::Str(request.repo.to_string()));
+            params.insert("path".into(), Term::Str(request.path.as_str().to_string()));
+            params.insert("verb".into(), Term::Str(request.verb.as_str().to_string()));
+            code.push_str("request_repo({repo});\nrequest_path({path});\nrequest_verb({verb});\n");
+            if let Some(ws) = request.workspace {
+                params.insert("ws".into(), Term::Str(ws.to_string()));
+                code.push_str("request_workspace({ws});\n");
+            }
         }
         // All restrictions live in the token's checks; the policy only has
         // to accept once every check holds.
@@ -114,7 +131,7 @@ impl Verifier {
         })?;
 
         // `query` (not `query_all`) sees only the authority block, so an
-        // attenuation block cannot inject a different principal.
+        // attenuation block cannot inject a different principal or token id.
         let facts: Vec<(String, String, String)> = authorizer
             .query(
                 format!("data($id, $kind, $name) <- {PRINCIPAL_FACT}($id, $kind, $name)").as_str(),
@@ -123,8 +140,15 @@ impl Verifier {
         let (id, kind, name) = facts
             .first()
             .ok_or_else(|| Error::Token("token carries no principal".into()))?;
+        let ids: Vec<(String,)> = authorizer
+            .query(format!("data($id) <- {TOKEN_FACT}($id)").as_str())
+            .map_err(|e| Error::Token(e.to_string()))?;
+        if ids.first().map(|(id,)| id.as_str()) != Some(claims.token_id.to_string().as_str()) {
+            return Err(Error::Token("token id does not match its claims".into()));
+        }
         Ok(Verified {
             principal: principal_from_fact(id, kind, name)?,
+            claims,
             capability,
         })
     }

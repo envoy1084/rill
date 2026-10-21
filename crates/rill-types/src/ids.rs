@@ -136,6 +136,17 @@ define_id!(
     "jb"
 );
 define_id!(
+    /// Identity of an issued token, and the id that revokes it and every
+    /// token attenuated from it.
+    TokenId,
+    "tk"
+);
+define_id!(
+    /// Identity of a sign-in session or an agent run.
+    SessionId,
+    "ss"
+);
+define_id!(
     /// Identity of an operation in a workspace's operation log. Also used as
     /// the idempotency key for write RPCs.
     OperationId,

@@ -29,4 +29,7 @@ pub use risk::{
 };
 pub use signing::{verify as verify_signature, KeyFile, Signer};
 pub use submit::{SubmitDecision, SubmitFacts, SubmitPolicy, VoteSummary};
-pub use tokens::{attenuate, Capability, Issuer, TokenRequest, Verb, Verified, Verifier};
+pub use tokens::{
+    attenuate, Capability, Issuer, KeyRing, SigningKey, TokenClaims, TokenLifetimes, TokenRequest,
+    Verb, Verified, Verifier,
+};

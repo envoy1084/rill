@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use rill_types::{Principal, RepoId, RepoPathBuf, Timestamp};
 
 use crate::error::{Error, Result};
-use crate::tokens::{Capability, TokenRequest, Verb, Verifier};
+use crate::tokens::{Capability, TokenClaims, Verb, Verifier};
 
 /// Credentials extracted from a request.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -42,6 +42,9 @@ pub struct AuthContext {
     /// The capability the request's token carries, if it carried one.
     /// `None` means the principal is bound only by relationship checks.
     pub capability: Option<Capability>,
+    /// The signed claims of the request's token; `None` for static tokens
+    /// and dev mode.
+    pub claims: Option<TokenClaims>,
 }
 
 impl AuthContext {
@@ -125,6 +128,7 @@ impl Authenticator for StaticTokenAuthenticator {
             principal: principal.clone(),
             teams: teams.clone(),
             capability: None,
+            claims: None,
         })
     }
 }
@@ -190,25 +194,9 @@ impl Authenticator for BiscuitAuthenticator {
             .bearer
             .as_deref()
             .ok_or_else(|| Error::Unauthenticated("missing bearer token".into()))?;
-        let capability = crate::tokens::inspect(token, self.verifier.root())
-            .map_err(|e| Error::Unauthenticated(e.to_string()))?;
-        // Probe with something the capability itself claims to allow, so
-        // that only the signature, expiry and a consistent block chain are
-        // being tested here.
-        let probe = TokenRequest {
-            repo: capability.repo,
-            workspace: capability.workspace,
-            path: capability
-                .paths
-                .first()
-                .cloned()
-                .unwrap_or_else(RepoPathBuf::root),
-            verb: capability.verbs.first().copied().unwrap_or(Verb::Read),
-            now: Timestamp::now(),
-        };
         let verified = self
             .verifier
-            .verify_full(token, &probe)
+            .authenticate(token, Timestamp::now())
             .map_err(|e| match e {
                 Error::TokenExpired { .. } => e,
                 other => Error::Unauthenticated(other.to_string()),
@@ -217,7 +205,8 @@ impl Authenticator for BiscuitAuthenticator {
         Ok(AuthContext {
             principal: verified.principal,
             teams,
-            capability: Some(verified.capability),
+            capability: verified.capability,
+            claims: Some(verified.claims),
         })
     }
 }
@@ -266,7 +255,7 @@ mod tests {
     async fn biscuit_tokens() {
         let issuer = Issuer::generate();
         let auth = BiscuitAuthenticator::with_teams(
-            Verifier::new(issuer.public_key()),
+            Verifier::new(issuer.key_ring()),
             Arc::new(FixedTeams),
         );
         let repo = RepoId::derived("t", "r");
@@ -277,7 +266,8 @@ mod tests {
             Timestamp::from_millis(Timestamp::now().millis() + 60_000),
         )
         .with_paths([RepoPathBuf::new("src").unwrap()]);
-        let token = issuer.issue(&bot, &cap).unwrap();
+        let claims = crate::TokenClaims::new("default", Timestamp::now(), 60_000);
+        let token = issuer.issue(&bot, &claims, Some(&cap)).unwrap();
 
         let ctx = auth
             .authenticate(&AuthHeaders::bearer(&token))
@@ -290,12 +280,8 @@ mod tests {
         assert!(!ctx.capability_allows(repo, &RepoPathBuf::new("src/x").unwrap(), Verb::Write));
         assert!(!ctx.capability_allows(repo, &RepoPathBuf::new("docs").unwrap(), Verb::Read));
 
-        let expired = issuer
-            .issue(
-                &bot,
-                &Capability::repo_wide(repo, [Verb::Read], Timestamp::from_millis(1)),
-            )
-            .unwrap();
+        let old = crate::TokenClaims::new("default", Timestamp::from_millis(1), 60_000);
+        let expired = issuer.issue(&bot, &old, None).unwrap();
         assert!(matches!(
             auth.authenticate(&AuthHeaders::bearer(expired)).await,
             Err(Error::TokenExpired { .. })

@@ -12,7 +12,10 @@ use biscuit_auth::builder::{BlockBuilder, Term};
 use biscuit_auth::Biscuit;
 use rill_types::{Principal, PrincipalKind, Timestamp};
 
+use serde::{Deserialize, Serialize};
+
 use super::capability::Capability;
+use super::claims::TokenClaims;
 use crate::error::{Error, Result};
 
 /// Fact name carrying the token holder's identity.
@@ -74,8 +77,29 @@ pub fn capability_block(cap: &Capability) -> Result<BlockBuilder> {
         .map(|b| b.context(context))
 }
 
-/// The authority block: the holder's identity plus the capability checks.
-pub fn authority_block(principal: &Principal, cap: &Capability) -> Result<BlockBuilder> {
+/// Fact name carrying the token's revocation id.
+pub const TOKEN_FACT: &str = "token";
+
+/// The authority block's context: the claims and the capability, if the
+/// token is narrowed to one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorityContext {
+    pub claims: TokenClaims,
+    pub capability: Option<Capability>,
+}
+
+/// The authority block: the holder's identity, the token id, the expiry
+/// check and, when the token is narrowed, the capability checks.
+pub fn authority_block(
+    principal: &Principal,
+    claims: &TokenClaims,
+    capability: Option<&Capability>,
+) -> Result<BlockBuilder> {
+    if let Some(cap) = capability {
+        if cap.expires_at > claims.expires_at {
+            return Err(Error::Widening("the capability outlives the token".into()));
+        }
+    }
     let params = HashMap::from([
         ("id".to_string(), Term::Str(principal.id.to_string())),
         (
@@ -83,31 +107,60 @@ pub fn authority_block(principal: &Principal, cap: &Capability) -> Result<BlockB
             Term::Str(principal.kind.as_str().to_string()),
         ),
         ("name".to_string(), Term::Str(principal.name.clone())),
+        ("tid".to_string(), Term::Str(claims.token_id.to_string())),
+        ("exp".to_string(), date(claims.expires_at)),
     ]);
     let identity = BlockBuilder::new()
         .code_with_params(
-            format!("{PRINCIPAL_FACT}({{id}}, {{kind}}, {{name}});"),
+            format!(
+                "{PRINCIPAL_FACT}({{id}}, {{kind}}, {{name}});\n\
+                 {TOKEN_FACT}({{tid}});\n\
+                 check if time($t), $t < {{exp}};"
+            ),
             params,
             HashMap::new(),
         )
         .map_err(token_err)?;
-    Ok(identity.merge(capability_block(cap)?))
+    let block = match capability {
+        Some(cap) => identity.merge(capability_block(cap)?),
+        None => identity,
+    };
+    let context = serde_json::to_string(&AuthorityContext {
+        claims: claims.clone(),
+        capability: capability.cloned(),
+    })
+    .map_err(token_err)?;
+    Ok(block.context(context))
 }
 
-/// The effective capability of a verified token: the capability of its last
-/// block, after checking that every block narrows the one before it.
-pub fn effective_capability(token: &Biscuit) -> Result<Capability> {
-    let mut effective: Option<Capability> = None;
-    for (i, ctx) in token.context().into_iter().enumerate() {
-        let ctx = ctx.ok_or_else(|| Error::Token(format!("block {i} has no capability")))?;
+/// What a verified token says: its claims and its effective capability,
+/// the one of its last block after checking that every block narrows the
+/// one before it. `None` means the token is not narrowed.
+pub fn effective_scope(token: &Biscuit) -> Result<(TokenClaims, Option<Capability>)> {
+    let mut contexts = token.context().into_iter();
+    let authority = contexts
+        .next()
+        .flatten()
+        .ok_or_else(|| Error::Token("token has no authority context".into()))?;
+    let AuthorityContext {
+        claims,
+        capability: mut effective,
+    } = serde_json::from_str(&authority)
+        .map_err(|e| Error::Token(format!("authority context: {e}")))?;
+    for (i, ctx) in contexts.enumerate() {
+        let ctx = ctx.ok_or_else(|| Error::Token(format!("block {} has no capability", i + 1)))?;
         let cap: Capability = serde_json::from_str(&ctx)
-            .map_err(|e| Error::Token(format!("block {i} capability: {e}")))?;
-        if let Some(parent) = &effective {
-            cap.check_narrower_than(parent)?;
+            .map_err(|e| Error::Token(format!("block {} capability: {e}", i + 1)))?;
+        match &effective {
+            Some(parent) => cap.check_narrower_than(parent)?,
+            None if cap.expires_at > claims.expires_at => {
+                return Err(Error::Widening("the capability outlives the token".into()))
+            }
+            None => {}
         }
         effective = Some(cap);
     }
-    effective.ok_or_else(|| Error::Token("token has no blocks".into()))
+    Ok((claims, effective))
 }
 
 /// Rebuild a principal from the identity fact's terms.

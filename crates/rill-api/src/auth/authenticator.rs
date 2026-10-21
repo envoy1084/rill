@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use rill_policy::{
-    AuthContext, AuthHeaders, Authenticator, BiscuitAuthenticator, Issuer,
-    StaticTokenAuthenticator, Verifier,
+    AuthContext, AuthHeaders, Authenticator, BiscuitAuthenticator, Issuer, KeyRing, SigningKey,
+    StaticTokenAuthenticator, TokenLifetimes, Verifier,
 };
 use rill_types::{Principal, PrincipalKind};
 
@@ -28,7 +28,10 @@ pub fn build_issuer(config: &AuthConfig) -> Result<Issuer> {
         } => {
             let bytes = hex::decode(private)
                 .map_err(|e| Error::Config(format!("root_private_key_hex: {e}")))?;
-            Ok(Issuer::from_private_key_bytes(&bytes)?)
+            Ok(Issuer::new(
+                SigningKey::from_secret_bytes(0, &bytes)?,
+                TokenLifetimes::default(),
+            ))
         }
         _ => {
             tracing::info!("no issuing key configured; using a process-local key");
@@ -70,7 +73,7 @@ impl Authenticator for CompositeAuthenticator {
 
 /// Build the authenticator for `config`, also trusting tokens from `issuer`.
 pub fn build_authenticator(config: &AuthConfig, issuer: &Issuer) -> Result<Arc<dyn Authenticator>> {
-    let own = BiscuitAuthenticator::new(Verifier::new(issuer.public_key()));
+    let own = BiscuitAuthenticator::new(Verifier::new(issuer.key_ring()));
     let (static_tokens, mut biscuit) = match config {
         AuthConfig::Static { tokens } => {
             let mut table = StaticTokenAuthenticator::new();
@@ -90,8 +93,10 @@ pub fn build_authenticator(config: &AuthConfig, issuer: &Issuer) -> Result<Arc<d
         } => {
             let bytes = hex::decode(root_public_key_hex)
                 .map_err(|e| Error::Config(format!("root_public_key_hex: {e}")))?;
-            let verifier = Verifier::from_public_key_bytes(&bytes)?;
-            let same_as_issuer = verifier.root() == &issuer.public_key();
+            let mut ring = KeyRing::new();
+            ring.insert_bytes(0, &bytes, None)?;
+            let verifier = Verifier::new(ring);
+            let same_as_issuer = bytes == issuer.public_key().to_bytes();
             if same_as_issuer {
                 (None, Vec::new())
             } else {
@@ -154,7 +159,10 @@ mod tests {
             [Verb::Read],
             Timestamp::from_millis(Timestamp::now().millis() + 60_000),
         );
-        let token = issuer.issue(&Principal::agent("bot"), &cap).unwrap();
+        let claims = rill_policy::TokenClaims::new("default", Timestamp::now(), 60_000);
+        let token = issuer
+            .issue(&Principal::agent("bot"), &claims, Some(&cap))
+            .unwrap();
         let ctx = auth
             .authenticate(&AuthHeaders::bearer(&token))
             .await

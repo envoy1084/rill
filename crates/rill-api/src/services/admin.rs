@@ -24,9 +24,6 @@ use crate::error::{Error, Result};
 use crate::state::policy::{self, StoredPolicy};
 use crate::state::AppState;
 
-/// Default lifetime of an issued token.
-const DEFAULT_TOKEN_TTL_MS: i64 = 24 * 60 * 60 * 1000;
-
 /// The admin service.
 #[derive(Clone)]
 pub struct AdminSvc {
@@ -215,10 +212,16 @@ impl AdminService for AdminSvc {
                 .resolve(repo_name.as_deref().unwrap_or_default())
                 .await?;
             let opened = common::opened(&self.state, ctx.clone(), repo.clone());
+            let principal = match req.for_principal.clone() {
+                Some(p) => Principal::try_from(p)?,
+                None => ctx.principal.clone(),
+            };
+            let now = Timestamp::now();
+            let longest = self.state.issuer.lifetimes().max_for(principal.kind);
             let expires_at = req
                 .expires_at
                 .map(Timestamp::from_millis)
-                .unwrap_or_else(|| Timestamp::from_millis(Timestamp::now().millis() + DEFAULT_TOKEN_TTL_MS));
+                .unwrap_or_else(|| Timestamp::from_millis(now.millis() + longest));
             if expires_at <= Timestamp::now() {
                 return Err(Error::invalid("expires_at is in the past"));
             }
@@ -228,11 +231,12 @@ impl AdminService for AdminSvc {
                 Some(parent) => capability.check_narrower_than(parent)?,
                 None => opened.permit().admin().await?,
             }
-            let principal = match req.for_principal.clone() {
-                Some(p) => Principal::try_from(p)?,
-                None => ctx.principal.clone(),
-            };
-            let token = self.state.issuer.issue(&principal, &capability)?;
+            let org = ctx
+                .claims
+                .as_ref()
+                .map_or(rill_store::repo::DEFAULT_ORG, |c| c.org.as_str());
+            let claims = rill_policy::TokenClaims::new(org, now, expires_at.millis() - now.millis());
+            let token = self.state.issuer.issue(&principal, &claims, Some(&capability))?;
             tracing::info!(by = %ctx.principal, for_principal = %principal, repo = %repo.config.name, "token issued");
             Ok(Response::new(pb::IssueTokenResponse {
                 token,

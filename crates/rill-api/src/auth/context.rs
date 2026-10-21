@@ -20,6 +20,7 @@ pub fn dev_context() -> AuthContext {
         principal: dev_principal(),
         teams: Vec::new(),
         capability: None,
+        claims: None,
     }
 }
 

@@ -1,11 +1,13 @@
 //! Issuing and attenuating capability tokens.
 
 use biscuit_auth::datalog::SymbolTable;
-use biscuit_auth::{Algorithm, Biscuit, KeyPair, PrivateKey, PublicKey};
-use rill_types::Principal;
+use biscuit_auth::{Algorithm, Biscuit, KeyPair, PublicKey};
+use rill_types::{Principal, Timestamp};
 
 use super::capability::Capability;
-use super::datalog::{authority_block, capability_block, effective_capability};
+use super::claims::{TokenClaims, TokenLifetimes};
+use super::datalog::{authority_block, capability_block, effective_scope};
+use super::keyring::{KeyRing, SigningKey};
 use crate::error::{Error, Result};
 
 fn token_err(e: impl std::fmt::Display) -> Error {
@@ -19,52 +21,62 @@ pub(crate) fn ephemeral_key() -> KeyPair {
     KeyPair::new_with_algorithm(Algorithm::Secp256r1)
 }
 
-/// Holder of the root keypair that signs authority blocks.
+/// Signs tokens with the current key, refusing lifetimes longer than a
+/// principal's kind allows.
 pub struct Issuer {
-    root: KeyPair,
+    key: SigningKey,
+    lifetimes: TokenLifetimes,
 }
 
 impl std::fmt::Debug for Issuer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Issuer")
-            .field("public_key", &self.public_key().to_bytes_hex())
-            .finish()
+        f.debug_struct("Issuer").field("key", &self.key).finish()
     }
 }
 
 impl Issuer {
-    /// Generate a fresh root keypair.
+    /// An issuer signing with `key`.
+    pub fn new(key: SigningKey, lifetimes: TokenLifetimes) -> Self {
+        Issuer { key, lifetimes }
+    }
+
+    /// An issuer with a fresh key `0` and the default lifetimes.
     pub fn generate() -> Self {
-        Issuer {
-            root: ephemeral_key(),
-        }
+        Issuer::new(SigningKey::generate(0), TokenLifetimes::default())
     }
 
-    /// Build from a 32-byte P-256 private key.
-    pub fn from_private_key_bytes(bytes: &[u8]) -> Result<Self> {
-        let key = PrivateKey::from_bytes(bytes, Algorithm::Secp256r1)
-            .map_err(|e| Error::InvalidKey(e.to_string()))?;
-        Ok(Issuer {
-            root: KeyPair::from(&key),
-        })
+    pub fn key_id(&self) -> u32 {
+        self.key.id
     }
 
-    /// The private key bytes, for persisting.
-    pub fn private_key_bytes(&self) -> Vec<u8> {
-        self.root.private().to_bytes().to_vec()
-    }
-
-    /// The root public key verifiers need.
+    /// The public key verifiers need.
     pub fn public_key(&self) -> PublicKey {
-        self.root.public()
+        self.key.public_key()
     }
 
-    /// Issue a token for `principal` with `capability`, as base64.
-    pub fn issue(&self, principal: &Principal, capability: &Capability) -> Result<String> {
-        let block = authority_block(principal, capability)?;
+    /// A ring trusting only this issuer's key.
+    pub fn key_ring(&self) -> KeyRing {
+        KeyRing::single(self.key.id, self.public_key())
+    }
+
+    pub fn lifetimes(&self) -> &TokenLifetimes {
+        &self.lifetimes
+    }
+
+    /// Issue a token for `principal` with `claims`, narrowed to
+    /// `capability` when one is given, as base64.
+    pub fn issue(
+        &self,
+        principal: &Principal,
+        claims: &TokenClaims,
+        capability: Option<&Capability>,
+    ) -> Result<String> {
+        self.lifetimes.check(principal, claims)?;
+        let block = authority_block(principal, claims, capability)?;
         let token = Biscuit::builder()
+            .root_key_id(self.key.id)
             .merge(block)
-            .build_with_key_pair(&self.root, SymbolTable::default(), &ephemeral_key())
+            .build_with_key_pair(&self.key.pair, SymbolTable::default(), &ephemeral_key())
             .map_err(token_err)?;
         token.to_base64().map_err(token_err)
     }
@@ -72,23 +84,48 @@ impl Issuer {
 
 /// Derive a child token that grants no more than `token` does.
 ///
-/// Needs the root public key to read the parent's capability from the
-/// verified token; the holder then appends a block with the narrower
-/// checks. Biscuit checks accumulate, so even a client that bypasses the
-/// narrowing check here cannot produce a token that passes verification
-/// for anything the parent forbade.
-pub fn attenuate(token: &str, root: &PublicKey, narrower: &Capability) -> Result<String> {
-    let parent = Biscuit::from_base64(token, root).map_err(token_err)?;
-    let effective = effective_capability(&parent)?;
-    narrower.check_narrower_than(&effective)?;
+/// Needs the trusted keys to read the parent's scope from the verified
+/// token; the holder then appends a block with the narrower checks.
+/// Biscuit checks accumulate, so even a client that bypasses the narrowing
+/// check here cannot produce a token that passes verification for anything
+/// the parent forbade.
+pub fn attenuate(token: &str, keys: &KeyRing, narrower: &Capability) -> Result<String> {
+    let now = Timestamp::now();
+    let parent = Biscuit::from_base64(token, |id| keys.key_at(id, now).map_err(key_err))
+        .map_err(token_err)?;
+    let (claims, effective) = effective_scope(&parent)?;
+    match &effective {
+        Some(parent) => narrower.check_narrower_than(parent)?,
+        None if narrower.expires_at > claims.expires_at => {
+            return Err(Error::Widening("the capability outlives the token".into()))
+        }
+        None => narrower.validate()?,
+    }
     let child = parent
         .append_with_keypair(&ephemeral_key(), capability_block(narrower)?)
         .map_err(token_err)?;
     child.to_base64().map_err(token_err)
 }
 
-/// Read the effective capability of a token without authorizing a request.
-pub fn inspect(token: &str, root: &PublicKey) -> Result<Capability> {
-    let token = Biscuit::from_base64(token, root).map_err(token_err)?;
-    effective_capability(&token)
+/// Read a token's claims and effective capability without authorizing a
+/// request.
+pub fn inspect(token: &str, keys: &KeyRing) -> Result<(TokenClaims, Option<Capability>)> {
+    inspect_at(token, keys, Timestamp::now())
+}
+
+/// [`inspect`] with key retirement judged at `now`.
+pub(crate) fn inspect_at(
+    token: &str,
+    keys: &KeyRing,
+    now: Timestamp,
+) -> Result<(TokenClaims, Option<Capability>)> {
+    let token = Biscuit::from_base64(token, |id| keys.key_at(id, now).map_err(key_err))
+        .map_err(token_err)?;
+    effective_scope(&token)
+}
+
+/// Biscuit's key provider must answer with its own error type.
+pub(crate) fn key_err(e: Error) -> biscuit_auth::error::Format {
+    tracing::debug!(error = %e, "token signing key refused");
+    biscuit_auth::error::Format::UnknownPublicKey
 }
