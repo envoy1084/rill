@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+roaring = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true }
 rill-core = { workspace = true }

@@ -130,8 +130,8 @@ impl SearchIndex {
     }
 
     /// Sorted documents containing `trigram`, or `None` if it never occurs.
-    pub fn postings_of(&self, trigram: u32) -> Option<Vec<DocId>> {
-        self.postings.get(&trigram).map(|l| l.docs().to_vec())
+    pub fn postings_of(&self, trigram: u32) -> Option<PostingList> {
+        self.postings.get(&trigram).map(|l| l.clone())
     }
 
     /// Tokenize one blob and add it to the postings. Returns its document

@@ -28,7 +28,7 @@ use rill_types::ObjectHash;
 use serde::{Deserialize, Serialize};
 
 use super::docs::DocTableRecord;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::trigram::{DocId, PostingList};
 
 /// Derived kind of per-blob index markers.
@@ -115,7 +115,15 @@ pub async fn put_shard(
     fence: Option<&Lease>,
 ) -> Result<()> {
     let record = ShardRecord {
-        lists: lists.into_iter().map(|(t, l)| (t, l.encode())).collect(),
+        lists: lists
+            .into_iter()
+            .map(|(t, l)| {
+                let mut bytes = Vec::with_capacity(l.serialized_size());
+                l.serialize_into(&mut bytes)
+                    .map_err(|e| Error::Codec(format!("posting list: {e}")))?;
+                Ok((t, bytes))
+            })
+            .collect::<Result<_>>()?,
     };
     put(
         repo,
@@ -156,7 +164,11 @@ pub async fn get_shard(repo: &RepoStore, shard: u8) -> Result<Option<Vec<(u32, P
     record
         .lists
         .into_iter()
-        .map(|(t, bytes)| Ok((t, PostingList::decode(&bytes)?)))
+        .map(|(t, bytes)| {
+            let list = PostingList::deserialize_from(&bytes[..])
+                .map_err(|e| Error::Codec(format!("posting list: {e}")))?;
+            Ok((t, list))
+        })
         .collect::<Result<Vec<_>>>()
         .map(Some)
 }
