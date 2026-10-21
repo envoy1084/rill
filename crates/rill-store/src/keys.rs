@@ -121,6 +121,8 @@ pub mod table {
     pub const AUDIT_CURSOR: &str = "audc";
     /// `(audr, org, last_seq)` → AuditRoot
     pub const AUDIT_ROOT: &str = "audr";
+    /// `(auds, org)` → the last sealed sequence, big-endian u64
+    pub const AUDIT_SEALED: &str = "auds";
     /// `(red, org, id)` → Redaction
     pub const REDACTION: &str = "red";
     /// `(redh, org, hash)` → id of the applied redaction of an object

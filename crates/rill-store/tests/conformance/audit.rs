@@ -103,9 +103,24 @@ pub async fn scenario(name: &str, stores: &Stores) {
         audit.put_root(&root).await.is_err(),
         "{name}: one root per seal"
     );
+    let overlapping = AuditRoot {
+        last_seq: 42,
+        ..root.clone()
+    };
+    assert!(
+        audit.put_root(&overlapping).await.unwrap_err().is_conflict(),
+        "{name}: a racing sealer that read no root cannot reseal sealed entries"
+    );
     assert_eq!(
         audit.latest_root("acme").await.unwrap(),
-        Some(root),
+        Some(root.clone()),
         "{name}"
     );
+    let next = AuditRoot {
+        first_seq: 41,
+        last_seq: 42,
+        ..root
+    };
+    audit.put_root(&next).await.unwrap();
+    assert_eq!(audit.roots("acme").await.unwrap().len(), 2, "{name}");
 }
