@@ -38,6 +38,16 @@ pub struct Verified {
     pub capability: Option<Capability>,
 }
 
+/// Biscuit's default allows 1 ms of wall-clock time per authorization,
+/// which a preempted thread on a busy server exceeds, refusing valid
+/// tokens. Facts and iterations stay bounded, which is what stops a
+/// degenerate token; time only has to catch a runaway.
+const AUTHORIZER_LIMITS: biscuit_auth::AuthorizerLimits = biscuit_auth::AuthorizerLimits {
+    max_facts: 1000,
+    max_iterations: 100,
+    max_time: std::time::Duration::from_millis(250),
+};
+
 /// Checks tokens against the trusted signing keys.
 #[derive(Debug, Clone)]
 pub struct Verifier {
@@ -119,6 +129,7 @@ impl Verifier {
         code.push_str("allow if true;\n");
 
         let mut authorizer = AuthorizerBuilder::new()
+            .set_limits(AUTHORIZER_LIMITS)
             .code_with_params(code, params, HashMap::new())
             .map_err(|e| Error::Token(e.to_string()))?
             .build(&token)

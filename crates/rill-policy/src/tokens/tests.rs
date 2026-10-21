@@ -392,3 +392,47 @@ fn every_key_in_a_token_is_p256() {
         assert_eq!(block.next_key.algorithm, p256);
     }
 }
+
+/// A valid token must verify on a machine with no CPU to spare: Biscuit's
+/// default allows 1 ms of wall-clock time per authorization, which a
+/// preempted thread exceeds, and the server refused valid tokens under
+/// load.
+#[test]
+fn tokens_verify_on_a_busy_machine() {
+    let issuer = Issuer::generate();
+    let verifier = Verifier::new(issuer.key_ring());
+    let token = issue(&issuer, &Principal::agent("bot"), &cap());
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let threads = std::thread::available_parallelism().map_or(8, |n| n.get()) * 4;
+    let spinners: Vec<_> = (0..threads)
+        .map(|_| {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                let mut x = 0u64;
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    x = std::hint::black_box(x.wrapping_mul(31).wrapping_add(7));
+                }
+            })
+        })
+        .collect();
+    let verifiers: Vec<_> = (0..threads)
+        .map(|_| {
+            let (verifier, token) = (verifier.clone(), token.clone());
+            std::thread::spawn(move || {
+                (0..300)
+                    .filter(|_| {
+                        verifier
+                            .verify(&token, &request("src/a", Verb::Read))
+                            .is_err()
+                    })
+                    .count()
+            })
+        })
+        .collect();
+    let refused: usize = verifiers.into_iter().map(|t| t.join().unwrap()).sum();
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    for s in spinners {
+        s.join().unwrap();
+    }
+    assert_eq!(refused, 0, "valid tokens were refused under load");
+}
