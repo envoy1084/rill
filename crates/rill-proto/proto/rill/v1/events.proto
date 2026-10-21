@@ -43,6 +43,8 @@ message Event {
     VersionStoredEvent version_stored = 22;
     StatusChangedEvent status_changed = 23;
     LandedEvent landed = 24;
+    LandRequestedEvent land_requested = 25;
+    LandStatusChangedEvent land_status_changed = 26;
   }
 }
 
@@ -110,4 +112,23 @@ message LandedEvent {
   uint64 seq = 1;
   bytes version = 2;
   bytes change_id = 3;
+}
+message LandRequestedEvent {
+  string ticket = 1;
+  bytes change_id = 2;
+  // "emergency", "human", "agent" or "bulk".
+  string lane = 3;
+}
+message LandStatusChangedEvent {
+  string ticket = 1;
+  bytes change_id = 2;
+  // "queued", "verifying", "landing", "landed", "failed", "conflict",
+  // "returned" or "ejected".
+  string status = 3;
+  // Why it failed, was returned or ejected.
+  optional string reason = 4;
+  // Where it landed.
+  optional uint64 seq = 5;
+  // The paths a conflicting rebase stopped on.
+  repeated string conflict_paths = 6;
 }

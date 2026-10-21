@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ids::{ChangeId, IntentId, OperationId, WorkspaceId};
 use crate::objects::change::ChangeVersionHash;
+use crate::objects::land_request::{LandStatus, LandTicket, Lane};
 use crate::objects::refs::TrunkSeq;
 use crate::objects::review::ReviewStatus;
 use crate::principal::Principal;
@@ -80,6 +81,18 @@ pub enum EventKind {
         from: ReviewStatus,
         to: ReviewStatus,
     },
+    /// A change was queued to land.
+    LandRequested {
+        ticket: LandTicket,
+        change: ChangeId,
+        lane: Lane,
+    },
+    /// A land request moved to a new status.
+    LandStatusChanged {
+        ticket: LandTicket,
+        change: ChangeId,
+        status: LandStatus,
+    },
     /// A version landed on trunk.
     Landed {
         seq: TrunkSeq,
@@ -115,6 +128,8 @@ impl EventKind {
             EventKind::StackSet { .. } => "stack_set",
             EventKind::StatusChanged { .. } => "status_changed",
             EventKind::Landed { .. } => "landed",
+            EventKind::LandRequested { .. } => "land_requested",
+            EventKind::LandStatusChanged { .. } => "land_status_changed",
             EventKind::WorkspaceChanged { .. } => "workspace_changed",
             EventKind::WorkspaceDeleted { .. } => "workspace_deleted",
             EventKind::IntentChanged { .. } => "intent_changed",
@@ -133,7 +148,9 @@ impl EventKind {
             | EventKind::ThreadResolved { change, .. }
             | EventKind::StackSet { change, .. }
             | EventKind::StatusChanged { change, .. }
-            | EventKind::Landed { change, .. } => Some(*change),
+            | EventKind::Landed { change, .. }
+            | EventKind::LandRequested { change, .. }
+            | EventKind::LandStatusChanged { change, .. } => Some(*change),
             _ => None,
         }
     }

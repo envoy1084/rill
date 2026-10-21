@@ -10,6 +10,7 @@ mod change;
 mod content;
 mod event;
 mod intent;
+mod land;
 mod primitives;
 mod principal;
 mod refs;
@@ -25,6 +26,7 @@ pub use content::{
     merge_terms_to_proto,
 };
 pub use intent::{intent_kind_from_proto, intent_status_from_proto, risk_from_proto};
+pub use land::{land_status_from_parts, land_status_parts, lane_from_proto, ticket_from_proto};
 pub use primitives::{
     enum_from_proto, hash_from_proto, hash_to_proto, hashes_from_proto, id_from_proto, id_to_proto,
     ids_from_proto, opt_hash_from_proto, opt_id_from_proto, path_from_proto, ref_name_from_proto,

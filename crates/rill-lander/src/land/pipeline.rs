@@ -34,11 +34,12 @@ impl Lander {
             let reason = format!("change is no longer landable: {e}");
             tracing::warn!(%change_id, ticket = %queued.ticket, reason, "landing refused");
             self.set_status(
-                queued.ticket,
+                queued,
                 LandStatus::Failed {
                     reason: reason.clone(),
                 },
-            );
+            )
+            .await;
             self.publish(LandEvent::Failed { change_id, reason });
             return;
         }
@@ -112,12 +113,18 @@ impl Lander {
             return Ok(Attempt::Done);
         }
 
-        self.set_status(queued.ticket, LandStatus::Landing);
+        self.set_status(queued, LandStatus::Landing).await;
         self.derive.ensure_land_critical(&hash).await?;
         let Some(lease) = self.lease().await? else {
             return Err(Error::Fenced);
         };
         let request = &queued.request;
+        let seq = TrunkSeq(head.map(|(s, _)| s.get()).unwrap_or(0) + 1);
+        let landed = self.repo.land_status_tx(
+            &queued.record,
+            LandStatus::Landed { seq },
+            &crate::revert::lander_principal(),
+        )?;
         let batch = LandBatch {
             expected: head.map(|(_, h)| h),
             entries: vec![LandEntry {
@@ -130,7 +137,7 @@ impl Lander {
             }],
             fence: Some(lease.clone()),
             actor: Some(crate::revert::lander_principal()),
-            also: super::followups::landing_jobs(&self.repo, &[hash])?,
+            also: super::followups::landing_jobs(&self.repo, &[hash])?.merge(landed),
         };
         match self.repo.land(batch).await {
             Ok(landings) => {
@@ -177,11 +184,12 @@ impl Lander {
             let change_id = queued.request.change_id;
             tracing::info!(%change_id, ?paths, "rebase conflicted");
             self.set_status(
-                queued.ticket,
+                queued,
                 LandStatus::Conflict {
                     paths: paths.clone(),
                 },
-            );
+            )
+            .await;
             self.return_to_owner(
                 change_id,
                 format!("rebase onto trunk conflicts at {} path(s)", paths.len()),
@@ -197,7 +205,7 @@ impl Lander {
     /// Run pre-land verification. Returns `false` after recording a
     /// failure status.
     async fn verify(&self, queued: &QueuedRequest, hash: &ChangeVersionHash) -> Result<bool> {
-        self.set_status(queued.ticket, LandStatus::Verifying);
+        self.set_status(queued, LandStatus::Verifying).await;
         let root = self.derive.get::<RootTree>(hash).await?;
         let outcome =
             match tokio::time::timeout(self.policy.max_wait, self.verifier.verify(root, *hash))
@@ -225,7 +233,7 @@ impl Lander {
     async fn announce(&self, queued: &QueuedRequest, landing: Landing, cv: &ChangeVersion) {
         let seq = landing.seq;
         let version = landing.version;
-        self.set_status(queued.ticket, LandStatus::Landed { seq });
+        tracing::debug!(ticket = %queued.ticket, %seq, "request landed");
         if let Err(e) = self.hooks.mark_landed(cv.change_id, seq, version).await {
             tracing::error!(change_id = %cv.change_id, error = %e, "mark_landed hook failed");
         }

@@ -397,8 +397,7 @@ impl ReviewService for ReviewSvc {
                         opened.principal().clone(),
                         state.risk,
                     ))
-                    .await;
-                common::remember_ticket(&opened.repo, ticket, id);
+                    .await?;
                 let (proto, _) = common::ticket_status(&opened.repo, ticket).await?;
                 Ok(Response::new(pb::RequestLandResponse {
                     ticket: Some(proto),
@@ -423,7 +422,8 @@ impl ReviewService for ReviewSvc {
                     (Some(seq.get()), hash.map(|h| hash_to_proto(&h)), None)
                 }
                 rill_lander::LandStatus::Failed { reason }
-                | rill_lander::LandStatus::Returned { reason } => (None, None, Some(reason)),
+                | rill_lander::LandStatus::Returned { reason }
+                | rill_lander::LandStatus::Ejected { reason } => (None, None, Some(reason)),
                 rill_lander::LandStatus::Conflict { paths } => (
                     None,
                     None,

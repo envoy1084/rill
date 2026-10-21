@@ -6,6 +6,7 @@
 //! root prefix per fixture.
 
 mod events;
+mod land_queue;
 mod layer;
 mod meta;
 mod objects;
@@ -142,6 +143,7 @@ async fn repo_stores_conform() {
         repo::scenario(f.name, &f.stores).await;
         repo::landing(f.name, &f.stores).await;
         events::scenario(f.name, &f.stores).await;
+        land_queue::scenario(f.name, &f.stores).await;
         f.finish().await;
     }
 }

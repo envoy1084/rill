@@ -520,7 +520,38 @@ fn every_event_kind_roundtrips() {
             version: h("b"),
             change,
         },
+        EventKind::LandRequested {
+            ticket: LandTicket(u64::MAX),
+            change,
+            lane: Lane::Emergency,
+        },
     ];
+    let statuses = [
+        LandStatus::Queued,
+        LandStatus::Verifying,
+        LandStatus::Landing,
+        LandStatus::Landed { seq: TrunkSeq(3) },
+        LandStatus::Failed {
+            reason: "red".into(),
+        },
+        LandStatus::Conflict {
+            paths: vec![p("src/a.rs")],
+        },
+        LandStatus::Returned { reason: "".into() },
+        LandStatus::Ejected {
+            reason: "votes withdrawn".into(),
+        },
+    ];
+    let kinds =
+        kinds.into_iter().chain(
+            statuses
+                .into_iter()
+                .map(|status| EventKind::LandStatusChanged {
+                    ticket: LandTicket(9),
+                    change,
+                    status,
+                }),
+        );
     for kind in kinds {
         let event = Event {
             kind,

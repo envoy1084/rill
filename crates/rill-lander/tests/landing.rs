@@ -279,16 +279,22 @@ async fn independent_changes_land_in_one_run() {
 
     let (_, a) = fx.commit(Some(base), &[("a.txt", "a")], "a").await;
     let (_, b) = fx.commit(Some(base), &[("b.txt", "b")], "b").await;
-    let ta = lander.enqueue(request(&a, RiskClass::Trivial)).await;
-    let tb = lander.enqueue(request(&b, RiskClass::Trivial)).await;
+    let ta = lander
+        .enqueue(request(&a, RiskClass::Trivial))
+        .await
+        .unwrap();
+    let tb = lander
+        .enqueue(request(&b, RiskClass::Trivial))
+        .await
+        .unwrap();
     assert_eq!(lander.run_once().await.unwrap(), 2);
 
     let mut seqs = vec![
-        match lander.queue().status(ta).unwrap() {
+        match lander.queue().status(ta).await.unwrap().unwrap() {
             LandStatus::Landed { seq } => seq,
             other => panic!("a: {other:?}"),
         },
-        match lander.queue().status(tb).unwrap() {
+        match lander.queue().status(tb).await.unwrap().unwrap() {
             LandStatus::Landed { seq } => seq,
             other => panic!("b: {other:?}"),
         },
@@ -635,16 +641,22 @@ async fn run_forever_processes_until_shutdown() {
     let task = tokio::spawn(lander.clone().run_forever(shutdown.clone()));
 
     let (_, cv) = fx.commit(None, &[("a", "a")], "a").await;
-    let ticket = lander.enqueue(request(&cv, RiskClass::Trivial)).await;
-    let mut rx = lander.queue().watch(ticket).unwrap();
-    tokio::time::timeout(Duration::from_secs(10), async {
-        while !rx.borrow_and_update().is_terminal() {
-            rx.changed().await.unwrap();
+    let ticket = lander
+        .enqueue(request(&cv, RiskClass::Trivial))
+        .await
+        .unwrap();
+    let status = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let status = lander.queue().status(ticket).await.unwrap().unwrap();
+            if status.is_terminal() {
+                return status;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
     })
     .await
     .unwrap();
-    assert_eq!(*rx.borrow(), LandStatus::Landed { seq: TrunkSeq(1) });
+    assert_eq!(status, LandStatus::Landed { seq: TrunkSeq(1) });
     shutdown.cancel();
     task.await.unwrap();
 }
@@ -659,7 +671,10 @@ async fn a_standby_lander_waits_for_the_lease() {
     assert!(active.lease().await.unwrap().is_some());
 
     let (_, a) = fx.commit(Some(base), &[("a.txt", "a")], "a").await;
-    let ticket = standby.enqueue(request(&a, RiskClass::Trivial)).await;
+    let ticket = standby
+        .enqueue(request(&a, RiskClass::Trivial))
+        .await
+        .unwrap();
     assert_eq!(
         standby.run_once().await.unwrap(),
         0,
@@ -670,7 +685,36 @@ async fn a_standby_lander_waits_for_the_lease() {
     active.release().await;
     assert_eq!(standby.run_once().await.unwrap(), 1);
     assert!(matches!(
-        standby.queue().status(ticket).unwrap(),
+        standby.queue().status(ticket).await.unwrap().unwrap(),
         LandStatus::Landed { seq: TrunkSeq(2) }
     ));
+}
+
+#[tokio::test]
+async fn a_request_outlives_the_lander_that_accepted_it() {
+    let fx = Fixture::new().await;
+    let (base, _) = fx.commit(None, &[("base", "0")], "base").await;
+    fx.repo.land_on_trunk(None, base).await.unwrap();
+    let (_, a) = fx.commit(Some(base), &[("a.txt", "a")], "a").await;
+
+    let crashed = fx.lander(Arc::new(NoopHooks), Arc::new(AlwaysGreen), fast_policy());
+    assert!(crashed.lease().await.unwrap().is_some());
+    let ticket = crashed.enqueue(request(&a, RiskClass::Trivial)).await.unwrap();
+    assert_eq!(
+        crashed.enqueue(request(&a, RiskClass::Trivial)).await.unwrap(),
+        ticket,
+        "asking again returns the same request"
+    );
+    // The process goes away before serving the request; its successor
+    // takes the lease and finds the request in the store.
+    crashed.release().await;
+    drop(crashed);
+
+    let successor = fx.lander(Arc::new(NoopHooks), Arc::new(AlwaysGreen), fast_policy());
+    assert_eq!(successor.run_once().await.unwrap(), 1);
+    assert_eq!(
+        successor.queue().status(ticket).await.unwrap(),
+        Some(LandStatus::Landed { seq: TrunkSeq(2) })
+    );
+    assert!(successor.queue().is_empty().await.unwrap());
 }

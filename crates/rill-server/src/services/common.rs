@@ -12,8 +12,7 @@ use rill_proto::convert::{
 };
 use rill_proto::rill::v1 as pb;
 use rill_types::{
-    ChangeVersionHash, OperationId, Principal, Provenance, RepoPathBuf, Timestamp, TreeHash,
-    TrunkSeq,
+    ChangeVersionHash, OperationId, Principal, Provenance, RepoPathBuf, TreeHash, TrunkSeq,
 };
 use tonic::{Request, Response, Status};
 
@@ -236,58 +235,37 @@ pub fn land_status_proto(status: &LandStatus) -> pb::LandStatus {
         LandStatus::Verifying | LandStatus::Landing => pb::LandStatus::Rebasing,
         LandStatus::Landed { .. } => pb::LandStatus::Landed,
         LandStatus::Failed { .. } | LandStatus::Conflict { .. } => pb::LandStatus::Failed,
-        LandStatus::Returned { .. } => pb::LandStatus::Cancelled,
+        LandStatus::Returned { .. } | LandStatus::Ejected { .. } => pb::LandStatus::Cancelled,
     }
 }
 
-/// Look up a ticket's current status, falling back to the review state
-/// once the queue has forgotten a terminal ticket.
+/// A land request's wire ticket and status, from the store.
 pub async fn ticket_status(
     ctx: &RepoContext,
     ticket: LandTicket,
 ) -> Result<(pb::LandTicket, LandStatus)> {
-    let info = ctx
-        .tickets
-        .get(&ticket.0)
-        .map(|t| t.clone())
+    let record = ctx
+        .lander
+        .queue()
+        .record(ticket)
+        .await?
         .ok_or_else(|| Error::not_found(format!("land ticket {}", ticket.0)))?;
-    let status = match ctx.lander.queue().status(ticket) {
-        Some(status) => status,
-        None => match ctx.repo.get_review(&info.change_id).await? {
-            Some(state) if state.landed_seq.is_some() => LandStatus::Landed {
-                seq: state.landed_seq.unwrap_or_default(),
-            },
-            _ => LandStatus::Returned {
-                reason: "ticket expired before it reached a terminal state".into(),
-            },
-        },
-    };
-    let proto = pb::LandTicket {
-        id: ticket.0.to_string(),
-        change_id: id_to_proto(&info.change_id),
-        status: land_status_proto(&status) as i32,
-        requested_at: timestamp_to_proto(info.requested_at),
-    };
-    Ok((proto, status))
+    Ok((ticket_proto(&record), record.status))
+}
+
+/// The wire form of a land request.
+pub fn ticket_proto(record: &rill_types::LandRequestRecord) -> pb::LandTicket {
+    pb::LandTicket {
+        id: record.ticket.0.to_string(),
+        change_id: id_to_proto(&record.request.change_id),
+        status: land_status_proto(&record.status) as i32,
+        requested_at: timestamp_to_proto(record.request.requested_at),
+    }
 }
 
 /// Parse a ticket id string.
 pub fn parse_ticket(id: &str) -> Result<LandTicket> {
-    id.trim_start_matches("land#")
-        .parse::<u64>()
-        .map(LandTicket)
-        .map_err(|_| Error::invalid(format!("invalid land ticket {id:?}")))
-}
-
-/// Record an issued ticket so status lookups outlive the queue entry.
-pub fn remember_ticket(ctx: &RepoContext, ticket: LandTicket, change_id: rill_types::ChangeId) {
-    ctx.tickets.insert(
-        ticket.0,
-        crate::state::TicketInfo {
-            change_id,
-            requested_at: Timestamp::now(),
-        },
-    );
+    Ok(rill_proto::convert::ticket_from_proto("ticket", id)?)
 }
 
 /// Clamp a client-supplied limit: zero means the default.

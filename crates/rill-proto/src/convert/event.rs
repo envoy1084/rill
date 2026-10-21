@@ -2,6 +2,9 @@
 
 use rill_types::{Event, EventKind};
 
+use crate::convert::land::{
+    land_status_from_parts, land_status_parts, lane_from_proto, ticket_from_proto,
+};
 use crate::convert::primitives::{
     hash_from_proto, hash_to_proto, id_from_proto, id_to_proto, ids_from_proto,
     opt_hash_from_proto, required, timestamp_from_proto, timestamp_to_proto, trunk_seq_from_proto,
@@ -104,6 +107,30 @@ impl From<&EventKind> for pb::event::Kind {
                     to: pb::ReviewStatus::from(*to) as i32,
                 })
             }
+            EventKind::LandRequested {
+                ticket,
+                change,
+                lane,
+            } => Kind::LandRequested(pb::LandRequestedEvent {
+                ticket: ticket.0.to_string(),
+                change_id: id_to_proto(change),
+                lane: lane.name().to_string(),
+            }),
+            EventKind::LandStatusChanged {
+                ticket,
+                change,
+                status,
+            } => {
+                let (status, reason, seq, conflict_paths) = land_status_parts(status);
+                Kind::LandStatusChanged(pb::LandStatusChangedEvent {
+                    ticket: ticket.0.to_string(),
+                    change_id: id_to_proto(change),
+                    status,
+                    reason,
+                    seq,
+                    conflict_paths,
+                })
+            }
             EventKind::Landed {
                 seq,
                 version,
@@ -178,6 +205,22 @@ impl TryFrom<pb::event::Kind> for EventKind {
                 change: id_from_proto("status_changed.change_id", &e.change_id)?,
                 from: review_status_from_proto("status_changed.from", e.from)?,
                 to: review_status_from_proto("status_changed.to", e.to)?,
+            },
+            Kind::LandRequested(e) => EventKind::LandRequested {
+                ticket: ticket_from_proto("land_requested.ticket", &e.ticket)?,
+                change: id_from_proto("land_requested.change_id", &e.change_id)?,
+                lane: lane_from_proto("land_requested.lane", &e.lane)?,
+            },
+            Kind::LandStatusChanged(e) => EventKind::LandStatusChanged {
+                ticket: ticket_from_proto("land_status_changed.ticket", &e.ticket)?,
+                change: id_from_proto("land_status_changed.change_id", &e.change_id)?,
+                status: land_status_from_parts(
+                    "land_status_changed.status",
+                    &e.status,
+                    e.reason,
+                    e.seq,
+                    &e.conflict_paths,
+                )?,
             },
             Kind::Landed(e) => EventKind::Landed {
                 seq: trunk_seq_from_proto(e.seq),

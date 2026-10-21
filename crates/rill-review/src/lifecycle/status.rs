@@ -38,12 +38,13 @@ impl ReviewService {
     }
 
     /// Hand a landable change to the lander. Fails unless the change is
-    /// currently `Landable`, which is the lander's guard against landing a
-    /// change whose approvals were withdrawn.
+    /// `Landable`, the lander's guard against landing a change whose
+    /// approvals were withdrawn, or already `Landing`, when a lander that
+    /// took over resumes a request (a change has one unfinished request).
     pub async fn mark_landing(&self, change_id: &ChangeId) -> Result<ReviewState> {
         self.transition(
             change_id,
-            &[ReviewStatus::Landable],
+            &[ReviewStatus::Landable, ReviewStatus::Landing],
             ReviewStatus::Landing,
             "mark_landing",
         )

@@ -150,26 +150,12 @@ impl LanderService for LanderSvc {
                 None => (0, Bytes::new()),
             };
             let mut in_flight = Vec::new();
-            for entry in ctx.tickets.iter() {
-                let ticket = rill_lander::LandTicket(*entry.key());
-                if let Some(status) = ctx.lander.queue().status(ticket) {
-                    if !status.is_terminal() {
-                        let (proto, _) = common::ticket_status(ctx, ticket).await?;
-                        let version = ctx
-                            .repo
-                            .get_review(&entry.value().change_id)
-                            .await?
-                            .and_then(|s| s.current_version())
-                            .map(|h| hash_to_proto(&h))
-                            .unwrap_or_default();
-                        in_flight.push(pb::InFlightLanding {
-                            ticket: Some(proto),
-                            version,
-                        });
-                    }
-                }
+            for queued in ctx.lander.queue().pending(MAX_LIST).await? {
+                in_flight.push(pb::InFlightLanding {
+                    ticket: Some(common::ticket_proto(&queued.record())),
+                    version: hash_to_proto(&queued.request.version),
+                });
             }
-            in_flight.sort_by_key(|l| l.ticket.as_ref().and_then(|t| t.id.parse::<u64>().ok()));
             let limit = common::limit(request.get_ref().recent_limit, DEFAULT_RECENT, MAX_LIST);
             let landings = ctx.lander.list_landings().await?;
             let mut recent = Vec::new();

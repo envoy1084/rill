@@ -3,13 +3,12 @@
 use rill_policy::{Relation, Subject};
 use rill_proto::convert::{hash_to_proto, ref_name_from_proto};
 use rill_proto::rill::v1 as pb;
-use rill_types::{ObjectHash, RefUpdate, RepoPathBuf, Timestamp, TrunkSeq};
+use rill_types::{ObjectHash, RefUpdate, RepoPathBuf, TrunkSeq};
 
 use super::RepoSvc;
 use crate::auth::caller;
 use crate::error::{Error, Result};
 use crate::services::common::{self, hash, open};
-use crate::state::RepoEvent;
 
 /// Longest a `WaitDerived` call blocks.
 const MAX_WAIT_MS: u64 = 60_000;
@@ -195,12 +194,6 @@ impl RepoSvc {
                     e.into()
                 }
             })?;
-        opened.repo.events.publish(RepoEvent::RefMoved {
-            name: update.name.clone(),
-            old: update.expected,
-            new: update.target,
-            at: Timestamp::now(),
-        });
         Ok(pb::MoveRefResponse {
             hash: update.target.map(|h| hash_to_proto(&h)),
         })

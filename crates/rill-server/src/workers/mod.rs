@@ -1,6 +1,5 @@
 //! Background tasks that run per repository: the landing loop, post-land
-//! verification, the derive and index job workers, event retention and
-//! the forwarders that feed the repository's event bus.
+//! verification, the derive and index job workers and event retention.
 
 mod deriver;
 mod hooks;
@@ -12,19 +11,15 @@ use std::sync::Arc;
 pub use hooks::ReviewHooksAdapter;
 pub use verifier::ExecVerifier;
 
-use crate::state::{land_to_bus, RepoContext, RepoEvent};
+use crate::state::RepoContext;
 
 /// How often expired events are swept.
 const EVENT_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3600);
 
 /// Spawn every worker for `ctx`. They run until the context's shutdown
-/// token is cancelled; the forwarders also stop when their source channel
-/// closes.
+/// token is cancelled.
 pub fn spawn_repo_workers(ctx: &Arc<RepoContext>) {
     let shutdown = ctx.shutdown.clone();
-    ctx.events
-        .forward(ctx.review().subscribe(), |e| vec![RepoEvent::Review(e)]);
-    ctx.events.forward(ctx.lander.subscribe(), land_to_bus);
 
     tokio::spawn(ctx.lander.clone().run_forever(shutdown.clone()));
     if let Some(postland) = &ctx.postland {

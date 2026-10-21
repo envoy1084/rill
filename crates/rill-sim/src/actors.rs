@@ -322,9 +322,13 @@ impl Ctx<'_> {
             return Outcome::Skipped;
         }
         let request = LandRequest::new(owned.id, version, agent.principal.clone(), state.risk);
-        let ticket = self.world.lander.enqueue(request).await;
-        self.oracle.requested(owned.id, ticket);
-        Outcome::Done
+        match self.world.lander.enqueue(request).await {
+            Ok(ticket) => {
+                self.oracle.requested(owned.id, ticket);
+                Outcome::Done
+            }
+            Err(_) => Outcome::Failed,
+        }
     }
 
     async fn sweep(&mut self) -> Outcome {

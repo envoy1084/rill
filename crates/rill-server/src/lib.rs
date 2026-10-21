@@ -32,7 +32,7 @@ use tokio_util::sync::CancellationToken;
 pub use config::{AuthConfig, ServerConfig, StorageConfig};
 pub use error::{Error, Result};
 pub use serve::{serve_with_state, Listeners};
-pub use state::{AppState, RepoContext, RepoEvent};
+pub use state::{AppState, RepoContext};
 
 /// Open storage and build the shared state without binding any sockets.
 /// Workers for existing repositories start immediately.

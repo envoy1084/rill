@@ -20,6 +20,7 @@ use super::common::GrpcResult;
 
 pub use commit::{commit_version, commit_version_with, CommitExtras};
 pub use trees::BlobStream;
+pub(crate) use watch::forward;
 pub use watch::EventStream;
 pub use write::version_from_diff;
 

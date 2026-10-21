@@ -13,13 +13,7 @@ pub struct KnownIssue {
 }
 
 /// Every known issue.
-pub const KNOWN_ISSUES: &[KnownIssue] = &[
-    KnownIssue {
-        invariant: Invariant::LandRequestsResolve,
-        cause: "the land queue and its tickets live in process memory, so a restart forgets queued requests",
-        fixed_by_phase: 9,
-    },
-];
+pub const KNOWN_ISSUES: &[KnownIssue] = &[];
 
 /// The known issue behind `invariant`, if any.
 pub fn known(invariant: Invariant) -> Option<&'static KnownIssue> {

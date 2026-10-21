@@ -122,7 +122,8 @@ async fn revert_with(
 ) -> Result<RevertOutcome> {
     let version = build_revert(lander, seq, reason, actor.clone(), tool).await?;
     let hash = version.version_hash();
-    let mut request = LandRequest::new(version.change_id, hash, actor, RiskClass::Normal);
+    let mut request = LandRequest::new(version.change_id, hash, actor, RiskClass::Normal)
+        .in_lane(rill_types::Lane::Emergency);
     request.verify_override = Some(VerifyMode::None);
     match lander.land_now(request).await? {
         LandStatus::Landed { seq: landed_at } => {

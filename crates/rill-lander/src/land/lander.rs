@@ -1,4 +1,4 @@
-//! The lander: owns the queue and drives requests through the pipeline.
+//! The lander: serves the stored land queue while it holds the lease.
 
 use std::sync::Arc;
 
@@ -14,12 +14,16 @@ use crate::config::LandPolicy;
 use crate::conflict_graph::touched_paths;
 use crate::error::Result;
 use crate::events::LandEvent;
-use crate::queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest};
+use crate::queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest, SWEEP_LIMIT};
 use crate::traits::{ReviewHooks, Verifier};
 
 /// Capacity of the event channel; slow subscribers lag rather than block
 /// landing.
 const EVENT_CAPACITY: usize = 1024;
+/// How often `land_now` looks again while another lander serves the queue.
+const STANDBY_POLL: std::time::Duration = std::time::Duration::from_millis(100);
+/// How often finished requests past their retention are deleted.
+const RETENTION_SWEEP: std::time::Duration = std::time::Duration::from_secs(3600);
 
 /// Lands changes on trunk.
 pub struct Lander {
@@ -29,7 +33,7 @@ pub struct Lander {
     pub(super) hooks: Arc<dyn ReviewHooks>,
     pub(super) verifier: Arc<dyn Verifier>,
     pub(super) policy: LandPolicy,
-    queue: Arc<LandQueue>,
+    queue: LandQueue,
     events: broadcast::Sender<LandEvent>,
     /// The lander lease.
     lease: LeaseHolder,
@@ -51,13 +55,13 @@ impl Lander {
         let (events, _) = broadcast::channel(EVENT_CAPACITY);
         Arc::new(Lander {
             lease: LeaseHolder::new(repo.clone(), LANDER_LEASE),
+            queue: LandQueue::new(repo.clone()),
             repo,
             derive,
             graph,
             hooks,
             verifier,
             policy,
-            queue: Arc::new(LandQueue::new()),
             events,
         })
     }
@@ -114,7 +118,7 @@ impl Lander {
     }
 
     /// The request queue.
-    pub fn queue(&self) -> &Arc<LandQueue> {
+    pub fn queue(&self) -> &LandQueue {
         &self.queue
     }
 
@@ -129,43 +133,46 @@ impl Lander {
         let _ = self.events.send(event);
     }
 
-    /// Queue a request and return its ticket.
-    pub async fn enqueue(&self, request: LandRequest) -> LandTicket {
+    /// Queue a request and return its ticket; a change with an
+    /// unfinished request gets that request's ticket.
+    pub async fn enqueue(&self, request: LandRequest) -> Result<LandTicket> {
         let change_id = request.change_id;
-        let ticket = self.queue.enqueue(request).await;
-        self.publish(LandEvent::Queued { ticket, change_id });
-        ticket
+        let (ticket, new) = self.queue.enqueue(&request).await?;
+        if new {
+            self.publish(LandEvent::Queued { ticket, change_id });
+        }
+        Ok(ticket)
     }
 
-    /// Queue `request`, process the queue, and return the request's final
-    /// status. For CLI and test callers that want a synchronous answer.
+    /// Queue `request`, serve the queue, and return the request's status
+    /// once it finishes, or after `max_wait` while another process holds
+    /// the lease. For CLI, revert and test callers that want an answer.
     pub async fn land_now(self: &Arc<Self>, request: LandRequest) -> Result<LandStatus> {
-        let ticket = self.enqueue(request).await;
-        let mut rx = self
-            .queue
-            .watch(ticket)
-            .ok_or(crate::error::Error::UnknownTicket(ticket.0))?;
-        self.run_once().await?;
+        let ticket = self.enqueue(request).await?;
+        let deadline = tokio::time::Instant::now() + self.policy.max_wait;
         loop {
-            let status = rx.borrow_and_update().clone();
-            if status.is_terminal() {
+            self.run_once().await?;
+            let status = self
+                .queue
+                .status(ticket)
+                .await?
+                .ok_or(crate::error::Error::UnknownTicket(ticket.0))?;
+            if status.is_terminal() || tokio::time::Instant::now() >= deadline {
                 return Ok(status);
             }
-            if rx.changed().await.is_err() {
-                return Ok(status);
-            }
+            tokio::time::sleep(STANDBY_POLL).await;
         }
     }
 
-    /// Process everything currently queued. Independent requests are
-    /// handled concurrently; overlapping ones in arrival order. Returns
-    /// the number of requests processed.
+    /// Serve every unfinished request. Independent requests are handled
+    /// concurrently; overlapping ones in queue order. Returns the number
+    /// of requests processed.
     pub async fn run_once(self: &Arc<Self>) -> Result<usize> {
         // A standby lander leaves requests queued until it holds the lease.
         if self.lease().await?.is_none() {
             return Ok(0);
         }
-        let queued = self.queue.drain().await;
+        let queued = self.queue.pending(SWEEP_LIMIT).await?;
         if queued.is_empty() {
             return Ok(0);
         }
@@ -204,21 +211,38 @@ impl Lander {
         crate::conflict_graph::partition(items)
     }
 
-    /// Sweep the queue every `batch_window` until `shutdown` is cancelled.
+    /// Serve the queue until `shutdown` is cancelled: after each sweep,
+    /// wait for a new request or `batch_window`, whichever comes first.
     pub async fn run_forever(self: Arc<Self>, shutdown: CancellationToken) {
+        let mut last_retention = tokio::time::Instant::now();
         loop {
+            let seen = self.repo.land_wake_count().await.unwrap_or(0);
+            if let Err(e) = self.run_once().await {
+                tracing::error!(error = %e, "landing sweep failed");
+            }
+            if last_retention.elapsed() >= RETENTION_SWEEP {
+                last_retention = tokio::time::Instant::now();
+                self.sweep_finished().await;
+            }
             tokio::select! {
                 _ = shutdown.cancelled() => break,
-                _ = tokio::time::sleep(self.policy.batch_window) => {
-                    if let Err(e) = self.run_once().await {
-                        tracing::error!(error = %e, "landing sweep failed");
-                    }
-                    self.queue.forget_terminal(crate::queue::TERMINAL_RETENTION);
-                }
+                _ = self.repo.wait_for_land_requests(seen, self.policy.batch_window) => {}
             }
         }
         self.release().await;
         tracing::info!("lander stopped");
+    }
+
+    async fn sweep_finished(&self) {
+        let before = rill_types::Timestamp::from_millis(
+            rill_types::Timestamp::now().millis()
+                - crate::queue::TERMINAL_RETENTION.as_millis() as i64,
+        );
+        match self.repo.sweep_land_requests(before, 10_000).await {
+            Ok(0) => {}
+            Ok(n) => tracing::debug!(removed = n, "swept finished land requests"),
+            Err(e) => tracing::warn!(error = %e, "sweeping land requests failed"),
+        }
     }
 
     /// Recent landings, oldest first.
@@ -230,12 +254,13 @@ impl Lander {
     pub(super) async fn fail(&self, queued: &QueuedRequest, reason: String) {
         let change_id = queued.request.change_id;
         tracing::warn!(%change_id, ticket = %queued.ticket, reason, "landing failed");
-        self.queue.set_status(
-            queued.ticket,
+        self.set_status(
+            queued,
             LandStatus::Failed {
                 reason: reason.clone(),
             },
-        );
+        )
+        .await;
         self.return_to_owner(change_id, reason.clone()).await;
         self.publish(LandEvent::Failed { change_id, reason });
     }
@@ -246,7 +271,24 @@ impl Lander {
         }
     }
 
-    pub(super) fn set_status(&self, ticket: LandTicket, status: LandStatus) {
-        self.queue.set_status(ticket, status);
+    /// Record `status` for `queued`, fenced by the lease this lander holds.
+    /// A lander that lost the lease records nothing; its successor serves
+    /// the request.
+    pub(super) async fn set_status(&self, queued: &QueuedRequest, status: LandStatus) {
+        let Some(lease) = self.held_lease().await else {
+            return;
+        };
+        if let Err(e) = self
+            .repo
+            .set_land_status(
+                queued.ticket,
+                status,
+                Some(&lease),
+                &crate::revert::lander_principal(),
+            )
+            .await
+        {
+            tracing::warn!(ticket = %queued.ticket, error = %e, "recording a land status failed");
+        }
     }
 }

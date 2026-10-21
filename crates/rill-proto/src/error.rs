@@ -26,6 +26,9 @@ pub enum ConvertError {
         source: rill_types::Error,
     },
 
+    #[error("field {field}: unknown value {value:?}")]
+    Unknown { field: &'static str, value: String },
+
     #[error("field {field}: value {value} out of range")]
     OutOfRange { field: &'static str, value: i64 },
 }

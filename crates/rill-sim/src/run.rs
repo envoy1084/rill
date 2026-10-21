@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use rill_core::ChangeBuilder;
 use rill_lander::{LandRequest, LandStatus};
+use rill_store::repo::LEASE_TTL_MS;
 use rill_types::testing::{set_clock, set_id_seed};
 use rill_types::{Principal, RiskClass, Timestamp};
 
@@ -104,18 +105,20 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
     }
 
     plan.set_enabled(false);
+    // Past any lease a restarted lander left behind, so the current one
+    // can take over and serve every stored request.
+    set_clock(Some(
+        START_MILLIS + scenario.steps as i64 * 1_000 + LEASE_TTL_MS + 1_000,
+    ));
     for _ in 0..SETTLE_SWEEPS {
-        if world.lander.queue().is_empty().await {
+        if world.lander.queue().is_empty().await.unwrap_or(false) {
             break;
         }
         let _ = world.lander.run_once().await;
     }
     oracle.observe_trunk(&world.repo).await;
     oracle.check_durability(&world.repo).await;
-    let queue = world.lander.queue().clone();
-    oracle
-        .check_settled(&world.repo, |ticket| queue.status(ticket))
-        .await;
+    oracle.check_settled(&world.repo).await;
     oracle.check_event_log(&world.repo).await;
     let settle_at = START_MILLIS + scenario.steps as i64 * 1_000 + SETTLE_MILLIS;
     oracle

@@ -19,11 +19,10 @@ use rill_review::votes::LabelSet;
 use rill_search::{IndexConfig, SearchIndex};
 use rill_store::repo::RepoConfig;
 use rill_store::{RepoStore, Stores};
-use rill_types::{ChangeId, RepoId, Timestamp};
+use rill_types::RepoId;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
-use super::events::EventBus;
 use super::policy;
 use crate::config::ServerConfig;
 use crate::error::{Error, Result};
@@ -31,15 +30,6 @@ use crate::workers;
 
 /// Size of the derived-data cache per repository.
 const DERIVE_CACHE: usize = 8192;
-
-/// Bookkeeping for a land ticket the server handed out.
-#[derive(Debug, Clone)]
-pub struct TicketInfo {
-    /// The change being landed.
-    pub change_id: ChangeId,
-    /// When the land was requested.
-    pub requested_at: Timestamp,
-}
 
 /// Everything the handlers need for one repository.
 pub struct RepoContext {
@@ -63,11 +53,6 @@ pub struct RepoContext {
     pub search: Arc<SearchIndex>,
     /// ReBAC relation checks.
     pub authorizer: Arc<Authorizer>,
-    /// Fan-in of review, landing and ref events.
-    pub events: EventBus,
-    /// Land tickets issued by this process, so status lookups work after
-    /// the queue forgets terminal tickets.
-    pub tickets: DashMap<u64, TicketInfo>,
     /// Vote labels.
     pub labels: Arc<LabelSet>,
     /// Cancelled when the server shuts down; long-lived streams and
@@ -339,8 +324,6 @@ impl RepoRegistry {
             runner,
             search,
             authorizer,
-            events: EventBus::new(),
-            tickets: DashMap::new(),
             labels,
             shutdown: self.shutdown.child_token(),
             review,

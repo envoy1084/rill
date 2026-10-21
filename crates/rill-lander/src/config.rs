@@ -5,20 +5,7 @@ use std::time::Duration;
 use rill_types::RiskClass;
 use serde::{Deserialize, Serialize};
 
-/// How much pre-land verification a request gets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum VerifyMode {
-    /// Land without verifying; post-land verification still runs.
-    None,
-    /// Verify only what the change affects. The lander passes this
-    /// through to the verifier as a hint; today both modes call the same
-    /// verifier.
-    #[default]
-    Affected,
-    /// Run the full verification plan.
-    Full,
-}
+pub use rill_types::VerifyMode;
 
 /// Verification mode per risk class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

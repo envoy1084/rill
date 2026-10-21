@@ -179,11 +179,7 @@ impl Oracle {
 
     /// After the run settles: every requested landing has a final outcome
     /// and every landed change's review says it landed.
-    pub async fn check_settled(
-        &mut self,
-        repo: &RepoStore,
-        status: impl Fn(LandTicket) -> Option<rill_lander::LandStatus>,
-    ) {
+    pub async fn check_settled(&mut self, repo: &RepoStore) {
         let landed: BTreeSet<ChangeId> = {
             let mut out = BTreeSet::new();
             for hash in &self.trunk {
@@ -194,7 +190,11 @@ impl Oracle {
             out
         };
         for (change, ticket) in self.requested.clone() {
-            match status(ticket) {
+            let status = match repo.land_request(ticket).await {
+                Ok(record) => record.map(|r| r.status),
+                Err(_) => continue,
+            };
+            match status {
                 Some(s) if s.is_terminal() => {}
                 Some(s) => self.violate(
                     Invariant::LandRequestsResolve,

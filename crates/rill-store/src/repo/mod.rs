@@ -4,6 +4,7 @@ mod codec;
 mod derived;
 mod events;
 mod idem;
+mod land_queue;
 mod landing;
 mod leases;
 mod orgs;

@@ -42,6 +42,16 @@ pub mod table {
     pub const LEASE: &str = "lease";
     /// `(lepoch, ns, repo, role)` → be64 epoch; fenced writes check it
     pub const LEASE_EPOCH: &str = "lepoch";
+    /// `(lrt, ns, repo, ticket)` → LandRequestRecord
+    pub const LAND_REQUEST: &str = "lrt";
+    /// `(lrq, ns, repo, lane, requested_at, ticket)` → empty; requests not
+    /// yet finished, in the order they are served
+    pub const LAND_PENDING: &str = "lrq";
+    /// `(lrc, ns, repo, change)` → be64 ticket of the change's unfinished
+    /// request
+    pub const LAND_BY_CHANGE: &str = "lrc";
+    /// `(lrn, ns, repo)` → counter moved by every new request
+    pub const LAND_WAKE: &str = "lrn";
     /// `(jobq, ns, repo, queue, shard, priority, run_at, stamp)` → job ready
     /// to run from `run_at` on
     pub const JOB_READY: &str = "jobq";
@@ -295,6 +305,29 @@ impl RepoKeys {
 
     pub fn misc(&self, name: &str) -> Bytes {
         self.row(table::MISC, &name)
+    }
+
+    pub fn land_request(&self, ticket: u64) -> Bytes {
+        self.row(table::LAND_REQUEST, &(ticket as i64))
+    }
+
+    pub fn land_requests(&self) -> Bytes {
+        self.table(table::LAND_REQUEST)
+    }
+
+    pub fn land_pending(&self, lane: u8, requested_at: i64, ticket: u64) -> Bytes {
+        self.row(
+            table::LAND_PENDING,
+            &(i64::from(lane), requested_at, ticket as i64),
+        )
+    }
+
+    pub fn land_pending_all(&self) -> Bytes {
+        self.table(table::LAND_PENDING)
+    }
+
+    pub fn land_by_change(&self, change: &ChangeId) -> Bytes {
+        self.row(table::LAND_BY_CHANGE, &change.as_bytes().as_slice())
     }
 
     /// Jobs of `queue` in `shard` at `priority`, ready or not yet.

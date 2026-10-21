@@ -21,7 +21,6 @@ use super::trees::check_content_exists;
 use crate::error::{Error, Result};
 use crate::services::common::Opened;
 use crate::services::idem;
-use crate::state::RepoEvent;
 
 /// Attempts at the commit transaction when the review moves under it.
 const COMMIT_ATTEMPTS: usize = 8;
@@ -116,7 +115,6 @@ pub async fn commit_version_with(
                 if let Some(p) = prepared {
                     ctx.review().version_written(p);
                 }
-                ctx.events.publish(RepoEvent::VersionCreated { hash });
                 return Ok((hash, cv));
             }
             Err(e) if e.is_conflict() => {
