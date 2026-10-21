@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
-use rill_lander::ReviewHooks;
+use rill_lander::{Approval, ReviewHooks};
 use rill_review::error::Error as ReviewError;
 use rill_review::service::ReviewService;
-use rill_types::{ChangeId, ChangeVersionHash, ThreadAnchor, TrunkSeq};
+use rill_types::{ChangeId, ChangeVersionHash, Principal, ReviewStatus, ThreadAnchor, TrunkSeq};
 
 /// Adapts [`ReviewService`] to [`ReviewHooks`]. Holds the swappable
 /// service handle so a policy reload is seen by in-flight landings.
@@ -95,5 +95,49 @@ impl ReviewHooks for ReviewHooksAdapter {
             .position(|c| *c == change)
             .map(|pos| stack[pos + 1..].to_vec())
             .unwrap_or_default())
+    }
+
+    /// Judge the review as stored now: still landing, still the version
+    /// that was requested, and still allowed by the policy for the
+    /// requester. The lander commits only against this very snapshot.
+    async fn approve(
+        &self,
+        change: ChangeId,
+        version: ChangeVersionHash,
+        requester: &Principal,
+    ) -> rill_lander::Result<Approval> {
+        let service = self.service();
+        let Some(review) = service.repo().read_review(&change).await? else {
+            return Ok(Approval::default());
+        };
+        let state = &review.state;
+        let refusal = if !matches!(state.status, ReviewStatus::Landing | ReviewStatus::Landable) {
+            Some(format!("the change is {:?}", state.status))
+        } else if state.current_version() != Some(version) {
+            Some("a newer version was pushed; request landing again".to_string())
+        } else {
+            let decision = service
+                .evaluate_for(state, requester)
+                .await
+                .map_err(hook_err)?;
+            (!decision.allowed).then(|| {
+                format!(
+                    "the submit policy no longer allows landing: {}",
+                    decision.reasons.join("; ")
+                )
+            })
+        };
+        let votes = state
+            .votes
+            .iter()
+            .filter(|v| v.version == version)
+            .cloned()
+            .collect();
+        Ok(Approval {
+            policy: Some(service.policy().digest()),
+            votes,
+            refusal,
+            review: Some(review),
+        })
     }
 }

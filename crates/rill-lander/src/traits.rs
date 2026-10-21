@@ -5,10 +5,25 @@
 //! the no-op and always-green ones here.
 
 use async_trait::async_trait;
-use rill_types::{ChangeId, ChangeVersionHash, TreeHash, TrunkSeq};
+use rill_store::repo::ReviewSnapshot;
+use rill_types::{ChangeId, ChangeVersionHash, LabelVote, Principal, TreeHash, TrunkSeq};
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
+
+/// What review says about landing a change now.
+#[derive(Debug, Clone, Default)]
+pub struct Approval {
+    /// The review as read; the landing commits only if it is unchanged.
+    /// `None` for a change without review (reverts, direct lands).
+    pub review: Option<ReviewSnapshot>,
+    /// Why the change may not land; `None` when it may.
+    pub refusal: Option<String>,
+    /// BLAKE3 of the submit policy that judged it.
+    pub policy: Option<[u8; 32]>,
+    /// The votes that policy saw.
+    pub votes: Vec<LabelVote>,
+}
 
 /// Review-state transitions the lander drives.
 #[async_trait]
@@ -31,6 +46,19 @@ pub trait ReviewHooks: Send + Sync {
 
     /// Changes stacked directly on `change`.
     async fn dependents_of(&self, change: ChangeId) -> Result<Vec<ChangeId>>;
+
+    /// Whether `requester` may land `version` of `change` now, judged on
+    /// the review as read; the lander lands only if that review is still
+    /// what it was when the landing commits. The default is for changes
+    /// without review.
+    async fn approve(
+        &self,
+        _change: ChangeId,
+        _version: ChangeVersionHash,
+        _requester: &Principal,
+    ) -> Result<Approval> {
+        Ok(Approval::default())
+    }
 }
 
 /// Hooks that do nothing; for tests and repositories without review.

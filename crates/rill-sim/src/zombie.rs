@@ -40,6 +40,8 @@ impl Ctx<'_> {
                 requester: cv.author,
                 risk: RiskClass::Normal,
                 review: None,
+                policy: None,
+                approvals: Vec::new(),
             }],
             fence: Some(stale),
             ..LandBatch::default()

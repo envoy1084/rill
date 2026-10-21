@@ -120,6 +120,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
     oracle.check_durability(&world.repo).await;
     oracle.check_settled(&world.repo).await;
     oracle.check_event_log(&world.repo).await;
+    oracle.check_landings_allowed(&world).await;
     let settle_at = START_MILLIS + scenario.steps as i64 * 1_000 + SETTLE_MILLIS;
     oracle
         .check_jobs(&world, settle_at, settle_at + SETTLE_MILLIS)

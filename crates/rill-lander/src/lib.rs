@@ -12,7 +12,6 @@
 //! review crate nor the execution runner.
 
 pub mod config;
-pub mod conflict_graph;
 pub mod error;
 pub mod events;
 pub mod land;
@@ -22,11 +21,12 @@ pub mod revert;
 pub mod traits;
 
 pub use config::{LandPolicy, VerifyMode, VerifyModes};
-pub use conflict_graph::{independent_batches, touched_paths};
 pub use error::{Error, Result};
 pub use events::LandEvent;
-pub use land::{landing_of, list_landings, Lander, Landing};
+pub use land::{landing_of, list_landings, Lander, Landing, MAX_BATCH};
 pub use postland::{PostLandVerifier, Sweep, VerificationRecord, VerificationStatus};
 pub use queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest};
 pub use revert::{auto_revert, build_revert, has_forward_fix, revert, RevertOutcome};
-pub use traits::{AlwaysGreen, FnVerifier, NoopHooks, ReviewHooks, VerificationOutcome, Verifier};
+pub use traits::{
+    AlwaysGreen, Approval, FnVerifier, NoopHooks, ReviewHooks, VerificationOutcome, Verifier,
+};

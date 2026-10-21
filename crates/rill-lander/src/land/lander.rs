@@ -11,7 +11,6 @@ use tokio_util::sync::CancellationToken;
 
 use super::record::{list_landings, Landing};
 use crate::config::LandPolicy;
-use crate::conflict_graph::touched_paths;
 use crate::error::Result;
 use crate::events::LandEvent;
 use crate::queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest, SWEEP_LIMIT};
@@ -137,6 +136,24 @@ impl Lander {
     /// unfinished request gets that request's ticket.
     pub async fn enqueue(&self, request: LandRequest) -> Result<LandTicket> {
         let change_id = request.change_id;
+        if let Some(ticket) = self.repo.active_land_request(&change_id).await? {
+            return Ok(ticket);
+        }
+        if request.lane != rill_types::Lane::Emergency {
+            let queued = self
+                .queue
+                .pending(SWEEP_LIMIT.max(self.policy.max_in_flight * 4))
+                .await?
+                .iter()
+                .filter(|q| q.request.requester.id == request.requester.id)
+                .count();
+            if queued >= self.policy.max_in_flight {
+                return Err(crate::error::Error::TooManyRequests {
+                    requester: request.requester.name.clone(),
+                    limit: self.policy.max_in_flight,
+                });
+            }
+        }
         let (ticket, new) = self.queue.enqueue(&request).await?;
         if new {
             self.publish(LandEvent::Queued { ticket, change_id });
@@ -164,51 +181,18 @@ impl Lander {
         }
     }
 
-    /// Serve every unfinished request. Independent requests are handled
-    /// concurrently; overlapping ones in queue order. Returns the number
-    /// of requests processed.
+    /// Serve every unfinished request, in queue order, as one sequence.
+    /// Returns the number of requests taken up.
     pub async fn run_once(self: &Arc<Self>) -> Result<usize> {
         // A standby lander leaves requests queued until it holds the lease.
-        if self.lease().await?.is_none() {
+        let Some(lease) = self.lease().await? else {
             return Ok(0);
-        }
+        };
         let queued = self.queue.pending(SWEEP_LIMIT).await?;
         if queued.is_empty() {
             return Ok(0);
         }
-        let count = queued.len();
-        let batches = self.partition(queued).await;
-        let tasks: Vec<_> = batches
-            .into_iter()
-            .map(|batch| {
-                let lander = self.clone();
-                tokio::spawn(async move {
-                    for queued in batch {
-                        lander.process(&queued).await;
-                    }
-                })
-            })
-            .collect();
-        for task in tasks {
-            task.await?;
-        }
-        Ok(count)
-    }
-
-    /// Group requests by touched paths; a request whose paths cannot be
-    /// computed (its version is missing) fails on the spot.
-    async fn partition(&self, queued: Vec<QueuedRequest>) -> Vec<Vec<QueuedRequest>> {
-        let mut items = Vec::with_capacity(queued.len());
-        for request in queued {
-            match touched_paths(&self.derive, &request.request.version).await {
-                Ok(paths) => items.push((request, paths)),
-                Err(e) => {
-                    self.fail(&request, format!("cannot compute touched paths: {e}"))
-                        .await
-                }
-            }
-        }
-        crate::conflict_graph::partition(items)
+        Ok(self.sequence(queued, &lease).await)
     }
 
     /// Serve the queue until `shutdown` is cancelled: after each sweep,

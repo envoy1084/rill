@@ -153,6 +153,8 @@ mod tests {
                 requester: fx.alice.clone(),
                 risk: rill_types::RiskClass::Normal,
                 review: repo.read_review(&cid).await.unwrap(),
+                policy: None,
+                approvals: Vec::new(),
             }],
             ..Default::default()
         })

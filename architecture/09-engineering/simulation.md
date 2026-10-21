@@ -85,6 +85,7 @@ change ids explicitly. A run's `digest` hashes every action and outcome, and
 | `EventsMatchState` | The event log has exactly one `VersionStored` per version-log entry and one `Landed` per trunk position, nothing extra, and the event counter matches |
 | `JobsFinish` | Every derive job finishes once faults stop, including those whose worker died, and every trunk version is derived |
 | `DeposedHolderFenced` | A replaced lander's landing never moves trunk, even when its acknowledgement is lost |
+| `LandingsWereAllowed` | Every landing of a reviewed change records the default policy's digest, and that policy allows it on the votes the landing records |
 
 ## Scenarios and known issues
 
@@ -92,19 +93,14 @@ change ids explicitly. A run's `digest` hashes every action and outcome, and
 | --- | --- | --- |
 | `clean` | none | every invariant |
 | `contended` | none; 16 agents, 70% of edits on the hot file | every invariant |
-| `faulty` | 3% failed writes, 2% lost acknowledgements, 1% corrupt reads, 2% restarts | only known issues |
+| `faulty` | 3% failed writes, 2% lost acknowledgements, 1% corrupt reads, 2% restarts | every invariant |
 
-`known.rs` lists the violations the current code produces under faults,
-with the roadmap phase whose redesign removes each:
-
-| Invariant | Cause | Phase |
-| --- | --- | --- |
-| `LandRequestsResolve` | The land queue and tickets live in process memory; a restart forgets queued requests | 9 |
-
-`ReviewMatchesTrunk` and `LandsOnce` were known issues until phase 6 made
-the trunk move, landing record and review status one transaction and
-taught the lander to recognise a land whose reply was lost; 10,000 faulty
-seeds now show neither.
+`known.rs` lists violations the current code is known to produce under
+faults, with the roadmap phase whose redesign removes each; the list is
+empty. `ReviewMatchesTrunk` and `LandsOnce` left it in phase 6 (one
+transaction for the trunk move, landing record and review, and lost-reply
+detection), and `LandRequestsResolve` in phase 8, when land requests moved
+into the store so a restarted lander serves the ones its predecessor left.
 
 A violation of any other invariant fails the tests. When a phase fixes a
 known issue, its entry is removed. The faulty test also requires that some

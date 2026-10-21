@@ -28,14 +28,15 @@ pub struct SubmitDecision {
 #[derive(Debug, Clone)]
 pub struct SubmitPolicy {
     policies: PolicySet,
+    digest: [u8; 32],
 }
 
 impl SubmitPolicy {
     /// Parse Cedar policy text and validate it against the submit schema in
     /// strict mode. Policies that reference unknown attributes or compare
     /// mismatched types are rejected here rather than failing at land time.
-    pub fn from_source(policies: &str) -> Result<Self> {
-        let parsed: PolicySet = policies
+    pub fn from_source(source: &str) -> Result<Self> {
+        let parsed: PolicySet = source
             .parse()
             .map_err(|e: cedar_policy::ParseErrors| Error::PolicyParse(e.to_string()))?;
         let policies = apply_id_annotations(parsed)?;
@@ -45,7 +46,10 @@ impl SubmitPolicy {
             let errors: Vec<String> = result.validation_errors().map(|e| e.to_string()).collect();
             return Err(Error::PolicyValidation(errors.join("; ")));
         }
-        Ok(SubmitPolicy { policies })
+        Ok(SubmitPolicy {
+            policies,
+            digest: *blake3::hash(source.as_bytes()).as_bytes(),
+        })
     }
 
     /// The built-in default rules.
@@ -53,6 +57,11 @@ impl SubmitPolicy {
         // The default text is covered by tests; failing to parse it would be
         // a bug in this crate.
         Self::from_source(DEFAULT_POLICY).expect("default submit policy is valid")
+    }
+
+    /// BLAKE3 of the policy text: which rules a decision came from.
+    pub fn digest(&self) -> [u8; 32] {
+        self.digest
     }
 
     /// Number of policies in the set.

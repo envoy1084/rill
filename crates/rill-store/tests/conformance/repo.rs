@@ -184,6 +184,8 @@ pub async fn landing(name: &str, stores: &Stores) {
             requester: Principal::agent("bot"),
             risk: RiskClass::Normal,
             review: repo.read_review(&version.change_id).await.unwrap(),
+            policy: None,
+            approvals: Vec::new(),
         });
     }
     let lease = repo.try_acquire("lander", "a").await.unwrap().unwrap();
@@ -239,6 +241,8 @@ pub async fn landing(name: &str, stores: &Stores) {
             requester: Principal::agent("bot"),
             risk: RiskClass::Normal,
             review: None,
+            policy: None,
+            approvals: Vec::new(),
         }],
         fence: Some(lease),
         ..LandBatch::default()
@@ -264,6 +268,8 @@ pub async fn landing(name: &str, stores: &Stores) {
             requester: Principal::agent("bot"),
             risk: RiskClass::Normal,
             review: repo.read_review(&next.change_id).await.unwrap(),
+            policy: None,
+            approvals: Vec::new(),
         }],
         ..LandBatch::default()
     };

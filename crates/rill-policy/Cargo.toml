@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 rill-types = { workspace = true }
+blake3 = { workspace = true }
 rill-store = { workspace = true }
 cedar-policy = { workspace = true }
 biscuit-auth = { workspace = true }

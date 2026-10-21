@@ -21,6 +21,11 @@ pub struct Landing {
     pub requester: Principal,
     pub risk: RiskClass,
     pub landed_at: Timestamp,
+    /// BLAKE3 of the submit policy that allowed the landing, checked in the
+    /// landing's own transaction; `None` for a change landed without review.
+    pub policy: Option<[u8; 32]>,
+    /// The votes that policy saw.
+    pub approvals: Vec<crate::objects::review::LabelVote>,
 }
 
 impl crate::Record for Landing {

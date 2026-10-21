@@ -7,6 +7,7 @@
 //! reproducible bug report.
 
 pub mod actors;
+pub mod approvals;
 pub mod event_log;
 pub mod faults;
 pub mod jobs;

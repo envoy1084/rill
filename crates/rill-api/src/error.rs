@@ -227,6 +227,7 @@ fn lander_code(e: &rill_lander::Error) -> Code {
         E::NotLanded(_) | E::ChangeNotFound(_) | E::UnknownTicket(_) => Code::NotFound,
         E::Shutdown => Code::Unavailable,
         E::RevertFailed { .. } | E::Fenced => Code::Aborted,
+        E::TooManyRequests { .. } => Code::ResourceExhausted,
         E::Types(_) => Code::InvalidArgument,
         E::Core(c) => core_code(c),
         E::Store(s) | E::Jobs(rill_jobs::Error::Store(s)) => store_code(s),

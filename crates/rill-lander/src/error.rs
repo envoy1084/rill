@@ -34,6 +34,9 @@ pub enum Error {
     #[error("another lander took over this repository")]
     Fenced,
 
+    #[error("{requester} already has {limit} landings queued; wait for some to finish")]
+    TooManyRequests { requester: String, limit: usize },
+
     #[error("verifier failed: {0}")]
     Verifier(String),
 

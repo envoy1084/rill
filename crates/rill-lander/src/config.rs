@@ -51,8 +51,8 @@ pub struct LandPolicy {
     pub modes: VerifyModes,
     /// Longest a pre-land verification may take before the request fails.
     pub max_wait: Duration,
-    /// Pause between queue sweeps in `run_forever`; requests arriving
-    /// within one window are batched together.
+    /// Longest pause between queue sweeps in `run_forever`; a new request
+    /// starts a sweep at once.
     pub batch_window: Duration,
     /// Revert a culprit automatically once post-land bisection finds it.
     pub auto_revert: bool,
@@ -61,6 +61,9 @@ pub struct LandPolicy {
     /// How many times to retry the trunk compare-and-swap after another
     /// landing wins the race.
     pub max_retries: u32,
+    /// Unfinished requests one principal may have queued; more are refused
+    /// until some finish. Reverts are exempt.
+    pub max_in_flight: usize,
 }
 
 impl Default for LandPolicy {
@@ -72,6 +75,7 @@ impl Default for LandPolicy {
             auto_revert: false,
             revert_grace: Duration::from_secs(15 * 60),
             max_retries: 8,
+            max_in_flight: 50,
         }
     }
 }

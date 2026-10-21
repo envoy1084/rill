@@ -33,6 +33,10 @@ pub struct LandEntry {
     /// The change's review as read; landing marks it `Landed`. `None` for
     /// a change landed without review.
     pub review: Option<ReviewSnapshot>,
+    /// The submit policy (BLAKE3 of its text) that allowed landing, judged
+    /// on `review`, and the votes it saw; recorded on the landing.
+    pub policy: Option<[u8; 32]>,
+    pub approvals: Vec<rill_types::LabelVote>,
 }
 
 /// Versions to land together, in order.
@@ -97,6 +101,8 @@ impl RepoStore {
                 requester: entry.requester.clone(),
                 risk: entry.risk,
                 landed_at: now,
+                policy: entry.policy,
+                approvals: entry.approvals.clone(),
             };
             let actor = batch
                 .actor
@@ -160,6 +166,8 @@ impl RepoStore {
                     requester: cv.author,
                     risk: RiskClass::Normal,
                     review: None,
+                    policy: None,
+                    approvals: Vec::new(),
                 }],
                 ..LandBatch::default()
             })

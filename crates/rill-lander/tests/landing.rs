@@ -5,129 +5,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use rill_core::{read_content, ChangeBuilder, CommitGraph, DeriveManager, RootTree, TreeOps};
 use rill_lander::land::followups;
 use rill_lander::{
-    revert, AlwaysGreen, FnVerifier, LandEvent, LandPolicy, LandRequest, LandStatus, Lander,
-    NoopHooks, PostLandVerifier, ReviewHooks, VerificationOutcome, VerificationStatus, Verifier,
+    revert, AlwaysGreen, FnVerifier, LandEvent, LandPolicy, LandStatus, Lander, NoopHooks,
+    PostLandVerifier, ReviewHooks, VerificationOutcome, VerificationStatus, Verifier,
 };
-use rill_store::{RepoStore, Stores};
 use rill_types::{
-    ChangeId, ChangeVersion, ChangeVersionHash, EntryKind, Principal, RepoPathBuf, RiskClass,
-    TreeHash, TrunkSeq,
+    ChangeId, ChangeVersionHash, Principal, RepoPathBuf, RiskClass, TreeHash, TrunkSeq,
 };
 use tokio::sync::Mutex;
 
-struct Fixture {
-    repo: RepoStore,
-    derive: Arc<DeriveManager>,
-    trees: TreeOps,
-}
-
-impl Fixture {
-    async fn new() -> Self {
-        let stores = Stores::memory();
-        let config = stores.create_repo("r", "").await.unwrap();
-        let repo = stores.repo(config.id);
-        let trees = TreeOps::new(repo.objects().clone(), 64);
-        let derive = DeriveManager::new(repo.clone(), trees.clone(), 64);
-        Fixture {
-            repo,
-            derive,
-            trees,
-        }
-    }
-
-    fn lander(
-        &self,
-        hooks: Arc<dyn ReviewHooks>,
-        verifier: Arc<dyn Verifier>,
-        policy: LandPolicy,
-    ) -> Arc<Lander> {
-        let graph = Arc::new(CommitGraph::new(self.repo.clone(), self.derive.clone()));
-        Lander::new(
-            self.repo.clone(),
-            self.derive.clone(),
-            graph,
-            hooks,
-            verifier,
-            policy,
-        )
-    }
-
-    async fn commit(
-        &self,
-        parent: Option<ChangeVersionHash>,
-        files: &[(&str, &str)],
-        message: &str,
-    ) -> (ChangeVersionHash, ChangeVersion) {
-        let mut builder = ChangeBuilder::new(Principal::human("alice")).message(message);
-        if let Some(parent) = parent {
-            builder = builder.parent(parent);
-        }
-        for (path, content) in files {
-            builder = builder.file(path, content.as_bytes().to_vec()).unwrap();
-        }
-        builder.commit(&self.repo).await.unwrap()
-    }
-
-    async fn delete(
-        &self,
-        parent: ChangeVersionHash,
-        path: &str,
-        message: &str,
-    ) -> (ChangeVersionHash, ChangeVersion) {
-        ChangeBuilder::new(Principal::human("alice"))
-            .message(message)
-            .parent(parent)
-            .delete(path)
-            .unwrap()
-            .commit(&self.repo)
-            .await
-            .unwrap()
-    }
-
-    async fn root(&self, version: &ChangeVersionHash) -> TreeHash {
-        self.derive.get::<RootTree>(version).await.unwrap()
-    }
-
-    async fn head(&self) -> (TrunkSeq, ChangeVersionHash) {
-        self.repo.trunk_head().await.unwrap().unwrap()
-    }
-
-    async fn file(&self, root: TreeHash, path: &str) -> Option<String> {
-        match self
-            .trees
-            .lookup(root, &RepoPathBuf::new(path).unwrap())
-            .await
-            .unwrap()
-        {
-            Some(EntryKind::File { content, .. }) => {
-                let bytes = read_content(self.trees.objects().as_ref(), &content)
-                    .await
-                    .unwrap();
-                Some(String::from_utf8(bytes.to_vec()).unwrap())
-            }
-            _ => None,
-        }
-    }
-}
-
-fn request(cv: &ChangeVersion, risk: RiskClass) -> LandRequest {
-    LandRequest::new(
-        cv.change_id,
-        cv.version_hash(),
-        Principal::human("alice"),
-        risk,
-    )
-}
-
-fn fast_policy() -> LandPolicy {
-    LandPolicy {
-        batch_window: Duration::from_millis(10),
-        ..LandPolicy::default()
-    }
-}
+mod common;
+use common::{fast_policy, request, Fixture};
 
 #[derive(Default)]
 struct RecordingHooks {
@@ -310,11 +199,12 @@ async fn independent_changes_land_in_one_run() {
     // Every trunk position has a record, the directly landed base too.
     assert_eq!(lander.list_landings().await.unwrap().len(), 3);
 
-    // Each landing queued its follow-up work in the same transaction.
+    // Both landed in one transaction, which queued their follow-up work: a
+    // derive job each and one index job for the new head.
     let derive = rill_jobs::Queue::new(fx.repo.clone(), followups::DERIVE_QUEUE);
     let index = rill_jobs::Queue::new(fx.repo.clone(), followups::INDEX_QUEUE);
     assert_eq!(derive.stats().await.unwrap().enqueued, 2);
-    assert_eq!(index.stats().await.unwrap().enqueued, 2);
+    assert_eq!(index.stats().await.unwrap().enqueued, 1);
     let mut derived = Vec::new();
     while let Some(claim) = derive.claim("test").await.unwrap() {
         derived.push(rill_types::ChangeVersionHash::from_slice(&claim.job.payload).unwrap());

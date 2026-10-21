@@ -35,6 +35,9 @@ pub enum Invariant {
     JobsFinish,
     /// A lease holder that was replaced cannot land.
     DeposedHolderFenced,
+    /// Every landing of a reviewed change was allowed by the policy it
+    /// records, on the votes it records.
+    LandingsWereAllowed,
 }
 
 /// One broken invariant with context.
