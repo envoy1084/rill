@@ -170,9 +170,10 @@ pub fn is_windows_reserved(component: &str) -> bool {
         || component.contains([':', '*', '?', '"', '<', '>', '|'])
 }
 
-/// The key two names collide under on a case-insensitive filesystem.
+/// The key two names collide under on a case-insensitive filesystem:
+/// full Unicode case folding (`ß` and `ss` collide).
 pub fn case_key(name: &str) -> String {
-    name.to_lowercase()
+    icu_casemap::CaseMapper::new().fold_string(name).into_owned()
 }
 
 fn is_reserved(path: &RepoPath) -> bool {
@@ -241,5 +242,13 @@ mod tests {
         assert!(check_change(&change(small.clone(), "ok")).is_ok());
         assert!(check_change(&change(large, "ok")).is_err());
         assert!(check_change(&change(small, &"m".repeat(MAX_MESSAGE_BYTES + 1))).is_err());
+    }
+
+    #[test]
+    fn names_that_differ_only_by_unicode_case_folding_collide() {
+        assert_eq!(case_key("Readme.MD"), case_key("readme.md"));
+        assert_eq!(case_key("STRASSE"), case_key("straße"), "ß folds to ss");
+        assert_eq!(case_key("ΣΊΣΥΦΟΣ"), case_key("σίσυφος"), "final sigma");
+        assert_ne!(case_key("a"), case_key("b"));
     }
 }
