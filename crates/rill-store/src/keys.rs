@@ -112,6 +112,18 @@ pub mod table {
     pub const IDENT_SESSION: &str = "idss";
     /// `(idrv, token)` → Revocation
     pub const IDENT_REVOKED: &str = "idrv";
+    /// `(idu, org, name)` → UserRecord
+    pub const IDENT_USER: &str = "idu";
+    /// `(idpn, kind, name)` → the org a principal name belongs to
+    pub const IDENT_PRINCIPAL: &str = "idpn";
+    /// `(idx, issuer, subject)` → `(org, name)` of the user it signs in as
+    pub const IDENT_EXTERNAL: &str = "idx";
+    /// `(idp, org, name)` → IdentityProvider
+    pub const IDENT_PROVIDER: &str = "idp";
+    /// `(idpi, issuer)` → `(org, name)` of the provider with that issuer
+    pub const IDENT_PROVIDER_ISSUER: &str = "idpi";
+    /// `(idpl, state)` → PendingLogin
+    pub const IDENT_LOGIN: &str = "idpl";
 }
 
 fn key<T: TuplePack>(t: &T) -> Bytes {
@@ -160,9 +172,16 @@ pub fn identity_table(table: &str) -> Bytes {
     key(&(table,))
 }
 
-/// One row of an instance-wide identity table keyed by `id`.
+/// One row of an instance-wide identity table keyed by `id`, or the
+/// prefix of every row whose key starts with `id`.
 pub fn identity_row<T: TuplePack>(table: &str, id: T) -> Bytes {
     key(&(table, id))
+}
+
+/// One row of an identity table keyed by two elements, such as
+/// `(org, name)`; [`identity_row`] with the first is its prefix.
+pub fn identity_pair<A: TuplePack, B: TuplePack>(table: &str, a: A, b: B) -> Bytes {
+    key(&(table, a, b))
 }
 
 pub fn repo(ns: &str, id: &RepoId) -> Bytes {

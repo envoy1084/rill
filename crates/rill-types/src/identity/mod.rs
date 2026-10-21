@@ -1,12 +1,18 @@
-//! Identity records: token signing keys, sessions, revocations and the
-//! identity change log every server follows.
+//! Identity records: token signing keys, sessions, revocations, users,
+//! identity providers, and the identity change log every server follows.
 
 mod event;
 mod keys;
+mod login;
+mod provider;
 mod revocation;
 mod session;
+mod user;
 
 pub use event::{IdentityChange, IdentityEvent};
 pub use keys::{TokenKeyRecord, WrappedSecret};
+pub use login::PendingLogin;
+pub use provider::IdentityProvider;
 pub use revocation::Revocation;
 pub use session::{SessionKind, SessionRecord};
+pub use user::{AccountStatus, ExternalIdentity, OrgRole, UserRecord};

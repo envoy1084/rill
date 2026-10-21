@@ -13,6 +13,10 @@ pub enum Error {
     #[error("{backend} key service: {message}")]
     KeyService { backend: String, message: String },
 
+    /// An OpenID Connect provider or token was unusable.
+    #[error("OIDC: {0}")]
+    Oidc(String),
+
     /// Identity configuration is unusable.
     #[error("identity configuration: {0}")]
     Config(String),

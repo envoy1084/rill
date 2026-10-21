@@ -132,6 +132,7 @@ impl Error {
                 rill_identity::Error::Store(e) => store_code(e),
                 rill_identity::Error::Policy(e) => policy_code(e),
                 rill_identity::Error::KeyService { .. } => Code::Unavailable,
+                rill_identity::Error::Oidc(_) => Code::Unauthenticated,
                 rill_identity::Error::Config(_) => Code::Internal,
             },
             Error::Search(e) => match e {

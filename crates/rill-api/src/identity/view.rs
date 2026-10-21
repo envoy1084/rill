@@ -142,6 +142,7 @@ impl IdentityView {
                     .insert(*session, Timestamp::from_millis(i64::MAX));
                 false
             }
+            IdentityChange::UserChanged { .. } | IdentityChange::ProviderChanged { .. } => false,
         }
     }
 

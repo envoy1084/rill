@@ -19,6 +19,15 @@ pub enum IdentityChange {
     SessionRevoked {
         session: SessionId,
     },
+    /// A user was created or changed (status, roles, teams).
+    UserChanged {
+        org: String,
+        name: String,
+    },
+    ProviderChanged {
+        org: String,
+        name: String,
+    },
 }
 
 /// One entry of the identity change log.

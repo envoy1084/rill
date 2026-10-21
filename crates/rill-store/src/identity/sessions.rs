@@ -31,6 +31,34 @@ impl IdentityStore {
         }
     }
 
+    /// Replace the refresh secret of session `id`, if it is still
+    /// `expected`. Returns the updated session, or `None` when the secret
+    /// was already used (a stolen refresh token, or a lost race).
+    pub async fn rotate_refresh(
+        &self,
+        id: &SessionId,
+        expected: [u8; 32],
+        next: [u8; 32],
+    ) -> Result<Option<SessionRecord>> {
+        let key = row(id);
+        let Some(current) = self.meta.get(&key).await? else {
+            return Ok(None);
+        };
+        let mut session: SessionRecord = decode_record(&current)?;
+        if session.refresh_hash != Some(expected) {
+            return Ok(None);
+        }
+        session.refresh_hash = Some(next);
+        let tx = Transaction::new()
+            .expect(key.clone(), Some(current))
+            .set(key, encode_record(&session)?);
+        match self.meta.transact(tx).await {
+            Ok(_) => Ok(Some(session)),
+            Err(Error::Conflict(_)) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Revoke session `id`; every token issued under it is refused from
     /// then on. Revoking a revoked session is a no-op.
     pub async fn revoke_session(&self, id: &SessionId, actor: &Principal) -> Result<()> {
