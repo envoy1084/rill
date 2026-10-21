@@ -35,9 +35,9 @@ flowchart LR
   W[write path] --> O[object put: hash verified]
   O --> M[metadata write: O size of change]
   M --> T{trunk move?}
-  T -->|only| CAS[RepoStore::land_on_trunk CAS, seq = head + 1]
-  CAS --> L[landing record under process-local lock]
-  L --> E[Landed event -> indexer, post-land]
+  T -->|only| CAS[RepoStore::land: head CAS, lease fence, seq = head + 1]
+  CAS --> L[landing records, events and jobs in the same transaction]
+  L --> E[derive and index jobs, post-land]
 ```
 
 **Data and storage**
@@ -80,6 +80,16 @@ flowchart LR
   objects and derived values, which are immutable, may be written before
   it.
 
+**Events and jobs**
+
+- Every committed change to a repository's state writes exactly one event,
+  in the same transaction as the change, so the event log neither misses
+  nor invents changes. Watch streams read the log, not process memory. See
+  [events and workers](../07-runtime/events-and-workers.md).
+- Work a change makes necessary is enqueued as a job in the same
+  transaction. A job may run more than once; handlers are idempotent or
+  fence their writes on the claim's token.
+
 **Crate boundaries**
 
 - The server hot-swaps the `ReviewService` when `SetPolicy` changes the
@@ -101,8 +111,9 @@ flowchart LR
 **Search**
 
 - Search indexes blobs by hash, so an unchanged blob is never re-indexed.
-  The indexer follows `Landed` events and indexes on demand otherwise
-  (`RepoContext::grep` indexes a root that has no manifest). See
+  Each landing enqueues an index job for the new head in its own
+  transaction, and `RepoContext::grep` indexes on demand a root that has no
+  manifest. See
   [search](../06-services/search.md).
 
 ## Limitations

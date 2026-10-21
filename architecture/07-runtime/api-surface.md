@@ -18,7 +18,7 @@ flowchart LR
     Gen --> C[rill-sdk]
 ```
 
-`build.rs` compiles the seven `.proto` files with `protox`, so no `protoc`
+`build.rs` compiles the eight `.proto` files with `protox`, so no `protoc`
 binary is needed. It writes the descriptor set that
 `rill_proto::FILE_DESCRIPTOR_SET` embeds for gRPC reflection. It configures
 `.btree_map(".rill.v1")` and `.bytes(".rill.v1")`, so maps are ordered and
@@ -33,18 +33,23 @@ The server registers all six services behind `AuthLayer`
 
 | Service | Proto | Handler | Covers |
 | --- | --- | --- | --- |
-| `RepoService` | `repo.proto` | `services/repo/` | repositories, history, blame, grep, trees and blobs, diff, merge base, writes (`CreateChangeVersion`, `ApplyEdits`, `Rebase`, `Merge`, `Resolve`), refs and trunk, `Watch*` streams, derived data |
+| `RepoService` | `repo.proto` | `services/repo/` | repositories, history, blame, grep, trees and blobs, diff, merge base, writes (`CreateChangeVersion`, `ApplyEdits`, `Rebase`, `Merge`, `Resolve`), refs and trunk, `Watch*` streams including `WatchEvents`, derived data |
 | `WorkspaceService` | `workspace.proto` | `services/workspace.rs` | server-side workspaces, snapshots, operation log, `Undo`, `WorkspaceDiff` |
-| `ReviewService` | `review.proto` | `services/review.rs` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand`, `GetLandStatus`, `WatchReview` |
+| `ReviewService` | `review.proto` | `services/review/` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand`, `GetLandStatus`, `WatchReview` |
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
 | `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs` |
 
-`types.proto` holds the shared object model. The streaming RPCs are
-`GetBlob` (server stream of `BlobChunk`), `PutBlob` (client stream: one
-`PutBlobHeader`, then `data`), and `WatchRefs`, `WatchTrunk`, `WatchLog`
-(a stream of `LogEntry { cursor, info }`, resumable by cursor) and
-`WatchReview`. [Events and workers](events-and-workers.md) describes how the
+`types.proto` holds the shared object model and `events.proto` the event
+log's messages. The streaming RPCs are `GetBlob` (server stream of
+`BlobChunk`), `PutBlob` (client stream: one `PutBlobHeader`, then `data`),
+`WatchRefs`, `WatchTrunk`, `WatchLog` (a stream of `LogEntry { cursor,
+info }`, resumable by cursor), `WatchReview`, and `WatchEvents`: every
+committed state change as `EventEnvelope { cursor, Event }`, where `Event`
+carries the actor, the time and a `kind` oneof with one message per event
+kind. A `WatchEventsRequest` names kinds, a change id and a ref prefix to
+filter by, and `after` (absent: now; empty: from the oldest retained event;
+otherwise a cursor). [Events and workers](events-and-workers.md) describes how the
 watches behave.
 
 `LandStatus` on the wire is `QUEUED | REBASING | LANDED | FAILED | CANCELLED`.

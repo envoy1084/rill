@@ -10,7 +10,7 @@ land on trunk.
 flowchart LR
   subgraph server[rill-server]
     grep[RepoSvc::grep_impl] --> ctx[RepoContext::grep]
-    idx[workers::indexer]
+    idx[workers::indexer index jobs]
   end
   subgraph search[rill-search]
     si[SearchIndex]
@@ -94,11 +94,14 @@ manifest, so any tree is searchable at the cost of a full walk.
 Error mapping: `InvalidPattern` and `InvalidGlob` are `InvalidArgument`,
 `RootNotIndexed` is `Unavailable`, `Codec` and `Join` are `Internal`.
 
-The indexer worker (`workers::indexer::run`) subscribes to the lander's
-broadcast channel. It indexes the trunk head at startup, then calls
-`index_version` and `flush` for every `LandEvent::Landed`. On
-`RecvError::Lagged` it re-indexes the head. It flushes once more on
-shutdown. Failures are logged and not retried. The server always uses
+Indexing runs as jobs. Each landing enqueues an `index_version` job for
+the new trunk head on the repository's `index` queue, in the land
+transaction. The index worker (`workers::indexer::run`) queues the current
+head once at start (trunk can move without a landing, by import), then
+runs jobs: `index_version` and `flush`. A failure is retried with backoff
+and a job whose worker died reruns when its claim expires (see
+[events and workers](../07-runtime/events-and-workers.md#jobs)). It
+flushes once more on shutdown. The server always uses
 `IndexConfig::default()`; nothing in server config tunes the index.
 
 ## Persistence
@@ -138,8 +141,9 @@ constructs one and there is no RPC.
 * Case-insensitive planning considers only ASCII fold variants, so a match
   that exists only through a non-ASCII fold (the Kelvin sign for `k`) can
   be pruned.
-* The indexer reacts only to lander events. Roots from other refs or from
-  [git import](git-import.md) are indexed lazily on first `Grep`.
+* Only trunk heads are indexed ahead of time: one per landing batch, and
+  the head at worker start. Intermediate landed roots and roots from other
+  refs are indexed lazily on first `Grep`.
 * Symbol extraction is per-line regex: multi-line signatures, nested
   definitions and macros are missed or misattributed.
 

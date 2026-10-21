@@ -98,21 +98,21 @@ version-keyed kind with its schedule:
 | Schedule | Kinds | Computed |
 | --- | --- | --- |
 | `LandCritical` | `root@1`, `changed@1`, `anc@1` | by `ensure_land_critical`, which the server's `commit_version` calls after storing a version and before replying, and the lander calls before moving trunk. A change whose tree cannot be built fails the request, and every trunk version has all three. |
-| `Background` | `phist@1`, `summary@1` | by `BackgroundDeriver`, for every trunk version in order |
+| `Background` | `phist@1`, `summary@1` | by a derive job (`ensure_background`) for every version that lands |
 | `OnDemand` | blame (keyed by path) | by the first reader |
 
 Any kind is also computed by its first reader if missing. `GetDerived`
 with `compute` set computes any registered kind (`compute_kind`); other
 kinds are returned as stored.
 
-**Background deriver**
-([background.rs](../../crates/rill-core/src/derive/background.rs)). A pass
-derives the background kinds for up to `limit` trunk versions after the
-cursor in the misc row `derive_cursor`, storing the cursor after each, so a
-restart resumes where it stopped. A version that fails stops the pass and
-is retried next pass; after `MAX_ATTEMPTS` (3) it is logged and skipped.
-The server runs one per repository (`workers/deriver.rs`), woken by each
-landing and every 5 seconds, in passes of 64 versions.
+**Derive jobs.** The land transaction enqueues one `derive_background` job
+per landed version on the repository's `derive` queue, so the work exists
+exactly when the landing does. The server's derive worker
+(`workers/deriver.rs`, two at a time per repository) runs
+`DeriveManager::ensure_background`; a failure is retried with backoff, a
+job whose worker died is taken back when its claim expires, and a job out
+of attempts waits in the dead-letter queue. See
+[events and workers](../07-runtime/events-and-workers.md#jobs).
 
 Other readers: the lander's conflict partition reads `changed@1`; tree
 reads in the server, review and post-land worker derive `RootTree`;
@@ -125,8 +125,8 @@ history and blame RPCs, the MCP blame tool and review agent context use
   cache is bounded.
 * `PutChange` stores the version before deriving its land-critical values;
   a version that fails to materialise stays in `ci`, `log` and `chv`.
-* The background deriver follows trunk only; versions that never land get
-  background kinds only when read.
+* Derive jobs follow landings only; versions that never land, and trunk
+  moved by imports (`land_on_trunk`), get background kinds only when read.
 * The `in_flight` lock covers the requested key only; concurrent requests
   for different descendants of one missing ancestor can both derive it
   (values are equal, the last write wins).
@@ -134,7 +134,7 @@ history and blame RPCs, the MCP blame tool and review agent context use
   parent's `RootTree`, which walks the first-parent line if nothing is
   stored.
 * `ChangeSummary` has no consumer in the server other than `GetDerived`
-  and the background deriver.
+  and the derive jobs.
 * History and blame follow first parents only. Blame derives the root tree
   of every first-parent version back to the file's creation, not only the
   versions that touched the path.
@@ -143,10 +143,10 @@ history and blame RPCs, the MCP blame tool and review agent context use
 ## Code
 
 * [derive/mod.rs](../../crates/rill-core/src/derive/mod.rs), [derive/traits.rs](../../crates/rill-core/src/derive/traits.rs), [derive/ctx.rs](../../crates/rill-core/src/derive/ctx.rs), [derive/manager.rs](../../crates/rill-core/src/derive/manager.rs)
-* [derive/root_tree.rs](../../crates/rill-core/src/derive/root_tree.rs), [derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs), [derive/changed_paths.rs](../../crates/rill-core/src/derive/changed_paths.rs), [derive/registry.rs](../../crates/rill-core/src/derive/registry.rs), [derive/background.rs](../../crates/rill-core/src/derive/background.rs), [derive/summary.rs](../../crates/rill-core/src/derive/summary.rs), [derive/history.rs](../../crates/rill-core/src/derive/history.rs), [derive/blame.rs](../../crates/rill-core/src/derive/blame.rs)
+* [derive/root_tree.rs](../../crates/rill-core/src/derive/root_tree.rs), [derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs), [derive/changed_paths.rs](../../crates/rill-core/src/derive/changed_paths.rs), [derive/registry.rs](../../crates/rill-core/src/derive/registry.rs), [derive/summary.rs](../../crates/rill-core/src/derive/summary.rs), [derive/history.rs](../../crates/rill-core/src/derive/history.rs), [derive/blame.rs](../../crates/rill-core/src/derive/blame.rs)
 * [tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs), [util/lru.rs](../../crates/rill-core/src/util/lru.rs)
 * [rill-server services/repo/refs.rs](../../crates/rill-server/src/services/repo/refs.rs): `GetDerived` compute dispatch
-* [rill-server services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/rill-server/src/workers/deriver.rs): background deriver
+* [rill-server services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/rill-server/src/workers/deriver.rs): derive jobs
 * [rill-server state/registry.rs](../../crates/rill-server/src/state/registry.rs): manager construction
 
 ---

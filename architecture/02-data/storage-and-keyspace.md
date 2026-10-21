@@ -88,8 +88,15 @@ is scoped to one org (`Stores::org(name)`, `"default"` by default), and
 | `cmt` | `change, thread, stamp` | `Comment` |
 | `thd` | (none) | trunk head: be64 seq ++ version hash |
 | `land` | `seq` | `Landing` record |
-| `lease` | `role` | be64 epoch of the role's holder |
+| `lease` | `role` | `LeaseRecord`: holder, epoch, expiry |
+| `lepoch` | `role` | be64 epoch; fenced writes check it |
 | `evt` | `stamp` | `Event`, written by the transaction that causes it |
+| `evtn` | (none) | counter of events written; tailers wait on it |
+| `jobq` | `queue, shard, priority, run_at, stamp` | `Job` ready from `run_at` |
+| `jobl` | `queue, job` | claimed job with holder and lease expiry |
+| `jobt` | `queue, job` | the claim's token; a handler's fenced writes check it |
+| `jobd` | `queue, job` | `DeadJob`: out of attempts or failed for good |
+| `jobn` | `queue, metric` | queue counter (`enqueued`, `completed`, `retried`, `dead`, `wake`) |
 | `trunk` | `seq` | version hash landed at that sequence |
 | `trunkh` | `hash` | be64 trunk sequence (reverse index) |
 | `ref` | `name` | version hash |
@@ -141,6 +148,9 @@ recreated.
   append to `log` and a dense append to `chv`. If the condition fails
   because a concurrent put won, it returns the hash; a version is logged
   once however many writers store it.
+* Every write below that changes state also appends its event to `evt`
+  and adds to `evtn` in the same transaction (`RepoStore::event`); see
+  [events and workers](../07-runtime/events-and-workers.md).
 * `update_ref` is `Equals(expected)` plus set or delete.
 * **Commit.** `stage_version` writes the version object and returns the
   transaction that makes it visible; the server's commit adds the
@@ -149,8 +159,8 @@ recreated.
   (see [changes and stacks](../04-workflow/changes-and-stacks.md)).
 * **Land.** `land(LandBatch)` checks the trunk-head row, the trunk ref, the
   lease epoch and each review snapshot, and writes positions, landing
-  records, `Landed` reviews, events, charges, the head row and the ref in
-  one transaction. Sequences are gap-free. See
+  records, `Landed` reviews, events, charges, the head row, the ref and the
+  caller's extra writes (the landing's jobs) in one transaction. Sequences are gap-free. See
   [landing](../04-workflow/landing.md).
 * **Reviews.** `review_writes(snapshot, next)` checks the change record
   read, writes only changed parts, and checks the vote epoch when the
@@ -158,10 +168,14 @@ recreated.
 * `operation_tx(expected, op)` checks `Absent(opi)` and the workspace as
   read, and writes the stamped operation, the resulting workspace and the
   `opi` marker.
-* `create_org` uses `Absent(org)`; `acquire_lease` is a compare-and-swap
-  on the epoch.
+* `create_org` uses `Absent(org)`. `try_acquire` takes a free or expired
+  lease and bumps the epoch; `renew` and `release` check the record the
+  holder has.
+* Job claims move a `jobq` row to `jobl` and `jobt` under `Equals` on the
+  row read; renew, complete and fail check the token.
 * `add_signatures` is a read and an `Equals` on what it read.
-* `put_derived`, `put_signatures`, `put_intent`, `set_misc` are plain sets.
+* `put_derived`, `put_signatures`, `set_misc` are plain sets; `put_intent`
+  is a set with its event.
 * `Stores::create_repo` uses `Present(org)` and `Absent(repon)`, and writes
   the `repoid` index, so names are unique per org.
 

@@ -26,7 +26,7 @@ Biscuit `Issuer`, the `RepoRegistry`, the root `CancellationToken` and
 `started_at`. `AppState::with_stores` builds state over stores that are
 already open; tests use it. `build_state` opens the stores and then calls
 `RepoRegistry::warm`, which builds the context of every existing
-repository. Landers and indexers therefore run before the first request.
+repository. Landers and job workers therefore run before the first request.
 
 ## RepoContext
 
@@ -43,7 +43,8 @@ the life of the process.
 `RepoRegistry::build` wires the lower crates for one repository: `RepoStore`,
 `TreeOps` (with `DEFAULT_TREE_CACHE`), `DeriveManager` (`DERIVE_CACHE` = 8192),
 `CommitGraph`, the `ReviewService`, `Lander`, the optional `PostLandVerifier`
-and `Runner`, `SearchIndex`, the ReBAC `Authorizer`, the `EventBus`, the land
+and `Runner`, `SearchIndex`, the ReBAC `Authorizer`, the `EventBus` (land-ticket
+progress for `WatchReview`), the land
 `tickets` map, the `LabelSet` and a child shutdown token.
 
 The review service sits behind an `ArcSwap`. It is built from the stored
@@ -128,7 +129,9 @@ The object protocol reuses this mapping through `ObjectError`; see
 `Listeners::addrs`), calls `build_state`, then `serve_with_state` runs gRPC
 and HTTP together. On ctrl-c the binary cancels the root token. Both servers
 drain in-flight requests, workers and watches stop on their child tokens,
-and the indexer flushes.
+and the index worker flushes. The lander releases its lease, so a standby
+takes over at once; claimed jobs left unfinished are taken back when their
+claims expire.
 
 ## Limitations
 

@@ -44,7 +44,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Intents | `intent create/list/show/update/link/similar` |
 | Workspaces, refs | `ws create/list/show/handoff/ops/delete`, `ref list/show/set/delete` |
 | Admin | `admin whoami`, `admin token issue`, `admin relation add/remove/list`, `admin policy get/set`, `admin health` |
-| Other | `import git`, `watch trunk/refs/log` (`log --after <cursor>` or `--from-start`), `completions <shell>` |
+| Other | `import git`, `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
 
 Each group lives in `commands/<group>.rs`. `commands/parse.rs` holds the
 shared positional parsers: `root_arg` (defaults to trunk), `seq_arg` (`7` or

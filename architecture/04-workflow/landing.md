@@ -85,8 +85,8 @@ starting at the requested version:
    `Verifier` on the candidate's root under `max_wait`. Timeout, verifier
    error or red outcome fails the request.
 4. Status `Landing`, `ensure_land_critical`, then `RepoStore::land` with
-   one entry: the candidate, the change's review as read, and the
-   lander's lease epoch. Success is announced. A `Conflict` retries with
+   one entry: the candidate, the change's review as read, the lander's
+   lease, and the landing's jobs. Success is announced. A `Conflict` retries with
    `tip = candidate`, unless the lease moved on, which fails with
    `Fenced`. Any other error first checks trunk: when the candidate has a
    landing record for this change the land committed and only its reply
@@ -99,19 +99,22 @@ up")`. Every `Failed` calls `return_to_owner` and publishes
 
 ## The land transaction
 
-`RepoStore::land(LandBatch { expected, entries, fence, actor })` reads the
+`RepoStore::land(LandBatch { expected, entries, fence, actor, also })` reads the
 trunk-head row (`(thd, ns, repo)`: be64 seq ++ hash) and returns
 `Conflict` if its hash is not `expected`. Otherwise one transaction, for
 entries at `seq = head_seq + 1, + 2, ...`:
 
 * checks: the head row equals what was read, the trunk ref equals
-  `expected`, each position is absent, the lease row equals the lander's
-  epoch, and each review's change record (and vote epoch) equals its
+  `expected`, each position is absent, the lease epoch row equals the
+  lander's, and each review's change record (and vote epoch) equals its
   snapshot;
 * writes: each position and its reverse index, a `Landing` record at
   `(land, ns, repo, seq)`, each review set to `Landed` with its
   `landed_seq`, `Landed` and `StatusChanged` events, a landings charge per
-  requester, then the new head row and trunk ref.
+  requester, the new head row and trunk ref, and `also`: the lander passes
+  one derive job per landed version and an index job for the new head
+  (`land::followups::landing_jobs`), so follow-up work exists exactly when
+  the landing does.
 
 A review that is no longer `Landing` or `Landable` (abandoned meanwhile)
 stops the batch. Two landers racing for a slot get exactly one winner; the
@@ -121,10 +124,14 @@ the sequencer's group commit (phase 9) uses. `land_on_trunk(expected,
 hash)` is a one-entry batch without review or lease, for imports and
 tools.
 
-**Fencing.** `Lander::epoch` takes the `lander` lease on first use
-(`acquire_lease` increments the epoch in `(lease, ns, repo, lander)`). A
-lander replaced by a newer one finds its epoch stale and every land fails,
-so two landers never both move one trunk.
+**Leases and fencing.** A lander lands only while it holds the `lander`
+lease (`LeaseHolder`, 10 s, renewed once half has passed); `run_once`
+leaves requests queued while another process holds it, and
+`run_forever` releases it at shutdown so a standby takes over at once.
+Taking the lease bumps its epoch, and the land transaction checks the
+epoch row, so a lander that was replaced (paused, partitioned) fails every
+land with `Fenced` even while it still believes it holds the lease. See
+[events and workers](../07-runtime/events-and-workers.md#leases).
 
 ## Announcing and land records
 
@@ -157,8 +164,8 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 ## Limitations
 
 * Queue and tickets are process-local; a restart loses queued requests
-  and ticket status (phase 9). The lease fences a replaced lander but is
-  never renewed or expired.
+  and ticket status (phase 9). A standby lander does not see the active
+  one's queue.
 * `RepoContext.tickets` is never pruned.
 * `VerifyMode::Affected` and `Full` call the same verifier; the mode is not
   passed through.
@@ -174,8 +181,9 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 
 * [rill-lander/src/land/lander.rs](../../crates/rill-lander/src/land/lander.rs), [pipeline.rs](../../crates/rill-lander/src/land/pipeline.rs), [record.rs](../../crates/rill-lander/src/land/record.rs)
 * [rill-lander/src/queue.rs](../../crates/rill-lander/src/queue.rs), [conflict_graph.rs](../../crates/rill-lander/src/conflict_graph.rs), [config.rs](../../crates/rill-lander/src/config.rs), [events.rs](../../crates/rill-lander/src/events.rs), [traits.rs](../../crates/rill-lander/src/traits.rs)
-* [rill-store/src/repo/landing.rs](../../crates/rill-store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records, leases), [repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)
-* [rill-server/src/services/review.rs](../../crates/rill-server/src/services/review.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-server/src/services/common.rs) (`ticket_status`), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs)
+* [rill-lander/src/land/followups.rs](../../crates/rill-lander/src/land/followups.rs) (jobs a landing enqueues)
+* [rill-store/src/repo/landing.rs](../../crates/rill-store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records), [repo/leases.rs](../../crates/rill-store/src/repo/leases.rs), [repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)
+* [rill-server/src/services/review/mod.rs](../../crates/rill-server/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-server/src/services/common.rs) (`ticket_status`), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs)
 
 ---
 ← Previous: [Review agents](review-agents.md) · [Index](../index.md) · Next: [Post-land verification](post-land-verification.md) →

@@ -1,128 +1,164 @@
 # Events and workers
 
-Each repository has an in-process event bus. Review events, landing events,
-ref moves and new versions fan into it, so watch streams have one thing to
-subscribe to. Background workers run next to the bus: the lander loop, the
-post-land verifier, the background deriver and the search indexer. The bus is lossy by design. The
-store is the source of truth, and anything that must be exact re-reads it.
+Every committed change to a repository's state writes exactly one event, in
+the transaction that makes the change. The event log is durable and
+ordered, and it is what watch streams read, so a watcher sees every change
+once, whichever server made it. Work that a change makes necessary
+(deriving and indexing a landing) is a durable job enqueued in the same
+transaction and run by workers that claim it under a lease. Roles that must
+have one holder at a time (the lander, the post-land verifier) hold a
+renewed, fenced lease. The in-process bus remains only for state that is
+not stored: land-ticket progress.
 
-## Event log and bus
+## Event log
 
-Durable events are rows in the repository's `evt` table, versionstamped
-and written by the transaction that causes them: `VersionStored` and
-`StatusChanged` by commits, `Landed` and `StatusChanged` by landings
-(`RepoStore::event`, `events_after(cursor, limit)`). Nothing reads them in
-the server yet; phase 7 moves watchers and workers onto this log. The
-in-process bus below is what streams use today.
+Events are rows `(evt, ns, repo, versionstamp)` holding an `Event {kind,
+actor, at}` (`rill-types/src/objects/event.rs`). `RepoStore::event` returns
+the two mutations every writer adds to its transaction: the stamped row and
+an atomic add to the counter `(evtn, ns, repo)`. Because the event commits
+with the change, a failed or retried write records nothing extra, and a
+write that commits records its event even if its acknowledgement is lost.
 
-`EventBus` (`state/events.rs`) wraps one `tokio::sync::broadcast` channel of
-`RepoEvent`, with capacity `EVENT_CAPACITY` = 4096. `publish` drops the event
-silently when nobody is subscribed. A subscriber that falls behind gets
-`RecvError::Lagged(n)` and has to recover from the store itself.
-
-```mermaid
-flowchart LR
-    RS[ReviewService broadcast] -->|forward| Bus[EventBus]
-    LD[Lander broadcast] -->|forward + land_to_bus| Bus
-    MR[MoveRef handler] -->|publish RefMoved| Bus
-    CV[commit_version] -->|publish VersionCreated| Bus
-    Bus --> WR[WatchRefs]
-    Bus --> WT[WatchTrunk / WatchLog]
-    Bus --> WV[WatchReview]
-    LD -->|own subscription| IX[search indexer]
-```
-
-| `RepoEvent` | Produced by |
+| Event kind | Written by |
 | --- | --- |
-| `Review(ReviewEvent)` | the review service broadcast (capacity 1024), forwarded by a task |
-| `Land(LandEvent)` | the lander broadcast (capacity 1024), forwarded through `land_to_bus` |
-| `RefMoved {name, old, new, at}` | `MoveRef`, plus one synthesised `trunk` move for each `LandEvent::Landed` |
-| `VersionCreated {hash}` | `commit_version`, the shared write path for change versions |
+| `RepoCreated` | `Stores::create_repo_with` |
+| `RefMoved` | `RepoStore::update_ref` (`MoveRef`) |
+| `VersionStored` | `put_change_version`, and the commit transaction |
+| `ReviewSubmitted` | `create_review` |
+| `Voted`, `Commented`, `ThreadResolved`, `StackSet`, `StatusChanged` | `review_writes`, from the difference between the review read and the one written; used by every review write, the commit transaction and landing |
+| `Landed` | the land transaction, one per trunk position |
+| `WorkspaceChanged`, `WorkspaceDeleted` | `operation_tx`, `delete_workspace` |
+| `IntentChanged` | `put_intent` |
+| `RelationChanged` | `add_relation`, `remove_relation` (`Authorizer::grant` / `revoke`) |
+| `PolicyChanged` | `SetPolicy`, through `set_misc_with_event` |
 
-`ReviewEvent` covers submission, new versions, votes, comments, resolved
-threads, stack and status changes. `LandEvent` covers `Queued`, `Landed`,
-`Conflict`, `Failed`, `DependentsReady`, `Verification`, `Culprit` and
-`Reverted`. When a forwarder lags, it logs a warning and skips the missed
-events. It stops when its source channel closes.
+Each writer takes the principal that caused the change; the review service
+uses `Principal::service("review")` for changes it makes on its own
+(re-evaluation, stacks, new versions), and landings use the lander's.
+
+`rill-events` reads the log:
+
+* `tail(repo, start, filter)` is a stream of `(cursor, Event)`. `Start` is
+  `Now` (after the newest event), `Beginning` or `After(cursor)`. Before
+  each page (256 events) it reads the event counter. When a page is empty
+  it waits for the counter to move past that reading
+  (`MetaStore::wait_counter`, at most 5 s per wait), so an event committed
+  between the read and the wait still wakes it. Versionstamps follow commit
+  order, so the tail never skips an event that commits later with a lower
+  cursor.
+* `EventFilter {kinds, change, ref_prefix}` is a conjunction; empty
+  matches all.
+* `run_retention` deletes events older than `RETENTION` (30 days) every
+  hour, 1,000 per transaction. The counter is not decremented.
 
 ## Watch streams
 
-Each watch RPC subscribes to the bus and spawns a task that feeds an
-`mpsc` channel (`STREAM_BUFFER` = 256) into the gRPC stream. The task ends
-on the context's shutdown token, on bus close, or when a send fails because
-the client went away. Lag handling differs per RPC:
+Each watch spawns a task feeding an `mpsc` channel (256) into the gRPC
+stream. It stops on the repository's shutdown token or when the client goes
+away.
 
-* `WatchTrunk` and `WatchLog` keep a cursor (`after_seq` for trunk; for
-  the log, the `after` versionstamp from an earlier `LogEntry`, empty to
-  replay from the start; the current head when absent). They use bus events only as wake-ups. On each
-  wake-up they read the store (`trunk_range`, or `log_after` in pages of
-  `REPLAY_PAGE` = 512) from the cursor. They subscribe before the first
-  read, so their output is exact even when the bus lags.
-* `WatchRefs` forwards `RefMoved` events whose name starts with the prefix.
-  It has no replay. Events lost to lag are not delivered.
-* `WatchReview` maps bus events for one change to wire `ReviewEvent`s. It
-  also has no replay, and lagged events are skipped.
+| RPC | Reads | Start |
+| --- | --- | --- |
+| `WatchEvents` | the event log through `tail`, with the request's kinds, change and ref prefix | `after`: absent is now, empty is the beginning, otherwise a cursor from an earlier `EventEnvelope` |
+| `WatchRefs` | `RefMoved` and `Landed` events; a landing is reported as a `trunk` move with the previous trunk entry as `old` | now |
+| `WatchTrunk`, `WatchLog` | the trunk and version log from a cursor (`trunk_range`, `log_after` in pages of 512), re-read whenever the event counter moves | `after_seq` / `after` as before |
+| `WatchReview` | the log, filtered to one change; plus land-ticket `Queued` and `Failed` updates from the lander's bus | now |
+
+## Jobs
+
+`rill-jobs` keeps queues in the metadata store, per repository:
+
+| Rows | Holds |
+| --- | --- |
+| `(jobq, …, queue, shard, priority, run_at, stamp)` | a job ready from `run_at` |
+| `(jobl, …, queue, job)` | a claimed job with its holder and lease expiry |
+| `(jobt, …, queue, job)` | the claim's token |
+| `(jobd, …, queue, job)` | a dead job and its last error |
+| `(jobn, …, queue, metric)` | counters: `enqueued`, `completed`, `retried`, `dead`, `wake` |
+
+* **Enqueue** (`Queue::enqueue`) returns mutations for the caller's
+  transaction: a stamped ready row in the shard picked by the job's key
+  (FNV-1a, 4 shards) and counter adds. A job exists exactly when the change
+  that needed it committed.
+* **Claim** scans each priority (high, normal, low) across shards, starting
+  at a random shard, for rows with `run_at <= now`. It moves one to `jobl`
+  and writes a fresh random token in one transaction conditioned on the
+  ready row; a conflict means someone else took it.
+* **Renew** rewrites the lease expiry, conditioned on the token.
+  **Complete** deletes the claim under the same condition
+  (`complete_tx` lets a handler commit its own writes with it). A handler's
+  own writes can be fenced with `Claim::fence()`. The token does not change
+  on renewal, so a fenced write fails once the job was taken back, however
+  often the claim was renewed.
+* **Fail** and **reap** turn an attempt into a retry, ready again after
+  `base_delay · 2^(attempt-1)` (1 s up to 5 min), or, after `max_attempts`
+  (5) or a fatal failure, a dead job. `reap` does this for every claim past
+  its lease (30 s). `retry_dead` revives a dead job with fresh attempts.
+* `Worker` runs a `Handler` over a queue: N claim loops that wait on the
+  `wake` counter when idle (at most 1 s, since backoffs do not move it),
+  renew each claim every third of the lease while the handler runs and drop
+  the attempt if the claim is lost, and a reaper every half lease. Jobs can
+  run more than once, so handlers are idempotent or fenced.
+
+The land transaction carries the jobs of a landing (`LandBatch::also`,
+built by `rill_lander::land::followups::landing_jobs`): one
+`derive_background` job per landed version on the `derive` queue and one
+low-priority `index_version` job for the new head on the `index` queue.
+
+## Leases
+
+`(lease, …, role)` holds `{holder, epoch, expires_at}` and `(lepoch, …,
+role)` the epoch alone. `try_acquire` takes a free or expired lease and
+bumps the epoch; `renew` and `release` are conditioned on the record the
+holder has. `LEASE_TTL_MS` is 10 s. `LeaseHolder::current` renews once half
+of it has passed and reports `None` while another process holds the role.
+`Lease::fence` is a condition on the epoch row: the land transaction and the
+post-land cursor write carry it, so a holder that was replaced (a paused or
+partitioned process) cannot write even if it still believes it holds the
+lease. A standby lander or verifier does nothing until the lease is free.
 
 ## Workers
 
-`workers::spawn_repo_workers` runs once per context, when `RepoRegistry::get`
-first builds it. That happens at startup through `warm`, or on the first
-request for a new repository. Every task watches the context's child
-shutdown token.
+`workers::spawn_repo_workers` runs once per repository context.
 
-| Worker | Trigger | On missed events or restart |
+| Worker | Trigger | After a restart |
 | --- | --- | --- |
-| Review and land forwarders | broadcast receive | skip lagged events (see above) |
-| Lander loop, `Lander::run_forever` | timer, every `LandPolicy::batch_window` | polls its in-memory queue, so it misses no events. Queued requests do not survive a restart |
-| Post-land verifier, `PostLandVerifier::run_forever` | timer, every `postland.interval_secs` (minimum 1 s) | polls trunk against a cursor stored in the repository, so missed events and restarts lose nothing |
-| Background deriver, `workers/deriver.rs` | its own `Lander::subscribe`, plus every 5 s | derives background kinds for trunk versions after a stored cursor (`derive_cursor`), so missed events and restarts lose nothing; see [derived data](../02-data/derived-data.md#when-values-are-computed) |
-| Search indexer, `workers/indexer.rs` | its own `Lander::subscribe` | on lag, re-indexes only the trunk head |
+| Lander loop, `Lander::run_forever` | every `batch_window`, while holding the `lander` lease | queued requests live in memory and are lost |
+| Post-land verifier | every `postland.interval_secs`, while holding the `postland` lease | resumes from its fenced cursor |
+| Derive worker, `workers/deriver.rs` | the `derive` queue, 2 at a time | unfinished jobs are reaped and rerun |
+| Index worker, `workers/indexer.rs` | the `index` queue; queues the trunk head once at start, for trunk moved without a landing (imports) | unfinished jobs are reaped and rerun |
+| Event retention | hourly | stateless |
+| Review and land forwarders | broadcast receive | feed the in-process bus |
 
 One server-wide task, `workers::sweep_idempotency`, deletes expired
-idempotency records every 10 minutes (up to 10,000 per sweep).
+idempotency records every 10 minutes.
 
-The verifier exists only when `postland.enabled` is set. Each sweep
-verifies up to `batch_size` landings after the stored cursor (default
-`DEFAULT_BATCH_SIZE` = 8). It bisects a red batch and may auto-revert. A
-sweep lock keeps two sweeps from racing on the cursor. See
-[post-land verification](../04-workflow/post-land-verification.md).
-
-The indexer indexes the trunk head at startup, then the root of every
-`LandEvent::Landed`, and flushes after each one and again at shutdown.
-Indexing is content-addressed: `index_root` returns early when a manifest
-already exists for the root. That makes repeats and restarts idempotent. A
-root that was skipped because of lag is indexed on demand by
-`RepoContext::grep` the first time someone searches it. See
-[search](../06-services/search.md).
-
-Two more pieces are wired in at build time. They are adapters, not tasks.
-
-* `ExecVerifier` (`workers/verifier.rs`) implements the lander's `Verifier`
-  by running `.rill/verify.toml` through `rill_exec::verify_tree`. Without
-  `verify.enabled`, the lander uses `AlwaysGreen`.
-* `ReviewHooksAdapter` (`workers/hooks.rs`) implements `ReviewHooks`. It
-  maps `mark_landing`, `mark_landed`, `return_to_owner` and `dependents_of`
-  onto the current review service. `ReviewNotFound` is tolerated, because
-  reverts and direct lands have no review. `return_to_owner` posts a comment
-  as the lander principal that tells the owner to rebase.
+The derive handler calls `DeriveManager::ensure_background`; the index
+handler calls `index_version` and flushes. Both treat errors as retryable
+and bad payloads as fatal. `ExecVerifier` and `ReviewHooksAdapter`
+(`workers/verifier.rs`, `workers/hooks.rs`) are adapters wired in at build
+time, not tasks.
 
 ## Limitations
 
-* The bus is in-process only. Events never leave one server process, and
-  nothing persists them.
-* `WatchRefs` and `WatchReview` can silently drop events when a subscriber
-  lags.
-* The synthesised `trunk` `RefMoved` always has `old: None`.
-* No subscriber in the server consumes `VersionCreated`.
-* After lag, the indexer indexes only the head. Intermediate landed roots
-  wait for an on-demand index.
+* Workers run inside the server process, one set per repository context;
+  there are no separate worker processes.
+* Waiting for events or jobs polls the counter (every 20 ms) on every
+  engine; the FoundationDB engine does not use watches yet.
+* A cursor older than the retention window resumes at the oldest retained
+  event without saying events were dropped.
+* Land tickets are in memory, so `WatchReview` land updates other than
+  `Landed` come from the local lander only.
+* A job's claim scan reads each shard and priority separately; with many
+  shards and empty queues an idle claim costs `shards × 3` range reads.
 
 ## Code
 
-* [state/events.rs](../../crates/rill-server/src/state/events.rs), [state/registry.rs](../../crates/rill-server/src/state/registry.rs)
-* [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs), [workers/indexer.rs](../../crates/rill-server/src/workers/indexer.rs), [workers/deriver.rs](../../crates/rill-server/src/workers/deriver.rs), [workers/verifier.rs](../../crates/rill-server/src/workers/verifier.rs), [workers/hooks.rs](../../crates/rill-server/src/workers/hooks.rs)
-* [services/repo/watch.rs](../../crates/rill-server/src/services/repo/watch.rs), [services/review.rs](../../crates/rill-server/src/services/review.rs)
-* [rill-lander/src/events.rs](../../crates/rill-lander/src/events.rs), [rill-lander/src/postland/worker.rs](../../crates/rill-lander/src/postland/worker.rs)
+* [rill-events](../../crates/rill-events/src/lib.rs), [rill-jobs](../../crates/rill-jobs/src/lib.rs)
+* [rill-store repo/events.rs](../../crates/rill-store/src/repo/events.rs), [repo/leases.rs](../../crates/rill-store/src/repo/leases.rs), [repo/reviews.rs](../../crates/rill-store/src/repo/reviews.rs)
+* [rill-lander land/followups.rs](../../crates/rill-lander/src/land/followups.rs)
+* [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs), [workers/deriver.rs](../../crates/rill-server/src/workers/deriver.rs), [workers/indexer.rs](../../crates/rill-server/src/workers/indexer.rs)
+* [services/repo/watch/](../../crates/rill-server/src/services/repo/watch/mod.rs), [services/review/watch.rs](../../crates/rill-server/src/services/review/watch.rs), [state/events.rs](../../crates/rill-server/src/state/events.rs)
 
 ---
 ← Previous: [API surface](api-surface.md) · [Index](../index.md) · Next: [Configuration](configuration.md) →

@@ -93,9 +93,9 @@ do not introduce v2 names or compatibility shims. The roadmap's "v2" means
 
 ## Layering
 
-`rill-types` ← `rill-store` ← `rill-core` ← `rill-policy` / `rill-review` /
-`rill-lander` / `rill-search` / `rill-exec` ← `rill-server` ← `rill-sdk` ←
-`rill-cli` / `rill-mcp`. Lower crates never depend on higher ones. Tooling
+`rill-types` ← `rill-store` ← `rill-events` / `rill-jobs` / `rill-core` ←
+`rill-policy` / `rill-review` / `rill-lander` / `rill-search` / `rill-exec` ←
+`rill-server` ← `rill-sdk` ← `rill-cli` / `rill-mcp`. Lower crates never depend on higher ones. Tooling
 crates (`rill-sim`, `rill-bench`, `rill-load`, `fuzz/`) may depend on
 anything; nothing depends on them. Test-only hooks in library crates live
 behind a `testing` feature.

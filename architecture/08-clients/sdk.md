@@ -59,6 +59,9 @@ streams. Each module under `repo/` wraps one group of RPCs.
 `watch_log(WatchStart)` starts `Now`, from the `Beginning` or `After` a
 `Versionstamp` cursor, and yields `LogEntry { cursor, info }`, so a client
 can stop and resume without missing or repeating a version.
+`watch_events(WatchStart, EventQuery { kinds, change, ref_prefix })`
+streams the event log the same way, yielding `LoggedEvent { cursor, event
+}` with the `rill_types::Event`.
 
 `Root` (`types/root.rs`) names a point in history: `Ref`, `Version`, `Tree`
 or `Seq`. It parses from `trunk`, `trunk@N`, `tree:<hex>`, a 64-hex version

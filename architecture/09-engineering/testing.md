@@ -101,9 +101,15 @@ round trips in `src/convert/roundtrip_tests.rs`.
   directories; diffs of split directories report exactly the changes
   (`rill-core/tests/large_dirs.rs`). Skip-pointer `is_ancestor` and
   `merge_base` agree with brute force on 2,000 queries over a random
-  branching history (`tests/ancestry.rs`). The background deriver resumes
-  from its cursor and skips a version after three failures
-  (`tests/background.rs`). A one-file commit writes one node per directory
+  branching history (`tests/ancestry.rs`). Job queues claim by priority
+  and age, back off and dead-letter failures, rerun the job of a worker
+  that died and refuse its late writes, and enqueue only with the
+  transaction that needs them (`rill-jobs/tests/`); each landing queues its
+  derive and index jobs (`rill-lander/tests/landing.rs`). Every store
+  write records one event, and tails resume after a cursor and wake on new
+  events on every backend (`rill-store/tests/conformance/events.rs`,
+  `rill-events`); `WatchEvents` delivers each change once over gRPC
+  (`rill-server/tests/grpc/events.rs`). A one-file commit writes one node per directory
   level (`rill-bench/tests/node_writes.rs`). The server stores every
   land-critical value before replying to a commit.
 - **Content**: streamed storage equals whole-content storage; a 4 KiB range

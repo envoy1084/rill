@@ -43,7 +43,7 @@ flowchart LR
   GRPC --> Lander[rill-lander]
   GRPC --> Policy[rill-policy]
   GRPC --> Core[rill-core]
-  GRPC --> Workers[indexer, post-land]
+  GRPC --> Workers[derive and index jobs, post-land]
   Workers --> Search[rill-search]
   Lander --> Exec[rill-exec via ExecVerifier]
   Review --> Core
@@ -83,7 +83,7 @@ sequenceDiagram
 
 A `RepoContext` holds everything handlers need for one repository: the
 `RepoStore`, tree cache, derived-data manager, commit graph, lander, review
-service, search index, authorizer and event bus. The `RepoRegistry` builds it
+service, search index, authorizer and the bus for land-ticket progress. The `RepoRegistry` builds it
 on first use and caches it for the life of the process. The request-scoped
 value is `Opened` (the caller's `AuthContext` plus an `Arc<RepoContext>`),
 which does not outlive the handler. See [server](../07-runtime/server.md).
@@ -112,14 +112,14 @@ fixed `dev` principal in dev mode. Three layers must all allow an action:
   Metadata (refs, trunk sequence, review, workspace and intent records) is
   written after and references objects by hash. See
   [storage and keyspace](../02-data/storage-and-keyspace.md).
-- Trunk moves only through `RepoStore::land_on_trunk`, a single metadata
-  transaction that compare-and-swaps the `trunk` ref and claims the next
-  sequence number. The lander writes the landing record under a
-  process-local lock.
-- Events are in-process. The lander and review service each broadcast on a
-  `tokio` channel; the server forwards both into a per-repository `EventBus`.
-  Workers (search indexer, post-land verifier) are idempotent over replays,
-  and a lagged indexer re-indexes the trunk head. See
+- Trunk moves only through `RepoStore::land`, one metadata transaction
+  that compare-and-swaps the trunk head, writes the positions, landing
+  records and review updates, and is fenced by the lander's lease. See
+  [landing](../04-workflow/landing.md).
+- Every committed state change writes one event in its own transaction, so
+  the repository's event log is exact; watch streams read it. Work a change
+  makes necessary (deriving and indexing landings) is a durable job
+  enqueued in the same transaction and run by leased workers. See
   [events and workers](../07-runtime/events-and-workers.md).
 
 The rules these mechanisms must keep are listed in
@@ -127,10 +127,10 @@ The rules these mechanisms must keep are listed in
 
 ## Limitations
 
-- One server process per repository. The land lock, event bus and land
-  tickets are process-local; there is no durable outbox.
-- A missed event is recovered only by on-demand work (a grep on an unindexed
-  root indexes it), not by replay.
+- One server process per repository. Land requests and tickets are
+  process-local, so a restart loses queued requests.
+- Workers run inside the server process; there are no separate worker
+  processes.
 - No identity provider: authentication is static tokens or self-issued
   Biscuits.
 

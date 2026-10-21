@@ -12,7 +12,7 @@ and crash bugs that example tests miss show up here first.
 ```mermaid
 flowchart LR
   S[seed] --> R[SimRng]
-  R --> A[agents: new change · amend · submit · vote · request land · sweep · sync · abandon]
+  R --> A[agents: new change · amend · submit · vote · request land · sweep · sync · abandon · derive work · zombie land]
   R --> X[restarts]
   S --> F[FaultPlan]
   A --> W[World: RepoStore · ReviewService · Lander · ReviewHooksAdapter]
@@ -30,9 +30,16 @@ flowchart LR
    human reviewers.
 3. **Restarts** rebuild every in-memory structure (caches, review service,
    lander, land queue and tickets) over the same stores, like a process
-   restart.
-4. **Settle:** faults stop and the lander sweeps until the queue is empty.
-   Then the final checks run.
+   restart. The old lander's lease is kept as a *zombie*: what a paused
+   process still holds when it wakes up after being replaced.
+4. **Background work:** a derive worker claims jobs from the `derive`
+   queue and, 30% of the time, dies holding the claim. Once another lander
+   holds the lease, the zombie tries to land an acknowledged version with
+   its stale lease.
+5. **Settle:** faults stop and the lander sweeps until the queue is empty.
+   The clock then jumps past every lease and backoff, expired claims are
+   reaped, dead jobs revived, and the derive queue is run dry. Then the
+   final checks run.
 
 `World` wires the services exactly as `rill-server` does, including its
 `ReviewHooksAdapter`, so the simulator tests the production wiring rather
@@ -75,6 +82,9 @@ change ids explicitly. A run's `digest` hashes every action and outcome, and
 | `RebaseNeverFailsOnContent` | Rebase fails only on storage errors |
 | `LandRequestsResolve` | Every land request ends in a final, queryable outcome |
 | `ReviewMatchesTrunk` | A change on trunk has a `Landed` review |
+| `EventsMatchState` | The event log has exactly one `VersionStored` per version-log entry and one `Landed` per trunk position, nothing extra, and the event counter matches |
+| `JobsFinish` | Every derive job finishes once faults stop, including those whose worker died, and every trunk version is derived |
+| `DeposedHolderFenced` | A replaced lander's landing never moves trunk, even when its acknowledgement is lost |
 
 ## Scenarios and known issues
 
@@ -97,7 +107,10 @@ taught the lander to recognise a land whose reply was lost; 10,000 faulty
 seeds now show neither.
 
 A violation of any other invariant fails the tests. When a phase fixes a
-known issue, its entry is removed.
+known issue, its entry is removed. The faulty test also requires that some
+worker died holding a job and some zombie tried to land, so the job and
+lease checks are never vacuous; 10,000 faulty seeds rerun about 5,900 jobs
+and refuse about 21,000 zombie landings.
 
 ## Running
 

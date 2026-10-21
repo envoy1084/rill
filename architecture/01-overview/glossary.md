@@ -59,11 +59,19 @@ flowchart LR
   [metadata engines](../02-data/metadata-engines.md).
 - **Versionstamp**: a 12-byte commit-order position assigned by the
   metadata store; the cursor of stamped logs such as the version log.
+- **Event**: what changed in a repository, by whom and when; written by the
+  transaction that makes the change, one per change, into the repository's
+  event log. See [events and workers](../07-runtime/events-and-workers.md).
+- **Job**: durable follow-up work in a queue (`derive`, `index`), enqueued
+  by the transaction that needs it and run by a worker holding a leased
+  claim. See [events and workers](../07-runtime/events-and-workers.md).
+- **Lease**: a renewed, expiring claim on a role (`lander`, `postland`) with
+  an epoch that fenced writes check, so a replaced holder cannot write.
 - **RepoStore**: typed view of one repository's keyspace over both stores:
   refs, trunk, change info, review, workspace and derived records. See
   [storage and keyspace](../02-data/storage-and-keyspace.md).
 - **RepoContext**: the server's cached per-repository service graph (store,
-  derive manager, graph, lander, review, search, authorizer, event bus). See
+  derive manager, graph, lander, review, search, authorizer, land-ticket bus). See
   [server](../07-runtime/server.md).
 
 ## Workflow

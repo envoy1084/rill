@@ -145,9 +145,18 @@ with the lander. It does not change the review status; the lander does
 when it picks the request up ([landing](landing.md)).
 
 `SetPolicy` makes `RepoContext::reload_policy` rebuild the `ReviewService`
-and swap it behind an `ArcSwap`. Every mutation emits a `ReviewEvent`
-(`Submitted`, `VersionAdded`, `Voted`, `StatusChanged`, ...) on a
-per-repository channel forwarded to the `EventBus` and `WatchReview`.
+and swap it behind an `ArcSwap`.
+
+**Events.** Every review write records its events in the same
+transaction: `create_review` writes `ReviewSubmitted`, and
+`review_writes(snapshot, next, actor)` derives the rest from what changed:
+`Voted` per changed vote (by the voter), `Commented` per new comment
+(`new_thread` on a thread's first), `ThreadResolved` when a thread flips,
+and `StackSet` and `StatusChanged` when the record changes. Writes the
+service makes on its own (re-evaluation, stacks, new versions) are by
+`Principal::service("review")`. `WatchReview` reads these from the event
+log ([events and workers](../07-runtime/events-and-workers.md)). The
+service also still broadcasts a `ReviewEvent` per mutation in process.
 
 ## Limitations
 
@@ -167,7 +176,7 @@ per-repository channel forwarded to the `EventBus` and `WatchReview`.
 * [rill-review/src/service.rs](../../crates/rill-review/src/service.rs), [evaluate.rs](../../crates/rill-review/src/evaluate.rs), [facts.rs](../../crates/rill-review/src/facts.rs), [stacks.rs](../../crates/rill-review/src/stacks.rs)
 * [rill-review/src/lifecycle/](../../crates/rill-review/src/lifecycle/mod.rs): [submit.rs](../../crates/rill-review/src/lifecycle/submit.rs), [versions.rs](../../crates/rill-review/src/lifecycle/versions.rs), [interdiff.rs](../../crates/rill-review/src/lifecycle/interdiff.rs), [status.rs](../../crates/rill-review/src/lifecycle/status.rs), [retry.rs](../../crates/rill-review/src/lifecycle/retry.rs)
 * [rill-review/src/votes/labels.rs](../../crates/rill-review/src/votes/labels.rs), [cast.rs](../../crates/rill-review/src/votes/cast.rs), [threads/comment.rs](../../crates/rill-review/src/threads/comment.rs), [threads/anchor.rs](../../crates/rill-review/src/threads/anchor.rs)
-* [rill-types/src/objects/review.rs](../../crates/rill-types/src/objects/review.rs), [rill-server/src/services/review.rs](../../crates/rill-server/src/services/review.rs)
+* [rill-types/src/objects/review.rs](../../crates/rill-types/src/objects/review.rs), [rill-server/src/services/review/](../../crates/rill-server/src/services/review/mod.rs)
 
 ---
 ← Previous: [Changes and stacks](changes-and-stacks.md) · [Index](../index.md) · Next: [Review agents](review-agents.md) →

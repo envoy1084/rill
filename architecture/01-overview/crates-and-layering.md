@@ -1,6 +1,6 @@
 # Crates and layering
 
-Rill is one Cargo workspace of fourteen crates under `crates/`. Each crate owns
+Rill is one Cargo workspace of sixteen crates under `crates/`. Each crate owns
 one boundary, and dependencies only point down the stack, so the algorithms
 and policy crates stay free of RPC and storage-layout concerns.
 
@@ -10,15 +10,17 @@ and policy crates stay free of RPC and storage-layout concerns.
 | --- | --- | --- |
 | `rill-types` | Object model, ids, BLAKE3 hashing, canonical encoding, `Merge<T>` | I/O, policy decisions |
 | `rill-store` | `ObjectStore` / `MetaStore` traits, the keyspace layer, object backends (memory, files, S3) and metadata engines (memory, redb, FoundationDB), typed `RepoStore`, trunk CAS | Diff, merge, authorization |
+| `rill-events` | Reading the event log: filtered, resumable tails that wait on the event counter; retention | Writing events (each writer does, in its own transaction) |
+| `rill-jobs` | Durable job queues: priorities, shards, leased claims with fencing tokens, backoff, dead-letter queue, counters, a worker runtime | What jobs do (handlers live with their callers) |
 | `rill-core` | Diff, three-way merge, trees, rebase, ancestry graph, derived data, blob chunking, `ChangeBuilder` | Storage layout, RPC |
 | `rill-policy` | Risk classification, Cedar submit rules, ReBAC, Biscuit capability tokens, signing | Enforcement points (the server owns those) |
 | `rill-review` | Labels, votes, threads, interdiff, stacks, submit evaluation, review agents | Landing |
-| `rill-lander` | Queue, rebase onto trunk, CAS land, landing records, post-land verification, bisect, revert | Review state (through `ReviewHooks`), execution (through `Verifier`) |
+| `rill-lander` | Queue, rebase onto trunk, CAS land, landing records, the jobs a landing enqueues, post-land verification, bisect, revert | Review state (through `ReviewHooks`), execution (through `Verifier`) |
 | `rill-search` | Trigram index, symbol extraction, query execution | Permission filtering (the server passes a `PathFilter`) |
 | `rill-exec` | Action cache, sandbox materialization, verify plans | Scheduling policy |
 | `rill-git-import` | One-way git history import onto trunk | Export, mirroring |
 | `rill-proto` | `rill.v1` protobufs, generated tonic services, domain/wire conversion | Handlers |
-| `rill-server` | Authentication, `RepoContext`, gRPC handlers, object HTTP protocol, event bus, workers, config | Client-side state |
+| `rill-server` | Authentication, `RepoContext`, gRPC handlers and watch streams, object HTTP protocol, job handlers and workers, config | Client-side state |
 | `rill-sdk` | Typed client, blob upload, local checkout (`.rill/`), status, sync, stack helpers | User interface |
 | `rill-mcp` | stdio JSON-RPC tool surface over the SDK for agents; `rill-mcp` binary | Anything the SDK cannot do |
 | `rill-cli` | `rill` and `rill-server` binaries, output formats, exit codes | Business rules |
@@ -38,15 +40,17 @@ Arrows point from a crate to what it depends on, as declared in each
 flowchart BT
   types[rill-types]
   store[rill-store] --> types
+  events[rill-events] --> store
+  jobs[rill-jobs] --> store
   core[rill-core] --> store
   policy[rill-policy] --> store
   review[rill-review] --> core & policy
-  lander[rill-lander] --> core
+  lander[rill-lander] --> core & jobs
   search[rill-search] --> core
   exec[rill-exec] --> core
   import[rill-git-import] --> core
   proto[rill-proto] --> types
-  server[rill-server] --> review & lander & search & exec & proto
+  server[rill-server] --> review & lander & search & exec & proto & events & jobs
   sdk[rill-sdk] --> proto & core
   mcp[rill-mcp] --> sdk & core
   cli[rill-cli] --> sdk & mcp & server & store & import
@@ -54,10 +58,15 @@ flowchart BT
 
 ## Layering rules
 
-The declared order is `rill-types` <- `rill-store` <- `rill-core` <-
-`rill-policy` / `rill-review` / `rill-lander` / `rill-search` / `rill-exec`
-<- `rill-server` <- `rill-sdk` <- `rill-cli` / `rill-mcp`. Lower crates never
-depend on higher ones. The manifests refine that order in a few places:
+The declared order is `rill-types` <- `rill-store` <- `rill-events` /
+`rill-jobs` / `rill-core` <- `rill-policy` / `rill-review` / `rill-lander` /
+`rill-search` / `rill-exec` <- `rill-server` <- `rill-sdk` <- `rill-cli` /
+`rill-mcp`. Lower crates never depend on higher ones. The manifests refine
+that order in a few places:
+
+- `rill-events` and `rill-jobs` depend only on `rill-types` and
+  `rill-store`. Key layouts for events and jobs stay in `rill-store`
+  (`keys.rs`) with every other table.
 
 - `rill-policy` depends on `rill-types` and `rill-store` only, not on
   `rill-core`. `rill-review` depends on both `rill-core` and `rill-policy`.
