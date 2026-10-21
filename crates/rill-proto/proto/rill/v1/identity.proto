@@ -25,6 +25,119 @@ service IdentityService {
   // Suspend or reactivate a user, or set their roles. Suspension refuses
   // every token the user holds at once.
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+
+  // Agents: org administrators, or a user for agents they sponsor.
+  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+  rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse);
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+
+  // Issuers whose workload JWTs may be exchanged for agent tokens; org
+  // administrators.
+  rpc PutWorkloadIssuer(PutWorkloadIssuerRequest) returns (PutWorkloadIssuerResponse);
+  rpc ListWorkloadIssuers(ListWorkloadIssuersRequest) returns (ListWorkloadIssuersResponse);
+  rpc DeleteWorkloadIssuer(DeleteWorkloadIssuerRequest) returns (DeleteWorkloadIssuerResponse);
+}
+
+message AgentBudgets {
+  optional uint64 versions_per_day = 1;
+  optional uint64 lands_per_day = 2;
+  optional uint64 requests_per_minute = 3;
+}
+
+message WorkloadBinding {
+  string issuer = 1;
+  // The `sub` claim; a trailing `*` matches any suffix.
+  string subject = 2;
+  // Further claims that must equal these values.
+  map<string, string> claims = 3;
+}
+
+message AgentSpec {
+  string org = 1;
+  string name = 2;
+  // `user:<name>` or `team:<name>`.
+  string sponsor = 3;
+  string purpose = 4;
+  // Repository names in the org; `*` for all.
+  repeated string repos = 5;
+  // Path prefixes; empty for every path.
+  repeated string paths = 6;
+  // Models it may run as; empty for any.
+  repeated string models = 7;
+  AgentBudgets budgets = 8;
+  repeated WorkloadBinding workloads = 9;
+  optional int64 expires_at = 10;
+}
+
+message Agent {
+  AgentSpec spec = 1;
+  Principal principal = 2;
+  // `active` or `suspended`.
+  string status = 3;
+  Principal created_by = 4;
+  int64 created_at = 5;
+  int64 updated_at = 6;
+}
+
+message RegisterAgentRequest {
+  bytes operation_id = 1;
+  AgentSpec agent = 2;
+}
+message RegisterAgentResponse {
+  Agent agent = 1;
+}
+message UpdateAgentRequest {
+  bytes operation_id = 1;
+  string org = 2;
+  string name = 3;
+  optional bool suspended = 4;
+  // Replaces the registration's sponsor, scope, models, budgets, bindings
+  // and expiry when set; the org and name must match.
+  AgentSpec spec = 5;
+}
+message UpdateAgentResponse {
+  Agent agent = 1;
+}
+message ListAgentsRequest {
+  string org = 1;
+}
+message ListAgentsResponse {
+  repeated Agent agents = 1;
+}
+
+message WorkloadIssuerSpec {
+  string org = 1;
+  string name = 2;
+  string issuer = 3;
+  oneof keys {
+    // OIDC discovery at the issuer.
+    bool discovery = 4;
+    string jwks_uri = 5;
+    // A JWKS document.
+    string jwks = 6;
+  }
+  repeated string audiences = 7;
+}
+message PutWorkloadIssuerRequest {
+  bytes operation_id = 1;
+  WorkloadIssuerSpec issuer = 2;
+}
+message PutWorkloadIssuerResponse {
+  WorkloadIssuerSpec issuer = 1;
+}
+message ListWorkloadIssuersRequest {
+  string org = 1;
+}
+message ListWorkloadIssuersResponse {
+  repeated WorkloadIssuerSpec issuers = 1;
+}
+message DeleteWorkloadIssuerRequest {
+  bytes operation_id = 1;
+  string org = 2;
+  string name = 3;
+}
+message DeleteWorkloadIssuerResponse {
+  bool deleted = 1;
 }
 
 message IdentityProviderSpec {
@@ -188,8 +301,15 @@ message ListSignInProvidersResponse {
 
 message ExchangeTokenRequest {
   string subject_token = 1;
-  // `urn:ietf:params:oauth:token-type:id_token`.
+  // `urn:ietf:params:oauth:token-type:id_token` (a person), or
+  // `urn:ietf:params:oauth:token-type:jwt` (a workload, for an agent).
   string subject_token_type = 2;
+  // For workloads: the org whose trusted issuer signed the JWT.
+  string org = 3;
+  // For workloads: the agent, when several bindings match.
+  optional string agent = 4;
+  // For workloads: the model the agent runs as.
+  optional string model = 5;
 }
 
 message RefreshSessionRequest {

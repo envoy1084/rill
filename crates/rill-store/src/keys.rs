@@ -124,6 +124,12 @@ pub mod table {
     pub const IDENT_PROVIDER_ISSUER: &str = "idpi";
     /// `(idpl, state)` → PendingLogin
     pub const IDENT_LOGIN: &str = "idpl";
+    /// `(ida, org, name)` → AgentRecord
+    pub const IDENT_AGENT: &str = "ida";
+    /// `(idw, org, name)` → WorkloadIssuer
+    pub const IDENT_WORKLOAD: &str = "idw";
+    /// `(idos, org)` → OrgIdentitySettings
+    pub const IDENT_ORG_SETTINGS: &str = "idos";
 }
 
 fn key<T: TuplePack>(t: &T) -> Bytes {

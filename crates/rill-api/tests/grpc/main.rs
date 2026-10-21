@@ -1,6 +1,7 @@
 //! End-to-end tests: an in-process server on ephemeral ports driven
 //! through the generated tonic clients and a raw HTTP client.
 
+mod agents;
 mod auth;
 mod cluster;
 mod commits;

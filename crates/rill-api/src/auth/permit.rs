@@ -9,6 +9,9 @@
 //! 2. the ReBAC relations stored on the repository must grant the relation
 //!    on the path's directory or an ancestor (`Authorizer::check_path`).
 //!
+//! A registered agent is also held to the repositories and paths its
+//! registration names, before either layer.
+//!
 //! The second layer is skipped in dev mode and for a repository that has
 //! no relation tuples at all. The latter is the bootstrap rule: a fresh
 //! repository is open until someone grants the first relation, at which
@@ -95,6 +98,17 @@ impl<'a> Permit<'a> {
                 self.repo.config.name
             )));
         }
+        if let Some(scope) = &self.ctx.scope {
+            let config = &self.repo.config;
+            if !scope.covers_repo(&config.org, &config.name) || !scope.covers_path(path) {
+                return Err(Error::denied(format!(
+                    "agent {} is not registered for {} in repository {}",
+                    self.ctx.principal,
+                    describe(path),
+                    config.name
+                )));
+            }
+        }
         if self.dev_mode || self.bootstrap().await? {
             return Ok(());
         }
@@ -118,14 +132,24 @@ impl<'a> Permit<'a> {
     /// A filter over paths the caller may read, for listings and diffs
     /// that must not leak names of directories the caller cannot see.
     pub async fn read_filter(&self) -> Result<PathFilter> {
-        if self.dev_mode || self.bootstrap().await? {
-            return Ok(PathFilter::allow_all());
-        }
-        Ok(self
-            .repo
-            .authorizer
-            .allowed_paths_for(&self.ctx.principal, &self.ctx.teams, Relation::Reader)
-            .await)
+        let relations = if self.dev_mode || self.bootstrap().await? {
+            PathFilter::allow_all()
+        } else {
+            self.repo
+                .authorizer
+                .allowed_paths_for(&self.ctx.principal, &self.ctx.teams, Relation::Reader)
+                .await
+        };
+        Ok(match self.ctx.scope.clone() {
+            None => relations,
+            Some(scope) => {
+                let config = &self.repo.config;
+                if !scope.covers_repo(&config.org, &config.name) {
+                    return Ok(PathFilter::deny_all());
+                }
+                PathFilter::new(move |p| scope.covers_path(p) && relations.allows(p))
+            }
+        })
     }
 
     /// The caller's kind as the `resolved_by` provenance value.

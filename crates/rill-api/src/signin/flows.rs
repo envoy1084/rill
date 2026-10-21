@@ -104,3 +104,56 @@ pub async fn refresh_live(state: &AppState, token: &RefreshToken) -> Result<Sess
     }
     Ok(tokens)
 }
+
+/// An agent token for a workload: short, and renewed by exchanging again.
+#[derive(Debug, Clone)]
+pub struct WorkloadGrant {
+    pub access_token: String,
+    pub expires_at: Timestamp,
+    pub session: rill_types::identity::SessionRecord,
+}
+
+/// A trusted workload's JWT becomes a short session of the agent it is
+/// bound to, carrying the agent's sponsor and the declared model.
+pub async fn exchange_workload(
+    state: &AppState,
+    token: &str,
+    org: &str,
+    agent: Option<&str>,
+    model: Option<&str>,
+) -> Result<WorkloadGrant> {
+    let now = Timestamp::now();
+    let store = state.identity.store();
+    let (agent, _) = rill_identity::agents::exchange_workload(
+        store,
+        state.identity.workload_keys(),
+        org,
+        token,
+        agent,
+        model,
+        now,
+    )
+    .await?;
+    let issuer = state.identity.issuer()?;
+    let lifetime = issuer.lifetimes().max_for(agent.principal.kind);
+    let session = rill_types::identity::SessionRecord {
+        id: rill_types::SessionId::new(),
+        org: agent.org.clone(),
+        principal: agent.principal.clone(),
+        kind: SessionKind::Workload,
+        created_at: now,
+        expires_at: Timestamp::from_millis(now.millis() + lifetime),
+        refresh_hash: None,
+        revoked_at: None,
+        sponsor: Some(agent.sponsor.label()),
+        model: model.map(String::from),
+    };
+    store.create_session(&session).await?;
+    let (access_token, expires_at) = rill_identity::signin::access_token(&issuer, &session, now)?;
+    tracing::info!(agent = %agent.principal, org = %agent.org, session = %session.id, model = ?model, "workload exchanged for an agent token");
+    Ok(WorkloadGrant {
+        access_token,
+        expires_at,
+        session,
+    })
+}

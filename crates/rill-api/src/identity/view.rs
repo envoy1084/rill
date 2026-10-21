@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
+use rill_identity::agents::WorkloadKeys;
 use rill_identity::keys::{key_service, KeyManager, KeySet};
 use rill_identity::oidc::Issuers;
 use rill_policy::{Issuer, TokenLifetimes, Verified, Verifier};
@@ -40,7 +41,9 @@ pub struct IdentityView {
     /// Users by `(org, name)`, read on first use and dropped when the
     /// identity log says they changed. `None` caches "no such user".
     users: DashMap<(String, String), Option<Arc<UserRecord>>>,
+    pub(super) callers: super::callers::CallerCaches,
     issuers: Issuers,
+    workload_keys: WorkloadKeys,
     config: IdentityConfig,
 }
 
@@ -58,6 +61,7 @@ impl IdentityView {
         );
         keys.ensure_key(Timestamp::now(), &system_actor()).await?;
         let set = keys.load(Timestamp::now()).await?;
+        let issuers = Issuers::new(reqwest::Client::new());
         let view = Arc::new(IdentityView {
             store: stores.identity(),
             keys,
@@ -68,7 +72,9 @@ impl IdentityView {
             last_forced_reload: Mutex::new(None),
             admins: config.admins.clone(),
             users: DashMap::new(),
-            issuers: Issuers::new(reqwest::Client::new()),
+            callers: Default::default(),
+            issuers: issuers.clone(),
+            workload_keys: WorkloadKeys::new(issuers),
             config: config.clone(),
         });
         view.reload_revocations().await?;
@@ -94,6 +100,11 @@ impl IdentityView {
     /// OIDC issuers this process has discovered.
     pub fn issuers(&self) -> &Issuers {
         &self.issuers
+    }
+
+    /// Key caches of workload issuers.
+    pub fn workload_keys(&self) -> &WorkloadKeys {
+        &self.workload_keys
     }
 
     /// The user `name` of `org`, from the cache.
@@ -150,6 +161,7 @@ impl IdentityView {
     /// Reread everything.
     pub async fn reload(&self) -> Result<()> {
         self.users.clear();
+        self.callers.clear();
         self.reload_keys().await?;
         self.reload_revocations().await
     }
@@ -175,9 +187,20 @@ impl IdentityView {
             }
             IdentityChange::UserChanged { org, name } => {
                 self.users.remove(&(org.clone(), name.clone()));
+                // A user may sponsor agents, directly or through a team.
+                self.callers.forget_org(org);
                 false
             }
-            IdentityChange::ProviderChanged { .. } => false,
+            IdentityChange::AgentChanged { org, name } => {
+                self.callers.forget_agent(org, name);
+                false
+            }
+            IdentityChange::OrgSettingsChanged { org } => {
+                self.callers.forget_org(org);
+                false
+            }
+            IdentityChange::ProviderChanged { .. }
+            | IdentityChange::WorkloadIssuerChanged { .. } => false,
         }
     }
 
@@ -221,16 +244,6 @@ impl IdentityView {
             }
         }
         Ok(verified)
-    }
-
-    /// The teams of a verified caller.
-    pub async fn teams_of(&self, verified: &Verified) -> Result<Vec<String>> {
-        Ok(self
-            .user(&verified.claims.org, &verified.principal.name)
-            .await?
-            .filter(|u| u.principal.kind == verified.principal.kind)
-            .map(|u| u.teams.clone())
-            .unwrap_or_default())
     }
 
     fn check_signature(&self, token: &str, now: Timestamp) -> rill_policy::Result<Verified> {

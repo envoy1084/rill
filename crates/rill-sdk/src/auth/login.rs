@@ -90,6 +90,9 @@ pub async fn login(
         .exchange_token(pb::ExchangeTokenRequest {
             subject_token: id_token,
             subject_token_type: TOKEN_TYPE_ID.into(),
+            org: org.into(),
+            agent: None,
+            model: None,
         })
         .await?
         .into_inner();

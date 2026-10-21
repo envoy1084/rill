@@ -88,6 +88,8 @@ The `IdentityService` RPCs:
 | `RevokeToken { token_id }` | instance administrators |
 | `RevokeSession` | the session's principal, or administrators |
 | `RotateTokenKeys`, `ListTokenKeys` | administrators |
+| identity providers, users, workload issuers | org administrators |
+| `RegisterAgent`, `UpdateAgent`, `ListAgents` | org administrators, or the sponsoring user |
 
 `require_instance_admin` passes in dev mode, or for a principal named in
 `identity.admins` presenting an unnarrowed token.
@@ -166,6 +168,43 @@ active member of the org with the `admin` role presenting an unnarrowed
 token for that org. `ListIdentityProviders`, `DeleteIdentityProvider`,
 `ListUsers` and `UpdateUser` (suspend, reactivate, set roles) need it.
 
+## Agents and workload identity
+
+An org registers agents ([`AgentRecord`](../../crates/rill-types/src/identity/agent.rs),
+`RegisterAgent`): a name unique across the instance, a sponsor (`user:<name>`
+or `team:<name>`, the team active while an active member has it), a
+purpose, the repositories (`*` for all) and path prefixes it may use, a
+model allow-list, budgets, workload bindings and an optional expiry. Org
+administrators manage every agent; a user may register and manage agents
+they sponsor themselves.
+
+Agents hold no secrets. A workload (a Kubernetes pod, a CI job, a SPIFFE
+workload, a cloud function) presents a JWT from an issuer its org trusts
+(`PutWorkloadIssuer`: issuer, keys by discovery, URL or an inline JWKS, and
+accepted audiences) to `ExchangeToken` or `/oauth/token` with
+`subject_token_type` `urn:ietf:params:oauth:token-type:jwt`, the `org`, and
+optionally the `agent` and `model`.
+[`exchange_workload`](../../crates/rill-identity/src/agents/exchange.rs)
+verifies the JWT against that issuer, finds the agent whose binding
+matches (issuer, `sub` with a trailing `*` wildcard, and exact claims;
+several matches need the `agent` named), and refuses unless
+[`agent_may_act`](../../crates/rill-identity/src/agents/standing.rs): the
+registration is active and unexpired, the model is allowed and not blocked
+by the org, and the sponsor is active. The grant is a `Workload` session of
+the agent's maximum lifetime (15 min) with no refresh token: the workload
+exchanges again. Its token carries the session, the sponsor label and the
+model.
+
+Every request by a registered agent re-checks its standing through the
+identity view (`IdentityView::context`, cached per agent and model and
+dropped by `AgentChanged`, `UserChanged` and `OrgSettingsChanged`), so
+suspending the agent or its sponsor, or blocking its model, refuses its
+tokens within the log's propagation time. Its `AuthContext.scope` holds the
+registered repositories and paths; `Permit` refuses anything outside them
+before the relation check, and read filters are narrowed to them. An agent
+principal with no registration (named by an administrator through
+`IssueToken` or `mint-token`) has no scope beyond its token.
+
 ## Bootstrap
 
 A server outside dev mode accepts only tokens the instance signed. The first
@@ -242,7 +281,8 @@ path and repository. `resolved_by()` maps the caller's kind to the
 
 * [`rill-policy/src/identity.rs`](../../crates/rill-policy/src/identity.rs): `AuthHeaders`, `AuthContext`, `Authenticator`, `StaticTokenAuthenticator`, `TeamResolver`.
 * [`signin/`](../../crates/rill-api/src/signin/mod.rs): the sign-in HTTP routes; [`rill-identity/src/signin/`](../../crates/rill-identity/src/signin/mod.rs), [`rill-identity/src/oidc/`](../../crates/rill-identity/src/oidc/mod.rs).
-* Tests: `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-cli/tests/bootstrap.rs`.
+* [`identity/callers.rs`](../../crates/rill-api/src/identity/callers.rs): teams, agent standing and scope; [`rill-identity/src/agents/`](../../crates/rill-identity/src/agents/mod.rs): the workload exchange.
+* Tests: `rill-api/tests/grpc/agents.rs` (exchange, scope, sponsor and model suspension), `rill-identity/tests/workload.rs`, `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-cli/tests/bootstrap.rs`.
 * [`rill-types/src/principal.rs`](../../crates/rill-types/src/principal.rs): `Principal`, `PrincipalKind`.
 * [`auth/authenticator.rs`](../../crates/rill-api/src/auth/authenticator.rs): `static_tokens`, `authenticate`.
 * [`auth/instance.rs`](../../crates/rill-api/src/auth/instance.rs): `require_instance_admin`.

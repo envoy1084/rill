@@ -21,6 +21,7 @@ pub fn dev_context() -> AuthContext {
         teams: Vec::new(),
         capability: None,
         claims: None,
+        scope: None,
     }
 }
 

@@ -19,6 +19,7 @@ use crate::state::AppState;
 pub const GRANT_REFRESH: &str = "refresh_token";
 pub const GRANT_EXCHANGE: &str = "urn:ietf:params:oauth:grant-type:token-exchange";
 pub const TOKEN_TYPE_ID: &str = "urn:ietf:params:oauth:token-type:id_token";
+pub const TOKEN_TYPE_JWT: &str = "urn:ietf:params:oauth:token-type:jwt";
 pub const TOKEN_TYPE_ACCESS: &str = "urn:ietf:params:oauth:token-type:access_token";
 
 #[derive(Deserialize)]
@@ -27,6 +28,10 @@ pub struct TokenForm {
     refresh_token: Option<String>,
     subject_token: Option<String>,
     subject_token_type: Option<String>,
+    /// Workload exchanges: the org, the agent and the model.
+    org: Option<String>,
+    agent: Option<String>,
+    model: Option<String>,
 }
 
 /// An RFC 6749 error response.
@@ -59,6 +64,7 @@ pub async fn token(State(state): State<Arc<AppState>>, Form(form): Form<TokenFor
                 Some(token) => super::flows::exchange_id_token(&state, token).await,
                 None => Err(Error::invalid("subject_token is required")),
             },
+            Some(TOKEN_TYPE_JWT) => return workload(&state, &form).await,
             other => {
                 return oauth_error(
                     StatusCode::BAD_REQUEST,
@@ -94,4 +100,38 @@ async fn refresh(state: &AppState, token: Option<&str>) -> Result<SessionTokens>
         .ok_or_else(|| Error::invalid("refresh_token is required"))?
         .parse()?;
     super::flows::refresh_live(state, &token).await
+}
+
+/// A workload JWT for an agent token: no refresh token, exchange again.
+async fn workload(state: &AppState, form: &TokenForm) -> Response {
+    let Some(token) = form.subject_token.as_deref() else {
+        return oauth_error(
+            StatusCode::BAD_REQUEST,
+            "invalid_request",
+            "subject_token is required",
+        );
+    };
+    let org = form.org.as_deref().unwrap_or(rill_store::DEFAULT_ORG);
+    match super::flows::exchange_workload(
+        state,
+        token,
+        org,
+        form.agent.as_deref(),
+        form.model.as_deref(),
+    )
+    .await
+    {
+        Ok(g) => Json(json!({
+            "access_token": g.access_token,
+            "issued_token_type": TOKEN_TYPE_ACCESS,
+            "token_type": "Bearer",
+            "expires_in": (g.expires_at.millis() - Timestamp::now().millis()).max(0) / 1000,
+            "session": g.session.id.to_string(),
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::info!(error = %e, "workload exchange refused");
+            oauth_error(StatusCode::BAD_REQUEST, "invalid_grant", &e.to_string())
+        }
+    }
 }

@@ -64,9 +64,24 @@ async fn login_keeps_a_session_that_refreshes_until_logout() {
         .unwrap();
     let issuer_url = idp.issuer().to_string();
     let (code, out) = rill(&[
-        "rill", "--endpoint", &endpoint, "--token", &root, "admin", "idp", "add", "mock",
-        "--issuer", &issuer_url, "--client-id", "rill-web", "--client-secret", "s",
-        "--cli-client-id", "rill-cli", "--auto-provision",
+        "rill",
+        "--endpoint",
+        &endpoint,
+        "--token",
+        &root,
+        "admin",
+        "idp",
+        "add",
+        "mock",
+        "--issuer",
+        &issuer_url,
+        "--client-id",
+        "rill-web",
+        "--client-secret",
+        "s",
+        "--cli-client-id",
+        "rill-cli",
+        "--auto-provision",
     ])
     .await;
     assert_eq!(code, 0, "{out}");
@@ -75,14 +90,30 @@ async fn login_keeps_a_session_that_refreshes_until_logout() {
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("eve"), "{out}");
     let (code, out) = rill(&[
-        "rill", "--endpoint", &endpoint, "--token", &root, "--json", "admin", "user", "list",
+        "rill",
+        "--endpoint",
+        &endpoint,
+        "--token",
+        &root,
+        "--json",
+        "admin",
+        "user",
+        "list",
     ])
     .await;
     assert_eq!(code, 0, "{out}");
     let users: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(users[0]["name"], "eve", "{users}");
     let (code, out) = rill(&[
-        "rill", "--endpoint", &endpoint, "--token", &root, "--json", "admin", "key", "list",
+        "rill",
+        "--endpoint",
+        &endpoint,
+        "--token",
+        &root,
+        "--json",
+        "admin",
+        "key",
+        "list",
     ])
     .await;
     assert_eq!(code, 0, "{out}");

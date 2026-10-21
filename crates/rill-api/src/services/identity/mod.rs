@@ -1,9 +1,11 @@
 //! The identity service: token keys, revocation and sessions.
 
+pub mod agents;
 mod keys;
 mod providers;
 mod revoke;
 mod users;
+mod workloads;
 
 use std::sync::Arc;
 
@@ -121,6 +123,70 @@ impl IdentityService for IdentitySvc {
     ) -> GrpcResult<pb::UpdateUserResponse> {
         idem::once(&self.state, request, |r| async move {
             users::update(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn register_agent(
+        &self,
+        request: Request<pb::RegisterAgentRequest>,
+    ) -> GrpcResult<pb::RegisterAgentResponse> {
+        idem::once(&self.state, request, |r| async move {
+            agents::register(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn update_agent(
+        &self,
+        request: Request<pb::UpdateAgentRequest>,
+    ) -> GrpcResult<pb::UpdateAgentResponse> {
+        idem::once(&self.state, request, |r| async move {
+            agents::update(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn list_agents(
+        &self,
+        request: Request<pb::ListAgentsRequest>,
+    ) -> GrpcResult<pb::ListAgentsResponse> {
+        agents::list(&self.state, request)
+            .await
+            .map(Response::new)
+            .map_err(Status::from)
+    }
+
+    async fn put_workload_issuer(
+        &self,
+        request: Request<pb::PutWorkloadIssuerRequest>,
+    ) -> GrpcResult<pb::PutWorkloadIssuerResponse> {
+        idem::once(&self.state, request, |r| async move {
+            workloads::put(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn list_workload_issuers(
+        &self,
+        request: Request<pb::ListWorkloadIssuersRequest>,
+    ) -> GrpcResult<pb::ListWorkloadIssuersResponse> {
+        workloads::list(&self.state, request)
+            .await
+            .map(Response::new)
+            .map_err(Status::from)
+    }
+
+    async fn delete_workload_issuer(
+        &self,
+        request: Request<pb::DeleteWorkloadIssuerRequest>,
+    ) -> GrpcResult<pb::DeleteWorkloadIssuerResponse> {
+        idem::once(&self.state, request, |r| async move {
+            workloads::delete(&self.state, r).await.map(Response::new)
         })
         .await
         .map_err(Status::from)

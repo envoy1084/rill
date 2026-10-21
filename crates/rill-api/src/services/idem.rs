@@ -77,6 +77,10 @@ idempotent!(
     PutIdentityProviderRequest,
     DeleteIdentityProviderRequest,
     UpdateUserRequest,
+    RegisterAgentRequest,
+    UpdateAgentRequest,
+    PutWorkloadIssuerRequest,
+    DeleteWorkloadIssuerRequest,
 );
 
 /// The idempotency key of the request being handled, for work that

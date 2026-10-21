@@ -28,6 +28,18 @@ pub enum IdentityChange {
         org: String,
         name: String,
     },
+    AgentChanged {
+        org: String,
+        name: String,
+    },
+    WorkloadIssuerChanged {
+        org: String,
+        name: String,
+    },
+    /// An org's identity settings (blocked models) changed.
+    OrgSettingsChanged {
+        org: String,
+    },
 }
 
 /// One entry of the identity change log.

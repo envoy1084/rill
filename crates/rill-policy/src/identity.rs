@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use rill_types::{Principal, RepoId, RepoPathBuf};
+use rill_types::{Principal, RepoId, RepoPath, RepoPathBuf};
 
 use crate::error::{Error, Result};
 use crate::tokens::{Capability, TokenClaims, Verb};
@@ -44,6 +44,30 @@ pub struct AuthContext {
     /// The signed claims of the request's token; `None` for static tokens
     /// and dev mode.
     pub claims: Option<TokenClaims>,
+    /// What a registered agent may touch; `None` for everyone else.
+    pub scope: Option<AgentScope>,
+}
+
+/// The repositories and paths a registered agent may use.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentScope {
+    pub org: String,
+    /// Repository names in `org`; `*` for all.
+    pub repos: Vec<String>,
+    /// Path prefixes; empty for every path.
+    pub paths: Vec<RepoPathBuf>,
+}
+
+impl AgentScope {
+    /// Whether the scope covers `repo` of `org`.
+    pub fn covers_repo(&self, org: &str, repo: &str) -> bool {
+        org == self.org && self.repos.iter().any(|r| r == "*" || r == repo)
+    }
+
+    /// Whether the scope covers `path`.
+    pub fn covers_path(&self, path: &RepoPath) -> bool {
+        self.paths.is_empty() || self.paths.iter().any(|p| path.starts_with(p))
+    }
 }
 
 impl AuthContext {
@@ -128,6 +152,7 @@ impl Authenticator for StaticTokenAuthenticator {
             teams: teams.clone(),
             capability: None,
             claims: None,
+            scope: None,
         })
     }
 }
@@ -191,6 +216,7 @@ mod tests {
             teams: Vec::new(),
             capability: Some(cap),
             claims: None,
+            scope: None,
         };
         assert!(ctx.capability_allows(repo, &RepoPathBuf::new("src/x").unwrap(), Verb::Read));
         assert!(!ctx.capability_allows(repo, &RepoPathBuf::new("src/x").unwrap(), Verb::Write));

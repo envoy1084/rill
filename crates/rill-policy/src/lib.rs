@@ -20,7 +20,8 @@ pub mod tokens;
 
 pub use error::{Error, Result};
 pub use identity::{
-    AuthContext, AuthHeaders, Authenticator, NoTeams, StaticTokenAuthenticator, TeamResolver,
+    AgentScope, AuthContext, AuthHeaders, Authenticator, NoTeams, StaticTokenAuthenticator,
+    TeamResolver,
 };
 pub use rebac::{Authorizer, PathFilter, Relation, Subject};
 pub use risk::{

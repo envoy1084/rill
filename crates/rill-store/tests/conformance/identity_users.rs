@@ -2,8 +2,9 @@
 
 use rill_store::Stores;
 use rill_types::identity::{
-    AccountStatus, ExternalIdentity, IdentityProvider, PendingLogin, SessionKind, SessionRecord,
-    UserRecord,
+    AccountStatus, AgentBudgets, AgentRecord, ExternalIdentity, IdentityProvider, IssuerKeys,
+    OrgIdentitySettings, PendingLogin, SessionKind, SessionRecord, Sponsor, UserRecord,
+    WorkloadIssuer,
 };
 use rill_types::{Principal, SessionId, Timestamp};
 
@@ -208,5 +209,104 @@ pub async fn scenario(name: &str, stores: &Stores) {
             .unwrap()
             .is_none(),
         "{name}: a refresh secret works once"
+    );
+
+    agents_and_workloads(name, stores).await;
+}
+
+async fn agents_and_workloads(name: &str, stores: &Stores) {
+    let identity = stores.identity();
+    let admin = Principal::human("admin");
+    let agent = AgentRecord {
+        org: "acme".into(),
+        principal: Principal::agent("alice"),
+        sponsor: Sponsor::User("alice".into()),
+        purpose: "tests".into(),
+        repos: vec!["*".into()],
+        paths: vec![],
+        models: vec![],
+        budgets: AgentBudgets::default(),
+        workloads: vec![],
+        status: AccountStatus::Active,
+        expires_at: None,
+        created_by: admin.clone(),
+        created_at: Timestamp::from_millis(1),
+        updated_at: Timestamp::from_millis(1),
+    };
+    // A user and an agent may share a name; two agents may not.
+    identity.create_agent(&agent, &admin).await.unwrap();
+    let elsewhere = AgentRecord {
+        org: "other".into(),
+        ..agent.clone()
+    };
+    assert!(
+        identity.create_agent(&elsewhere, &admin).await.is_err(),
+        "{name}"
+    );
+    let suspended = AgentRecord {
+        status: AccountStatus::Suspended,
+        ..agent.clone()
+    };
+    identity
+        .update_agent(&agent, &suspended, &admin)
+        .await
+        .unwrap();
+    assert!(
+        identity
+            .update_agent(&agent, &suspended, &admin)
+            .await
+            .is_err(),
+        "{name}"
+    );
+    assert_eq!(
+        identity.agents("acme").await.unwrap(),
+        [suspended],
+        "{name}"
+    );
+
+    let issuer = WorkloadIssuer {
+        org: "acme".into(),
+        name: "k8s".into(),
+        issuer: "https://kubernetes.default.svc".into(),
+        keys: IssuerKeys::Inline("{\"keys\":[]}".into()),
+        audiences: vec!["rill".into()],
+        created_at: Timestamp::from_millis(1),
+    };
+    identity.put_workload_issuer(&issuer, &admin).await.unwrap();
+    assert_eq!(
+        identity.workload_issuers("acme").await.unwrap(),
+        [issuer],
+        "{name}"
+    );
+    assert!(
+        identity
+            .delete_workload_issuer("acme", "k8s", &admin)
+            .await
+            .unwrap(),
+        "{name}"
+    );
+    assert!(
+        identity.workload_issuers("acme").await.unwrap().is_empty(),
+        "{name}"
+    );
+
+    assert!(
+        identity
+            .org_settings("acme")
+            .await
+            .unwrap()
+            .blocked_models
+            .is_empty(),
+        "{name}"
+    );
+    let settings = OrgIdentitySettings {
+        org: "acme".into(),
+        blocked_models: vec!["model-x".into()],
+    };
+    identity.put_org_settings(&settings, &admin).await.unwrap();
+    assert_eq!(
+        identity.org_settings("acme").await.unwrap(),
+        settings,
+        "{name}"
     );
 }

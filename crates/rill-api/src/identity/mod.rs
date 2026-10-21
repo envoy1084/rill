@@ -3,6 +3,7 @@
 //! it current from the identity log; maintenance rotates keys and sweeps
 //! expired records.
 
+mod callers;
 mod follower;
 mod maintenance;
 mod mint;
