@@ -30,6 +30,5 @@ tracing = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 parking_lot = { workspace = true }
-time = { workspace = true }
 
 [dev-dependencies]

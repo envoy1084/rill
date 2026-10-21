@@ -21,7 +21,6 @@ testing = []
 [dependencies]
 rill-types = { workspace = true }
 serde = { workspace = true }
-postcard = { workspace = true }
 bytes = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true }

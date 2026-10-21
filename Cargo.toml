@@ -89,10 +89,7 @@ rustls = { version = "0.23.46", default-features = false, features = ["aws_lc_rs
 rustls-pki-types = { version = "1.15.1", features = ["std"] }
 rcgen = "0.14.10"
 tower = "0.5.3"
-tower-http = { version = "0.7.1", features = ["trace", "cors"] }
 http = "1.5.0"
-hyper = "1.12.0"
-http-body-util = "0.1.5"
 arc-swap = "1.9.3"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "stream", "json", "form", "query"] }
 
@@ -136,12 +133,10 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 clap_complete = "4.6.11"
 comfy-table = "8.0.1"
 owo-colors = { version = "4.4.0", features = ["supports-colors"] }
-uuid = { version = "1.28.0", features = ["v4", "serde"] }
 time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros"] }
 parking_lot = "0.12.5"
 dashmap = "6.2.1"
 libc = "0.2.191"
-walkdir = "2.5.0"
 ignore = "0.4.33"
 globset = "0.4.20"
 regex = "1.13.1"
@@ -165,12 +160,10 @@ governor = "0.10.4"
 # Pinned with weave-core, which depends on the same release.
 sem-core = { version = "=0.28.1", features = ["grammar-all"] }
 proptest = "1.12.0"
-similar-asserts = "2.0.0"
 
 # Testing, benchmarking and fuzzing tools
 criterion = { version = "0.8.2", features = ["async_tokio"] }
 hdrhistogram = "7.6.0"
-arbitrary = { version = "1.5.0", features = ["derive"] }
 
 [profile.release]
 lto = "thin"

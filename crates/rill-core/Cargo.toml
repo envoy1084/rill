@@ -13,7 +13,6 @@ blake3 = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true }
 serde = { workspace = true }
-postcard = { workspace = true }
 bytes = { workspace = true }
 imara-diff = { workspace = true }
 fastcdc = { workspace = true }

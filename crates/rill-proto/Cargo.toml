@@ -20,3 +20,7 @@ thiserror = { workspace = true }
 tonic-prost-build = { workspace = true }
 protox = { workspace = true }
 prost = { workspace = true }
+
+[package.metadata.cargo-machete]
+# Used by the generated gRPC code.
+ignored = ["tonic-prost"]

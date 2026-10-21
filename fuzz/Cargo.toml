@@ -14,7 +14,6 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4.13"
 arbitrary = { version = "1.5.0", features = ["derive"] }
-bytes = "1.12.1"
 rill-types = { path = "../crates/rill-types" }
 rill-core = { path = "../crates/rill-core" }
 rill-proto = { path = "../crates/rill-proto" }

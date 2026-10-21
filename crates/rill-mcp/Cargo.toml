@@ -16,7 +16,6 @@ rmcp = { workspace = true }
 rill-sdk = { workspace = true }
 rill-types = { workspace = true }
 rill-core = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
 bytes = { workspace = true }
 hex = { workspace = true }
