@@ -46,7 +46,7 @@ flowchart LR
 
 | # | Threat | v1 state | Control (planned) | Phase |
 | --- | --- | --- | --- | --- |
-| T1 | Tokens sniffed on the wire | No TLS on either listener; the SDK cannot dial `https` | TLS everywhere, mTLS between services | 8 |
+| T1 | Tokens sniffed on the wire | TLS on both listeners when `[tls]` is set, optionally mutual (`client_ca`); the SDK checks the server for `https` endpoints and can present a client certificate. Plain text when unset (`rill dev`) | Certificates from an issuer (SPIFFE) and rotation | 8 (done), 10 |
 | T2 | Repository writer runs code on the server | `.rill/verify.toml` steps run as host processes with the server's user and network when verification is enabled | Sandboxed remote execution; refuse unsandboxed outside dev | 15 |
 | T3 | Checkout writes outside its directory | Server side fixed: every commit rejects symlink targets that are absolute or climb above the root, inline or blob-stored. Clients still follow symlinks when writing | `O_NOFOLLOW` writes on clients | 20 |
 | T4 | Repository content rewrites client state | Server side fixed: `.rill/checkout.toml` and `.rill/manifest.toml` cannot be committed, copied into or targeted by a symlink. Client state still lives in the working tree | Client state outside the working tree | 20 |

@@ -29,6 +29,8 @@ pub struct ServerConfig {
     pub roles: Roles,
     /// How the process stops.
     pub shutdown: ShutdownConfig,
+    /// TLS for both listeners; plain text when absent.
+    pub tls: Option<TlsConfig>,
     /// Where objects and metadata live.
     pub storage: StorageConfig,
     /// Where metadata lives, when not beside the objects.
@@ -66,6 +68,7 @@ impl Default for ServerConfig {
                 .expect("default HTTP address is valid"),
             roles: Roles::default(),
             shutdown: ShutdownConfig::default(),
+            tls: None,
             storage: StorageConfig::Memory,
             metadata: MetadataConfig::Storage,
             auth: AuthConfig::default(),
@@ -124,6 +127,18 @@ impl Roles {
         }
         Ok(roles)
     }
+}
+
+/// TLS for the gRPC and HTTP listeners, from PEM files.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TlsConfig {
+    /// Certificate chain, leaf first.
+    pub cert: std::path::PathBuf,
+    /// Private key of the leaf certificate.
+    pub key: std::path::PathBuf,
+    /// When set, every connection must present a client certificate this
+    /// CA signed (mutual TLS).
+    pub client_ca: Option<std::path::PathBuf>,
 }
 
 /// How a process stops after it is told to.

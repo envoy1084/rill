@@ -11,6 +11,38 @@ use crate::error::{Error, Result};
 pub const ENDPOINT_ENV: &str = "RILL_ENDPOINT";
 /// Environment variable carrying the bearer token.
 pub const TOKEN_ENV: &str = "RILL_TOKEN";
+/// Environment variable naming a PEM file of CAs to trust beyond the
+/// system's.
+pub const CA_FILE_ENV: &str = "RILL_CA_FILE";
+/// Environment variable naming a PEM client certificate, for servers that
+/// require one.
+pub const CLIENT_CERT_ENV: &str = "RILL_CLIENT_CERT";
+/// Environment variable naming the client certificate's PEM key.
+pub const CLIENT_KEY_ENV: &str = "RILL_CLIENT_KEY";
+
+/// TLS settings for `https://` endpoints. The server's certificate is
+/// always checked, against the system's roots and `ca_file`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TlsOptions {
+    /// Extra CAs to trust (PEM).
+    pub ca_file: Option<PathBuf>,
+    /// Client certificate (PEM), for mutual TLS.
+    pub client_cert: Option<PathBuf>,
+    /// The client certificate's key (PEM).
+    pub client_key: Option<PathBuf>,
+}
+
+impl TlsOptions {
+    /// Read `RILL_CA_FILE`, `RILL_CLIENT_CERT` and `RILL_CLIENT_KEY`.
+    pub fn from_env() -> Self {
+        let path = |name| std::env::var_os(name).filter(|v| !v.is_empty()).map(PathBuf::from);
+        TlsOptions {
+            ca_file: path(CA_FILE_ENV),
+            client_cert: path(CLIENT_CERT_ENV),
+            client_key: path(CLIENT_KEY_ENV),
+        }
+    }
+}
 
 /// How to reach a Rill server.
 #[derive(Debug, Clone)]
@@ -23,17 +55,28 @@ pub struct ClientConfig {
     pub timeout: Option<Duration>,
     /// `user-agent` header value.
     pub user_agent: String,
+    /// TLS settings for `https://` endpoints.
+    pub tls: TlsOptions,
 }
 
 impl ClientConfig {
-    /// Configuration for `endpoint` with no token and default tuning.
+    /// Configuration for `endpoint` with no token and default tuning. TLS
+    /// files come from `RILL_CA_FILE`, `RILL_CLIENT_CERT` and
+    /// `RILL_CLIENT_KEY` when set.
     pub fn new(endpoint: impl Into<String>) -> Self {
         ClientConfig {
             endpoint: endpoint.into(),
             token: None,
             timeout: Some(Duration::from_secs(30)),
             user_agent: default_user_agent(),
+            tls: TlsOptions::from_env(),
         }
+    }
+
+    /// Set the TLS settings.
+    pub fn with_tls(mut self, tls: TlsOptions) -> Self {
+        self.tls = tls;
+        self
     }
 
     /// Set the bearer token.
@@ -74,13 +117,20 @@ impl ClientConfig {
         let server = file
             .server
             .ok_or_else(|| Error::config("missing [server] section"))?;
+        let base = ClientConfig::new(server.endpoint);
+        let tls = TlsOptions {
+            ca_file: server.ca_file.or(base.tls.ca_file.clone()),
+            client_cert: server.client_cert.or(base.tls.client_cert.clone()),
+            client_key: server.client_key.or(base.tls.client_key.clone()),
+        };
         Ok(ClientConfig {
             token: server.token.filter(|t| !t.is_empty()),
             timeout: server
                 .timeout_secs
                 .map(Duration::from_secs)
                 .or(Some(Duration::from_secs(30))),
-            ..ClientConfig::new(server.endpoint)
+            tls,
+            ..base
         })
     }
 
@@ -117,6 +167,9 @@ struct ServerSection {
     endpoint: String,
     token: Option<String>,
     timeout_secs: Option<u64>,
+    ca_file: Option<PathBuf>,
+    client_cert: Option<PathBuf>,
+    client_key: Option<PathBuf>,
 }
 
 #[cfg(test)]

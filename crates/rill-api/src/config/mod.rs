@@ -13,7 +13,7 @@ mod storage;
 
 pub use auth::{AuthConfig, StaticToken};
 pub use server::{
-    PostLandConfig, Roles, SandboxKind, ServerConfig, ShutdownConfig, VerifyConfig,
+    PostLandConfig, Roles, SandboxKind, ServerConfig, ShutdownConfig, TlsConfig, VerifyConfig,
     DEFAULT_GRPC_ADDR, DEFAULT_HTTP_ADDR,
 };
 pub use storage::{MetadataConfig, StorageConfig};

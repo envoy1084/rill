@@ -23,6 +23,7 @@ pub mod objects;
 mod serve;
 pub mod services;
 mod shutdown;
+mod tls;
 pub mod state;
 pub mod workers;
 
@@ -30,7 +31,7 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-pub use config::{AuthConfig, Roles, ServerConfig, ShutdownConfig, StorageConfig};
+pub use config::{AuthConfig, Roles, ServerConfig, ShutdownConfig, StorageConfig, TlsConfig};
 pub use error::{Error, Result};
 pub use serve::{serve_with_state, Listeners};
 pub use shutdown::serve_until;

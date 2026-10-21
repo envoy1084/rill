@@ -67,7 +67,7 @@ futures = "0.3.34"
 async-trait = "0.1.92"
 
 # RPC and HTTP
-tonic = { version = "0.14.6", features = ["transport", "codegen"] }
+tonic = { version = "0.14.6", features = ["transport", "codegen", "tls-aws-lc", "tls-native-roots"] }
 tonic-prost = "0.14.6"
 tonic-prost-build = "0.14.6"
 tonic-reflection = "0.14.6"
@@ -76,13 +76,17 @@ prost = "0.14.4"
 prost-types = "0.14.4"
 protox = "0.10.0"
 axum = { version = "0.8.9", features = ["http2"] }
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
+rustls = { version = "0.23.46", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
+rustls-pki-types = { version = "1.15.1", features = ["std"] }
+rcgen = "0.14.10"
 tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["trace", "cors"] }
 http = "1.5.0"
 hyper = "1.12.0"
 http-body-util = "0.1.5"
 arc-swap = "1.9.3"
-reqwest = { version = "0.13.5", default-features = false, features = ["rustls-tls", "stream", "json"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "stream", "json"] }
 
 # Storage
 redb = "4.4.0"

@@ -128,6 +128,11 @@ impl Client {
         if let Some(t) = config.timeout {
             endpoint = endpoint.timeout(t);
         }
+        if config.endpoint.starts_with("https://") {
+            endpoint = endpoint
+                .tls_config(tls_config(&config.tls)?)
+                .map_err(|e| Error::config(format!("tls: {e}")))?;
+        }
         Ok(endpoint)
     }
 
@@ -179,4 +184,28 @@ impl Client {
     pub fn admin_svc(&self) -> AdminSvc {
         AdminServiceClient::new(self.svc())
     }
+}
+
+/// TLS for an `https://` endpoint: the system's roots plus any configured
+/// CA, and a client certificate when one is configured.
+fn tls_config(tls: &crate::config::TlsOptions) -> Result<tonic::transport::ClientTlsConfig> {
+    let read = |path: &std::path::Path| {
+        std::fs::read(path).map_err(|e| Error::config(format!("tls: reading {}: {e}", path.display())))
+    };
+    let mut config = tonic::transport::ClientTlsConfig::new().with_native_roots();
+    if let Some(ca) = &tls.ca_file {
+        config = config.ca_certificate(tonic::transport::Certificate::from_pem(read(ca)?));
+    }
+    match (&tls.client_cert, &tls.client_key) {
+        (Some(cert), Some(key)) => {
+            config = config.identity(tonic::transport::Identity::from_pem(read(cert)?, read(key)?));
+        }
+        (None, None) => {}
+        _ => {
+            return Err(Error::config(
+                "a client certificate needs both RILL_CLIENT_CERT and RILL_CLIENT_KEY",
+            ))
+        }
+    }
+    Ok(config)
 }

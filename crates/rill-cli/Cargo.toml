@@ -48,3 +48,5 @@ tonic = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+rcgen = { workspace = true }
+reqwest = { workspace = true }

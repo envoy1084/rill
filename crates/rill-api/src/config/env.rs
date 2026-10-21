@@ -14,6 +14,8 @@ impl ServerConfig {
     /// * `RILL_LISTEN_GRPC`, `RILL_LISTEN_HTTP`: socket addresses;
     /// * `RILL_DEV_MODE`: `true`/`false`;
     /// * `RILL_ROLES`: `api`, `workers` or `api,workers`;
+    /// * `RILL_TLS_CERT`, `RILL_TLS_KEY`, `RILL_TLS_CLIENT_CA`: PEM files
+    ///   for TLS on both listeners (the CA makes it mutual);
     /// * `RILL_STORAGE`: `memory`, `local:<dir>` or `s3:<url>`;
     /// * `RILL_S3_PREFIX`, `RILL_S3_META_DIR`: details for `s3:` storage;
     /// * `RILL_FDB_CLUSTER_FILE` (empty for the default), `RILL_FDB_ROOT`:
@@ -30,6 +32,16 @@ impl ServerConfig {
         }
         if let Some(v) = lookup("RILL_LISTEN_HTTP") {
             self.listen_http = parse_env("RILL_LISTEN_HTTP", &v)?;
+        }
+        if let Some(cert) = lookup("RILL_TLS_CERT") {
+            let key = lookup("RILL_TLS_KEY").ok_or_else(|| {
+                Error::Config("RILL_TLS_CERT needs RILL_TLS_KEY".into())
+            })?;
+            self.tls = Some(super::TlsConfig {
+                cert: PathBuf::from(cert),
+                key: PathBuf::from(key),
+                client_ca: lookup("RILL_TLS_CLIENT_CA").map(PathBuf::from),
+            });
         }
         if let Some(v) = lookup("RILL_ROLES") {
             self.roles = super::Roles::parse(&v)?;

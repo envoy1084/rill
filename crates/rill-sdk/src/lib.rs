@@ -40,7 +40,7 @@ pub mod workspace;
 
 pub use admin::AdminClient;
 pub use client::Client;
-pub use config::ClientConfig;
+pub use config::{ClientConfig, TlsOptions};
 pub use error::{Error, Result};
 pub use intent::IntentClient;
 pub use lander::LanderClient;

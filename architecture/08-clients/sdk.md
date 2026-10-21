@@ -44,6 +44,13 @@ and optional `token` and `timeout_secs`. The path is
 `dirs::config_dir()/rill/config.toml`: `~/.config` on Linux,
 `~/Library/Application Support` on macOS.
 
+For `https://` endpoints the channel uses TLS (`TlsOptions`): the server's
+certificate is checked against the system's roots plus `ca_file`, and
+`client_cert` / `client_key` are presented to servers that require them.
+`ClientConfig::new` takes them from `RILL_CA_FILE`, `RILL_CLIENT_CERT` and
+`RILL_CLIENT_KEY`; the config file's `[server]` section may set
+`ca_file`, `client_cert` and `client_key`.
+
 ## Repository API
 
 Repositories are named `org/name`, or by a bare name in the default org;

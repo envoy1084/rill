@@ -111,7 +111,13 @@ async fn serve_grpc(
         set_health(&reporter, false).await;
     });
 
-    tonic::transport::Server::builder()
+    let mut builder = tonic::transport::Server::builder();
+    if let Some(tls) = &state.config.tls {
+        builder = builder
+            .tls_config(crate::tls::grpc(tls)?)
+            .map_err(|e| Error::Config(format!("tls: {e}")))?;
+    }
+    builder
         .add_service(reflection)
         .add_service(health)
         .add_service(auth.layer(RepoServiceServer::new(RepoSvc::new(state.clone()))))
@@ -133,8 +139,26 @@ async fn serve_http(
     shutdown: CancellationToken,
 ) -> Result<()> {
     let router = objects::router(state.clone(), state.config.roles.api);
-    axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown.cancelled_owned())
+    let Some(tls) = &state.config.tls else {
+        return axum::serve(listener, router)
+            .with_graceful_shutdown(shutdown.cancelled_owned())
+            .await
+            .map_err(|e| Error::Transport(format!("HTTP server: {e}")));
+    };
+    let config = crate::tls::http(tls)?;
+    let handle = axum_server::Handle::new();
+    let stopping = handle.clone();
+    tokio::spawn(async move {
+        shutdown.cancelled().await;
+        stopping.graceful_shutdown(None);
+    });
+    let listener = listener
+        .into_std()
+        .map_err(|e| Error::Transport(format!("HTTP listener: {e}")))?;
+    axum_server::from_tcp_rustls(listener, config)
+        .map_err(|e| Error::Transport(format!("HTTP listener: {e}")))?
+        .handle(handle)
+        .serve(router.into_make_service())
         .await
         .map_err(|e| Error::Transport(format!("HTTP server: {e}")))
 }

@@ -35,6 +35,7 @@ defaults with a comment header that lists every alternative.
 | `listen_http` | `127.0.0.1:7421` (`DEFAULT_HTTP_ADDR`) | object protocol and health |
 | `roles.api`, `roles.workers` | `true`, `true` | serve the gRPC API and object protocol; run landers, post-land, job workers, retention and repository discovery. Every process follows policy and relation changes. `RILL_ROLES=api,workers` |
 | `shutdown.drain_secs`, `shutdown.grace_secs` | `5`, `30` | seconds unready before refusing requests; seconds for requests and jobs to finish before running jobs are given back ([server](server.md#startup-and-shutdown)) |
+| `tls.cert`, `tls.key`, `tls.client_ca` | none (plain text) | PEM files for TLS on both listeners; `client_ca` makes it mutual: every connection must present a certificate that CA signed. `RILL_TLS_CERT`, `RILL_TLS_KEY`, `RILL_TLS_CLIENT_CA` |
 | `dev_mode` | `false` | anonymous requests act as `dev`; ReBAC checks pass |
 | `attestation_key` | none | path to an Ed25519 key file the server signs every stored version with; without it a per-process key is generated (warned outside dev mode). Its public half is in `Health` |
 | `[storage] kind` | `memory` | backend, see below |
