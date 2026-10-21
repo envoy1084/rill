@@ -14,7 +14,7 @@ pub enum Schedule {
     /// Before a stored version is acknowledged and before it lands:
     /// landing reads it.
     LandCritical,
-    /// By the background worker for every trunk version, ahead of reads.
+    /// By a derive job for every version that lands, ahead of reads.
     Background,
     /// When first read.
     OnDemand,

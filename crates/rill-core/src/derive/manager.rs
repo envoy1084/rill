@@ -88,6 +88,14 @@ impl DeriveManager {
         Ok(())
     }
 
+    /// Compute every background kind of `hash`, ahead of reads.
+    pub async fn ensure_background(self: &Arc<Self>, hash: &ChangeVersionHash) -> Result<()> {
+        for kind in super::registry::scheduled(super::Schedule::Background) {
+            kind.compute(self, *hash).await?;
+        }
+        Ok(())
+    }
+
     /// Whether every land-critical value of `hash` is stored.
     pub async fn has_land_critical(self: &Arc<Self>, hash: &ChangeVersionHash) -> Result<bool> {
         for kind in super::registry::scheduled(super::Schedule::LandCritical) {

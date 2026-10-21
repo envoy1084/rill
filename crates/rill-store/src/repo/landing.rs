@@ -3,9 +3,9 @@
 //! A batch writes, all or nothing: the trunk positions (gap-free, after
 //! the head it expects), the trunk-head row the compare-and-swap is on, a
 //! landing record per position, each change's review marked `Landed`,
-//! events, quota charges and the trunk ref. A lander passes the epoch of
-//! the lease it holds; a lander that was replaced cannot land, because the
-//! epoch moved on.
+//! events, quota charges, the trunk ref and whatever the caller adds (the
+//! jobs a landing makes necessary). A lander passes the lease it holds; a
+//! lander that was replaced cannot land, because the epoch moved on.
 
 use bytes::Bytes;
 use rill_types::{
@@ -45,6 +45,9 @@ pub struct LandBatch {
     pub fence: Option<super::leases::Lease>,
     /// Who lands the batch, for its events.
     pub actor: Option<Principal>,
+    /// More writes that commit with the landing, such as the jobs it
+    /// makes necessary.
+    pub also: Transaction,
 }
 
 impl RepoStore {
@@ -81,6 +84,7 @@ impl RepoStore {
         if let Some(lease) = &batch.fence {
             tx.conditions.push(lease.fence(self));
         }
+        tx = tx.merge(batch.also);
         let stores = self.stores();
         let mut landings = Vec::with_capacity(batch.entries.len());
         for (i, entry) in batch.entries.into_iter().enumerate() {

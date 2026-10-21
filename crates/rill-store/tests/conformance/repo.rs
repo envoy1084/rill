@@ -192,8 +192,17 @@ pub async fn landing(name: &str, stores: &Stores) {
         entries: entries.clone(),
         fence: Some(lease.clone()),
         actor: None,
+        also: rill_store::Transaction::new().set(repo.keys().misc("followup"), "jobs"),
     };
     let landed = repo.land(batch.clone()).await.unwrap();
+    assert!(
+        repo.meta()
+            .get(&repo.keys().misc("followup"))
+            .await
+            .unwrap()
+            .is_some(),
+        "{name}: the caller's writes commit with the landing"
+    );
     let seqs: Vec<_> = landed.iter().map(|l| l.seq).collect();
     assert_eq!(seqs, vec![TrunkSeq(2), TrunkSeq(3), TrunkSeq(4)], "{name}");
     assert_eq!(
@@ -232,7 +241,7 @@ pub async fn landing(name: &str, stores: &Stores) {
             review: None,
         }],
         fence: Some(lease),
-        actor: None,
+        ..LandBatch::default()
     };
     assert!(
         repo.land(stale).await.unwrap_err().is_conflict(),

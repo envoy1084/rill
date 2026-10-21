@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use rill_core::{read_content, ChangeBuilder, CommitGraph, DeriveManager, RootTree, TreeOps};
+use rill_lander::land::followups;
 use rill_lander::{
     revert, AlwaysGreen, FnVerifier, LandEvent, LandPolicy, LandRequest, LandStatus, Lander,
     NoopHooks, PostLandVerifier, ReviewHooks, VerificationOutcome, VerificationStatus, Verifier,
@@ -302,6 +303,21 @@ async fn independent_changes_land_in_one_run() {
     assert_eq!(fx.file(root, "b.txt").await.as_deref(), Some("b"));
     // Every trunk position has a record, the directly landed base too.
     assert_eq!(lander.list_landings().await.unwrap().len(), 3);
+
+    // Each landing queued its follow-up work in the same transaction.
+    let derive = rill_jobs::Queue::new(fx.repo.clone(), followups::DERIVE_QUEUE);
+    let index = rill_jobs::Queue::new(fx.repo.clone(), followups::INDEX_QUEUE);
+    assert_eq!(derive.stats().await.unwrap().enqueued, 2);
+    assert_eq!(index.stats().await.unwrap().enqueued, 2);
+    let mut derived = Vec::new();
+    while let Some(claim) = derive.claim("test").await.unwrap() {
+        derived.push(rill_types::ChangeVersionHash::from_slice(&claim.job.payload).unwrap());
+        derive.complete(&claim).await.unwrap();
+    }
+    derived.sort();
+    let mut landed = vec![fx.repo.trunk_at(TrunkSeq(2)).await.unwrap().unwrap(), head];
+    landed.sort();
+    assert_eq!(derived, landed);
 }
 
 #[tokio::test]

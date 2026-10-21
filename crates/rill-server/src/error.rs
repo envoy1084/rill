@@ -219,7 +219,8 @@ fn lander_code(e: &rill_lander::Error) -> Code {
         E::RevertFailed { .. } | E::Fenced => Code::Aborted,
         E::Types(_) => Code::InvalidArgument,
         E::Core(c) => core_code(c),
-        E::Store(s) => store_code(s),
+        E::Store(s) | E::Jobs(rill_jobs::Error::Store(s)) => store_code(s),
+        E::Jobs(rill_jobs::Error::Lost(_)) => Code::Aborted,
         E::Hook(_) | E::Verifier(_) | E::Codec(_) | E::Join(_) => Code::Internal,
     }
 }

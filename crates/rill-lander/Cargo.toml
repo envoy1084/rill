@@ -11,6 +11,7 @@ repository.workspace = true
 rill-types = { workspace = true }
 rill-store = { workspace = true }
 rill-core = { workspace = true }
+rill-jobs = { workspace = true }
 serde = { workspace = true }
 postcard = { workspace = true }
 bytes = { workspace = true }

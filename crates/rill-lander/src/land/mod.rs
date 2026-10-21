@@ -1,5 +1,6 @@
 //! The landing pipeline.
 
+pub mod followups;
 mod lander;
 mod pipeline;
 mod record;

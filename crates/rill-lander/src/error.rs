@@ -11,6 +11,9 @@ pub enum Error {
     Core(#[from] rill_core::Error),
 
     #[error(transparent)]
+    Jobs(#[from] rill_jobs::Error),
+
+    #[error(transparent)]
     Types(#[from] rill_types::Error),
 
     #[error("change version not found: {0}")]

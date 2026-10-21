@@ -3,7 +3,6 @@
 //! paths, change summaries, path history and blame.
 
 mod ancestry;
-mod background;
 mod blame;
 mod changed_paths;
 mod ctx;
@@ -15,7 +14,6 @@ mod summary;
 mod traits;
 
 pub use ancestry::{Ancestry, AncestryInfo};
-pub use background::{BackgroundDeriver, Pass, DERIVE_CURSOR_MISC, MAX_ATTEMPTS};
 pub use blame::{Blame, BlameLine};
 pub use changed_paths::{ChangedPathSet, ChangedPaths};
 pub use ctx::DeriveCtx;

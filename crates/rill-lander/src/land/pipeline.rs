@@ -130,6 +130,7 @@ impl Lander {
             }],
             fence: Some(lease.clone()),
             actor: Some(crate::revert::lander_principal()),
+            also: super::followups::landing_jobs(&self.repo, &[hash])?,
         };
         match self.repo.land(batch).await {
             Ok(landings) => {

@@ -1,6 +1,6 @@
 //! Background tasks that run per repository: the landing loop, post-land
-//! verification, background derivation, search indexing, event retention
-//! and the forwarders that feed the repository's event bus.
+//! verification, the derive and index job workers, event retention and
+//! the forwarders that feed the repository's event bus.
 
 mod deriver;
 mod hooks;
