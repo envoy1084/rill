@@ -148,6 +148,9 @@ pub async fn commit_version_with(
     )))
 }
 
+/// Findings named in one audit record.
+const AUDITED_FINDINGS: usize = 20;
+
 /// Scan `cv` for credentials. A finding refuses the version unless the
 /// repository's rules say warn or quarantine, in which case the returned
 /// mutations (the audit record, and the quarantine) commit with it.
@@ -175,6 +178,7 @@ async fn secret_findings(
         outcome,
         detail: findings
             .iter()
+            .take(AUDITED_FINDINGS)
             .enumerate()
             .map(|(i, f)| {
                 (

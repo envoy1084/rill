@@ -8,4 +8,4 @@ mod scan;
 
 pub use detectors::{entropy, Detector, BUILT_IN};
 pub use rules::{ScanMode, SecretRules, RULES_PATH};
-pub use scan::{fingerprint, scan, Finding};
+pub use scan::{fingerprint, scan, Finding, MAX_FINDINGS};

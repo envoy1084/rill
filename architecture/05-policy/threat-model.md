@@ -88,4 +88,4 @@ flowchart LR
 - [rill-sdk/src/local/](../../crates/rill-sdk/src/local/mod.rs), [rill-policy/src/tokens/](../../crates/rill-policy/src/tokens/mod.rs)
 
 ---
-← Previous: [Data protection](data-protection.md) · [Index](../index.md) · Next: [Search](../06-services/search.md) →
+← Previous: [Data protection](data-protection.md) · [Index](../index.md) · Next: [Security review packet](security-review.md) →

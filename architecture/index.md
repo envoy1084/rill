@@ -66,38 +66,39 @@ Read in this order the first time; each page ends with Previous / Next links.
 32. [Audit log](05-policy/audit.md)
 33. [Data protection](05-policy/data-protection.md)
 34. [Threat model](05-policy/threat-model.md)
+35. [Security review packet](05-policy/security-review.md)
 
 **06 Services**
 
-35. [Search](06-services/search.md)
-36. [Exec](06-services/exec.md)
-37. [Git import and export](06-services/git-import.md)
+36. [Search](06-services/search.md)
+37. [Exec](06-services/exec.md)
+38. [Git import and export](06-services/git-import.md)
 
 **07 Runtime**
 
-38. [Server](07-runtime/server.md)
-39. [API surface](07-runtime/api-surface.md)
-40. [Events and workers](07-runtime/events-and-workers.md)
-41. [Configuration](07-runtime/configuration.md)
-42. [Observability](07-runtime/observability.md)
-43. [Cache tier](07-runtime/cache.md)
+39. [Server](07-runtime/server.md)
+40. [API surface](07-runtime/api-surface.md)
+41. [Events and workers](07-runtime/events-and-workers.md)
+42. [Configuration](07-runtime/configuration.md)
+43. [Observability](07-runtime/observability.md)
+44. [Cache tier](07-runtime/cache.md)
 
 **08 Clients**
 
-44. [SDK](08-clients/sdk.md)
-45. [CLI](08-clients/cli.md)
-46. [MCP server](08-clients/mcp.md)
+45. [SDK](08-clients/sdk.md)
+46. [CLI](08-clients/cli.md)
+47. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-47. [Development](09-engineering/development.md)
-48. [Testing](09-engineering/testing.md)
-49. [Simulation](09-engineering/simulation.md)
-50. [Performance](09-engineering/performance.md)
+48. [Development](09-engineering/development.md)
+49. [Testing](09-engineering/testing.md)
+50. [Simulation](09-engineering/simulation.md)
+51. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-51. [Architecture decisions](10-decisions/README.md): the fourteen ADRs that
+52. [Architecture decisions](10-decisions/README.md): the fourteen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -125,7 +126,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | What a change needs before it may land | [Risk classification](05-policy/risk-classification.md), [Submit policy](05-policy/submit-policy.md) |
 | Who did what, provably | [Audit log](05-policy/audit.md) |
 | Keeping secrets out, redacting what leaked | [Data protection](05-policy/data-protection.md) |
-| Known threats and which phase closes each | [Threat model](05-policy/threat-model.md) |
+| Known threats and which phase closes each | [Threat model](05-policy/threat-model.md), [Security review packet](05-policy/security-review.md) |
 | Code search and symbols | [Search](06-services/search.md) |
 | Pre-land checks and the action cache | [Exec](06-services/exec.md) |
 | How the server is assembled and a request is handled | [Server](07-runtime/server.md) |
