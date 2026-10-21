@@ -127,6 +127,11 @@ the store conformance suite and the server's end-to-end test against it.
 - Postcard-encoded types never use `skip_serializing_if`.
 - Every external dependency is declared once in `[workspace.dependencies]`.
   Crates use `{ workspace = true }`.
+- Reuse before building ([ADR 015](../10-decisions/015-reuse-open-source.md)):
+  generic needs come from a mature, permissively licensed library, pinned
+  exactly when pre-1.0 and wrapped behind a Rill module. Tests cover the
+  integration, not the library. GPL, AGPL, SSPL and source-available code
+  is never linked.
 - A behaviour change updates the architecture page that owns it.
 
 ## Running locally

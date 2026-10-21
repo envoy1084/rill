@@ -27,8 +27,14 @@ do not introduce v2 names or compatibility shims. The roadmap's "v2" means
 * **Clear boundaries.** Pure logic (no I/O) lives apart from code that talks
   to storage or the network, so it can be tested without either. Public APIs
   are narrow: re-export what callers need, keep the rest `pub(crate)`.
-* **Reuse before writing.** Look for an existing helper in the crate (and in
-  lower crates) before adding one. Shared helpers go in a named module
+* **Reuse before writing.** For anything that is not Rill's own design, use
+  a mature open-source library rather than writing one, and delete the
+  hand-written version it replaces (ADR 015). Link only permissive
+  licences (MIT, BSD, Apache-2.0, ISC, MPL-2.0); never GPL, AGPL, SSPL or
+  source-available code. Pin pre-1.0 crates exactly and wrap them behind a
+  Rill module. Test the integration, not the library. Inside the
+  workspace, look for an existing helper in the crate (and in lower
+  crates) before adding one. Shared helpers go in a named module
   (`util/`, `testing/`), never copied between files.
 * **Names say what things are.** Modules, types and functions are named for
   their domain meaning; avoid `helpers.rs`, `misc.rs`, `utils2.rs`.

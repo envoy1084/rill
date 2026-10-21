@@ -28,6 +28,7 @@ accepted one beyond fixing errors. Status is one of `accepted`,
 | [012](012-rust-server-generated-clients.md) | Rust on the server; generated clients elsewhere | accepted |
 | [013](013-p256-envelope-token-keys.md) | P-256 everywhere, with token keys wrapped by a key service | accepted |
 | [014](014-objects-per-organization.md) | Objects are stored and deduplicated per organization | accepted |
+| [015](015-reuse-open-source.md) | Reuse mature open source; build only what is Rill's | accepted |
 
 ## Template
 
