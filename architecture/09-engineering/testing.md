@@ -81,6 +81,18 @@ round trips in `src/convert/roundtrip_tests.rs`.
   flipped byte on disk is reported as corrupt; a blob-stored symlink that
   escapes the repository is rejected and an existing case collision does
   not block unrelated edits (`rill-core/tests/validation.rs`).
+- **Trees and derived data**: a directory built by random batches of
+  adds, rewrites and deletes across the split threshold hashes the same
+  as one built at once; a rewrite in a 200k-entry directory writes at most
+  5 nodes and an insert at most 10; case collisions are found in split
+  directories; diffs of split directories report exactly the changes
+  (`rill-core/tests/large_dirs.rs`). Skip-pointer `is_ancestor` and
+  `merge_base` agree with brute force on 2,000 queries over a random
+  branching history (`tests/ancestry.rs`). The background deriver resumes
+  from its cursor and skips a version after three failures
+  (`tests/background.rs`). A one-file commit writes one node per directory
+  level (`rill-bench/tests/node_writes.rs`). The server stores every
+  land-critical value before replying to a commit.
 - **Content**: streamed storage equals whole-content storage; a 4 KiB range
   read touches at most two chunks; a 1 GiB upload grows memory by less than
   64 MiB (`rill-core/tests/streaming_memory.rs`).

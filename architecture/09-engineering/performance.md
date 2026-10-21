@@ -15,9 +15,9 @@ the same files and trees. Benchmarks in `benches/core.rs`:
 
 | Benchmark | 100k files | 1M files |
 | --- | --- | --- |
-| `commit_10_files` (build, store, derive root) | 0.58 ms | 0.84 ms |
-| `diff_adjacent_roots` (10 files changed) | 0.18 ms | 0.27 ms |
-| `rebase_10_files_over_20` | 0.20 ms | 0.29 ms |
+| `commit_10_files` (build, store, derive root) | 0.57 ms | 0.82 ms |
+| `diff_adjacent_roots` (10 files changed) | 0.21 ms | 0.31 ms |
+| `rebase_10_files_over_20` | 0.23 ms | 0.33 ms |
 | `diff_lines_2000` | 58 µs | 60 µs |
 | `merge_file_2000` | 127 µs | 183 µs |
 
@@ -30,7 +30,16 @@ corpus takes about a minute and 4.5 GB of memory.
 cargo bench -p rill-bench --bench core
 RILL_BENCH_FILES=1000000 cargo bench -p rill-bench --bench core
 cargo bench -p rill-bench --bench meta
+cargo bench -p rill-bench --bench trees
+RILL_BENCH_FILES=1000000 cargo bench -p rill-bench --bench trees
 ```
+
+`benches/trees.rs` times a one-file commit, a full walk and a one-file
+diff in the deep corpus, and commits, lookups and diffs in one
+200,000-entry directory, printing the tree nodes each one-file commit
+writes; the numbers are in [trees](../03-core-algorithms/trees.md#scale).
+The corpus is built as a chain of 5,000-file commits, since one change is
+capped at 8 MiB.
 
 `benches/meta.rs` times metadata round trips (conditional write, point
 read, 100-row scan) on the memory and redb engines; the numbers are in

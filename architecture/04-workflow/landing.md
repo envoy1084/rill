@@ -48,8 +48,10 @@ itself never sets `Returned`.
 
 ## Conflict graph
 
-`touched_paths(version)` is the tree diff of the version against its first
-parent, plus its conflicted paths and its `subtree_changes` keys.
+`touched_paths(version)` reads the version's stored `changed@1` set (its
+file change and subtree change paths, conflicted paths included); no tree
+is diffed. Before moving trunk the lander calls `ensure_land_critical`, so
+every trunk version has its root tree, changed paths and ancestry stored.
 `partition` is a union-find over the drained requests in arrival order:
 two requests join one group when they share a path or one path is a
 directory prefix of the other. Each group runs as its own task and

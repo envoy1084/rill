@@ -2,16 +2,19 @@
 
 `CommitGraph` answers ancestry questions over change versions: parents,
 generation numbers, `is_ancestor`, `merge_bases` and the walk behind `log`.
-It reads `ChangeInfo` records, never full `ChangeVersion`s, so a version
-with a million paths costs the same as an empty one. Every query relies on
-one invariant: a parent's generation is strictly lower than its child's.
+It reads `ChangeInfo` records and `Ancestry` values, never full
+`ChangeVersion`s, so a version with a million paths costs the same as an
+empty one. Walks rely on one invariant: a parent's generation is strictly
+lower than its child's. On histories without merges, which is every
+history except git imports with merge commits, ancestry and merge bases
+take O(log depth) steps through skip pointers instead of a walk.
 
 ```mermaid
 flowchart LR
     CG[CommitGraph] --> P[(parents cache)]
-    CG --> G[(generations cache)]
+    CG --> G[(ancestry cache)]
     CG --> RS[RepoStore::get_change_info]
-    CG --> DM["DeriveManager::get::&lt;Generation&gt;"]
+    CG --> DM["DeriveManager::get::&lt;Ancestry&gt;"]
     CG --> IA[is_ancestor]
     CG --> MB[merge_bases]
     CG --> AN[ancestors / ancestors_excluding]
@@ -24,12 +27,20 @@ flowchart LR
 | Method | Source | Cache |
 | --- | --- | --- |
 | `info(hash)` | `RepoStore::get_change_info`; absent is `Error::ChangeNotFound` | Fills `parents` as a side effect; `info` itself always reads the store |
-| `parents(hash)` | `info` | `DashMap<ChangeVersionHash, Arc<[ChangeVersionHash]>>` |
-| `generation(hash)` | `DeriveManager::get::<Generation>` | `DashMap<ChangeVersionHash, u64>` |
+| `parents(hash)` | `info` | `LruCache` of 200,000 versions |
+| `ancestry(hash)`, `generation(hash)` | `DeriveManager::get::<Ancestry>` | `LruCache` of 200,000 versions |
+| `ancestor_at_depth(from, depth)` | jump pointers | |
 
-`Generation` ([derive/generation.rs](../../crates/rill-core/src/derive/generation.rs))
-is a derivation with kind `gen`: `1 + max(parent generations)`, and 1 for a
-root. It is stored once computed. See
+`Ancestry` ([derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs))
+is a land-critical derivation with kind `anc`. `AncestryInfo` holds the
+generation (`1 + max(parent generations)`, 1 for a root), the first-parent
+`depth` (0 for a root), `merges` (true when the version or any ancestor
+has several parents), the first `parent`, and one `jump` pointer with its
+depth. Jumps follow the skew-binary rule (Myers 1983): a version jumps to
+its parent's jump's jump when the parent's two jumps cover equal
+distances, and to its parent otherwise. `ancestor_at_depth` follows a jump
+when it does not overshoot and a parent otherwise, reaching any
+first-parent ancestor in O(log depth) steps. See
 [derived data](../02-data/derived-data.md).
 
 `ChangeInfo` is the metadata projection of a version: hash, `change_id`,
@@ -37,12 +48,14 @@ parents, predecessor, author, provenance, intent, message, `created_at`,
 `files_changed`, `has_conflicts` and `trunk_seq`. The store writes it on
 `put_change_version`.
 
-Both caches are process-local and never evict. Versions are immutable, so
+Both caches are process-local and bounded. Versions are immutable, so
 entries never go stale.
 
 ## is_ancestor
 
-`is_ancestor(ancestor, descendant)` is true when the two are equal.
+`is_ancestor(ancestor, descendant)` is true when the two are equal. When
+no merge lies behind `descendant`, the history is a tree and the answer is
+whether `ancestor_at_depth(descendant, depth(ancestor))` is `ancestor`.
 Otherwise it runs a max-heap on generation seeded with `descendant`. A
 popped version at or below the target's generation is not expanded, since
 nothing beneath it can reach the target. Each parent is compared with the
@@ -54,7 +67,13 @@ uses it to skip rebasing a tip that is already on trunk.
 
 `merge_bases(a, b)` returns every best common ancestor (none an ancestor of
 another), empty for disjoint histories. More than one means a criss-cross
-history. `merge_base` is the first of them. The walk is git's
+history. `merge_base` is the first of them.
+
+When neither side has a merge behind it there is exactly one candidate,
+found by `common_ancestor`: bring both to the shallower depth, then step
+both through their jumps while the jumps differ and through their parents
+when they agree. Jumps depend only on depth, so both sides stay level and
+the search takes O(log depth) steps. Otherwise the walk is git's
 `paint_down_to_common` with generation numbers:
 
 1. Flags `LEFT = 1`, `RIGHT = 2`, `STALE = 4`. `a` starts `LEFT`, `b`
@@ -104,11 +123,12 @@ that fails part-way returns the error, not a partial list.
 
 ## Limitations
 
-- The caches grow by one entry per version touched and never shrink.
+- Histories with merges (git imports) fall back to the generation walks.
 - `ancestors` reads `ChangeInfo` twice per version: once when queued and
   again when popped.
-- The first `Generation` of an un-derived version walks all its un-derived
-  ancestors.
+- Versions stored through the server have `Ancestry` from the commit
+  path; a version stored directly (tests, tools) derives it on first use,
+  walking its un-derived ancestors.
 - `CommitGraph` has no first-parent walk, date-bounded walk or descendant
   walk.
 
@@ -117,7 +137,7 @@ that fails part-way returns the error, not a partial list.
 - [graph/mod.rs](../../crates/rill-core/src/graph/mod.rs)
 - [graph/commit_graph.rs](../../crates/rill-core/src/graph/commit_graph.rs)
 - [graph/walk.rs](../../crates/rill-core/src/graph/walk.rs)
-- [derive/generation.rs](../../crates/rill-core/src/derive/generation.rs)
+- [derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs), [tests/ancestry.rs](../../crates/rill-core/tests/ancestry.rs)
 - [rill-types objects/change.rs](../../crates/rill-types/src/objects/change.rs)
 
 ---

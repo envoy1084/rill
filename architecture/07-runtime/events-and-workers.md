@@ -3,7 +3,7 @@
 Each repository has an in-process event bus. Review events, landing events,
 ref moves and new versions fan into it, so watch streams have one thing to
 subscribe to. Background workers run next to the bus: the lander loop, the
-post-land verifier and the search indexer. The bus is lossy by design. The
+post-land verifier, the background deriver and the search indexer. The bus is lossy by design. The
 store is the source of truth, and anything that must be exact re-reads it.
 
 ## Event bus
@@ -68,6 +68,7 @@ shutdown token.
 | Review and land forwarders | broadcast receive | skip lagged events (see above) |
 | Lander loop, `Lander::run_forever` | timer, every `LandPolicy::batch_window` | polls its in-memory queue, so it misses no events. Queued requests do not survive a restart |
 | Post-land verifier, `PostLandVerifier::run_forever` | timer, every `postland.interval_secs` (minimum 1 s) | polls trunk against a cursor stored in the repository, so missed events and restarts lose nothing |
+| Background deriver, `workers/deriver.rs` | its own `Lander::subscribe`, plus every 5 s | derives background kinds for trunk versions after a stored cursor (`derive_cursor`), so missed events and restarts lose nothing; see [derived data](../02-data/derived-data.md#when-values-are-computed) |
 | Search indexer, `workers/indexer.rs` | its own `Lander::subscribe` | on lag, re-indexes only the trunk head |
 
 The verifier exists only when `postland.enabled` is set. Each sweep
@@ -109,7 +110,7 @@ Two more pieces are wired in at build time. They are adapters, not tasks.
 ## Code
 
 * [state/events.rs](../../crates/rill-server/src/state/events.rs), [state/registry.rs](../../crates/rill-server/src/state/registry.rs)
-* [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs), [workers/indexer.rs](../../crates/rill-server/src/workers/indexer.rs), [workers/verifier.rs](../../crates/rill-server/src/workers/verifier.rs), [workers/hooks.rs](../../crates/rill-server/src/workers/hooks.rs)
+* [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs), [workers/indexer.rs](../../crates/rill-server/src/workers/indexer.rs), [workers/deriver.rs](../../crates/rill-server/src/workers/deriver.rs), [workers/verifier.rs](../../crates/rill-server/src/workers/verifier.rs), [workers/hooks.rs](../../crates/rill-server/src/workers/hooks.rs)
 * [services/repo/watch.rs](../../crates/rill-server/src/services/repo/watch.rs), [services/review.rs](../../crates/rill-server/src/services/review.rs)
 * [rill-lander/src/events.rs](../../crates/rill-lander/src/events.rs), [rill-lander/src/postland/worker.rs](../../crates/rill-lander/src/postland/worker.rs)
 

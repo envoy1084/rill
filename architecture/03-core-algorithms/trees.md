@@ -1,48 +1,96 @@
 # Trees
 
-A `Tree` is one directory: a `BTreeMap<String, TreeEntry>` whose entries
-are files (`ContentRef` + `FileKind`) or subdirectories (`TreeHash` +
-`DirSummary`). Trees are encoded canonically and addressed by hash, so equal
-directories have equal hashes and an unchanged subtree is never loaded,
-rewritten or walked. `rill-core` reads and writes trees through `TreeOps`,
-builds new roots with `TreeBuilder`, and projects a `ChangeVersion` onto its
-parent's root.
+A `Tree` is one directory's listing: a `BTreeMap<String, TreeEntry>` whose
+entries are files (`ContentRef` + `FileKind`) or subdirectories
+(`TreeHash` + `DirSummary`). It is stored as one or more `TreeNode`s. A
+directory of up to `SHARD_ENTRIES` (4,096) entries is one node; a larger
+one is split into leaves under inner nodes, with boundaries that depend
+only on the names. Equal directories therefore have equal hashes however
+they were built, an unchanged subtree is never loaded, rewritten or
+walked, and an edit inside a huge directory rewrites only the nodes on its
+path. `rill-core` reads and writes trees through `TreeOps`, builds new
+roots with `TreeBuilder`, and projects a `ChangeVersion` onto its parent's
+root.
 
 ```mermaid
 flowchart LR
     CV[ChangeVersion] --> M[TreeOps::materialize]
     RL[RootLookup] --> M
     M --> TB[TreeBuilder<br/>edit trie]
-    TB --> OPS[TreeOps<br/>get_tree / put_tree<br/>LruCache]
+    TB --> ED[edit_dir / check_case]
+    ED --> SH[split lists<br/>leaves + inner nodes]
+    SH --> OPS[TreeOps<br/>get_node / put_node<br/>LruCache of nodes]
     OPS <--> OS[(ObjectStore)]
-    OPS --> LK[lookup / dir_hash / list_dir]
+    OPS --> LK[entry / lookup / list_dir / summary]
     OPS --> WK[walk + SparseProfile]
+    OPS --> DF[differing → diff_trees]
 ```
 
-The `Tree` type and its hashing live in `rill-types`; see
-[objects and IDs](../02-data/objects-and-ids.md). Writing files to disk is
-done by the SDK checkout and the exec runner, not here.
+The types live in `rill-types` (`objects/tree/`); see
+[objects and IDs](../02-data/objects-and-ids.md#tree). Writing files to
+disk is done by the SDK checkout and the exec runner, not here.
+
+## Nodes
+
+| `TreeNode` | Holds |
+| --- | --- |
+| `Leaf(Tree)` | a whole directory of up to 4,096 entries, or one leaf of a split directory |
+| `Inner { level, children, names }` | `TreeChild { first, hash, count, summary }` pointers; `level` 1 points at leaves. The top node of a split directory sets `names` |
+| `Names(Vec<String>)` | a leaf of a split directory's name index |
+
+All three are `ObjectKind::Tree` objects. A parent entry points at a
+directory's top node; `summary` on each child lets a split directory's
+`DirSummary` be summed from its top node alone.
+
+**Boundaries** ([shape.rs](../../crates/rill-types/src/objects/tree/shape.rs)).
+Chunking a sorted sequence left to right, a node at `level` ends after an
+item when BLAKE3 (keyed `"rill tree node boundary"`, over the level and
+the item's key) is divisible by the target (1,024 for leaves, 64 for inner
+nodes), or when the node reaches its cap (4,096 items, 256 children). The
+rule reads only the key and the node's length, so the nodes are a
+function of the entries alone.
+
+**Name index.** A split directory's top node points at a second split
+list holding `case_key(name) NUL name` for every entry, sorted, so names
+that collide on a case-insensitive filesystem sit next to each other. A
+case check for a new name is a prefix lookup, not a scan.
+
+## Editing a split list
+
+[shard/list.rs](../../crates/rill-core/src/tree/shard/list.rs). `edit`
+takes the leaf pointers (read from the inner nodes, which are few) and the
+edits by key. Leaves before the first edited one are kept. From there it
+re-chunks the edited leaves' items through a `Chunker`, continuing into
+following leaves until it ends a node exactly where an old leaf ended and
+the next leaf has no edits; the rest of the old leaves stand, because the
+chunking state is the same from there on. Inner levels are then rebuilt
+from the leaf list with `write_inner`; nodes already in the cache exist in
+the store and are not written again, so only changed inner nodes are
+written. A directory that drops to 4,096 entries or fewer becomes one
+`Leaf` again; one that grows past it is split by `put_tree`.
 
 ## TreeOps
 
 `TreeOps::new(objects, cache_size)`
-([ops.rs](../../crates/rill-core/src/tree/ops.rs)) binds an object store to
-an `LruCache<TreeHash, Arc<Tree>>`. The server uses
-`DEFAULT_TREE_CACHE = 4096` decoded trees per repository. Clones share the
-cache.
+([ops.rs](../../crates/rill-core/src/tree/ops.rs),
+[shard/dir.rs](../../crates/rill-core/src/tree/shard/dir.rs)) binds an
+object store to an `LruCache<TreeHash, NodeRef>` of decoded nodes. The
+server uses `DEFAULT_TREE_CACHE = 4096` nodes per repository. Clones share
+the cache. `nodes_written()` counts nodes actually written, for tests and
+benchmarks.
 
 | Method | Behaviour |
 | --- | --- |
-| `get_tree` | Cache, else `get_object`; missing is `Error::TreeNotFound` |
-| `put_tree` | `put_object` (hash-verified by the store), then cache |
-| `empty_tree` | Stores `Tree::empty()` so its hash always loads |
-| `lookup(root, path)` | Root path gives `Dir { hash: root, .. }`; a file in the middle of the path gives `None` |
-| `dir_hash` | `Some` only for a directory |
-| `list_dir` | Entries sorted by name; `Error::NotADirectory` for a file or missing path |
-
-`LruCache` ([util/lru.rs](../../crates/rill-core/src/util/lru.rs)) stamps
-each entry on access. On overflow it evicts `capacity / 8 + 1` of the oldest
-entries in one pass. Minimum capacity is 8.
+| `get_node` | Cache, else decode from the store; missing is `Error::TreeNotFound` |
+| `get_tree` | The whole listing; a split directory loads every leaf |
+| `entry(dir, name)` | One entry; a split directory descends from its top node |
+| `summary(dir)`, `dir_len(dir)` | From the top node, without loading leaves |
+| `put_tree` | One `Leaf`, or split with its name index above 4,096 entries |
+| `edit_dir(base, DirEdits)` | Apply set and delete edits, keeping the name index in step |
+| `check_case(base, added, removed)` | `InvalidChange` when an added name differs only in case from another entry after the edit |
+| `differing(a, b)` | Listings that may differ; two split directories skip the leaves they share |
+| `lookup(root, path)`, `dir_hash`, `list_dir` | Path lookups through `entry`; `list_dir` lists everything |
+| `empty_tree` | Stores the empty directory, `Tree::empty_hash()` |
 
 ## TreeBuilder
 
@@ -53,24 +101,27 @@ a trie keyed by path component. `build(ops, base)` walks the trie once.
 | --- | --- |
 | `Set(ContentRef, FileKind)` | Entry becomes a file |
 | `Delete` | Entry removed, file or whole directory |
-| `Dir(TreeHash)` | Entry becomes that directory; its `DirSummary` is read from the stored tree |
+| `Dir(TreeHash)` | Entry becomes that directory; its `DirSummary` comes from `summary` |
 
-Rules:
+For each directory it looks up only the edited names (`entry`), builds
+edited subdirectories first, collects a `DirEdits` of changed entries with
+the names added and removed, runs `check_case`, and writes the directory
+with `edit_dir`. Rules:
 
 - A later edit at the same path replaces an earlier one.
 - An edit at the root path is ignored. With no non-root edits, `build`
   returns `base`, or stores the empty tree when `base` is `None`.
-- A base subtree is loaded only when an edit lies beneath it.
 - Edits beneath a name that holds a file build a fresh directory there;
   beneath a directory they edit it in place.
 - A subtree that becomes empty is removed from its parent. Stored trees
   never contain empty directories.
-- An unchanged directory returns its base hash without a write. Writes are
-  confined to the spine from each edited path to the root.
-- `DirSummary` (`file_count`, `dir_count`, `total_size`) is recomputed for
-  each rewritten directory, so size and count queries never walk.
+- An unchanged directory returns its base hash without a write.
+- A name added in a directory must not differ only in case from another
+  entry; existing collisions do not block unrelated edits, and renaming a
+  name to a case variant is allowed.
 
-Cost: O(edited paths x depth) tree loads and at most as many writes.
+Cost: O(edited paths × depth) node loads and writes; in a split directory,
+O(log n) per edit plus a read of its inner nodes.
 
 ## Applying a change version
 
@@ -88,45 +139,47 @@ calls it; see [derived data](../02-data/derived-data.md). Steps:
    state (a set, or a delete when absent).
 3. `TreeBuilder::build(self, parent_root)`.
 
-A subtree or file change at the root path is `Error::InvalidChange`. File
-edits go into the same trie after subtree edits, so a file change under a
-copied subtree overrides the copied entry. Conflicts leave no trace in the
-tree; they live only in the change. `DeriveCtx` implements `RootLookup`;
-`NoRoots` fails every lookup with `Error::ChangeNotFound`.
+A subtree or file change at the root path is `Error::InvalidChange`.
+Conflicts leave no trace in the tree; they live only in the change.
 
 ## Walk
 
 `TreeOps::walk(root, prefix, sparse) -> Vec<WalkEntry>`
 ([walk.rs](../../crates/rill-core/src/tree/walk.rs)) lists every file under
-`prefix` as `(path, content, kind)`, sorted by path.
+`prefix` as `(path, content, kind)`, sorted by path. `SparseProfile`
+filters files, and excluded directories are pruned before loading.
 
-- A `prefix` naming a file yields that file; a missing prefix yields nothing.
-- `SparseProfile::contains` filters files: an `exclude` prefix wins, and an
-  empty `include` means everything.
-- Directories are pruned before loading when they sit under an `exclude`, or
-  when includes exist and none is an ancestor or descendant of the
-  directory.
+## Scale
+
+From `cargo bench -p rill-bench --bench trees` (laptop, release, memory
+stores):
+
+| Case | Nodes written | Time |
+| --- | --- | --- |
+| One-file commit, 100k files (fan-out 32) | 4 | 107 µs |
+| One-file commit, 1M files | 4 | 117 µs |
+| Diff of that commit, 100k / 1M files | | 10.8 / 10.5 µs |
+| One-file commit in one 200k-entry directory | 3 | 1.2 ms |
+| Lookup in a 200k-entry directory | | 0.37 µs |
+| Diff of one changed entry, 200k-entry directory | | 0.23 ms |
+
+`rill-bench/tests/node_writes.rs` asserts that a one-file commit writes
+exactly one node per directory level.
 
 ## Limitations
 
-- `FileKind` is the only mode information. Symlink targets are ordinary
-  content and are not validated.
-- No path normalisation beyond `RepoPathBuf` validation; case folding is
-  not handled.
-- `walk` collects the whole listing in memory; callers page by narrowing
-  `prefix`.
-- The tree cache is per process and sized by entry count, not bytes.
+- An edit in a split directory reads all of its inner nodes (about one
+  pointer per thousand entries) and rebuilds the inner levels in memory.
+- `get_tree`, `list_dir` and `walk` load whole listings; there is no paged
+  listing of a split directory yet.
+- The node cache is sized by node count, not bytes.
 
 ## Code
 
-- [tree/mod.rs](../../crates/rill-core/src/tree/mod.rs)
-- [tree/ops.rs](../../crates/rill-core/src/tree/ops.rs)
-- [tree/builder.rs](../../crates/rill-core/src/tree/builder.rs)
-- [tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs)
-- [tree/walk.rs](../../crates/rill-core/src/tree/walk.rs)
-- [util/lru.rs](../../crates/rill-core/src/util/lru.rs)
-- [derive/root_tree.rs](../../crates/rill-core/src/derive/root_tree.rs)
-- [rill-types objects/tree.rs](../../crates/rill-types/src/objects/tree.rs)
+- [tree/ops.rs](../../crates/rill-core/src/tree/ops.rs), [tree/builder.rs](../../crates/rill-core/src/tree/builder.rs), [tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs), [tree/walk.rs](../../crates/rill-core/src/tree/walk.rs)
+- [tree/shard/](../../crates/rill-core/src/tree/shard/mod.rs): [dir.rs](../../crates/rill-core/src/tree/shard/dir.rs), [list.rs](../../crates/rill-core/src/tree/shard/list.rs), [layout.rs](../../crates/rill-core/src/tree/shard/layout.rs)
+- [rill-types objects/tree/](../../crates/rill-types/src/objects/tree/mod.rs): [listing.rs](../../crates/rill-types/src/objects/tree/listing.rs), [node.rs](../../crates/rill-types/src/objects/tree/node.rs), [shape.rs](../../crates/rill-types/src/objects/tree/shape.rs)
+- [tests/large_dirs.rs](../../crates/rill-core/tests/large_dirs.rs), [rill-bench benches/trees.rs](../../crates/rill-bench/benches/trees.rs)
 
 ---
 ← Previous: [Rebase](rebase.md) · [Index](../index.md) · Next: [History graph](history-graph.md) →

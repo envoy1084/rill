@@ -78,7 +78,7 @@ An `Encodable` type declares `KIND`, `SCHEMA` (a `u16`) and `NAME`.
 postcard body. `decode` rejects a different kind or schema with
 `Error::UnsupportedSchema { kind, found, expected }`, so bytes are never
 decoded as the wrong type. `hash()` is `digest(KIND, encode())`.
-`ChangeVersion`, `Tree` and `BlobManifest` are `Encodable` at schema 1; so
+`ChangeVersion`, `TreeNode` and `BlobManifest` are `Encodable` at schema 1; so
 is `HistoryNode` in `rill-core`, under kind `Derived`. Blobs and chunks are
 not encoded: their bytes are the content.
 
@@ -99,11 +99,18 @@ Mutable records are framed by `encode_record`, never hashed: see
 
 ## Tree
 
-`Tree { entries: BTreeMap<String, TreeEntry> }`; an entry is
-`File { content: ContentRef, kind: FileKind }` or `Dir { hash, summary }`.
-`DirSummary` (`file_count`, `dir_count`, `total_size`) covers the whole
-subtree, so size queries never walk. `FileKind` is `Regular`, `Executable`
-or `Symlink`. `ContentRef` is in [content and chunking](content-and-chunking.md).
+`Tree { entries: BTreeMap<String, TreeEntry> }` is a directory's listing;
+an entry is `File { content: ContentRef, kind: FileKind }` or
+`Dir { hash, summary }`. `DirSummary` (`file_count`, `dir_count`,
+`total_size`, `max_depth`) covers the whole subtree, so size, count and
+depth queries never walk. `FileKind` is `Regular`, `Executable` or
+`Symlink`. `ContentRef` is in [content and chunking](content-and-chunking.md).
+
+The stored object is a `TreeNode` (`Encodable`, kind `Tree`): `Leaf(Tree)`
+for a directory of up to 4,096 entries, and `Inner` and `Names` nodes for
+larger directories, which are split by name-derived boundaries so their
+hash still depends only on their entries. `Tree::empty_hash()` is the
+empty directory. See [trees](../03-core-algorithms/trees.md).
 
 ## ChangeVersion
 
@@ -193,7 +200,7 @@ compare-and-swap request: `expected: None` means the ref must not exist,
 
 * [hash.rs](../../crates/rill-types/src/hash.rs), [ids.rs](../../crates/rill-types/src/ids.rs), [encoding.rs](../../crates/rill-types/src/encoding.rs)
 * [path.rs](../../crates/rill-types/src/path.rs), [limits.rs](../../crates/rill-types/src/limits.rs), [rill-core validate.rs](../../crates/rill-core/src/validate.rs), [time.rs](../../crates/rill-types/src/time.rs), [principal.rs](../../crates/rill-types/src/principal.rs), [error.rs](../../crates/rill-types/src/error.rs)
-* [objects/tree.rs](../../crates/rill-types/src/objects/tree.rs), [objects/change.rs](../../crates/rill-types/src/objects/change.rs), [objects/blob.rs](../../crates/rill-types/src/objects/blob.rs), [objects/refs.rs](../../crates/rill-types/src/objects/refs.rs)
+* [objects/tree/](../../crates/rill-types/src/objects/tree/mod.rs), [objects/change.rs](../../crates/rill-types/src/objects/change.rs), [objects/blob.rs](../../crates/rill-types/src/objects/blob.rs), [objects/refs.rs](../../crates/rill-types/src/objects/refs.rs)
 * [objects/workspace.rs](../../crates/rill-types/src/objects/workspace.rs), [objects/review.rs](../../crates/rill-types/src/objects/review.rs), [objects/intent.rs](../../crates/rill-types/src/objects/intent.rs)
 
 ---

@@ -2,8 +2,10 @@
 
 A derived value is a pure function of a change version and the same value
 for its parents. The `derive` module in `rill-core` defines the `Derivable`
-trait, the `DeriveManager` that fetches or computes values, and the built-in
-derivations: root tree, generation, change summary, path history and blame.
+trait, the `DeriveManager` that fetches or computes values, a registry
+saying when each kind is computed, a background worker, and the built-in
+derivations: root tree, changed paths, ancestry, change summary, path
+history and blame.
 A value is keyed by `(kind@version, version hash)` and versions are
 immutable, so nothing is ever invalidated.
 
@@ -11,7 +13,7 @@ immutable, so nothing is ever invalidated.
 flowchart TD
     REQ["manager.get::&lt;D&gt;(hash)"] --> CACHE{"LRU cache"}
     CACHE -- hit --> OUT["decode_record: D::Value"]
-    CACHE -- miss --> DD{"dd/&lt;repo&gt;/&lt;kind&gt;/&lt;hash&gt;"}
+    CACHE -- miss --> DD{"(dd, ns, repo, kind, hash)"}
     DD -- present --> OUT
     DD -- absent --> LOCK["per-key in_flight lock"]
     LOCK --> RELOAD{"stored meanwhile?"}
@@ -25,9 +27,10 @@ flowchart TD
 
 | Item | Meaning |
 | --- | --- |
-| `KIND` | short name in the storage key (`root`, `gen`, `summary`, `phist`) |
+| `KIND` | short name in the storage key (`root`, `changed`, `anc`, `summary`, `phist`) |
 | `VERSION` | computation version; `derived_kind_key::<D>()` is `"{KIND}@{VERSION}"` |
 | `NEEDS_PARENTS` | default `true`; when `false` the manager passes an empty vector and never walks ancestors |
+| `SCHEDULE` | `LandCritical`, `Background` or `OnDemand` (default); see below |
 | `Value` | serde type, stored with `encode_record` |
 | `derive(ctx, cv, parents)` | `parents[i]` is the value for `cv.parents[i]` |
 
@@ -46,7 +49,7 @@ The server uses `DERIVE_CACHE = 8192` values and a `TreeOps` cache of
 
 `get::<D>(hash)`:
 
-1. Look in the in-process `LruCache` of encoded bytes, then in `dd/` via
+1. Look in the in-process `LruCache` of encoded bytes, then in the `dd` table via
    `RepoStore::get_derived`.
 2. On a miss, take the `Mutex` for `(kind, hash)` from the `in_flight`
    `DashMap`, then look again, so concurrent requests compute a value once.
@@ -66,9 +69,10 @@ key; blame uses them. The cache evicts the oldest eighth when it is full.
 | Derivation | Key | Value | What it does |
 | --- | --- | --- | --- |
 | `RootTree` | `root@1` | `TreeHash` | `TreeOps::materialize` applies `subtree_changes` then `file_changes` to the first parent's tree; a conflict contributes its first add. A subtree copy resolves `from_version` through `RootLookup`. See [trees](../03-core-algorithms/trees.md). |
-| `Generation` | `gen@1` | `u64` | `1 + max(parents)`, 1 for a root; used by the commit graph to prune ancestry walks. See [history graph](../03-core-algorithms/history-graph.md). |
+| `ChangedPaths` | `changed@1` | `ChangedPathSet` | `NEEDS_PARENTS = false`; the change's file and subtree change paths, sorted, plus a Bloom filter of `=path` for each and `/dir` for each directory above one. `touches(path)` is true for the path, anything under it, or a path above it that replaced it; `overlaps(other)` checks two sets. Read from the change, so it never diffs trees; a superset of the paths whose state differs. |
+| `Ancestry` | `anc@1` | `AncestryInfo` | generation (`1 + max(parents)`, 1 for a root), first-parent depth, whether a merge lies behind the version, first parent, and one skew-binary jump pointer. See [history graph](../03-core-algorithms/history-graph.md). |
 | `ChangeSummary` | `summary@1` | `ChangeSummary` | `NEEDS_PARENTS = false`; reads the first parent's root and counts files added, modified, deleted and conflicted, `bytes_added`, `bytes_removed`, `languages` (by extension), `top_level_dirs`, `subtree_changes`. |
-| `PathHistory` | `phist@1` | hash of a `HistoryNode` | rewrites only the `HistoryNode`s along touched paths and shares the rest with the first parent. Nodes are stored in the object store under kind `Derived`; `dd/` holds the root hash. |
+| `PathHistory` | `phist@1` | hash of a `HistoryNode` | rewrites only the `HistoryNode`s along touched paths and shares the rest with the first parent. Nodes are stored in the object store under kind `Derived`; the `dd` row holds the root hash. |
 | `Blame` | `blame@1` (keyed) | `Vec<BlameLine>` | per `(version, path)`, key `Blame::key`; not a `Derivable`. |
 
 `HistoryNode { entries: BTreeMap<String, HistoryEntry { version, subtree }> }`
@@ -86,33 +90,51 @@ It fails with `Error::PathNotFound` when the path is absent at `version` and
 `Error::BinaryContent` when a replayed version is binary. `BlameLine`
 holds `version`, `author` and the one-based `line_no` in that version.
 
-## What triggers computation
+## When values are computed
 
-There is no background worker. Every value is computed by its first reader.
+[registry.rs](../../crates/rill-core/src/derive/registry.rs) lists every
+version-keyed kind with its schedule:
 
-* `PutChange` calls `get::<RootTree>` right after `put_change_version`, so a
-  change whose tree cannot be built fails the request.
-* Tree reads in the server, review, lander, conflict graph and post-land
-  worker derive `RootTree` on demand.
-* The `GetDerived` RPC with `compute` set computes `root@1`, `phist@1`,
-  `gen@1` and `summary@1`; other kinds are returned as stored.
-* History and blame RPCs, the MCP blame tool and review agent context use
-  `PathHistory` and `blame`.
-* Commit-graph ancestry queries use `Generation`.
+| Schedule | Kinds | Computed |
+| --- | --- | --- |
+| `LandCritical` | `root@1`, `changed@1`, `anc@1` | by `ensure_land_critical`, which the server's `commit_version` calls after storing a version and before replying, and the lander calls before moving trunk. A change whose tree cannot be built fails the request, and every trunk version has all three. |
+| `Background` | `phist@1`, `summary@1` | by `BackgroundDeriver`, for every trunk version in order |
+| `OnDemand` | blame (keyed by path) | by the first reader |
+
+Any kind is also computed by its first reader if missing. `GetDerived`
+with `compute` set computes any registered kind (`compute_kind`); other
+kinds are returned as stored.
+
+**Background deriver**
+([background.rs](../../crates/rill-core/src/derive/background.rs)). A pass
+derives the background kinds for up to `limit` trunk versions after the
+cursor in the misc row `derive_cursor`, storing the cursor after each, so a
+restart resumes where it stopped. A version that fails stops the pass and
+is retried next pass; after `MAX_ATTEMPTS` (3) it is logged and skipped.
+The server runs one per repository (`workers/deriver.rs`), woken by each
+landing and every 5 seconds, in passes of 64 versions.
+
+Other readers: the lander's conflict partition reads `changed@1`; tree
+reads in the server, review and post-land worker derive `RootTree`;
+history and blame RPCs, the MCP blame tool and review agent context use
+`PathHistory` and `blame`; commit-graph queries use `Ancestry`.
 
 ## Limitations
 
-* `dd/` rows and `Derived` objects are never deleted; only the in-process
+* `dd` rows and `Derived` objects are never deleted; only the in-process
   cache is bounded.
-* `PutChange` stores the version before deriving its root tree; a version
-  that fails to materialise stays in `ci`, `log` and `chv`.
+* `PutChange` stores the version before deriving its land-critical values;
+  a version that fails to materialise stays in `ci`, `log` and `chv`.
+* The background deriver follows trunk only; versions that never land get
+  background kinds only when read.
 * The `in_flight` lock covers the requested key only; concurrent requests
   for different descendants of one missing ancestor can both derive it
   (values are equal, the last write wins).
 * `ChangeSummary` skips parent summaries but still derives the first
   parent's `RootTree`, which walks the first-parent line if nothing is
   stored.
-* `ChangeSummary` has no consumer in the server other than `GetDerived`.
+* `ChangeSummary` has no consumer in the server other than `GetDerived`
+  and the background deriver.
 * History and blame follow first parents only. Blame derives the root tree
   of every first-parent version back to the file's creation, not only the
   versions that touched the path.
@@ -121,10 +143,10 @@ There is no background worker. Every value is computed by its first reader.
 ## Code
 
 * [derive/mod.rs](../../crates/rill-core/src/derive/mod.rs), [derive/traits.rs](../../crates/rill-core/src/derive/traits.rs), [derive/ctx.rs](../../crates/rill-core/src/derive/ctx.rs), [derive/manager.rs](../../crates/rill-core/src/derive/manager.rs)
-* [derive/root_tree.rs](../../crates/rill-core/src/derive/root_tree.rs), [derive/generation.rs](../../crates/rill-core/src/derive/generation.rs), [derive/summary.rs](../../crates/rill-core/src/derive/summary.rs), [derive/history.rs](../../crates/rill-core/src/derive/history.rs), [derive/blame.rs](../../crates/rill-core/src/derive/blame.rs)
+* [derive/root_tree.rs](../../crates/rill-core/src/derive/root_tree.rs), [derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs), [derive/changed_paths.rs](../../crates/rill-core/src/derive/changed_paths.rs), [derive/registry.rs](../../crates/rill-core/src/derive/registry.rs), [derive/background.rs](../../crates/rill-core/src/derive/background.rs), [derive/summary.rs](../../crates/rill-core/src/derive/summary.rs), [derive/history.rs](../../crates/rill-core/src/derive/history.rs), [derive/blame.rs](../../crates/rill-core/src/derive/blame.rs)
 * [tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs), [util/lru.rs](../../crates/rill-core/src/util/lru.rs)
 * [rill-server services/repo/refs.rs](../../crates/rill-server/src/services/repo/refs.rs): `GetDerived` compute dispatch
-* [rill-server services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs): eager root tree on `PutChange`
+* [rill-server services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/rill-server/src/workers/deriver.rs): background deriver
 * [rill-server state/registry.rs](../../crates/rill-server/src/state/registry.rs): manager construction
 
 ---
