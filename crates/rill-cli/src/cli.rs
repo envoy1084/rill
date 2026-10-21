@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    admin, change, checkout, history, import, intent, land, refs, repo, review, stack, status,
+    admin, change, checkout, history, import, intent, land, org, refs, repo, review, stack, status,
     watch, ws,
 };
 
@@ -72,6 +72,10 @@ pub enum Command {
     /// Repositories: list, create, inspect.
     #[command(subcommand)]
     Repo(repo::RepoCmd),
+
+    /// Organizations: list, create.
+    #[command(subcommand)]
+    Org(org::OrgCmd),
 
     /// Materialize a repository into a directory and register a workspace.
     Checkout(checkout::CheckoutArgs),

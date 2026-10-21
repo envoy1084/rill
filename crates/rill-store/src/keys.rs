@@ -52,6 +52,12 @@ pub mod table {
     pub const MISC: &str = "misc";
     /// `(meta, "format")` → store format
     pub const META: &str = "meta";
+    /// `(org, name)` → OrgConfig
+    pub const ORG: &str = "org";
+    /// `(repoid, repo)` → the org a repository belongs to
+    pub const REPO_ORG: &str = "repoid";
+    /// `(quota, org, principal, metric, day, shard)` → usage counter
+    pub const QUOTA: &str = "quota";
 }
 
 fn key<T: TuplePack>(t: &T) -> Bytes {
@@ -69,6 +75,22 @@ pub fn tail<'de, T: TupleUnpack<'de>>(prefix: &[u8], key: &'de [u8]) -> Result<T
 /// The store-wide format marker.
 pub fn store_format() -> Bytes {
     key(&(table::META, "format"))
+}
+
+pub fn org(name: &str) -> Bytes {
+    key(&(table::ORG, name))
+}
+
+pub fn org_list() -> Bytes {
+    key(&(table::ORG,))
+}
+
+pub fn repo_org(id: &RepoId) -> Bytes {
+    key(&(table::REPO_ORG, id.as_bytes().as_slice()))
+}
+
+pub fn quota(org: &str, principal: &str, metric: &str, day: i64, shard: u8) -> Bytes {
+    key(&(table::QUOTA, org, principal, metric, day, shard as u64))
 }
 
 pub fn repo(ns: &str, id: &RepoId) -> Bytes {

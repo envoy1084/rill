@@ -21,6 +21,7 @@ pub fn repo_info(r: &RepoInfo) -> Value {
         "created_at": timestamp(&r.created_at),
         "trunk_head_seq": r.trunk_head_seq.get(),
         "windows_safe": r.windows_safe,
+        "org": r.org,
     })
 }
 

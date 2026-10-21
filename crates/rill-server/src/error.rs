@@ -142,7 +142,7 @@ fn store_code(e: &rill_store::Error) -> Code {
     match e {
         E::ObjectNotFound { .. } | E::KeyNotFound(_) | E::NotFound(_) => Code::NotFound,
         E::Conflict(_) => Code::Aborted,
-        E::HashMismatch { .. } | E::Types(_) => Code::InvalidArgument,
+        E::HashMismatch { .. } | E::Types(_) | E::Invalid(_) => Code::InvalidArgument,
         E::Codec(_) | E::Corrupt { .. } => Code::DataLoss,
         E::IncompatibleFormat { .. } => Code::FailedPrecondition,
         E::TooLarge(_) => Code::ResourceExhausted,

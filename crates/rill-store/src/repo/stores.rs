@@ -18,6 +18,8 @@ use crate::seal::DEFAULT_NAMESPACE;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RepoConfig {
     pub id: RepoId,
+    /// The org the repository belongs to.
+    pub org: String,
     pub name: String,
     pub description: String,
     pub created_at: Timestamp,
@@ -61,6 +63,7 @@ impl Stores {
         }
     }
 
+    /// In-memory stores with the default org, for tests and tools.
     pub fn memory() -> Self {
         Stores::new(
             Arc::new(crate::memory::MemoryObjectStore::new()),
@@ -68,9 +71,18 @@ impl Stores {
         )
     }
 
-    /// The namespace every key of these stores is under.
+    /// The org every key of these stores is under.
     pub fn namespace(&self) -> &str {
         &self.namespace
+    }
+
+    /// The same stores scoped to the org `name`.
+    pub fn org(&self, name: &str) -> Stores {
+        Stores {
+            objects: self.objects.clone(),
+            meta: self.meta.clone(),
+            namespace: Arc::from(name),
+        }
     }
 
     /// Stamp an empty store with [`STORE_FORMAT`], or refuse a store
@@ -118,8 +130,13 @@ impl Stores {
         description: &str,
         settings: RepoSettings,
     ) -> Result<RepoConfig> {
+        super::orgs::validate_repo_name(name)?;
+        if self.namespace() == super::orgs::DEFAULT_ORG {
+            self.ensure_default_org().await?;
+        }
         let config = RepoConfig {
             id: RepoId::new(),
+            org: self.namespace().to_string(),
             name: name.to_string(),
             description: description.to_string(),
             created_at: Timestamp::now(),
@@ -127,17 +144,25 @@ impl Stores {
             settings,
         };
         let ns = self.namespace();
+        let (index_key, index_value) = self.repo_org_row(&config.id);
         let tx = Transaction::new()
+            .expect_present(keys::org(ns))
             .expect_absent(keys::repo_by_name(ns, name))
+            .set(index_key, index_value)
             .set(keys::repo(ns, &config.id), encode_record(&config)?)
             .set(
                 keys::repo_by_name(ns, name),
                 Bytes::copy_from_slice(config.id.as_bytes()),
             );
-        self.meta.transact(tx).await.map_err(|e| match e {
-            Error::Conflict(_) => Error::Conflict(format!("repo {name:?} already exists")),
-            other => other,
-        })?;
+        if let Err(e) = self.meta.transact(tx).await {
+            return Err(match e {
+                Error::Conflict(_) if self.get_org(ns).await?.is_none() => {
+                    Error::NotFound(format!("org {ns:?}"))
+                }
+                Error::Conflict(_) => Error::Conflict(format!("repo {name:?} already exists")),
+                other => other,
+            });
+        }
         Ok(config)
     }
 
@@ -177,6 +202,49 @@ impl Stores {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn orgs_scope_repositories() {
+        let stores = Stores::memory();
+        let a = stores.create_repo("app", "").await.unwrap();
+        stores.create_org("acme", "").await.unwrap();
+        let acme = stores.org("acme");
+        let b = acme.create_repo("app", "").await.unwrap();
+        assert_ne!(a.id, b.id);
+        assert_eq!((a.org.as_str(), b.org.as_str()), ("default", "acme"));
+        assert_eq!(stores.find_repo(&b.id).await.unwrap(), Some(b.clone()));
+        assert_eq!(acme.list_repos().await.unwrap(), vec![b]);
+        assert!(stores
+            .org("nope")
+            .create_repo("x", "")
+            .await
+            .unwrap_err()
+            .is_not_found());
+        assert!(stores.create_repo("a/b", "").await.is_err());
+        assert!(stores.create_org("Bad Name", "").await.is_err());
+
+        let alice = rill_types::Principal::human("alice");
+        for _ in 0..40 {
+            let mut tx = Transaction::new();
+            tx.mutations
+                .push(acme.charge(&alice, super::super::metric::VERSIONS, 2));
+            acme.meta.transact(tx).await.unwrap();
+        }
+        let today = super::super::day_of(Timestamp::now());
+        assert_eq!(
+            acme.usage(&alice, super::super::metric::VERSIONS, today)
+                .await
+                .unwrap(),
+            80
+        );
+        assert_eq!(
+            stores
+                .usage(&alice, super::super::metric::VERSIONS, today)
+                .await
+                .unwrap(),
+            0
+        );
+    }
 
     #[tokio::test]
     async fn repo_names_are_unique() {

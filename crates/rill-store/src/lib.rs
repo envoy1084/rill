@@ -49,7 +49,7 @@ pub use local::{LocalObjectStore, LocalOptions, LocalStores, RedbMetaStore};
 pub use memory::{MemoryMetaStore, MemoryObjectStore};
 pub use meta::{Condition, KeyRange, MetaStore, Mutation, Transaction, TxOutcome};
 pub use object::{ObjectStore, ObjectStoreExt, StoredObject};
-pub use repo::{RepoSettings, RepoStore, Stores, STORE_FORMAT};
+pub use repo::{OrgConfig, RepoSettings, RepoStore, Stores, DEFAULT_ORG, STORE_FORMAT};
 #[cfg(feature = "s3")]
 pub use s3::ObjectStoreBackend;
 pub use seal::{Plaintext, Sealer, DEFAULT_NAMESPACE};

@@ -498,4 +498,12 @@ message Repo {
   uint64 trunk_head_seq = 5;
   // Paths Windows cannot create are rejected.
   bool windows_safe = 6;
+  // The org the repository belongs to.
+  string org = 7;
+}
+
+message Org {
+  string name = 1;
+  optional string description = 2;
+  int64 created_at = 3;
 }

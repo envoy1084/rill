@@ -29,7 +29,7 @@ pub struct ListArgs {
 /// `rill repo create`.
 #[derive(Args, Debug)]
 pub struct CreateArgs {
-    /// Repository name.
+    /// Repository name: `org/name`, or a name in the default org.
     pub name: String,
     /// Free-form description.
     #[arg(long)]
@@ -57,7 +57,7 @@ async fn list(ctx: &mut Ctx<'_>, args: ListArgs) -> Result<()> {
         let mut table = Table::new(&["NAME", "TRUNK", "CREATED", "ID", "DESCRIPTION"]);
         for r in &page.items {
             table.row(vec![
-                r.name.clone(),
+                format!("{}/{}", r.org, r.name),
                 format!("trunk@{}", r.trunk_head_seq.get()),
                 when(&r.created_at),
                 r.id.to_string(),
@@ -85,7 +85,7 @@ async fn create(ctx: &mut Ctx<'_>, args: CreateArgs) -> Result<()> {
     ctx.emit(json::repo_info(&repo), |out| {
         out.line(format!(
             "created repository {} ({})",
-            out.bold(&repo.name),
+            out.bold(&format!("{}/{}", repo.org, repo.name)),
             repo.id
         ))
     })
@@ -96,6 +96,7 @@ async fn info(ctx: &mut Ctx<'_>) -> Result<()> {
     ctx.emit(json::repo_info(&repo), |out| {
         out.kv(&[
             ("name", repo.name.clone()),
+            ("org", repo.org.clone()),
             ("id", repo.id.to_string()),
             ("description", repo.description.clone().unwrap_or_default()),
             ("trunk head", format!("trunk@{}", repo.trunk_head_seq.get())),

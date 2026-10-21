@@ -45,6 +45,7 @@ pub async fn open_stores(storage: &StorageConfig, metadata: &MetadataConfig) -> 
         }
     };
     stores.check_format().await?;
+    stores.ensure_default_org().await?;
     Ok(stores)
 }
 

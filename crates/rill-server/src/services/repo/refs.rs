@@ -59,11 +59,8 @@ impl RepoSvc {
     ) -> Result<pb::CreateRepoResponse> {
         let ctx = caller(&request)?;
         let req = request.get_ref();
-        if req.repo.is_empty()
-            || req.repo.contains('/')
-            || req.repo.parse::<rill_types::RepoId>().is_ok()
-        {
-            return Err(Error::invalid("repo must be a non-empty name without '/'"));
+        if req.repo.parse::<rill_types::RepoId>().is_ok() {
+            return Err(Error::invalid("repo must be a name, not an id"));
         }
         let repo = self
             .state

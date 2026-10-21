@@ -29,6 +29,8 @@ pub struct RepoInfo {
     pub trunk_head_seq: TrunkSeq,
     /// Paths Windows cannot create are rejected.
     pub windows_safe: bool,
+    /// The org the repository belongs to.
+    pub org: String,
 }
 
 impl TryFrom<pb::Repo> for RepoInfo {
@@ -42,7 +44,29 @@ impl TryFrom<pb::Repo> for RepoInfo {
             created_at: timestamp_from_proto(r.created_at),
             trunk_head_seq: trunk_seq_from_proto(r.trunk_head_seq),
             windows_safe: r.windows_safe,
+            org: r.org,
         })
+    }
+}
+
+/// An organization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrgInfo {
+    /// The org's name, the first part of `org/repo`.
+    pub name: String,
+    /// Free-form description.
+    pub description: Option<String>,
+    /// Creation time.
+    pub created_at: Timestamp,
+}
+
+impl From<pb::Org> for OrgInfo {
+    fn from(o: pb::Org) -> Self {
+        OrgInfo {
+            name: o.name,
+            description: o.description,
+            created_at: timestamp_from_proto(o.created_at),
+        }
     }
 }
 

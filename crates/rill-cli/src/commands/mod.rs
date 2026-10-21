@@ -9,6 +9,7 @@ pub mod history;
 pub mod import;
 pub mod intent;
 pub mod land;
+pub mod org;
 pub mod refs;
 pub mod repo;
 pub mod review;
@@ -31,6 +32,7 @@ use crate::Result;
 pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
     match command {
         Command::Repo(cmd) => repo::run(ctx, cmd).await,
+        Command::Org(cmd) => org::run(ctx, cmd).await,
         Command::Checkout(args) => checkout::run(ctx, args).await,
         Command::Status(args) => status::status(ctx, args).await,
         Command::Diff(args) => status::diff(ctx, args).await,

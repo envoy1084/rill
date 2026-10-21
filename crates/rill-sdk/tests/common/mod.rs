@@ -205,6 +205,7 @@ impl RepoService for MockRepo {
                 created_at: 1,
                 trunk_head_seq: self.trunk.lock().unwrap().0,
                 windows_safe: false,
+                org: "default".into(),
             }),
         }))
     }

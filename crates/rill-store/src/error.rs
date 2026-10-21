@@ -38,6 +38,9 @@ pub enum Error {
     )]
     IncompatibleFormat { found: u32, expected: u32 },
 
+    #[error("invalid: {0}")]
+    Invalid(String),
+
     #[error("too large: {0}")]
     TooLarge(String),
 

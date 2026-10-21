@@ -6,7 +6,7 @@ use rill_types::{OperationId, Timestamp};
 
 use crate::client::Client;
 use crate::error::Result;
-use crate::types::{Health, IssuedToken, Policy, Relation, TokenRequest, WhoAmI};
+use crate::types::{Health, IssuedToken, OrgInfo, Policy, Relation, TokenRequest, WhoAmI};
 
 /// Instance-wide administrative operations; not scoped to a repository.
 #[derive(Clone, Debug)]
@@ -148,6 +148,30 @@ impl AdminClient {
             .await?
             .into_inner();
         Ok(timestamp_from_proto(resp.updated_at))
+    }
+
+    /// Create an org.
+    pub async fn create_org(&self, name: &str, description: Option<&str>) -> Result<OrgInfo> {
+        let resp = self
+            .svc()
+            .create_org(pb::CreateOrgRequest {
+                operation_id: id_to_proto(&OperationId::new()),
+                name: name.to_string(),
+                description: description.map(str::to_string),
+            })
+            .await?
+            .into_inner();
+        Ok(rill_proto::convert::required("create_org.org", resp.org)?.into())
+    }
+
+    /// Every org.
+    pub async fn list_orgs(&self) -> Result<Vec<OrgInfo>> {
+        let resp = self
+            .svc()
+            .list_orgs(pb::ListOrgsRequest {})
+            .await?
+            .into_inner();
+        Ok(resp.orgs.into_iter().map(OrgInfo::from).collect())
     }
 
     /// Server health.

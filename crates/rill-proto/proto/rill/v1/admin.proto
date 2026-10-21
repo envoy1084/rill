@@ -14,6 +14,22 @@ service AdminService {
   rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
   rpc SetPolicy(SetPolicyRequest) returns (SetPolicyResponse);
   rpc Health(HealthRequest) returns (HealthResponse);
+  rpc CreateOrg(CreateOrgRequest) returns (CreateOrgResponse);
+  rpc ListOrgs(ListOrgsRequest) returns (ListOrgsResponse);
+}
+
+message CreateOrgRequest {
+  bytes operation_id = 1;
+  // 1-63 lowercase letters, digits and dashes.
+  string name = 2;
+  optional string description = 3;
+}
+message CreateOrgResponse {
+  Org org = 1;
+}
+message ListOrgsRequest {}
+message ListOrgsResponse {
+  repeated Org orgs = 1;
 }
 
 message WhoAmIRequest {}

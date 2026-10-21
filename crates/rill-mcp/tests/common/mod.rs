@@ -141,6 +141,7 @@ impl RepoService for MockRepo {
                 created_at: 1,
                 trunk_head_seq: 3,
                 windows_safe: false,
+                org: "default".into(),
             }),
         }))
     }

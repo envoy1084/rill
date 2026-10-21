@@ -199,17 +199,18 @@ impl RepoRegistry {
         &self.stores
     }
 
-    /// Resolve a request's `repo` field: a repository name, or an id in
-    /// `rp_<hex>` or bare hex form.
+    /// Resolve a request's `repo` field: `org/name`, a bare name in the
+    /// default org, or an id in `rp_<hex>` or bare hex form.
     pub async fn resolve(&self, spec: &str) -> Result<Arc<RepoContext>> {
         if spec.is_empty() {
             return Err(Error::invalid("repo is required"));
         }
-        if let Some(found) = self.stores.get_repo_by_name(spec).await? {
+        let (org, name) = split_repo(spec);
+        if let Some(found) = self.stores.org(org).get_repo_by_name(name).await? {
             return self.get(found.id).await;
         }
         if let Ok(id) = spec.parse::<RepoId>() {
-            if self.stores.get_repo(&id).await?.is_some() {
+            if self.stores.find_repo(&id).await?.is_some() {
                 return self.get(id).await;
             }
         }
@@ -229,7 +230,7 @@ impl RepoRegistry {
         }
         let config = self
             .stores
-            .get_repo(&id)
+            .find_repo(&id)
             .await?
             .ok_or_else(|| Error::not_found(format!("repository {id}")))?;
         let ctx = Arc::new(self.build(config).await?);
@@ -238,15 +239,18 @@ impl RepoRegistry {
         Ok(ctx)
     }
 
-    /// Create a repository and build its context.
+    /// Create a repository (`org/name`, or a name in the default org) and
+    /// build its context.
     pub async fn create(
         &self,
-        name: &str,
+        spec: &str,
         description: &str,
         settings: rill_store::RepoSettings,
     ) -> Result<Arc<RepoContext>> {
+        let (org, name) = split_repo(spec);
         let config = self
             .stores
+            .org(org)
             .create_repo_with(name, description, settings)
             .await
             .map_err(|e| {
@@ -259,9 +263,13 @@ impl RepoRegistry {
         self.get(config.id).await
     }
 
-    /// Every repository record.
+    /// Every repository record, in every org.
     pub async fn list(&self) -> Result<Vec<RepoConfig>> {
-        Ok(self.stores.list_repos().await?)
+        let mut out = Vec::new();
+        for org in self.stores.list_orgs().await? {
+            out.extend(self.stores.org(&org.name).list_repos().await?);
+        }
+        Ok(out)
     }
 
     /// Build every existing repository's context up front so landers and
@@ -275,7 +283,7 @@ impl RepoRegistry {
     }
 
     async fn build(&self, config: RepoConfig) -> Result<RepoContext> {
-        let repo = self.stores.repo(config.id);
+        let repo = self.stores.org(&config.org).repo(config.id);
         let trees = TreeOps::new(repo.objects().clone(), DEFAULT_TREE_CACHE);
         let derive = DeriveManager::new(repo.clone(), trees.clone(), DERIVE_CACHE);
         let graph = Arc::new(CommitGraph::new(repo.clone(), derive.clone()));
@@ -339,5 +347,13 @@ impl RepoRegistry {
             server_config: self.config.clone(),
             attestor: self.attestor.clone(),
         })
+    }
+}
+
+/// Split `org/name` into its parts; a bare name is in the default org.
+pub fn split_repo(spec: &str) -> (&str, &str) {
+    match spec.split_once('/') {
+        Some((org, name)) => (org, name),
+        None => (rill_store::DEFAULT_ORG, spec),
     }
 }

@@ -4,6 +4,7 @@
 mod auth;
 mod commits;
 mod end_to_end;
+mod orgs;
 
 use std::sync::Arc;
 use std::time::Duration;

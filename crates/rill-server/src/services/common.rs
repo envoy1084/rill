@@ -188,6 +188,7 @@ pub async fn repo_proto(ctx: &RepoContext) -> Result<pb::Repo> {
         created_at: timestamp_to_proto(ctx.config.created_at),
         trunk_head_seq: head.map(|(s, _)| s.get()).unwrap_or(0),
         windows_safe: ctx.config.settings.windows_safe,
+        org: ctx.config.org.clone(),
     })
 }
 

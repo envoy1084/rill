@@ -380,6 +380,24 @@ impl AdminService for AdminSvc {
         result.map_err(Status::from)
     }
 
+    async fn create_org(
+        &self,
+        request: Request<pb::CreateOrgRequest>,
+    ) -> GrpcResult<pb::CreateOrgResponse> {
+        Ok(Response::new(
+            super::orgs::create(&self.state, request).await?,
+        ))
+    }
+
+    async fn list_orgs(
+        &self,
+        request: Request<pb::ListOrgsRequest>,
+    ) -> GrpcResult<pb::ListOrgsResponse> {
+        Ok(Response::new(
+            super::orgs::list(&self.state, request).await?,
+        ))
+    }
+
     async fn health(&self, _request: Request<pb::HealthRequest>) -> GrpcResult<pb::HealthResponse> {
         let result: crate::error::Result<Response<pb::HealthResponse>> = async {
             let components = health_components(&self.state).await;
@@ -399,7 +417,7 @@ impl AdminService for AdminSvc {
 
 /// Probe each dependency the server needs to answer requests.
 pub async fn health_components(state: &AppState) -> Vec<pb::ComponentHealth> {
-    let meta = match state.stores.list_repos().await {
+    let meta = match state.repos.list().await {
         Ok(repos) => pb::ComponentHealth {
             name: "meta_store".into(),
             ok: true,
