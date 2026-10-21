@@ -12,6 +12,8 @@ struct OpStats {
     latency: Option<Histogram<u64>>,
     errors: u64,
     dropped: u64,
+    /// Errors by their first words, to tell what went wrong.
+    kinds: BTreeMap<String, u64>,
 }
 
 /// Shared counters for a run.
@@ -32,6 +34,15 @@ impl Stats {
 
     pub fn error(&self, op: &'static str) {
         self.ops.lock().entry(op).or_default().errors += 1;
+    }
+
+    /// An error with what it said; the report counts errors by kind.
+    pub fn error_with(&self, op: &'static str, error: &dyn std::fmt::Display) {
+        let kind: String = error.to_string().chars().take(60).collect();
+        let mut ops = self.ops.lock();
+        let entry = ops.entry(op).or_default();
+        entry.errors += 1;
+        *entry.kinds.entry(kind).or_default() += 1;
     }
 
     /// The operation could not start because too many were in flight.
@@ -63,6 +74,7 @@ impl Stats {
                     "p90_ms": ms(0.9),
                     "p99_ms": ms(0.99),
                     "max_ms": s.latency.as_ref().map_or(0.0, |h| h.max() as f64 / 1000.0),
+                    "error_kinds": s.kinds,
                 })
             })
             .collect();

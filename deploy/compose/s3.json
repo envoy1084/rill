@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "rill",
+      "credentials": [
+        { "accessKey": "rill", "secretKey": "rill-staging-secret" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

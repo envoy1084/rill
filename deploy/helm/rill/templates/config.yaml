@@ -1,0 +1,53 @@
+# The server configuration, as a Secret because it may hold tokens.
+{{- if not .Values.existingConfigSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "rill.name" . }}-config
+  labels:
+    {{- include "rill.labels" . | nindent 4 }}
+stringData:
+  rill.toml: |
+    listen_grpc = "0.0.0.0:{{ .Values.service.grpcPort }}"
+    listen_http = "0.0.0.0:{{ .Values.service.httpPort }}"
+
+    [storage]
+    kind = "s3"
+    url = {{ .Values.s3.url | quote }}
+    prefix = {{ .Values.s3.prefix | quote }}
+
+    [metadata]
+    kind = "fdb"
+    cluster_file = "/etc/foundationdb/fdb.cluster"
+    root = {{ .Values.fdb.root | quote }}
+
+
+    [auth]
+    kind = "static"
+    {{- range .Values.auth.tokens }}
+
+    [[auth.tokens]]
+    token = {{ .token | quote }}
+    principal_name = {{ .principalName | quote }}
+    kind = {{ .kind | default "Human" | quote }}
+    {{- end }}
+    {{- if .Values.tls.secret }}
+
+    [tls]
+    cert = "/etc/rill/tls/tls.crt"
+    key = "/etc/rill/tls/tls.key"
+    {{- if .Values.tls.clientCaKey }}
+    client_ca = "/etc/rill/tls/{{ .Values.tls.clientCaKey }}"
+    {{- end }}
+    {{- end }}
+
+    [shutdown]
+    drain_secs = {{ .Values.shutdown.drainSecs }}
+    grace_secs = {{ .Values.shutdown.graceSecs }}
+
+    [telemetry]
+    log_format = {{ .Values.telemetry.logFormat | quote }}
+    {{- if .Values.telemetry.otlpEndpoint }}
+    otlp_endpoint = {{ .Values.telemetry.otlpEndpoint | quote }}
+    {{- end }}
+{{- end }}

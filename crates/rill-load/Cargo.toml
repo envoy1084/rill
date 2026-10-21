@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 rill-types = { workspace = true }
+futures = { workspace = true }
 rill-sdk = { workspace = true }
 rill-api = { workspace = true }
 tokio = { workspace = true }

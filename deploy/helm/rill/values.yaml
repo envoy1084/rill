@@ -1,0 +1,78 @@
+# The rill image (see the Dockerfile at the repository root).
+image:
+  repository: rill
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# Servers. Every server may run every role; leases and job claims share
+# the background work, so replicas > 1 is safe with FoundationDB metadata.
+replicas: 3
+roles: api,workers
+
+service:
+  type: ClusterIP
+  grpcPort: 7420
+  httpPort: 7421
+
+# Objects: an S3-compatible bucket. Credentials come from `s3.secret`
+# (keys AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY), the endpoint from
+# `s3.endpoint` (empty for AWS).
+s3:
+  url: s3://rill
+  prefix: ""
+  endpoint: ""
+  region: us-east-1
+  allowHttp: false
+  secret: rill-s3
+
+# Metadata: FoundationDB. The cluster file comes from a ConfigMap, as the
+# fdb-kubernetes-operator publishes it (`<cluster>-config`, key
+# `cluster-file`).
+fdb:
+  clusterFileConfigMap: fdb-cluster-config
+  clusterFileKey: cluster-file
+  root: rill
+
+# A Secret with a complete `rill.toml` (key `rill.toml`) to use instead of
+# the one rendered from these values; keeps tokens out of values files.
+existingConfigSecret: ""
+
+# Bearer tokens, when the configuration is rendered from these values.
+auth:
+  tokens: []
+  # - token: change-me
+  #   principalName: admin
+  #   kind: Human
+
+# TLS for both listeners from a kubernetes.io/tls Secret; `clientCaKey`
+# names a CA certificate in the same Secret to require client certificates.
+tls:
+  secret: ""
+  clientCaKey: ""
+
+shutdown:
+  drainSecs: 5
+  graceSecs: 30
+
+telemetry:
+  logFormat: json
+  otlpEndpoint: ""
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    memory: 4Gi
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+serviceMonitor:
+  enabled: false
+  interval: 15s
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

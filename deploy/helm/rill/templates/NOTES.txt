@@ -1,0 +1,7 @@
+Rill is starting with {{ .Values.replicas }} servers (roles: {{ .Values.roles }}).
+
+  gRPC:  {{ include "rill.name" . }}:{{ .Values.service.grpcPort }}
+  HTTP:  {{ include "rill.name" . }}:{{ .Values.service.httpPort }} (/livez, /readyz, /metrics, objects)
+
+Point clients at it with RILL_ENDPOINT=http://{{ include "rill.name" . }}:{{ .Values.service.grpcPort }}
+and a token from your auth configuration.

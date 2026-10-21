@@ -12,6 +12,7 @@ use rill_types::{FileKind, SparseProfile, Tree};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
+use crate::ledger::Ledger;
 use crate::profile::Profile;
 use crate::stats::Stats;
 use crate::workload::{file_path, Workload, DIRS, FILES_PER_DIR};
@@ -25,11 +26,21 @@ pub struct Settings {
     pub duration: Duration,
     pub max_in_flight: usize,
     pub hot_share: f64,
+    /// Bearer token, when the cluster authenticates.
+    pub token: Option<String>,
+    /// Streams watching the event log.
+    pub watchers: usize,
+    /// Print an interim report to stderr this often; long runs.
+    pub report_every: Option<Duration>,
 }
 
 /// Create and seed the repository, then drive load for the duration.
 pub async fn run(settings: Settings) -> anyhow::Result<serde_json::Value> {
-    let client = Client::connect(ClientConfig::new(settings.endpoint.clone())).await?;
+    let mut config = ClientConfig::new(settings.endpoint.clone());
+    if let Some(token) = &settings.token {
+        config = config.with_token(token.clone());
+    }
+    let client = Client::connect(config).await?;
     client
         .create_repo(&settings.repo, Some("load test".into()))
         .await?;
@@ -37,13 +48,43 @@ pub async fn run(settings: Settings) -> anyhow::Result<serde_json::Value> {
     seed(&repo).await?;
 
     let stats = Arc::new(Stats::default());
-    let workload = Arc::new(Workload::new(repo, stats.clone(), settings.hot_share));
+    let ledger = Arc::new(Ledger::default());
+    let workload = Arc::new(Workload::new(
+        repo.clone(),
+        stats.clone(),
+        ledger.clone(),
+        settings.hot_share,
+    ));
     let limit = Arc::new(Semaphore::new(settings.max_in_flight));
     let p = settings.profile;
     let deadline = Instant::now() + settings.duration;
     let started = Instant::now();
 
     let mut tickers = JoinSet::new();
+    if settings.watchers > 0 {
+        tickers.spawn(crate::watch::watch(
+            repo.clone(),
+            settings.watchers,
+            deadline,
+            stats.clone(),
+        ));
+    }
+    if let Some(every) = settings.report_every {
+        let stats = stats.clone();
+        tickers.spawn(async move {
+            let mut tick = tokio::time::interval(every);
+            tick.tick().await;
+            let until = tokio::time::Instant::from_std(deadline);
+            loop {
+                tokio::select! {
+                    _ = tick.tick() => {}
+                    _ = tokio::time::sleep_until(until) => return,
+                }
+                let report = stats.report(started.elapsed());
+                eprintln!("{}", serde_json::json!({ "interim": report }));
+            }
+        });
+    }
     ticker(
         &mut tickers,
         "read",
@@ -110,6 +151,8 @@ pub async fn run(settings: Settings) -> anyhow::Result<serde_json::Value> {
     // Rates are over the load window; in-flight work finishing after it
     // still counts toward latencies.
     let mut report = stats.report(settings.duration);
+    report["ledger"] = ledger.verify(&repo).await;
+    report["slo"] = crate::slo::judge(&report);
     report["drain_secs"] =
         serde_json::json!((started.elapsed().saturating_sub(settings.duration)).as_secs_f64());
     report["target"] = serde_json::json!({

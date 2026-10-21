@@ -1,0 +1,6 @@
+target
+fuzz/target
+research
+.git
+.DS_Store
+**/*.rs.bk

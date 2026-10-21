@@ -1,0 +1,35 @@
+# The staging servers' configuration. Every server runs every role; leases
+# and job claims share the background work between them.
+
+listen_grpc = "0.0.0.0:7420"
+listen_http = "0.0.0.0:7421"
+
+[storage]
+kind = "s3"
+url = "s3://rill"
+prefix = "staging"
+
+[metadata]
+kind = "fdb"
+cluster_file = "/etc/foundationdb/fdb.cluster"
+root = "rill-staging"
+
+[auth]
+kind = "static"
+
+[[auth.tokens]]
+token = "staging-admin"
+principal_name = "staging-admin"
+kind = "Human"
+
+[[auth.tokens]]
+token = "staging-agent"
+principal_name = "load-agent"
+kind = "Agent"
+
+[shutdown]
+drain_secs = 2
+grace_secs = 20
+
+[telemetry]
+log_format = "json"

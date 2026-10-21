@@ -14,6 +14,9 @@ async fn short_run_completes_without_errors() {
         duration: Duration::from_secs(2),
         max_in_flight: 64,
         hot_share: 0.3,
+        token: None,
+        watchers: 2,
+        report_every: None,
     })
     .await
     .unwrap();
@@ -25,4 +28,7 @@ async fn short_run_completes_without_errors() {
         .map(|r| r["ok"].as_u64().unwrap())
         .sum();
     assert!(reads > 50, "{report:#}");
+    let ledger = &report["ledger"];
+    assert!(ledger["acknowledged_versions"].as_u64().unwrap() > 0, "{report:#}");
+    assert_eq!(ledger["lost_versions"].as_array().unwrap().len(), 0, "{report:#}");
 }

@@ -97,3 +97,15 @@ fn metric_names(expr: &str) -> Vec<String> {
     }
     names
 }
+
+#[test]
+fn shipped_configurations_parse() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let config = ServerConfig::load(Some(&root.join("deploy/compose/rill.toml"))).unwrap();
+    assert!(!config.dev_mode);
+    assert!(matches!(
+        config.metadata,
+        rill_api::config::MetadataConfig::Fdb { .. }
+    ));
+    assert!(matches!(config.storage, rill_api::StorageConfig::S3 { .. }));
+}

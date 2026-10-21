@@ -29,6 +29,15 @@ struct Args {
     /// Print the report as JSON.
     #[arg(long)]
     json: bool,
+    /// Bearer token for an authenticating cluster.
+    #[arg(long, env = "RILL_TOKEN")]
+    token: Option<String>,
+    /// Streams watching the event log (D1 has 50,000).
+    #[arg(long, default_value_t = 0)]
+    watchers: usize,
+    /// Print an interim report to stderr every this many seconds.
+    #[arg(long)]
+    report_every: Option<u64>,
 }
 
 #[tokio::main]
@@ -50,6 +59,9 @@ async fn main() -> anyhow::Result<()> {
         duration: Duration::from_secs(args.duration),
         max_in_flight: args.max_in_flight,
         hot_share: args.hot_share,
+        token: args.token,
+        watchers: args.watchers,
+        report_every: args.report_every.map(Duration::from_secs),
     })
     .await?;
     if args.json {
@@ -57,6 +69,15 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
     print_table(&report);
+    let ledger = &report["ledger"];
+    println!(
+        "acknowledged: {} versions, {} landings; lost: {} versions, {} landings",
+        ledger["acknowledged_versions"],
+        ledger["acknowledged_landings"],
+        ledger["lost_versions"].as_array().map_or(0, Vec::len),
+        ledger["lost_landings"].as_array().map_or(0, Vec::len),
+    );
+    println!("SLOs met: {}", report["slo"]["met"]);
     Ok(())
 }
 

@@ -10,6 +10,7 @@ use rand::RngExt;
 use rill_sdk::{ApplyOptions, Edit, EditBase, GrepQuery, LandStatus, LogStart, RepoClient, Root};
 use rill_types::{ChangeId, FileKind, RepoPathBuf};
 
+use crate::ledger::Ledger;
 use crate::stats::Stats;
 
 /// Directories and files the repository is seeded with.
@@ -21,6 +22,7 @@ const HOT_FILES: usize = 5;
 pub struct Workload {
     pub repo: RepoClient,
     pub stats: Arc<Stats>,
+    pub ledger: Arc<Ledger>,
     pub hot_share: f64,
     /// Changes created but not yet submitted.
     drafts: Mutex<Vec<ChangeId>>,
@@ -29,10 +31,11 @@ pub struct Workload {
 }
 
 impl Workload {
-    pub fn new(repo: RepoClient, stats: Arc<Stats>, hot_share: f64) -> Self {
+    pub fn new(repo: RepoClient, stats: Arc<Stats>, ledger: Arc<Ledger>, hot_share: f64) -> Self {
         Workload {
             repo,
             stats,
+            ledger,
             hot_share,
             drafts: Mutex::new(Vec::new()),
             approved: Mutex::new(Vec::new()),
@@ -63,8 +66,8 @@ impl Workload {
                 self.stats.ok(op, started.elapsed());
                 Some(v)
             }
-            Err(_) => {
-                self.stats.error(op);
+            Err(e) => {
+                self.stats.error_with(op, &e);
                 None
             }
         }
@@ -118,6 +121,7 @@ impl Workload {
             )
             .await
         {
+            self.ledger.version(result.hash);
             self.drafts.lock().push(result.version.change_id);
         }
     }
@@ -159,7 +163,12 @@ impl Workload {
             .await_land(&ticket.id, Duration::from_secs(120))
             .await
         {
-            Ok(p) if p.status() == LandStatus::Landed => self.stats.ok("land", started.elapsed()),
+            Ok(p) if p.status() == LandStatus::Landed => {
+                self.stats.ok("land", started.elapsed());
+                if let (Some(seq), Some(hash)) = (p.seq, p.landed_hash) {
+                    self.ledger.landing(seq, hash);
+                }
+            }
             _ => self.stats.error("land"),
         }
     }

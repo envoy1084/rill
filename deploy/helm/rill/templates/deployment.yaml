@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rill.name" . }}
+  labels:
+    {{- include "rill.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rill.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rill.selector" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      # Drain, then finish requests and jobs, then a margin.
+      terminationGracePeriodSeconds: {{ add .Values.shutdown.drainSecs .Values.shutdown.graceSecs 10 }}
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: rill
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - api
+            - --config
+            - /etc/rill/rill.toml
+            - --roles
+            - {{ .Values.roles | quote }}
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
+            - name: http
+              containerPort: {{ .Values.service.httpPort }}
+          env:
+            - name: AWS_REGION
+              value: {{ .Values.s3.region | quote }}
+            {{- if .Values.s3.endpoint }}
+            - name: AWS_ENDPOINT
+              value: {{ .Values.s3.endpoint | quote }}
+            {{- end }}
+            {{- if .Values.s3.allowHttp }}
+            - name: AWS_ALLOW_HTTP
+              value: "true"
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.s3.secret }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+              scheme: {{ if .Values.tls.secret }}HTTPS{{ else }}HTTP{{ end }}
+            periodSeconds: 2
+            failureThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+              scheme: {{ if .Values.tls.secret }}HTTPS{{ else }}HTTP{{ end }}
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/rill/rill.toml
+              subPath: rill.toml
+            - name: fdb
+              mountPath: /etc/foundationdb
+            {{- if .Values.tls.secret }}
+            - name: tls
+              mountPath: /etc/rill/tls
+            {{- end }}
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ .Values.existingConfigSecret | default (printf "%s-config" (include "rill.name" .)) }}
+        - name: fdb
+          configMap:
+            name: {{ .Values.fdb.clusterFileConfigMap }}
+            items:
+              - key: {{ .Values.fdb.clusterFileKey }}
+                path: fdb.cluster
+        {{- if .Values.tls.secret }}
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secret }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
