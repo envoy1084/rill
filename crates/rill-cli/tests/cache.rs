@@ -265,7 +265,7 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
     let mut status = 0;
     for _ in 0..250 {
         status = fetch().await;
-        if status == 451 && cache.disk().len() == 0 {
+        if status == 451 && cache.disk().is_empty() {
             break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
