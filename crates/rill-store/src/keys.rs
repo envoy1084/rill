@@ -42,6 +42,18 @@ pub mod table {
     pub const LEASE: &str = "lease";
     /// `(lepoch, ns, repo, role)` → be64 epoch; fenced writes check it
     pub const LEASE_EPOCH: &str = "lepoch";
+    /// `(jobq, ns, repo, queue, shard, priority, run_at, stamp)` → job ready
+    /// to run from `run_at` on
+    pub const JOB_READY: &str = "jobq";
+    /// `(jobl, ns, repo, queue, job)` → claimed job with its lease
+    pub const JOB_LEASED: &str = "jobl";
+    /// `(jobt, ns, repo, queue, job)` → the claim's token; fenced writes
+    /// check it
+    pub const JOB_TOKEN: &str = "jobt";
+    /// `(jobd, ns, repo, queue, job)` → job that ran out of attempts
+    pub const JOB_DEAD: &str = "jobd";
+    /// `(jobn, ns, repo, queue, metric)` → queue counter
+    pub const JOB_COUNT: &str = "jobn";
     /// `(log, ns, repo, stamp)` → version hash, every stored version
     pub const LOG: &str = "log";
     /// `(trunk, ns, repo, seq)` → version hash
@@ -283,6 +295,47 @@ impl RepoKeys {
 
     pub fn misc(&self, name: &str) -> Bytes {
         self.row(table::MISC, &name)
+    }
+
+    /// Jobs of `queue` in `shard` at `priority`, ready or not yet.
+    pub fn jobs_ready(&self, queue: &str, shard: u8, priority: u8) -> Bytes {
+        self.row(
+            table::JOB_READY,
+            &(queue, i64::from(shard), i64::from(priority)),
+        )
+    }
+
+    /// The prefix a job ready from `run_at` is stamped under; also the
+    /// exclusive end of the jobs ready before `run_at`.
+    pub fn job_ready_at(&self, queue: &str, shard: u8, priority: u8, run_at: i64) -> Bytes {
+        self.row(
+            table::JOB_READY,
+            &(queue, i64::from(shard), i64::from(priority), run_at),
+        )
+    }
+
+    pub fn jobs_leased(&self, queue: &str) -> Bytes {
+        self.row(table::JOB_LEASED, &queue)
+    }
+
+    pub fn job_leased(&self, queue: &str, job: &[u8; 16]) -> Bytes {
+        self.row(table::JOB_LEASED, &(queue, job.as_slice()))
+    }
+
+    pub fn job_token(&self, queue: &str, job: &[u8; 16]) -> Bytes {
+        self.row(table::JOB_TOKEN, &(queue, job.as_slice()))
+    }
+
+    pub fn jobs_dead(&self, queue: &str) -> Bytes {
+        self.row(table::JOB_DEAD, &queue)
+    }
+
+    pub fn job_dead(&self, queue: &str, job: &[u8; 16]) -> Bytes {
+        self.row(table::JOB_DEAD, &(queue, job.as_slice()))
+    }
+
+    pub fn job_count(&self, queue: &str, metric: &str) -> Bytes {
+        self.row(table::JOB_COUNT, &(queue, metric))
     }
 }
 

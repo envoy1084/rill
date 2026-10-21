@@ -1,0 +1,23 @@
+[package]
+name = "rill-jobs"
+description = "Durable job queues for Rill: priorities, shards, leased claims, backoff, a dead-letter queue and a worker runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-types = { workspace = true }
+rill-store = { workspace = true }
+serde = { workspace = true }
+bytes = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+parking_lot = { workspace = true }
+async-trait = { workspace = true }

@@ -29,7 +29,7 @@ pub use encoding::{
 };
 pub use error::{Error, Result};
 pub use hash::{ObjectHash, ObjectKind};
-pub use ids::{ChangeId, IntentId, OperationId, PrincipalId, RepoId, WorkspaceId};
+pub use ids::{ChangeId, IntentId, JobId, OperationId, PrincipalId, RepoId, WorkspaceId};
 pub use merge::Merge;
 pub use objects::blob::{BlobManifest, ContentRef, INLINE_THRESHOLD};
 pub use objects::change::{

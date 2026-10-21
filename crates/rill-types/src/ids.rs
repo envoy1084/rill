@@ -131,6 +131,11 @@ define_id!(
     "rp"
 );
 define_id!(
+    /// Identity of a background job.
+    JobId,
+    "jb"
+);
+define_id!(
     /// Identity of an operation in a workspace's operation log. Also used as
     /// the idempotency key for write RPCs.
     OperationId,
