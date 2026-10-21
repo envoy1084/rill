@@ -12,8 +12,7 @@ use rill_store::RepoStore;
 use rill_types::{ObjectHash, RepoPath, RepoPathBuf, SparseProfile, TreeHash};
 use serde::{Deserialize, Serialize};
 
-use super::extract::{extract_for, Symbol};
-use super::lang::Language;
+use super::extract::{extract_symbols, is_source, Symbol};
 use crate::error::Result;
 
 /// Derived kind under which a root's symbol table is stored.
@@ -87,14 +86,14 @@ impl RootSymbols {
 
 /// Builds and caches symbol tables per root tree.
 ///
-/// Extraction is cached per `(content hash, language)` because the same
+/// Extraction is cached per `(content hash, path)` because the same
 /// blob recurs across roots; the per-root table itself is persisted as
 /// derived data so a root is walked once.
 pub struct SymbolIndex {
     repo: RepoStore,
     trees: TreeOps,
     roots: DashMap<TreeHash, Arc<RootSymbols>>,
-    blobs: DashMap<(ObjectHash, Language), Arc<Vec<Symbol>>>,
+    blobs: DashMap<(ObjectHash, String), Arc<Vec<Symbol>>>,
 }
 
 impl SymbolIndex {
@@ -145,21 +144,22 @@ impl SymbolIndex {
             .await?;
         let objects = self.trees.objects().clone();
         let extracted: Vec<(RepoPathBuf, Arc<Vec<Symbol>>)> = stream::iter(entries)
-            .filter_map(|e| async move {
-                Language::from_path(e.path.as_str())
-                    .filter(|_| e.content.size() as usize <= MAX_SYMBOL_FILE)
-                    .map(|lang| (e, lang))
+            .filter(|e| {
+                let keep =
+                    is_source(e.path.as_str()) && e.content.size() as usize <= MAX_SYMBOL_FILE;
+                async move { keep }
             })
-            .map(|(e, lang)| {
+            .map(|e| {
                 let objects = objects.clone();
                 async move {
-                    let key = (e.content.content_hash(), lang);
+                    let path = e.path.as_str().to_string();
+                    let key = (e.content.content_hash(), path.clone());
                     let symbols = match self.blobs.get(&key) {
                         Some(cached) => cached.clone(),
                         None => {
                             let bytes: Bytes = read_content(objects.as_ref(), &e.content).await?;
                             let symbols =
-                                tokio::task::spawn_blocking(move || extract_for(lang, &bytes))
+                                tokio::task::spawn_blocking(move || extract_symbols(&path, &bytes))
                                     .await?;
                             let symbols = Arc::new(symbols);
                             self.blobs.insert(key, symbols.clone());

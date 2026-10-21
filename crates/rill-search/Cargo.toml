@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+sem-core = { workspace = true }
 roaring = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true }
