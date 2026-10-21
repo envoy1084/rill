@@ -17,7 +17,7 @@ pub use agent::{AgentBudgets, AgentRecord, Sponsor, WorkloadBinding};
 pub use event::{IdentityChange, IdentityEvent};
 pub use keys::{TokenKeyRecord, WrappedSecret};
 pub use login::PendingLogin;
-pub use provider::IdentityProvider;
+pub use provider::{IdentityProvider, SamlSettings};
 pub use revocation::Revocation;
 pub use scim::ScimCredential;
 pub use session::{SessionKind, SessionRecord};

@@ -214,6 +214,14 @@ message IdentityProviderSpec {
   optional string username_claim = 8;
   optional string groups_claim = 9;
   bool auto_provision = 10;
+  // A SAML 2.0 provider instead of OIDC: the IdP's metadata XML. `issuer`
+  // is then taken from it and the client fields are ignored; the username
+  // is the NameID unless `username_claim` names an attribute, and groups
+  // come from the attribute `groups_claim` names.
+  optional string saml_metadata = 11;
+  // Rill's entity id at the IdP; defaults to
+  // `<public_url>/auth/saml/<org>/<name>`.
+  optional string saml_sp_entity_id = 12;
 }
 message IdentityProviderInfo {
   string org = 1;
@@ -227,6 +235,8 @@ message IdentityProviderInfo {
   optional string groups_claim = 9;
   bool auto_provision = 10;
   int64 created_at = 11;
+  bool saml = 12;
+  optional string saml_sp_entity_id = 13;
 }
 
 message PutIdentityProviderRequest {

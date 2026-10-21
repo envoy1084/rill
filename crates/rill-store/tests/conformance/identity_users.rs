@@ -40,6 +40,7 @@ fn provider(org: &str, name: &str, issuer: &str) -> IdentityProvider {
         username_claim: "preferred_username".into(),
         groups_claim: None,
         auto_provision: true,
+        saml: None,
         created_at: Timestamp::from_millis(1),
     }
 }

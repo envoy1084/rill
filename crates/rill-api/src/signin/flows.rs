@@ -29,7 +29,10 @@ pub struct SignInProvider {
 pub async fn sign_in_providers(state: &AppState, org: &str) -> Result<Vec<SignInProvider>> {
     let mut out = Vec::new();
     for p in state.identity.store().providers(org).await? {
-        let meta = state.identity.issuers().metadata(&p.issuer).await.ok();
+        let meta = match p.saml {
+            Some(_) => None,
+            None => state.identity.issuers().metadata(&p.issuer).await.ok(),
+        };
         out.push(SignInProvider {
             org: p.org,
             name: p.name,
@@ -57,6 +60,11 @@ pub async fn exchange_id_token(state: &AppState, token: &str) -> Result<SessionT
         .ok_or_else(|| {
             Error::Unauthenticated(format!("no provider trusts issuer {issuer_url:?}"))
         })?;
+    if provider.saml.is_some() {
+        return Err(Error::Unauthenticated(
+            "a SAML provider issues no ID tokens".into(),
+        ));
+    }
     let claims = state
         .identity
         .issuers()

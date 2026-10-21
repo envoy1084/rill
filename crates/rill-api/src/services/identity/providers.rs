@@ -2,7 +2,7 @@
 
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
-use rill_types::identity::IdentityProvider;
+use rill_types::identity::{IdentityProvider, SamlSettings};
 use rill_types::Timestamp;
 use tonic::Request;
 
@@ -23,7 +23,56 @@ fn info(p: IdentityProvider) -> pb::IdentityProviderInfo {
         groups_claim: p.groups_claim,
         auto_provision: p.auto_provision,
         created_at: timestamp_to_proto(p.created_at),
+        saml: p.saml.is_some(),
+        saml_sp_entity_id: p.saml.map(|s| s.sp_entity_id),
     }
+}
+
+/// The settings of a SAML provider, checked as sign-in will use them.
+#[cfg(feature = "saml")]
+fn saml_settings(
+    state: &AppState,
+    spec: &pb::IdentityProviderSpec,
+    metadata: String,
+) -> Result<(String, SamlSettings)> {
+    let settings = SamlSettings {
+        idp_metadata: metadata,
+        sp_entity_id: spec.saml_sp_entity_id.clone().unwrap_or_else(|| {
+            format!(
+                "{}/auth/saml/{}/{}",
+                crate::signin::public_url(state),
+                spec.org,
+                spec.name
+            )
+        }),
+    };
+    let sp = rill_identity::saml::SamlProvider::new(&settings, "")
+        .map_err(|e| Error::invalid(e.to_string()))?;
+    Ok((sp.entity_id().to_string(), settings))
+}
+
+#[cfg(not(feature = "saml"))]
+fn saml_settings(
+    _: &AppState,
+    _: &pb::IdentityProviderSpec,
+    _: String,
+) -> Result<(String, SamlSettings)> {
+    Err(Error::invalid("this server was built without SAML support"))
+}
+
+/// An OIDC issuer must use https outside development.
+fn check_issuer(state: &AppState, issuer: &str) -> Result<()> {
+    let url = url::Url::parse(issuer).map_err(|e| Error::invalid(format!("issuer: {e}")))?;
+    let loopback = matches!(
+        url.host(),
+        Some(url::Host::Domain("localhost"))
+            | Some(url::Host::Ipv4(std::net::Ipv4Addr::LOCALHOST))
+            | Some(url::Host::Ipv6(std::net::Ipv6Addr::LOCALHOST))
+    );
+    if url.scheme() != "https" && !loopback && !state.dev_mode() {
+        return Err(Error::invalid("the issuer must use https"));
+    }
+    Ok(())
 }
 
 pub async fn put(
@@ -39,20 +88,24 @@ pub async fn put(
     if state.stores.get_org(&spec.org).await?.is_none() {
         return Err(Error::NotFound(format!("org {:?}", spec.org)));
     }
-    let issuer =
-        url::Url::parse(&spec.issuer).map_err(|e| Error::invalid(format!("issuer: {e}")))?;
-    let loopback = matches!(
-        issuer.host(),
-        Some(url::Host::Domain("localhost"))
-            | Some(url::Host::Ipv4(std::net::Ipv4Addr::LOCALHOST))
-            | Some(url::Host::Ipv6(std::net::Ipv6Addr::LOCALHOST))
-    );
-    if issuer.scheme() != "https" && !loopback && !state.dev_mode() {
-        return Err(Error::invalid("the issuer must use https"));
+    if spec.name.is_empty() {
+        return Err(Error::invalid("name is required"));
     }
-    if spec.name.is_empty() || spec.client_id.is_empty() {
-        return Err(Error::invalid("name and client_id are required"));
-    }
+    let (issuer, client_id, saml) = match spec.saml_metadata.clone() {
+        Some(metadata) => {
+            let (entity_id, settings) = saml_settings(state, &spec, metadata)?;
+            let sp_entity_id = settings.sp_entity_id.clone();
+            (entity_id, sp_entity_id, Some(settings))
+        }
+        None => {
+            check_issuer(state, &spec.issuer)?;
+            if spec.client_id.is_empty() {
+                return Err(Error::invalid("client_id is required"));
+            }
+            let issuer = spec.issuer.trim_end_matches('/').to_string();
+            (issuer, spec.client_id.clone(), None)
+        }
+    };
     let client_secret = match spec.client_secret {
         Some(secret) => Some(
             state
@@ -64,7 +117,7 @@ pub async fn put(
         ),
         None => None,
     };
-    let scopes = if spec.scopes.is_empty() {
+    let scopes = if spec.scopes.is_empty() && saml.is_none() {
         vec!["openid".into(), "profile".into(), "email".into()]
     } else {
         spec.scopes
@@ -72,16 +125,22 @@ pub async fn put(
     let provider = IdentityProvider {
         org: spec.org,
         name: spec.name,
-        issuer: spec.issuer.trim_end_matches('/').to_string(),
-        client_id: spec.client_id,
+        issuer,
+        client_id,
         client_secret,
         cli_client_id: spec.cli_client_id,
         scopes,
-        username_claim: spec
-            .username_claim
-            .unwrap_or_else(|| "preferred_username".into()),
+        username_claim: spec.username_claim.unwrap_or_else(|| {
+            if saml.is_some() {
+                "sub"
+            } else {
+                "preferred_username"
+            }
+            .into()
+        }),
         groups_claim: spec.groups_claim,
         auto_provision: spec.auto_provision,
+        saml,
         created_at: Timestamp::now(),
     };
     state

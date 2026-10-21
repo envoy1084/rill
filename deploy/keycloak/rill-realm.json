@@ -98,6 +98,52 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "rill-saml",
+      "name": "Rill (SAML)",
+      "enabled": true,
+      "protocol": "saml",
+      "redirectUris": [
+        "http://127.0.0.1:*",
+        "http://localhost:*"
+      ],
+      "frontchannelLogout": false,
+      "attributes": {
+        "saml.authnstatement": "true",
+        "saml.server.signature": "true",
+        "saml.assertion.signature": "true",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.client.signature": "false",
+        "saml.encrypt": "false",
+        "saml_force_name_id_format": "true",
+        "saml_name_id_format": "username"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "saml",
+          "protocolMapper": "saml-group-membership-mapper",
+          "config": {
+            "attribute.name": "groups",
+            "friendly.name": "groups",
+            "attribute.nameformat": "Basic",
+            "single": "false",
+            "full.path": "false"
+          }
+        },
+        {
+          "name": "email",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "config": {
+            "user.attribute": "email",
+            "attribute.name": "email",
+            "friendly.name": "email",
+            "attribute.nameformat": "Basic"
+          }
+        }
+      ]
     }
   ]
 }

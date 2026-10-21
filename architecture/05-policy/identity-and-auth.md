@@ -101,7 +101,8 @@ its principal and capability.
 
 ## Sign-in
 
-Each organization registers OpenID Connect providers
+Each organization registers OpenID Connect providers (or
+[SAML](#saml-20) ones)
 (`PutIdentityProvider`: issuer, a confidential client for browsers whose
 secret the key service wraps, an optional public client for the CLI, the
 username and groups claims, and whether a first sign-in provisions the
@@ -164,6 +165,46 @@ SDK use it ([CLI](../08-clients/cli.md), [SDK](../08-clients/sdk.md)).
 Refreshing refuses and ends the session of a user suspended since signing
 in; every request by a suspended user is refused through the identity view
 (`UserChanged` in the log drops the cached user).
+
+### SAML 2.0
+
+A server built with the `saml` feature also signs browsers in through SAML
+2.0 providers ([`rill-identity/src/saml/`](../../crates/rill-identity/src/saml/mod.rs),
+on samael with xmlsec). `PutIdentityProvider` with `saml_metadata` (the
+IdP's metadata XML) stores the provider with the IdP's entity id as its
+issuer and Rill's entity id (`saml_sp_entity_id`, default
+`<public_url>/auth/saml/<org>/<name>`) as its client. Metadata without a
+signing certificate or an HTTP-Redirect SSO endpoint is refused when it is
+saved, since samael would accept unsigned responses for it.
+
+`/auth/login` for a SAML provider records a `PendingLogin` keyed by a
+random RelayState, with the AuthnRequest's id (`rill-<40 hex>`) as its
+nonce, and redirects to the IdP. The IdP posts the response to
+`POST /auth/saml/acs`. That route takes the pending login once and then
+checks the response:
+
+* its signature, against the metadata's certificates, with RSA or ECDSA
+  over SHA-256/384/512 only;
+* the issuer;
+* `InResponseTo`, which must equal the request id (IdP-initiated sign-in is
+  refused);
+* the destination and recipient, which must equal
+  `<public_url>/auth/saml/acs`;
+* the validity window;
+* an audience restriction to Rill's entity id.
+
+The assertion then reads as claims: `iss` is the entity id, `sub` is the
+NameID, and each attribute appears under its name and its friendly name.
+Users, groups and sessions are then the same as for OIDC. The username is
+the NameID unless `username_claim` names an attribute. Responses are
+verified on a blocking thread. `GET /auth/saml/metadata?org&provider`
+serves Rill's SP metadata. A SAML provider issues no ID tokens, so the CLI
+signs in through OIDC providers only.
+
+Building needs libxml2 and xmlsec1 (with OpenSSL). On macOS the Homebrew
+`libxml2`, `libxslt` and `libxmlsec1` must all be on `PKG_CONFIG_PATH`.
+Otherwise the binary links the system libxml2 next to Homebrew's, xmlsec
+cannot resolve signature references, and every response is refused.
 
 Org administration (`require_org_admin`): instance administrators, or an
 active member of the org with the `admin` role presenting an unnarrowed
@@ -314,7 +355,8 @@ path and repository. `resolved_by()` maps the caller's kind to the
   is accepted for any workspace.
 * No `TeamResolver` is wired in the server. Token-authenticated principals
   always have empty teams; only static tokens carry teams.
-* SAML providers are not supported.
+* SAML sign-in is browser-only, does no single logout, and does not
+  accept encrypted assertions.
 * `PrincipalKind` has no serde rename, so a TOML `auth.tokens[].kind` must be
   written `Human`, `Agent` or `Service`. The env var form uses lowercase.
 * `CreateChangeVersion` stores the client-supplied `author` and `provenance`
@@ -328,7 +370,7 @@ path and repository. `resolved_by()` maps the caller's kind to the
 * [`rill-policy/src/identity.rs`](../../crates/rill-policy/src/identity.rs): `AuthHeaders`, `AuthContext`, `Authenticator`, `StaticTokenAuthenticator`, `TeamResolver`.
 * [`signin/`](../../crates/rill-api/src/signin/mod.rs): the sign-in HTTP routes; [`rill-identity/src/signin/`](../../crates/rill-identity/src/signin/mod.rs), [`rill-identity/src/oidc/`](../../crates/rill-identity/src/oidc/mod.rs).
 * [`identity/callers.rs`](../../crates/rill-api/src/identity/callers.rs): teams, agent standing and scope; [`rill-identity/src/agents/`](../../crates/rill-identity/src/agents/mod.rs): the workload exchange.
-* Tests: `rill-api/tests/grpc/scim.rs` (credentials, groups as teams, deactivation), `rill-identity/tests/scim.rs`, `rill-api/tests/grpc/killswitch.rs` (exact budgets, rate, kill switch ejection), `rill-api/tests/grpc/agents.rs` (exchange, scope, sponsor and model suspension), `rill-identity/tests/workload.rs`, `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-cli/tests/bootstrap.rs`.
+* Tests: `rill-api/tests/grpc/scim.rs` (credentials, groups as teams, deactivation), `rill-identity/tests/scim.rs`, `rill-api/tests/grpc/killswitch.rs` (exact budgets, rate, kill switch ejection), `rill-api/tests/grpc/agents.rs` (exchange, scope, sponsor and model suspension), `rill-identity/tests/workload.rs`, `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-api/tests/grpc/keycloak_saml.rs` (SAML through Keycloak: a forged response, a replay), `rill-cli/tests/bootstrap.rs`.
 * [`rill-types/src/principal.rs`](../../crates/rill-types/src/principal.rs): `Principal`, `PrincipalKind`.
 * [`auth/authenticator.rs`](../../crates/rill-api/src/auth/authenticator.rs): `static_tokens`, `authenticate`.
 * [`auth/instance.rs`](../../crates/rill-api/src/auth/instance.rs): `require_instance_admin`.

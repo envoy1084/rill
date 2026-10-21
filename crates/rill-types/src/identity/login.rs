@@ -12,7 +12,10 @@ pub struct PendingLogin {
     pub state: String,
     pub org: String,
     pub provider: String,
+    /// The OIDC nonce, or the id of the SAML AuthnRequest the response
+    /// must answer.
     pub nonce: String,
+    /// Empty for SAML.
     pub pkce_verifier: String,
     /// Where to send the browser afterwards; a path on this server.
     pub return_to: Option<String>,

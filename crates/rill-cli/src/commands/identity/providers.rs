@@ -11,8 +11,8 @@ use crate::Result;
 /// `rill admin idp <subcommand>`.
 #[derive(Subcommand, Debug)]
 pub enum IdpCmd {
-    /// Add or replace an OpenID Connect provider.
-    Add(IdpAddArgs),
+    /// Add or replace an OpenID Connect or SAML 2.0 provider.
+    Add(Box<IdpAddArgs>),
     /// The org's providers.
     List(OrgArg),
     /// Remove a provider.
@@ -33,11 +33,18 @@ pub struct IdpAddArgs {
     /// A name for the provider within the org.
     pub name: String,
     /// The OIDC issuer URL.
-    #[arg(long)]
-    pub issuer: String,
+    #[arg(long, required_unless_present = "saml_metadata")]
+    pub issuer: Option<String>,
     /// The confidential client browsers sign in with.
-    #[arg(long)]
-    pub client_id: String,
+    #[arg(long, required_unless_present = "saml_metadata")]
+    pub client_id: Option<String>,
+    /// A SAML 2.0 provider instead: a file holding the IdP's metadata.
+    #[arg(long, conflicts_with_all = ["issuer", "client_id"])]
+    pub saml_metadata: Option<std::path::PathBuf>,
+    /// Rill's entity id at the SAML IdP (default:
+    /// `<public_url>/auth/saml/<org>/<name>`).
+    #[arg(long, requires = "saml_metadata")]
+    pub saml_sp_entity_id: Option<String>,
     /// Its secret (wrapped by the key service before it is stored).
     #[arg(long, env = "RILL_IDP_CLIENT_SECRET", hide_env_values = true)]
     pub client_secret: Option<String>,
@@ -47,7 +54,8 @@ pub struct IdpAddArgs {
     /// Scopes to request (default: openid profile email).
     #[arg(long, value_delimiter = ',')]
     pub scopes: Vec<String>,
-    /// The claim naming the user (default: preferred_username).
+    /// The claim naming the user (default: preferred_username; for SAML,
+    /// the NameID).
     #[arg(long)]
     pub username_claim: Option<String>,
     /// A claim listing groups, which become teams.
@@ -77,6 +85,7 @@ fn info_json(p: &pb::IdentityProviderInfo) -> serde_json::Value {
         "has_client_secret": p.has_client_secret, "cli_client_id": p.cli_client_id,
         "scopes": p.scopes, "username_claim": p.username_claim,
         "groups_claim": p.groups_claim, "auto_provision": p.auto_provision,
+        "saml": p.saml, "saml_sp_entity_id": p.saml_sp_entity_id,
     })
 }
 
@@ -85,20 +94,26 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
     let mut svc = ctx.client()?.identity_svc();
     match cmd {
         IdpCmd::Add(a) => {
+            let saml_metadata = match &a.saml_metadata {
+                Some(path) => Some(std::fs::read_to_string(path)?),
+                None => None,
+            };
             let saved = svc
                 .put_identity_provider(pb::PutIdentityProviderRequest {
                     operation_id: Default::default(),
                     provider: Some(pb::IdentityProviderSpec {
                         org: a.org.org,
                         name: a.name,
-                        issuer: a.issuer,
-                        client_id: a.client_id,
+                        issuer: a.issuer.unwrap_or_default(),
+                        client_id: a.client_id.unwrap_or_default(),
                         client_secret: a.client_secret,
                         cli_client_id: a.cli_client_id,
                         scopes: a.scopes,
                         username_claim: a.username_claim,
                         groups_claim: a.groups_claim,
                         auto_provision: a.auto_provision,
+                        saml_metadata,
+                        saml_sp_entity_id: a.saml_sp_entity_id,
                     }),
                 })
                 .await?

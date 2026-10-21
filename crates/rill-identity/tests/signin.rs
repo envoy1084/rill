@@ -20,6 +20,7 @@ fn provider(idp: &MockIdp, auto_provision: bool) -> IdentityProvider {
         username_claim: "preferred_username".into(),
         groups_claim: Some("groups".into()),
         auto_provision,
+        saml: None,
         created_at: Timestamp::now(),
     }
 }

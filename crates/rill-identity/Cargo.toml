@@ -13,6 +13,8 @@ default = []
 aws = ["dep:aws-config", "dep:aws-sdk-kms"]
 # Google Cloud KMS as a key service.
 gcp = ["dep:gcp_auth"]
+# SAML 2.0 identity providers. Needs libxml2 and xmlsec1.
+saml = ["dep:samael"]
 # A mock OpenID Connect provider for tests in this and other crates.
 testing = ["dep:axum", "dep:p256"]
 
@@ -41,6 +43,7 @@ tracing = { workspace = true }
 aws-config = { workspace = true, optional = true }
 aws-sdk-kms = { workspace = true, optional = true }
 gcp_auth = { workspace = true, optional = true }
+samael = { workspace = true, optional = true }
 
 [dev-dependencies]
 axum = { workspace = true }

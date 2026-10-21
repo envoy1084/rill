@@ -1,4 +1,5 @@
-//! OpenID Connect identity providers an organization signs in through.
+//! The OpenID Connect and SAML identity providers an organization signs in
+//! through.
 
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +29,20 @@ pub struct IdentityProvider {
     /// Whether a first sign-in creates the user; otherwise provisioning
     /// must have created it.
     pub auto_provision: bool,
+    /// Set for a SAML 2.0 provider; `issuer` is then the IdP's entity id
+    /// and the OIDC client fields are unused.
+    pub saml: Option<SamlSettings>,
     pub created_at: Timestamp,
+}
+
+/// How Rill signs in through a SAML 2.0 identity provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SamlSettings {
+    /// The IdP's metadata XML: its entity id, SSO endpoint and signing
+    /// certificates.
+    pub idp_metadata: String,
+    /// Rill's entity id at the IdP (the audience of assertions).
+    pub sp_entity_id: String,
 }
 
 impl Record for IdentityProvider {

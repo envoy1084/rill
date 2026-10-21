@@ -10,13 +10,15 @@ ARG RUST_VERSION=1.99
 
 FROM rust:${RUST_VERSION}-bookworm AS build
 ARG TARGETARCH
-# Cargo features of the `rill` binary: FoundationDB and the cloud key services.
-ARG FEATURES=fdb,aws,gcp
+# Cargo features of the `rill` binary: FoundationDB, the cloud key services
+# and SAML sign-in.
+ARG FEATURES=fdb,aws,gcp,saml
 ARG FDB_VERSION=7.3.77
 ARG FDB_CLIENTS_SHA256_AMD64=b6c263723009bddbc30b6ae8cf9854340bd35cef14152abb0da8fb5af2b91254
 ARG FDB_CLIENTS_SHA256_ARM64=b3a5dd972ffd37c1d5dc0c29ffa00e2169bcac62c0186571acced8b006af7cc2
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends clang libclang-dev \
+    && apt-get install -y --no-install-recommends clang libclang-dev pkg-config \
+       libxml2-dev libxmlsec1-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN set -eu; \
     case "$TARGETARCH" in \
@@ -43,6 +45,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates liblzma5 \
+       libxml2 libxmlsec1 libxmlsec1-openssl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --no-create-home rill
 COPY --from=build /usr/lib/libfdb_c.so /usr/lib/libfdb_c.so

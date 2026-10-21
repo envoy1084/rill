@@ -1,6 +1,7 @@
 //! The browser flow: redirect to the provider, take its callback, keep
 //! the session in an HttpOnly cookie, and hand the page short access
-//! tokens from it.
+//! tokens from it. SAML providers start here too and end at
+//! `/auth/saml/acs`.
 
 use std::sync::Arc;
 
@@ -8,9 +9,9 @@ use axum::extract::{Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
-use rill_identity::oidc::{authorize_url, exchange_code, AuthorizationRequest};
+use rill_identity::oidc::{authorize_url, exchange_code, AuthorizationRequest, Claims};
 use rill_identity::signin::{open_session, resolve_user, RefreshToken};
-use rill_types::identity::{PendingLogin, SessionKind};
+use rill_types::identity::{IdentityProvider, PendingLogin, SessionKind, UserRecord};
 use rill_types::Timestamp;
 use serde::Deserialize;
 use serde_json::json;
@@ -25,7 +26,7 @@ const COOKIE: &str = "rill_session";
 /// form cannot send.
 const CSRF_HEADER: &str = "x-rill-request";
 /// How long a started sign-in may take.
-const LOGIN_TTL_MS: i64 = 600_000;
+pub(super) const LOGIN_TTL_MS: i64 = 600_000;
 
 #[derive(Deserialize)]
 pub struct LoginQuery {
@@ -35,7 +36,7 @@ pub struct LoginQuery {
     return_to: Option<String>,
 }
 
-fn default_org() -> String {
+pub(super) fn default_org() -> String {
     rill_store::DEFAULT_ORG.to_string()
 }
 
@@ -53,6 +54,12 @@ pub async fn login(State(state): State<Arc<AppState>>, Query(q): Query<LoginQuer
 
 async fn start(state: &AppState, q: LoginQuery) -> Result<String> {
     let provider = provider(state, &q.org, &q.provider).await?;
+    if provider.saml.is_some() {
+        #[cfg(feature = "saml")]
+        return super::saml::start(state, &provider, safe_return(q.return_to)).await;
+        #[cfg(not(feature = "saml"))]
+        return Err(Error::invalid("this server was built without SAML support"));
+    }
     let meta = state.identity.issuers().metadata(&provider.issuer).await?;
     let request = AuthorizationRequest::new();
     let login = PendingLogin {
@@ -97,11 +104,16 @@ pub async fn callback(
             "the callback lacks a code or state",
         );
     };
-    match finish(&state, &code, &login_state).await {
-        Ok((cookie, user, org, return_to)) => {
+    signed_in(finish(&state, &code, &login_state).await)
+}
+
+/// The page a finished sign-in lands on, setting the session cookie.
+pub(super) fn signed_in(result: Result<(HeaderValue, UserRecord, Option<String>)>) -> Response {
+    match result {
+        Ok((cookie, user, return_to)) => {
             let mut response = match return_to {
                 Some(to) => Redirect::to(&to).into_response(),
-                None => page::signed_in(&user, &org),
+                None => page::signed_in(&user.principal.name, &user.org),
             };
             response.headers_mut().insert(header::SET_COOKIE, cookie);
             response
@@ -117,7 +129,7 @@ async fn finish(
     state: &AppState,
     code: &str,
     login_state: &str,
-) -> Result<(HeaderValue, String, String, Option<String>)> {
+) -> Result<(HeaderValue, UserRecord, Option<String>)> {
     let now = Timestamp::now();
     let login = state
         .identity
@@ -144,7 +156,18 @@ async fn finish(
         .await?
         .verify(&tokens.id_token, Some(&login.nonce))
         .await?;
-    let user = resolve_user(state.identity.store(), &provider, &claims, now).await?;
+    let (cookie, user) = sign_in(state, &provider, &claims, now).await?;
+    Ok((cookie, user, login.return_to))
+}
+
+/// The user verified `claims` name, and a browser session cookie for them.
+pub(super) async fn sign_in(
+    state: &AppState,
+    provider: &IdentityProvider,
+    claims: &Claims,
+    now: Timestamp,
+) -> Result<(HeaderValue, UserRecord)> {
+    let user = resolve_user(state.identity.store(), provider, claims, now).await?;
     let issuer = state.identity.issuer()?;
     let session = open_session(
         state.identity.store(),
@@ -161,12 +184,7 @@ async fn finish(
         &session.refresh_token.to_string(),
         session_ttl_ms(state) / 1000,
     )?;
-    Ok((
-        cookie,
-        user.principal.name.clone(),
-        user.org.clone(),
-        login.return_to,
-    ))
+    Ok((cookie, user))
 }
 
 fn session_cookie(state: &AppState, value: &str, max_age_secs: i64) -> Result<HeaderValue> {

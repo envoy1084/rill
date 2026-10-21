@@ -10,6 +10,8 @@ mod events;
 mod history;
 mod identity;
 mod keycloak;
+#[cfg(feature = "saml")]
+mod keycloak_saml;
 mod killswitch;
 mod kubernetes;
 mod orgs;

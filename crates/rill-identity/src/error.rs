@@ -17,6 +17,10 @@ pub enum Error {
     #[error("OIDC: {0}")]
     Oidc(String),
 
+    /// A SAML identity provider or response was unusable.
+    #[error("SAML: {0}")]
+    Saml(String),
+
     /// Sign-in or a token request was refused.
     #[error("refused: {0}")]
     Denied(String),

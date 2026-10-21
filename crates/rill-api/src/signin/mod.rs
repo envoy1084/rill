@@ -1,7 +1,8 @@
 //! Signing in over HTTP: the browser flow through an organization's
 //! identity provider, the OAuth token endpoint that refreshes sessions and
 //! exchanges ID tokens (the CLI's device flow ends here), and the provider
-//! list clients start from. These routes are open; each checks what it is
+//! list clients start from. With the `saml` feature, SAML 2.0 providers
+//! sign browsers in too. These routes are open; each checks what it is
 //! given.
 
 mod browser;
@@ -9,6 +10,8 @@ pub mod flows;
 mod oauth;
 mod page;
 mod providers;
+#[cfg(feature = "saml")]
+mod saml;
 
 use std::sync::Arc;
 
@@ -22,7 +25,13 @@ use crate::state::AppState;
 
 /// The sign-in routes.
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new()
+    #[cfg(feature = "saml")]
+    let router = Router::new()
+        .route("/auth/saml/acs", post(saml::acs))
+        .route("/auth/saml/metadata", get(saml::metadata));
+    #[cfg(not(feature = "saml"))]
+    let router = Router::new();
+    router
         .route("/auth/login", get(browser::login))
         .route("/auth/callback", get(browser::callback))
         .route("/auth/token", post(browser::token))
@@ -32,7 +41,7 @@ pub fn router() -> Router<Arc<AppState>> {
 }
 
 /// Where browsers reach this server.
-fn public_url(state: &AppState) -> String {
+pub(crate) fn public_url(state: &AppState) -> String {
     match &state.config.identity.public_url {
         Some(url) => url.trim_end_matches('/').to_string(),
         None => {

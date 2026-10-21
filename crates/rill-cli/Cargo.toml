@@ -17,6 +17,8 @@ fdb = ["rill-api/fdb"]
 # AWS KMS and Google Cloud KMS as token key services.
 aws = ["rill-api/aws"]
 gcp = ["rill-api/gcp"]
+# SAML 2.0 sign-in. Needs libxml2 and xmlsec1.
+saml = ["rill-api/saml"]
 
 [[bin]]
 name = "rill"

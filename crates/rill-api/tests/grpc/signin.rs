@@ -53,6 +53,8 @@ async fn register(server: &TestServer, idp: &MockIdp) {
                 username_claim: None,
                 groups_claim: Some("groups".into()),
                 auto_provision: true,
+                saml_metadata: None,
+                saml_sp_entity_id: None,
             }),
         })
         .await

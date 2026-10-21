@@ -184,7 +184,7 @@ is, so CI skips them:
 | --- | --- | --- |
 | `RILL_TEST_VAULT_ADDR` (+ `VAULT_TOKEN`) | `rill-identity --test key_services` | `docker run -p 8200:8200 -e VAULT_DEV_ROOT_TOKEN_ID=root hashicorp/vault`, then enable `transit` and create key `rill` |
 | `RILL_TEST_AWS_KMS_ENDPOINT` (`--features aws`) | the same | `docker run -p 4566:4566 -e SERVICES=kms localstack/localstack`, with `AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test` |
-| `RILL_TEST_KEYCLOAK` | `rill-api --test grpc keycloak` (password-grant exchange, the browser code flow through Keycloak's login form), `rill-cli --test keycloak` (the SDK's device flow, approved through Keycloak's pages) | the realm in [deploy/keycloak](../../deploy/keycloak/README.md); `RILL_TEST_KEYCLOAK=http://localhost:8180/realms/rill` |
+| `RILL_TEST_KEYCLOAK` | `rill-api --test grpc keycloak` (password-grant exchange, the browser code flow through Keycloak's login form; with `--features saml`, SAML sign-in that refuses a forged and a replayed response), `rill-cli --test keycloak` (the SDK's device flow, approved through Keycloak's pages) | the realm in [deploy/keycloak](../../deploy/keycloak/README.md); `RILL_TEST_KEYCLOAK=http://localhost:8180/realms/rill` |
 | `RILL_TEST_K8S_DIR` | `rill-api --test grpc kubernetes` | a directory with the cluster's `issuer.txt` and `jwks.json` (`kubectl get --raw /.well-known/openid-configuration`, `/openid/v1/jwks`), `token.jwt` (`kubectl -n rill-test create token builder --audience rill`) and `token-other.jwt` (another audience); a local cluster such as OrbStack's, with `--context` named explicitly |
 
 Identity providers in tests are `rill_identity::testing::MockIdp` (feature

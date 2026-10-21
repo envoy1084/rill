@@ -14,10 +14,10 @@ use super::*;
 
 /// Cookies by name, kept across a browser's requests to one site.
 #[derive(Default)]
-struct Jar(HashMap<String, String>);
+pub(super) struct Jar(HashMap<String, String>);
 
 impl Jar {
-    fn take(&mut self, response: &reqwest::Response) {
+    pub(super) fn take(&mut self, response: &reqwest::Response) {
         for value in response.headers().get_all("set-cookie") {
             if let Some((pair, _)) = value.to_str().unwrap_or_default().split_once(';') {
                 if let Some((name, value)) = pair.split_once('=') {
@@ -27,7 +27,7 @@ impl Jar {
         }
     }
 
-    fn header(&self) -> String {
+    pub(super) fn header(&self) -> String {
         self.0
             .iter()
             .map(|(k, v)| format!("{k}={v}"))
@@ -36,8 +36,17 @@ impl Jar {
     }
 }
 
-fn location(response: &reqwest::Response) -> String {
+pub(super) fn location(response: &reqwest::Response) -> String {
     response.headers()["location"].to_str().unwrap().to_string()
+}
+
+/// The `action` of the first form on a page.
+pub(super) fn form_action(html: &str) -> String {
+    html.split("action=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("a form")
+        .replace("&amp;", "&")
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -73,6 +82,8 @@ async fn people_sign_in_through_keycloak() {
                 username_claim: None,
                 groups_claim: Some("groups".into()),
                 auto_provision: true,
+                saml_metadata: None,
+                saml_sp_entity_id: None,
             }),
         })
         .await
@@ -130,13 +141,7 @@ async fn people_sign_in_through_keycloak() {
     let mut jar = Jar::default();
     let page = http.get(location(&to_keycloak)).send().await.unwrap();
     jar.take(&page);
-    let html = page.text().await.unwrap();
-    let action = html
-        .split("action=\"")
-        .nth(1)
-        .and_then(|rest| rest.split('"').next())
-        .expect("a login form")
-        .replace("&amp;", "&");
+    let action = form_action(&page.text().await.unwrap());
     let back = http
         .post(action)
         .header("cookie", jar.header())

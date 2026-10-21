@@ -89,7 +89,7 @@ wrap with the key service and keep in the metadata store
 | `[identity.lifetimes]` | `human_secs = 3600`, `agent_secs = 900`, `service_secs = 43200` | longest token per principal kind |
 | `[identity.rotation]` | `rotate_after_days = 30`, `activation_delay_secs = 60`, `grace_secs = 300` | key rotation |
 | `identity.admins` | none | principal names that administer the instance |
-| `identity.public_url` | `http(s)://<listen_http>` | where browsers reach the server; sign-in callbacks return to `<public_url>/auth/callback` |
+| `identity.public_url` | `http(s)://<listen_http>` | where browsers reach the server; sign-in callbacks return to `<public_url>/auth/callback`, SAML responses to `<public_url>/auth/saml/acs` |
 | `identity.session_hours` | `12` | how long a sign-in session lasts |
 
 Servers sharing a store must share the key service, or each mints its own

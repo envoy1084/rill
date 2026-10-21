@@ -52,6 +52,10 @@ works without installing buf). It is not part of CI.
 (`object_store`) and `fdb` (the FoundationDB metadata store).
 `rill-api` enables `s3`; `rill-api/fdb` and `rill-cli/fdb` forward
 `fdb`. Without `fdb` nothing needs the FoundationDB client library.
+`aws` and `gcp` add the cloud key services. `saml` (on `rill-identity`,
+`rill-api` and `rill-cli`) adds SAML sign-in and needs libxml2 and xmlsec1;
+see [identity](../05-policy/identity-and-auth.md#saml-20) for the macOS
+`PKG_CONFIG_PATH`. CI builds neither.
 
 ## FoundationDB locally
 

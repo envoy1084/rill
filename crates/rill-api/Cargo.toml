@@ -13,6 +13,8 @@ fdb = ["rill-store/fdb"]
 # AWS KMS and Google Cloud KMS as token key services.
 aws = ["rill-identity/aws"]
 gcp = ["rill-identity/gcp"]
+# SAML 2.0 sign-in. Needs libxml2 and xmlsec1.
+saml = ["rill-identity/saml"]
 
 [dependencies]
 rill-types = { workspace = true }
