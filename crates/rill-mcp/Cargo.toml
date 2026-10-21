@@ -12,6 +12,7 @@ name = "rill-mcp"
 path = "src/bin/rill_mcp.rs"
 
 [dependencies]
+rmcp = { workspace = true }
 rill-sdk = { workspace = true }
 rill-types = { workspace = true }
 rill-core = { workspace = true }

@@ -1,47 +1,40 @@
 # MCP server
 
-`rill-mcp` speaks the Model Context Protocol over stdio. It exposes the SDK
+`rill-mcp` serves the Model Context Protocol over stdio. It exposes the SDK
 as 27 tools, so an agent can read history, edit, review and land without a
-checkout. The protocol code is hand-written and small. Nothing an agent sends
-can stop the session loop. A tool failure is returned as a result with
-`isError: true`, malformed JSON-RPC gets a JSON-RPC error, and only a
-transport failure ends `serve`.
-
-## Framing and dispatch
+checkout. The protocol is the official Rust SDK,
+[`rmcp`](https://crates.io/crates/rmcp) (Apache-2.0, pinned): it handles
+framing, `initialize` and protocol-version negotiation, `ping`,
+notifications, cancellation and errors, and its transports would serve
+streamable HTTP as well as stdio. Rill implements only `ServerHandler`
+([`server.rs`](../../crates/rill-mcp/src/server.rs)): `get_info` (server
+name and version, the tools capability, and `instructions` covering `repo`,
+root syntax and provenance), `list_tools` and `call_tool`.
 
 ```mermaid
 sequenceDiagram
     participant Ag as Agent
+    participant Rm as rmcp
     participant Sv as McpServer
     participant Tl as tools::call
     participant Sdk as rill-sdk
-    Ag->>Sv: one JSON-RPC line on stdin
+    Ag->>Rm: JSON-RPC over stdio
+    Rm->>Sv: list_tools / call_tool
     Sv->>Tl: name, arguments
     Tl->>Sdk: typed call
     Sdk-->>Tl: value or rill_sdk::Error
     Tl-->>Sv: Some(Ok) / Some(Err(ToolError)) / None
-    Sv-->>Ag: one JSON line on stdout
+    Sv-->>Rm: CallToolResult
+    Rm-->>Ag: JSON-RPC reply
 ```
 
-`protocol/framing.rs` reads newline-delimited JSON and skips blank lines. A
-line that does not parse gets `PARSE_ERROR` (-32700) with `id: null`, and the
-loop continues. Replies are compact JSON plus `\n`. Compact JSON never
-contains a raw newline, so the framing holds for any payload.
-
-| Method | Result |
-| --- | --- |
-| `initialize` | `protocolVersion` `2025-06-18`, `tools.listChanged = false`, `serverInfo`, and `instructions` covering `repo`, root syntax and provenance |
-| `ping` | `{}` |
-| `tools/list` | every `ToolDef` with name, description and `inputSchema` |
-| `tools/call` | a tool result; `INVALID_PARAMS` when `name` is missing or unknown |
-| `notifications/*` | no reply |
-| other | `METHOD_NOT_FOUND` |
-
-A request without an `id` is a notification and never gets a reply. A batch
-array gets `INVALID_REQUEST`. On success a call returns `content` (the value
-as pretty JSON text), `structuredContent` (the value) and `isError: false`.
-On failure it returns the text `error (<code>): <message>`,
-`structuredContent: {error: {code, message}}` and `isError: true`.
+`list_tools` advertises every `ToolDef` with its name, description and
+`inputSchema`. `call_tool` runs the tool: an unknown name is an
+`invalid_params` protocol error; on success the result carries `content`
+(the value as pretty JSON text) and `structuredContent` (the value); on
+failure it carries the text `error (<code>): <message>`,
+`structuredContent: {error: {code, message}}` and `isError: true`. Nothing
+an agent sends can stop the session; only a transport failure ends it.
 
 ## Configuration
 
@@ -136,7 +129,6 @@ name (`transport`, `conflict`, `land_failed`). The crate-level `Error`
 ## Code
 
 - [lib.rs](../../crates/rill-mcp/src/lib.rs), [bin/rill_mcp.rs](../../crates/rill-mcp/src/bin/rill_mcp.rs), [config.rs](../../crates/rill-mcp/src/config.rs), [error.rs](../../crates/rill-mcp/src/error.rs), [server.rs](../../crates/rill-mcp/src/server.rs)
-- [protocol/framing.rs](../../crates/rill-mcp/src/protocol/framing.rs), [protocol/rpc.rs](../../crates/rill-mcp/src/protocol/rpc.rs)
 - [tools/mod.rs](../../crates/rill-mcp/src/tools/mod.rs), [tools/schema.rs](../../crates/rill-mcp/src/tools/schema.rs), [tools/args.rs](../../crates/rill-mcp/src/tools/args.rs), [tools/write.rs](../../crates/rill-mcp/src/tools/write.rs), [tools/repo.rs](../../crates/rill-mcp/src/tools/repo.rs), [tools/review.rs](../../crates/rill-mcp/src/tools/review.rs)
 - [grep.rs](../../crates/rill-mcp/src/grep.rs)
 - [json/mod.rs](../../crates/rill-mcp/src/json/mod.rs), [json/primitives.rs](../../crates/rill-mcp/src/json/primitives.rs), [json/history.rs](../../crates/rill-mcp/src/json/history.rs)
