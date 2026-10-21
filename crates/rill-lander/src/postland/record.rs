@@ -112,16 +112,21 @@ pub async fn load_cursor(repo: &RepoStore) -> Result<TrunkSeq> {
     }
 }
 
-/// Persist the cursor; fails once `lease` is lost, so a replaced verifier
-/// cannot move it.
+/// Move the cursor from `from` to `to`; fails once `lease` is lost or the
+/// cursor is no longer `from`, so a replaced or racing verifier cannot
+/// move it twice.
 pub async fn store_cursor(
     repo: &RepoStore,
-    seq: TrunkSeq,
+    from: TrunkSeq,
+    to: TrunkSeq,
     lease: &rill_store::repo::Lease,
 ) -> Result<()> {
-    repo.set_misc_fenced(
+    let expected =
+        (from != TrunkSeq::ZERO).then(|| Bytes::copy_from_slice(&from.get().to_be_bytes()));
+    repo.set_misc_if(
         POSTLAND_CURSOR_MISC,
-        Bytes::copy_from_slice(&seq.get().to_be_bytes()),
+        expected,
+        Bytes::copy_from_slice(&to.get().to_be_bytes()),
         lease,
     )
     .await?;

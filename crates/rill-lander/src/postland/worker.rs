@@ -13,10 +13,13 @@ use super::record::{
     load_cursor, put_record, recent_records, record_at, store_cursor, VerificationRecord,
     VerificationStatus,
 };
+use super::reverts::schedule_auto_revert;
 use crate::error::{Error, Result};
 use crate::events::LandEvent;
 use crate::land::Lander;
-use crate::revert::schedule_auto_revert;
+
+/// Positions a bisection round splits its range into.
+pub const BISECT_WAYS: u64 = 8;
 
 /// Default number of consecutive landings verified as one batch when the
 /// worker is behind.
@@ -149,8 +152,17 @@ impl PostLandVerifier {
                 "after culprit",
             )
             .await?;
+            // Bisection verified some of these directly; they are red
+            // because of the culprit too.
+            for (seq, _) in repo.trunk_range(found, to).await? {
+                if let Some(record) = record_at(repo, seq).await? {
+                    if record.status == VerificationStatus::Red && record.culprit.is_none() {
+                        self.set_culprit(seq, found).await?;
+                    }
+                }
+            }
         }
-        if let Err(e) = store_cursor(repo, to, &lease).await {
+        if let Err(e) = store_cursor(repo, cursor, to, &lease).await {
             self.lease.lost().await;
             return Err(e);
         }
@@ -217,20 +229,26 @@ impl PostLandVerifier {
     }
 
     /// Find the first red position in `(green, red]`, where `green` is a
-    /// known-green position (or zero) and `red` a known-red one.
+    /// known-green position (or zero) and `red` a known-red one. Each round
+    /// verifies [`BISECT_WAYS`]` - 1` evenly spaced positions at once, so a
+    /// range of 64 takes two rounds instead of six.
     ///
     /// Verifier results are content-addressed in practice, so re-verifying
     /// a position costs nothing beyond the first time.
     pub async fn bisect(self: &Arc<Self>, green: TrunkSeq, red: TrunkSeq) -> Result<TrunkSeq> {
-        let mut lo = green.get();
-        let mut hi = red.get();
+        let (mut lo, mut hi) = (green.get(), red.get());
         while hi - lo > 1 {
-            let mid = lo + (hi - lo) / 2;
-            let record = self.verify_seq(TrunkSeq(mid)).await?;
-            if record.is_green() {
-                lo = mid;
-            } else {
-                hi = mid;
+            let points = probes(lo, hi);
+            let results =
+                futures::future::join_all(points.iter().map(|p| self.verify_seq(TrunkSeq(*p))))
+                    .await;
+            for (point, record) in points.iter().zip(results) {
+                if record?.is_green() {
+                    lo = *point;
+                } else {
+                    hi = *point;
+                    break;
+                }
             }
         }
         let culprit = TrunkSeq(hi);
@@ -238,7 +256,7 @@ impl PostLandVerifier {
         tracing::warn!(%culprit, "post-land verification found a culprit");
         self.lander.publish(LandEvent::Culprit { seq: culprit });
         if self.lander.policy().auto_revert {
-            schedule_auto_revert(self.lander.clone(), culprit);
+            schedule_auto_revert(&self.lander, culprit).await?;
         }
         Ok(culprit)
     }
@@ -286,5 +304,30 @@ impl PostLandVerifier {
             put_record(repo, &record).await?;
         }
         Ok(())
+    }
+}
+
+/// The positions strictly between `lo` and `hi` a bisection round checks,
+/// ascending.
+fn probes(lo: u64, hi: u64) -> Vec<u64> {
+    let span = hi - lo;
+    let mut points: Vec<u64> = (1..BISECT_WAYS)
+        .map(|i| lo + span * i / BISECT_WAYS)
+        .filter(|p| *p > lo && *p < hi)
+        .collect();
+    points.dedup();
+    points
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn probes_split_evenly_and_shrink_to_one() {
+        assert_eq!(probes(0, 64), vec![8, 16, 24, 32, 40, 48, 56]);
+        assert_eq!(probes(32, 40), vec![33, 34, 35, 36, 37, 38, 39]);
+        assert_eq!(probes(4, 6), vec![5]);
+        assert!(probes(4, 5).is_empty());
     }
 }

@@ -387,10 +387,10 @@ async fn postland_marks_and_bisects() {
     assert_eq!(
         summary,
         vec![
-            (1, VerificationStatus::Green, None, true),
+            (1, VerificationStatus::Green, None, false),
             (2, VerificationStatus::Green, None, false),
             (3, VerificationStatus::Red, Some(3), false),
-            (4, VerificationStatus::Red, Some(3), true),
+            (4, VerificationStatus::Red, Some(3), false),
             (5, VerificationStatus::Red, Some(3), false),
         ]
     );
@@ -493,21 +493,26 @@ async fn auto_revert_after_grace_without_forward_fix() {
     let good = fx
         .root(&fx.repo.trunk_at(TrunkSeq(1)).await.unwrap().unwrap())
         .await;
-    let mut events = lander.subscribe();
     let worker = PostLandVerifier::new(lander.clone(), 8);
     let sweep = worker.run_once().await.unwrap().unwrap();
     assert_eq!(sweep.culprit, Some(TrunkSeq(2)));
 
-    let reverted = tokio::time::timeout(Duration::from_secs(10), async {
-        loop {
-            if let LandEvent::Reverted { culprit, revert } = events.recv().await.unwrap() {
-                return (culprit, revert);
-            }
-        }
-    })
-    .await
-    .unwrap();
-    assert_eq!(reverted, (TrunkSeq(2), TrunkSeq(4)));
+    // The revert is a job, ready once the grace period is over; a lander
+    // that replaced this one runs it just the same.
+    let reverts = rill_jobs::Queue::new(fx.repo.clone(), rill_lander::postland::REVERT_QUEUE);
+    assert_eq!(reverts.stats().await.unwrap().pending(), 1);
+    let successor = fx.lander(Arc::new(NoopHooks), bad_file_verifier(&fx), fast_policy());
+    lander.release().await;
+    drop(lander);
+    let runner = rill_jobs::Worker::new(
+        reverts.clone(),
+        rill_lander::postland::RevertHandler::new(successor.clone()),
+    );
+    tokio::time::sleep(Duration::from_millis(60)).await;
+    assert!(runner.run_once().await.unwrap());
+    assert_eq!(reverts.stats().await.unwrap().pending(), 0);
+    assert_eq!(fx.head().await.0, TrunkSeq(4), "the revert landed");
+    let lander = successor;
 
     let (_, head) = fx.head().await;
     let root = fx.root(&head).await;

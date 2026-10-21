@@ -14,8 +14,8 @@ flowchart LR
     V -->|red, base red| R[fill Red, base culprit]
     V -->|red, base green| B[bisect -> culprit]
     B --> F[fill Green before, Red after]
-    B -->|auto_revert| AR[sleep revert_grace]
-    AR -->|no forward fix| RV[revert via land_now]
+    B -->|auto_revert| AR[revert job, ready after revert_grace]
+    AR -->|any worker, no forward fix| RV[revert in the emergency lane]
 ```
 
 ## Sweep
@@ -34,7 +34,9 @@ holds `sweep_lock` (a process-local `tokio::sync::Mutex`) and:
    base: fill as `Red` with the base culprit ("still red"). Tip not green
    on a green base: `bisect(cursor, to)`, fill before the culprit `Green`
    and after it `Red` with `culprit = found`.
-6. Stores the cursor at `to`.
+6. Moves the cursor from `cursor` to `to` with a compare-and-swap that is
+   also fenced on the `postland` lease, so neither a replaced verifier nor
+   a second sweep can move it twice.
 
 `verify_seq(seq)` runs the lander's `Verifier` on the root of
 `trunk_at(seq)`, writes a direct record and publishes
@@ -51,11 +53,14 @@ green base.
 
 ## Bisect
 
-`bisect(green, red)` is a binary search that calls `verify_seq` on
-midpoints (each a direct record; `rill-exec`'s action cache makes repeats
-cheap). `Flaky` counts as not green. The culprit's own record gets
-`culprit = itself`, `LandEvent::Culprit` is published, and if
-`LandPolicy.auto_revert` is set, `schedule_auto_revert` is called.
+`bisect(green, red)` is a k-ary search (`BISECT_WAYS` = 8): each round
+verifies the 7 evenly spaced positions inside the range at once (each a
+direct record; `rill-exec`'s action cache makes repeats cheap) and keeps the
+range between the last green and the first red of them, so 64 positions
+take two rounds instead of six. `Flaky` counts as not green. The culprit's
+own record gets `culprit = itself`, red records after it get `culprit =
+it`, `LandEvent::Culprit` is published, and if `LandPolicy.auto_revert` is
+set, `schedule_auto_revert` queues the revert.
 
 ## Revert
 
@@ -69,16 +74,22 @@ Provenance carries `tool` (`lander:revert` or `lander:auto-revert`) and
 `extra["reverts"] = seq`, `extra["reverted_version"]`. The message is
 `Revert trunk@N: <summary>`.
 
-`revert` lands it with `land_now`, `risk = Normal` and
-`verify_override = Some(VerifyMode::None)`. Any result other than `Landed`
+`revert` lands it with `land_now` in the `emergency` lane, `risk =
+Normal` and `verify_override = Some(VerifyMode::None)`. Any result other than `Landed`
 is `RevertFailed` (gRPC `Aborted`). On success it publishes
 `LandEvent::Reverted { culprit, revert }`.
 
-`schedule_auto_revert` spawns a task that sleeps `revert_grace` and calls
-`auto_revert`. That skips the revert if `has_forward_fix(seq)` finds a
-later trunk position whose provenance has `reverts == seq`, or whose
-message or linked intent title or body contains `trunk@<seq>`. Otherwise it
-reverts as the service principal `svc:lander`.
+`schedule_auto_revert` stores the pending revert as a high-priority job on
+the repository's `revert` queue, ready `revert_grace` after the culprit was
+found, so a restart does not forget it. Each server with the workers role
+runs a revert worker (`workers/reverter.rs`, `RevertHandler`); the job
+calls `auto_revert`, retrying with backoff if landing fails. That skips the
+revert if `has_forward_fix(seq)` finds a later trunk position whose
+provenance has `reverts == seq`, or whose message or linked intent title
+or body contains `trunk@<seq>`. Otherwise it reverts as the service
+principal `svc:lander`, as a change whose id is derived from the culprit's
+position: a job rerun after a crash finds the request or the landed revert
+the first run made instead of reverting twice.
 
 ## `ReviewHooks`
 
@@ -120,7 +131,6 @@ record (target `postland`) with external reports, worst wins: `Failed` or
   by an explicit `Bisect`.
 * A new failure inside a batch that is already red is attributed to the
   earlier culprit; it is not bisected separately.
-* Pending auto-reverts live in a spawned task and are lost on restart.
 * `has_forward_fix` is a substring match on `trunk@N`.
 * The `Bisect` RPC does not take `sweep_lock` and does not check that
   `from` is green or `to` red.

@@ -55,6 +55,17 @@ pub async fn build_revert(
     actor: Principal,
     tool: &str,
 ) -> Result<ChangeVersion> {
+    build_revert_as(lander, seq, reason, actor, tool, ChangeId::new()).await
+}
+
+async fn build_revert_as(
+    lander: &Lander,
+    seq: TrunkSeq,
+    reason: &str,
+    actor: Principal,
+    tool: &str,
+    change_id: ChangeId,
+) -> Result<ChangeVersion> {
     let repo = lander.repo();
     let derive = lander.derive();
     let landed = repo.trunk_at(seq).await?.ok_or(Error::NotLanded(seq))?;
@@ -86,7 +97,7 @@ pub async fn build_revert(
         .insert("reverted_version".to_string(), landed.to_hex());
 
     let revert = ChangeVersion {
-        change_id: ChangeId::new(),
+        change_id,
         parents: vec![landed],
         predecessor: None,
         subtree_changes: BTreeMap::new(),
@@ -110,7 +121,7 @@ pub async fn revert(
     reason: &str,
     actor: Principal,
 ) -> Result<RevertOutcome> {
-    revert_with(lander, seq, reason, actor, REVERT_TOOL).await
+    revert_with(lander, seq, reason, actor, REVERT_TOOL, None).await
 }
 
 async fn revert_with(
@@ -119,8 +130,10 @@ async fn revert_with(
     reason: &str,
     actor: Principal,
     tool: &str,
+    change: Option<ChangeId>,
 ) -> Result<RevertOutcome> {
-    let version = build_revert(lander, seq, reason, actor.clone(), tool).await?;
+    let change = change.unwrap_or_default();
+    let version = build_revert_as(lander, seq, reason, actor.clone(), tool, change).await?;
     let hash = version.version_hash();
     let mut request = LandRequest::new(version.change_id, hash, actor, RiskClass::Normal)
         .in_lane(rill_types::Lane::Emergency);
@@ -179,35 +192,35 @@ pub async fn has_forward_fix(lander: &Lander, seq: TrunkSeq) -> Result<bool> {
     Ok(false)
 }
 
-/// Spawn the automatic-revert flow for `culprit`: wait `revert_grace`
-/// for a forward fix, then revert as `svc:lander`.
-pub fn schedule_auto_revert(lander: Arc<Lander>, culprit: TrunkSeq) {
-    let grace = lander.policy().revert_grace;
-    tokio::spawn(async move {
-        tokio::time::sleep(grace).await;
-        match auto_revert(&lander, culprit).await {
-            Ok(Some(outcome)) => {
-                tracing::warn!(%culprit, revert = %outcome.seq, "auto-reverted culprit")
-            }
-            Ok(None) => tracing::info!(%culprit, "forward fix landed; no auto-revert"),
-            Err(e) => tracing::error!(%culprit, error = %e, "auto-revert failed"),
-        }
-    });
-}
-
 /// Revert `culprit` as `svc:lander` unless a forward fix has landed.
 pub async fn auto_revert(lander: &Arc<Lander>, culprit: TrunkSeq) -> Result<Option<RevertOutcome>> {
     if has_forward_fix(lander, culprit).await? {
         return Ok(None);
     }
     let reason = format!("post-land verification found {culprit} red and no forward fix landed");
+    // One change per culprit: a rerun of this after a crash finds the
+    // request or the revert the first run made instead of adding another.
+    let change = auto_revert_change(lander, culprit);
     revert_with(
         lander,
         culprit,
         &reason,
         lander_principal(),
         AUTO_REVERT_TOOL,
+        Some(change),
     )
     .await
     .map(Some)
+}
+
+/// The change an automatic revert of `culprit` is, the same every time.
+fn auto_revert_change(lander: &Lander, culprit: TrunkSeq) -> ChangeId {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"rill:auto-revert");
+    hasher.update(lander.repo().keys().table("trunk").as_ref());
+    hasher.update(&culprit.get().to_be_bytes());
+    let digest = hasher.finalize();
+    let mut id = [0u8; 16];
+    id.copy_from_slice(&digest.as_bytes()[..16]);
+    ChangeId::from_bytes(id)
 }

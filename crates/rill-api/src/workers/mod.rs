@@ -8,6 +8,7 @@ mod hooks;
 mod indexer;
 pub use indexer::SEARCH_LEASE;
 mod leader;
+mod reverter;
 mod verifier;
 
 use std::sync::Arc;
@@ -45,6 +46,9 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>, roles: crate::config::Roles) {
     ctx.lifecycle
         .tasks
         .spawn(deriver::run(ctx.clone(), shutdown.clone()));
+    ctx.lifecycle
+        .tasks
+        .spawn(reverter::run(ctx.clone(), shutdown.clone()));
     ctx.lifecycle.tasks.spawn(rill_events::run_retention(
         ctx.repo.clone(),
         EVENT_SWEEP_INTERVAL,

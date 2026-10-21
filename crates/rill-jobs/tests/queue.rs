@@ -163,3 +163,19 @@ async fn a_released_job_is_ready_again_without_losing_an_attempt() {
     queue.complete(&again).await.unwrap();
     assert_eq!(queue.stats().await.unwrap().pending(), 0);
 }
+
+#[tokio::test]
+async fn a_job_for_later_waits_until_its_time() {
+    let queue = Queue::new(repo().await, "q");
+    let later =
+        rill_types::Timestamp::from_millis(rill_types::Timestamp::now().millis() + 3_600_000);
+    queue
+        .push_at(JobSpec::new("t", "k", vec![]), later)
+        .await
+        .unwrap();
+    assert!(
+        queue.claim("w").await.unwrap().is_none(),
+        "not before its time"
+    );
+    assert_eq!(queue.stats().await.unwrap().pending(), 1, "but stored");
+}

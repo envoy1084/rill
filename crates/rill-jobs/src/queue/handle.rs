@@ -81,6 +81,11 @@ impl Queue {
     /// The mutations enqueueing `spec`, for the transaction that makes
     /// the job necessary.
     pub fn enqueue(&self, spec: JobSpec) -> Result<Vec<Mutation>> {
+        self.enqueue_at(spec, Timestamp::now())
+    }
+
+    /// The mutations enqueueing `spec` to run from `run_at` on.
+    pub fn enqueue_at(&self, spec: JobSpec, run_at: Timestamp) -> Result<Vec<Mutation>> {
         let job = Job {
             id: JobId::new(),
             kind: spec.kind,
@@ -91,15 +96,20 @@ impl Queue {
             enqueued_at: Timestamp::now(),
             last_error: None,
         };
-        let mut mutations = self.ready(&job, job.enqueued_at)?;
+        let mut mutations = self.ready(&job, run_at)?;
         mutations.push(self.count(metric::ENQUEUED, 1));
         Ok(mutations)
     }
 
     /// Enqueue `spec` on its own.
     pub async fn push(&self, spec: JobSpec) -> Result<()> {
+        self.push_at(spec, Timestamp::now()).await
+    }
+
+    /// Enqueue `spec` on its own, to run from `run_at` on.
+    pub async fn push_at(&self, spec: JobSpec, run_at: Timestamp) -> Result<()> {
         let mut tx = Transaction::new();
-        tx.mutations = self.enqueue(spec)?;
+        tx.mutations = self.enqueue_at(spec, run_at)?;
         self.repo.meta().transact(tx).await?;
         Ok(())
     }
