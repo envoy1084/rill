@@ -30,6 +30,7 @@ rill-sdk = { workspace = true }
 rill-mcp = { workspace = true }
 rill-types = { workspace = true }
 rill-core = { workspace = true }
+rill-cache = { workspace = true }
 rill-api = { workspace = true }
 rill-store = { workspace = true }
 rill-git-import = { workspace = true }

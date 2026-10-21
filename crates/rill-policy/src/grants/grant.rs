@@ -69,6 +69,12 @@ impl ReadGrant {
         Ok(b64().encode(signed))
     }
 
+    /// The key a grant says signed it, without checking anything: for a
+    /// verifier deciding whether to fetch keys it does not have yet.
+    pub fn key_id_of(text: &str) -> Option<u32> {
+        Self::decode(text).ok().map(|(grant, _, _)| grant.key_id)
+    }
+
     /// Split a grant into its body and signature, and read the body,
     /// without checking the signature.
     pub(super) fn decode(text: &str) -> Result<(ReadGrant, Vec<u8>, Vec<u8>)> {

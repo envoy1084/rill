@@ -21,7 +21,8 @@ and policy crates stay free of RPC and storage-layout concerns.
 | `rill-identity` | Token signing keys and the key services that wrap them (local, Vault, AWS KMS, Google Cloud KMS), key rotation | Request authentication (the server owns it) |
 | `rill-git-import` | One-way git history import onto trunk | Export, mirroring |
 | `rill-proto` | `rill.v1` protobufs, generated tonic services, domain/wire conversion | Handlers |
-| `rill-api` | Authentication, `RepoContext`, gRPC handlers and watch streams, object HTTP protocol, job handlers and workers, config | Client-side state |
+| `rill-api` | Authentication, `RepoContext`, gRPC handlers and watch streams, object HTTP protocol, read grants, job handlers and workers, config | Client-side state |
+| `rill-cache` | The regional cache tier: grant checks, a disk LRU, coalesced origin fetches | Authorization decisions (the origin's grants carry them) |
 | `rill-sdk` | Typed client, blob upload, local checkout (`.rill/`), status, sync, stack helpers | User interface |
 | `rill-mcp` | stdio JSON-RPC tool surface over the SDK for agents; `rill-mcp` binary | Anything the SDK cannot do |
 | `rill-cli` | `rill` and `rill-api` binaries, output formats, exit codes | Business rules |
@@ -53,9 +54,10 @@ flowchart BT
   identity[rill-identity] --> policy
   proto[rill-proto] --> types
   server[rill-api] --> review & lander & search & exec & proto & events & jobs
+  cache[rill-cache] --> policy
   sdk[rill-sdk] --> proto & core
   mcp[rill-mcp] --> sdk & core
-  cli[rill-cli] --> sdk & mcp & server & store & import
+  cli[rill-cli] --> sdk & mcp & server & cache & store & import
 ```
 
 ## Layering rules
@@ -63,7 +65,8 @@ flowchart BT
 The declared order is `rill-types` <- `rill-store` <- `rill-events` /
 `rill-jobs` / `rill-core` <- `rill-policy` / `rill-review` / `rill-lander` /
 `rill-search` / `rill-exec` <- `rill-identity` <- `rill-api` <- `rill-sdk` <-
-`rill-cli` / `rill-mcp`. Lower crates never depend on higher ones. The manifests refine
+`rill-cli` / `rill-mcp`, with `rill-cache` beside `rill-api` on
+`rill-policy`. Lower crates never depend on higher ones. The manifests refine
 that order in a few places:
 
 - `rill-events` and `rill-jobs` depend only on `rill-types` and
@@ -83,8 +86,11 @@ that order in a few places:
   It is a client of the wire surface, not of the server crate.
 - `rill-mcp` depends on `rill-sdk` (and `rill-types`, `rill-core`). It uses
   `rill-proto` and `tonic` only as dev-dependencies for tests.
+- `rill-cache` depends on `rill-policy` (grant verification), `rill-store`
+  (hash checks) and `rill-types`, not on `rill-api`: it talks to the origin
+  only over the object protocol.
 - The binary crate `rill-cli` additionally links `rill-api` (for `rill dev`
-  and `rill api`), `rill-store` and `rill-git-import` (for
+  and `rill api`), `rill-cache` (for `rill cache`), `rill-store` and `rill-git-import` (for
   `rill import git`), and `rill-mcp` (shared JSON encoding, error codes,
   grep helper). No library crate links those.
 - The tooling crates `rill-sim` and `rill-load` link `rill-api` to reuse
@@ -96,8 +102,8 @@ RPC and HTTP dependencies:
 
 - `tonic` appears in `rill-proto`, `rill-api`, `rill-sdk` and `rill-cli`.
   No crate below `rill-proto` depends on it.
-- `axum` appears only in `rill-api`, which serves the object protocol and
-  health endpoints.
+- `axum` appears only in `rill-api` and `rill-cache`, which serve the
+  object protocol and health endpoints.
 - The library crates `rill-core`, `rill-policy`, `rill-review`,
   `rill-lander`, `rill-exec` and `rill-search` have no RPC dependency.
 

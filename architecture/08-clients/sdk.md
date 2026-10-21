@@ -202,4 +202,4 @@ cancelled land and `Error::Timeout` when the deadline passes.
 - [stack.rs](../../crates/rill-sdk/src/stack.rs), [review.rs](../../crates/rill-sdk/src/review.rs), [workspace.rs](../../crates/rill-sdk/src/workspace.rs), [lander.rs](../../crates/rill-sdk/src/lander.rs), [admin.rs](../../crates/rill-sdk/src/admin.rs)
 
 ---
-← Previous: [Observability](../07-runtime/observability.md) · [Index](../index.md) · Next: [CLI](cli.md) →
+← Previous: [Cache tier](../07-runtime/cache.md) · [Index](../index.md) · Next: [CLI](cli.md) →

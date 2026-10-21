@@ -197,6 +197,9 @@ pub enum Command {
 
     /// Run the service from a configuration file.
     Api(crate::server::ApiArgs),
+
+    /// Run the regional cache tier in front of an origin.
+    Cache(crate::server::cache::CacheArgs),
 }
 
 /// `rill completions`.

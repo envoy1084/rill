@@ -44,6 +44,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Intents | `intent create/list/show/update/link/similar` |
 | Workspaces, refs | `ws create/list/show/handoff/ops/delete`, `ref list/show/set/delete` |
 | Sign-in | `login [--org] [--provider]` (device flow through the org's identity provider), `logout` |
+| Services | `dev`, `api [--roles]`, `cache --origin --dir --max-bytes` ([cache tier](../07-runtime/cache.md)) |
 | Access | `access grant/revoke <subject> <relation> [path]`, `access list [--path] [--subject] [--relation]`, `access check <relation> [path] [--as]`, `access who <relation> [path]`, `access where <relation> [--as]` |
 | Admin | `admin whoami`, `admin token issue`, `admin policy get/set`, `admin health`, `admin idp add/list/remove` (OIDC, or SAML with `--saml-metadata`), `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session`, `admin agent register/list/suspend/activate`, `admin trust add/list/remove` (workload issuers), `admin kill --agent/--session/--sponsor/--model`, `admin scim create/list/revoke` |
 | Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |

@@ -78,23 +78,24 @@ Read in this order the first time; each page ends with Previous / Next links.
 38. [Events and workers](07-runtime/events-and-workers.md)
 39. [Configuration](07-runtime/configuration.md)
 40. [Observability](07-runtime/observability.md)
+41. [Cache tier](07-runtime/cache.md)
 
 **08 Clients**
 
-41. [SDK](08-clients/sdk.md)
-42. [CLI](08-clients/cli.md)
-43. [MCP server](08-clients/mcp.md)
+42. [SDK](08-clients/sdk.md)
+43. [CLI](08-clients/cli.md)
+44. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-44. [Development](09-engineering/development.md)
-45. [Testing](09-engineering/testing.md)
-46. [Simulation](09-engineering/simulation.md)
-47. [Performance](09-engineering/performance.md)
+45. [Development](09-engineering/development.md)
+46. [Testing](09-engineering/testing.md)
+47. [Simulation](09-engineering/simulation.md)
+48. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-48. [Architecture decisions](10-decisions/README.md): the fourteen ADRs that
+49. [Architecture decisions](10-decisions/README.md): the fourteen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -128,6 +129,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Events, background workers | [Events and workers](07-runtime/events-and-workers.md) |
 | Server flags, config file, dev mode | [Configuration](07-runtime/configuration.md) |
 | Metrics, logs, traces, health endpoints, dashboards | [Observability](07-runtime/observability.md) |
+| The regional cache in front of the origin | [Cache tier](07-runtime/cache.md) |
 | Client library, `rill` commands, agent tools | [SDK](08-clients/sdk.md), [CLI](08-clients/cli.md), [MCP server](08-clients/mcp.md) |
 | Building, CI, tests | [Development](09-engineering/development.md), [Testing](09-engineering/testing.md) |
 | Seeded fault simulation, benchmarks, load | [Simulation](09-engineering/simulation.md), [Performance](09-engineering/performance.md) |

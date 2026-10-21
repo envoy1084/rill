@@ -5447,6 +5447,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "rill-cache"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "hex",
+ "parking_lot",
+ "reqwest",
+ "rill-policy",
+ "rill-store",
+ "rill-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "rill-cli"
 version = "0.1.0"
 dependencies = [
@@ -5465,6 +5486,7 @@ dependencies = [
  "rcgen",
  "reqwest",
  "rill-api",
+ "rill-cache",
  "rill-core",
  "rill-git-import",
  "rill-identity",

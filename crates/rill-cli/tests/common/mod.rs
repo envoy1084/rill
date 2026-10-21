@@ -2,6 +2,8 @@
 
 #![allow(dead_code)]
 
+pub mod secure;
+
 use std::net::SocketAddr;
 use std::path::Path;
 

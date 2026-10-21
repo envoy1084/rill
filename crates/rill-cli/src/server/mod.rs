@@ -6,6 +6,7 @@
 //! `RILL_*` variables, with `--roles` choosing what it does; any number of
 //! such processes may share one store.
 
+pub mod cache;
 mod template;
 
 use std::net::SocketAddr;

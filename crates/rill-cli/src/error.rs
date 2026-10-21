@@ -41,6 +41,10 @@ pub enum CliError {
     #[error("server error: {0}")]
     Server(#[from] rill_api::Error),
 
+    /// The cache tier failed to start or stopped with an error.
+    #[error("cache error: {0}")]
+    Cache(#[from] rill_cache::Error),
+
     /// A JSON value could not be written.
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
@@ -72,6 +76,7 @@ impl CliError {
             CliError::Import(_) => "import".into(),
             CliError::Store(_) => "storage".into(),
             CliError::Server(_) => "server".into(),
+            CliError::Cache(_) => "cache".into(),
             CliError::Json(_) => "json".into(),
             CliError::Other(_) => "error".into(),
         }

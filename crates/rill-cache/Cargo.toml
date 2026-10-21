@@ -1,0 +1,27 @@
+[package]
+name = "rill-cache"
+description = "The regional cache tier: immutable objects on local disk, served to holders of read grants"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-types = { workspace = true }
+rill-store = { workspace = true }
+rill-policy = { workspace = true }
+axum = { workspace = true }
+bytes = { workspace = true }
+hex = { workspace = true }
+parking_lot = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
