@@ -113,13 +113,24 @@ impl ObjectStoreBackend {
     }
 
     /// Build a backend from a URL such as `s3://bucket/path`, `file:///dir`
-    /// or `memory:///`. The URL's own path and `prefix` are joined.
-    /// Credentials and region for S3 come from the environment, as
-    /// `object_store::parse_url` documents.
+    /// or `memory:///`. The URL's own path and `prefix` are joined. For S3,
+    /// credentials, region and endpoint come from the `AWS_*` environment
+    /// variables (`AWS_ACCESS_KEY_ID`, `AWS_ENDPOINT`, `AWS_ALLOW_HTTP`, ...).
     pub fn from_url(url: &str, prefix: impl AsRef<str>) -> Result<Self> {
         let url =
             Url::parse(url).map_err(|e| Error::Backend(format!("bad object store url: {e}")))?;
-        let (store, url_path) = object_store::parse_url(&url).map_err(Error::backend)?;
+        let (store, url_path): (Box<dyn object_store::ObjectStore>, Path) = match url.scheme() {
+            // `parse_url` ignores the environment; S3 needs it for
+            // credentials and non-AWS endpoints.
+            "s3" | "s3a" => {
+                let store = object_store::aws::AmazonS3Builder::from_env()
+                    .with_url(url.as_str())
+                    .build()
+                    .map_err(Error::backend)?;
+                (Box::new(store), Path::from(url.path()))
+            }
+            _ => object_store::parse_url(&url).map_err(Error::backend)?,
+        };
         let mut full = url_path;
         for part in Path::from(prefix.as_ref()).parts() {
             full = full.join(part);
@@ -249,6 +260,45 @@ fn is_unsupported(e: &object_store::Error) -> bool {
 mod tests {
     use super::*;
     use object_store::memory::InMemory;
+
+    /// S3 settings come from the environment: a PUT goes to `AWS_ENDPOINT`
+    /// signed with `AWS_ACCESS_KEY_ID`, not to the instance metadata
+    /// service.
+    #[tokio::test]
+    async fn s3_urls_take_credentials_and_endpoint_from_the_environment() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let seen = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = vec![0u8; 8192];
+            let n = socket.read(&mut request).await.unwrap();
+            let text = String::from_utf8_lossy(&request[..n]).to_string();
+            let reply = "HTTP/1.1 200 OK\r\nETag: \"e\"\r\nContent-Length: 0\r\n\r\n";
+            socket.write_all(reply.as_bytes()).await.unwrap();
+            text
+        });
+        // SAFETY of the environment: no other test reads these variables.
+        std::env::set_var("AWS_ENDPOINT", &endpoint);
+        std::env::set_var("AWS_ALLOW_HTTP", "true");
+        std::env::set_var("AWS_ACCESS_KEY_ID", "rill-test-key");
+        std::env::set_var("AWS_SECRET_ACCESS_KEY", "rill-test-secret");
+        std::env::set_var("AWS_REGION", "us-east-1");
+        let backend = ObjectStoreBackend::from_url("s3://bucket", "staging").unwrap();
+        let _ = backend
+            .store
+            .put(&Path::from("probe"), Bytes::from_static(b"x").into())
+            .await;
+        let request = tokio::time::timeout(std::time::Duration::from_secs(10), seen)
+            .await
+            .expect("the configured endpoint was called")
+            .unwrap();
+        assert!(request.starts_with("PUT /bucket/probe"), "{request}");
+        assert!(
+            request.contains("rill-test-key"),
+            "signed with the environment's key"
+        );
+    }
 
     fn backend() -> ObjectStoreBackend {
         ObjectStoreBackend::new(Arc::new(InMemory::new()), "rill/objects")
