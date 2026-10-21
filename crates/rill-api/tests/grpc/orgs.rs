@@ -4,7 +4,9 @@ use super::*;
 
 #[tokio::test]
 async fn repositories_are_addressed_within_their_org() {
-    let server = TestServer::start(ServerConfig::default()).await;
+    let mut config = ServerConfig::default();
+    config.identity.admins = vec!["alice".into()];
+    let server = TestServer::start(config).await;
     let alice_token = server.token_for(&rill_types::Principal::human("alice"));
     let bot_token = server.token_for(&rill_types::Principal::agent("bot"));
     let mut alice = clients(&server, Some(&alice_token)).await;

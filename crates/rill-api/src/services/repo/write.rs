@@ -24,6 +24,7 @@ impl RepoSvc {
         request: tonic::Request<pb::CreateChangeVersionRequest>,
     ) -> Result<pb::CreateChangeVersionResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        opened.permit().write_any().await?;
         let req = request.into_inner();
         let mut cv = ChangeVersion::try_from(
             req.version
@@ -166,6 +167,7 @@ impl RepoSvc {
         request: tonic::Request<pb::ResolveRequest>,
     ) -> Result<pb::ResolveResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        opened.permit().write_any().await?;
         let req = request.into_inner();
         let ctx = &opened.repo;
         let version = hash("hash", &req.hash)?;

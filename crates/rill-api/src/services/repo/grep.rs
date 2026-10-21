@@ -18,10 +18,10 @@ impl RepoSvc {
     ) -> Result<pb::GrepResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
+        let filter = opened.permit().read_any().await?;
         if req.pattern.is_empty() {
             return Err(Error::invalid("pattern must not be empty"));
         }
-        let filter = opened.permit().read_filter().await?;
         let ctx = &opened.repo;
         let resolved = resolve_root(ctx, req.root.as_ref()).await?;
 

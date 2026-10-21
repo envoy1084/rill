@@ -3,5 +3,7 @@
 mod fixture;
 mod grants;
 mod holes;
+mod matrix;
+mod raw;
 mod relations;
 mod writes;

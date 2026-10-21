@@ -3,7 +3,6 @@
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_store::OrgConfig;
-use rill_types::PrincipalKind;
 use tonic::Request;
 
 use crate::auth::caller;
@@ -18,19 +17,14 @@ fn org_proto(org: OrgConfig) -> pb::Org {
     }
 }
 
-/// Create an org. Humans may create orgs; agents may not, so an agent
-/// cannot mint itself a fresh tenant. Org-level roles arrive with org
-/// authorization.
+/// Create an org: instance administrators only, since an org is a tenant
+/// with its own users, policies and keys.
 pub async fn create(
     state: &AppState,
     request: Request<pb::CreateOrgRequest>,
 ) -> Result<pb::CreateOrgResponse> {
     let ctx = caller(&request)?;
-    if !state.dev_mode() && ctx.principal.kind != PrincipalKind::Human {
-        return Err(Error::PermissionDenied(
-            "only humans may create orgs".into(),
-        ));
-    }
+    crate::auth::require_instance_admin(state, &ctx)?;
     let req = request.into_inner();
     let org = state
         .stores

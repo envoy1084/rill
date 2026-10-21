@@ -250,7 +250,7 @@ The CLI is `rill access grant/revoke/list/check/who/where`
 * [`rill-store/src/repo/relations.rs`](../../crates/rill-store/src/repo/relations.rs): tuples, the subject index and the relation version.
 * [`auth/permit.rs`](../../crates/rill-api/src/auth/permit.rs): `Permit`; [`auth/instance.rs`](../../crates/rill-api/src/auth/instance.rs): org administration.
 * [`services/access/`](../../crates/rill-api/src/services/access/mod.rs): `AccessService`.
-* Tests: [`rebac/tests.rs`](../../crates/rill-policy/src/rebac/tests.rs), `rill-api/tests/grpc/access/` (holes, closed repositories, explanations, relation versions).
+* Tests: [`rebac/tests.rs`](../../crates/rill-policy/src/rebac/tests.rs), `rill-api/tests/grpc/access/` (the permission matrix, holes, grants, relations, writes).
 
 ---
 ← Previous: [Token keys](token-keys.md) · [Index](../index.md) · Next: [Risk classification](risk-classification.md) →

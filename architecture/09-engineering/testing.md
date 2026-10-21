@@ -71,6 +71,22 @@ round trips in `src/convert/roundtrip_tests.rs`.
 
 ## What is covered
 
+- **Authorization** (`rill-api/tests/grpc/access/`):
+  - The permission matrix (`matrix.rs`) reads every RPC from the
+    embedded descriptor and fails until a new one is classified. It calls
+    each RPC as an anonymous caller, a stranger, a reader of one directory,
+    a writer of it, a narrowed token and the owner, and checks each answer
+    against the class. An RPC that rejects an empty request before checking
+    permission must have a targeted probe. A path reader's answers to
+    probes aimed at the hidden directory are searched for its canary, paths
+    and hashes; turning off version filtering makes that test fail.
+  - `holes.rs` pins the audit's findings.
+  - `grants.rs` covers read grants; `relations.rs` covers closed
+    repositories, explanations and relation versions; `writes.rs` covers
+    configuration paths, merges, a revoke between commit and land, and
+    Owner approvals.
+  - `rill-cli/tests/access.rs` and `cache.rs` run the SDK and the cache
+    tier against a real server.
 - **Core**: building history, trees, merge, rebase, resolve and blame, and
   delete-versus-modify conflicts as data (`rill-core/tests/workflow.rs`);
   criss-cross merges against a virtual base (`criss_cross.rs`); subtree

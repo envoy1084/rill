@@ -5398,6 +5398,7 @@ dependencies = [
  "parking_lot",
  "prometheus-client",
  "prost 0.14.4",
+ "prost-types 0.14.4",
  "rand 0.10.3",
  "reqwest",
  "rill-core",
