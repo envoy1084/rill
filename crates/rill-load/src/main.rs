@@ -29,6 +29,14 @@ struct Args {
     /// Print the report as JSON.
     #[arg(long)]
     json: bool,
+    /// Every new version writes a file of its own, so landings never
+    /// interact (the sequencer's throughput gate).
+    #[arg(long)]
+    disjoint: bool,
+    /// Landings per second, overriding the D1 share (versions and votes
+    /// rise to feed them).
+    #[arg(long)]
+    lands_per_sec: Option<f64>,
     /// Bearer token for an authenticating cluster.
     #[arg(long, env = "RILL_TOKEN")]
     token: Option<String>,
@@ -55,10 +63,14 @@ async fn main() -> anyhow::Result<()> {
     let report = run(Settings {
         endpoint,
         repo: args.repo,
-        profile: Profile::of_d1(args.percent),
+        profile: match args.lands_per_sec {
+            Some(lands) => Profile::of_d1(args.percent).with_lands(lands),
+            None => Profile::of_d1(args.percent),
+        },
         duration: Duration::from_secs(args.duration),
         max_in_flight: args.max_in_flight,
         hot_share: args.hot_share,
+        disjoint: args.disjoint,
         token: args.token,
         watchers: args.watchers,
         report_every: args.report_every.map(Duration::from_secs),

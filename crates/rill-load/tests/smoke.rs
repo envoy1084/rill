@@ -14,6 +14,7 @@ async fn short_run_completes_without_errors() {
         duration: Duration::from_secs(2),
         max_in_flight: 64,
         hot_share: 0.3,
+        disjoint: false,
         token: None,
         watchers: 2,
         report_every: None,
@@ -38,4 +39,32 @@ async fn short_run_completes_without_errors() {
         0,
         "{report:#}"
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn disjoint_landings_all_land() {
+    let server = EmbeddedServer::start().await.unwrap();
+    let report = run(Settings {
+        endpoint: server.endpoint.clone(),
+        repo: "disjoint".into(),
+        profile: Profile::of_d1(0.0).with_lands(5.0),
+        duration: Duration::from_secs(3),
+        max_in_flight: 64,
+        hot_share: 0.0,
+        disjoint: true,
+        token: None,
+        watchers: 0,
+        report_every: None,
+    })
+    .await
+    .unwrap();
+    let land = report["ops"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["op"] == "land")
+        .cloned()
+        .unwrap_or_default();
+    assert!(land["ok"].as_u64().unwrap_or(0) > 0, "{report:#}");
+    assert_eq!(land["errors"], 0, "{report:#}");
 }

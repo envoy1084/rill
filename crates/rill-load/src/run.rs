@@ -26,6 +26,8 @@ pub struct Settings {
     pub duration: Duration,
     pub max_in_flight: usize,
     pub hot_share: f64,
+    /// Every new version writes a file of its own.
+    pub disjoint: bool,
     /// Bearer token, when the cluster authenticates.
     pub token: Option<String>,
     /// Streams watching the event log.
@@ -54,6 +56,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<serde_json::Value> {
         stats.clone(),
         ledger.clone(),
         settings.hot_share,
+        settings.disjoint,
     ));
     let limit = Arc::new(Semaphore::new(settings.max_in_flight));
     let p = settings.profile;

@@ -24,6 +24,9 @@ pub struct Workload {
     pub stats: Arc<Stats>,
     pub ledger: Arc<Ledger>,
     pub hot_share: f64,
+    /// Every change writes a new file of its own, so no two interact.
+    pub disjoint: bool,
+    fresh: std::sync::atomic::AtomicU64,
     /// Changes created but not yet submitted.
     drafts: Mutex<Vec<ChangeId>>,
     /// Changes submitted and approved, ready to land.
@@ -31,18 +34,32 @@ pub struct Workload {
 }
 
 impl Workload {
-    pub fn new(repo: RepoClient, stats: Arc<Stats>, ledger: Arc<Ledger>, hot_share: f64) -> Self {
+    pub fn new(
+        repo: RepoClient,
+        stats: Arc<Stats>,
+        ledger: Arc<Ledger>,
+        hot_share: f64,
+        disjoint: bool,
+    ) -> Self {
         Workload {
             repo,
             stats,
             ledger,
             hot_share,
+            disjoint,
+            fresh: std::sync::atomic::AtomicU64::new(0),
             drafts: Mutex::new(Vec::new()),
             approved: Mutex::new(Vec::new()),
         }
     }
 
     fn path(&self) -> RepoPathBuf {
+        if self.disjoint {
+            let n = self
+                .fresh
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return RepoPathBuf::new(format!("fresh/f{n}.rs")).expect("generated paths are valid");
+        }
         let mut rng = rand::rng();
         let (dir, file) = if rng.random_bool(self.hot_share) {
             (0, rng.random_range(0..HOT_FILES))

@@ -28,4 +28,13 @@ impl Profile {
             lands_per_sec: D1_LANDS_PER_SEC * f,
         }
     }
+
+    /// The same rates with `lands_per_sec` landings, and enough new
+    /// versions and votes to feed them.
+    pub fn with_lands(mut self, lands_per_sec: f64) -> Self {
+        self.lands_per_sec = lands_per_sec;
+        self.versions_per_sec = self.versions_per_sec.max(lands_per_sec * 1.5);
+        self.votes_per_sec = self.votes_per_sec.max(lands_per_sec * 1.5);
+        self
+    }
 }
