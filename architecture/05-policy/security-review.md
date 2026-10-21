@@ -71,11 +71,11 @@ finding was reproduced by a test that failed before its fix.
 | Change messages were not scanned | low | fixed (`86fbfa5`) |
 | `GET /redactions` was public; a cache that could not reread it kept serving | low | fixed (`4885996`) |
 | Inline files (≤ 256 bytes) cannot be redacted by their own hash | medium | by design: redact the trees holding them; block mode keeps credentials out |
-| Copy scanning ran before authorization, so a refusal named files under paths the author could not read | high | fixed (`bb14163`) |
-| Copies were walked in full before any limit, so one version could copy a large tree many times | high | fixed (`bb14163`) |
-| Findings past the caps were dropped silently, so a quarantine could be released after reviewing only fakes | medium | fixed (`bb14163`): reaching a cap refuses the version |
-| The quarantine ancestry walk could be made slow by a long off-trunk chain | medium | fixed (`bb14163`): each quarantine is tested against the commit graph |
-| UTF-16 big-endian or at an odd offset was still missed; extension fields and paths were not scanned | low | fixed (`bb14163`) |
+| Copy scanning ran before authorization, so a refusal named files under paths the author could not read | high | fixed (`b5d2f4f`) |
+| Copies were walked in full before any limit, so one version could copy a large tree many times | high | fixed (`b5d2f4f`) |
+| Findings past the caps were dropped silently, so a quarantine could be released after reviewing only fakes | medium | fixed (`b5d2f4f`): reaching a cap refuses the version |
+| The quarantine ancestry walk could be made slow by a long off-trunk chain | medium | fixed (`b5d2f4f`): each quarantine is tested against the commit graph |
+| UTF-16 big-endian or at an odd offset was still missed; extension fields and paths were not scanned | low | fixed (`b5d2f4f`) |
 | An org administrator who controls a second admin account can satisfy two-person redaction alone | low | by design: both accounts are audited; separate identity control is the operator's |
 
 ## Code
