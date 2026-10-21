@@ -81,6 +81,19 @@ round trips in `src/convert/roundtrip_tests.rs`.
   flipped byte on disk is reported as corrupt; a blob-stored symlink that
   escapes the repository is rejected and an existing case collision does
   not block unrelated edits (`rill-core/tests/validation.rs`).
+- **Records and transactions**: votes from 24 reviewers at once never
+  exhaust retries, and three votes cast together over a store with real
+  latency reach the status they add up to (`rill-review/tests/
+  concurrency.rs`, which fails without the post-vote re-check); a retried
+  mutation returns its first response, a reused id with another request
+  is refused, and a retry after a simulated crash between commit and reply
+  returns the version already committed (`rill-server/tests/grpc/
+  retries.rs`); undo restores the sparse profile and undoing the undo
+  redoes (`grpc/workspaces.rs`); repositories are addressed within their
+  org (`grpc/orgs.rs`); the land transaction lands batches at gap-free
+  positions with records and `Landed` reviews, refuses a replayed batch,
+  fences a replaced lander and stops at an abandoned change, on every
+  backend (`conformance/repo.rs`).
 - **Trees and derived data**: a directory built by random batches of
   adds, rewrites and deletes across the split threshold hashes the same
   as one built at once; a rewrite in a 200k-entry directory writes at most

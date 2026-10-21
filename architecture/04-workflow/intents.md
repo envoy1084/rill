@@ -50,7 +50,7 @@ The only automatic status move is `Open` to `InProgress` on the first
 | `GetIntent` | `read(root)` | The record. | `NotFound` |
 | `UpdateIntent` | `write(root)` + owner or admin | Updates any of `title`, `body`, `status`, `parent` / `clear_parent`, `risk_override` / `clear_risk_override`. Bumps `updated_at`. | self-parent: `InvalidArgument` |
 | `ListIntents` | `read(root)` | Filters by `status[]`, `kind[]`, `owner`, `parent`. Sorted newest `updated_at` first. `limit` default 100, max 10 000. | |
-| `LinkChange` | `write(root)` | Appends the change to `changes` if absent and moves `Open` to `InProgress`. If the change has a review, sets `ReviewState.intent` with a compare-and-swap `put_review`. | change with no versions: `NotFound`; review CAS conflict: `Aborted` |
+| `LinkChange` | `write(root)` | Appends the change to `changes` if absent and moves `Open` to `InProgress`. If the change has a review, sets the review's `intent` with `write_review`, checked against the change record it read. | change with no versions: `NotFound`; review CAS conflict: `Aborted` |
 | `FindSimilarIntents` | `read(root)` | Scores every intent against the query's `title` and `body`. | |
 
 Intent records are written with an unconditional `put_intent`. Two

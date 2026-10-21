@@ -1,6 +1,7 @@
 # Review
 
-Review is a state machine over one `ReviewState` record per change. It
+Review is a state machine over each change's review: a change record,
+its votes and its threads. It
 collects votes and threads and decides when the change may land: a change
 is `Landable` exactly when the Cedar submit policy lets its owner land the
 current version, given the votes on it, unresolved threads and risk class.
@@ -8,14 +9,34 @@ Automated reviewers are covered in [review agents](review-agents.md).
 
 ## Record and writes
 
-`ReviewState` holds `versions` (last is current), `status`, `owner` (who
-called `submit`), `intent`, `votes`, `threads`, `risk`, `risk_reasons`,
-`stack` and `landed_seq`, stored at `keys::change` (`ch/<repo>/<change_id>`).
+`ReviewState` is the assembled view: `versions` (last is current),
+`status`, `owner` (who called `submit`), `intent`, `votes`, `threads`,
+`risk`, `risk_reasons`, `stack` and `landed_seq`. It is stored as parts, so
+reviewers acting at once do not rewrite each other's data:
 
-`ReviewService` holds no state. Every mutation reads the record, mutates a
-copy and writes it with `put_review(next, Some(prev))`, which succeeds only
-if the stored record still equals `prev`. On conflict it retries, up to
-`MAX_WRITE_ATTEMPTS` (8), then fails with `Contended` (gRPC `Aborted`).
+| Part | Key | Written by |
+| --- | --- | --- |
+| `ChangeRecord` (everything but votes and threads) | `(ch, ns, repo, change)` | status, version, risk, stack and intent changes |
+| `LabelVote` | `(vote, ns, repo, change, label, voter, version)` | its voter, blind |
+| vote epoch | `(vep, ns, repo, change)` | every vote write, blind |
+| `ThreadHeader` | `(thr, ns, repo, change, thread)` | thread creation, resolve, re-anchor |
+| `Comment` | `(cmt, ns, repo, change, thread, stamp)` | each comment, appended with a versionstamp |
+
+`ReviewService` holds no state. Every mutation (`update`) reads a
+`ReviewSnapshot`, mutates a copy of the assembled state, and
+`RepoStore::review_writes` turns the difference into the rows that
+changed. Every write checks the change record it read, so a decision made
+on stale status or versions retries. A write that changes the record also
+checks the vote epoch, so a status computed from fewer votes cannot
+overwrite one computed from more; votes and comments themselves never
+conflict. `updated_at` moves only with the record. On conflict `update`
+retries up to `MAX_WRITE_ATTEMPTS` (8), then fails with `Contended` (gRPC
+`Aborted`). Votes are listed in the order they were cast.
+
+A vote that does not change the status re-checks it after writing: votes
+cast together each see only some of the others, and whoever writes last
+re-evaluates with every vote in view, so the change reaches the status the
+votes add up to (`tests/concurrency.rs`).
 
 ## Labels and votes
 
@@ -134,8 +155,8 @@ per-repository channel forwarded to the `EventBus` and `WatchReview`.
 * `vote`, `resolve` and `unresolve` compute `ChangeFacts` once before the
   retry loop, so a concurrently added version is evaluated with stale facts
   for that write.
-* `submit` writes with no expected value; two simultaneous submits can both
-  succeed, last writer wins.
+* Assembling a review reads the record, the votes and each thread's
+  comments; listing many reviews costs a scan per review.
 * Re-anchoring is line-exact and path-bound; a renamed file loses anchors.
 * `reopen` exists in `ReviewService` but has no RPC.
 * The version the lander lands (often a rebased one) is not appended to

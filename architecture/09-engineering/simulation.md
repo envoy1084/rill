@@ -90,8 +90,11 @@ with the roadmap phase whose redesign removes each:
 | Invariant | Cause | Phase |
 | --- | --- | --- |
 | `LandRequestsResolve` | The land queue and tickets live in process memory; a restart forgets queued requests | 9 |
-| `ReviewMatchesTrunk` | Trunk, landing record and review status are separate writes | 6 |
-| `LandsOnce` | A trunk write whose acknowledgement is lost counts as failed, so the change returns to its owner and can land again | 6 |
+
+`ReviewMatchesTrunk` and `LandsOnce` were known issues until phase 6 made
+the trunk move, landing record and review status one transaction and
+taught the lander to recognise a land whose reply was lost; 10,000 faulty
+seeds now show neither.
 
 A violation of any other invariant fails the tests. When a phase fixes a
 known issue, its entry is removed.

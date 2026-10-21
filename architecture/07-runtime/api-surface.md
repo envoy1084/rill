@@ -38,7 +38,7 @@ The server registers all six services behind `AuthLayer`
 | `ReviewService` | `review.proto` | `services/review.rs` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand`, `GetLandStatus`, `WatchReview` |
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
-| `AdminService` | `admin.proto` | `services/admin.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health` |
+| `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs` |
 
 `types.proto` holds the shared object model. The streaming RPCs are
 `GetBlob` (server stream of `BlobChunk`), `PutBlob` (client stream: one
@@ -70,10 +70,36 @@ These conventions are stated at the top of `types.proto` and enforced by
   [merge algebra](../02-data/merge-algebra.md)).
 * `RootSpec` is a `oneof` of `ref`, `version_hash`, `tree_hash` and
   `trunk_seq`. Absent means the trunk head.
-* Every repo-scoped request carries `string repo`: a name, `rp_<hex>` or
-  bare hex.
+* Every repo-scoped request carries `string repo`: `org/name`, a bare name
+  in the default org, `rp_<hex>` or bare hex. `Repo.org` names the org.
+  `CreateOrg` takes 1-63 lowercase letters, digits and dashes; only humans
+  may create orgs (anyone in dev mode). Creating `org/name` in a missing
+  org is `NOT_FOUND`.
 * Write requests carry `bytes operation_id`, and list requests carry
   `uint32 limit` (0 means the server default, clamped by `common::limit`).
+
+## Retries
+
+Every mutating RPC (34 of them; `PutBlob` is content-addressed and needs
+none) runs through `services/idem.rs::once`. A request with a non-empty
+`operation_id` claims `(principal, operation_id)` in the `idem` table
+before it runs:
+
+| Found | Result |
+| --- | --- |
+| nothing, or an expired claim | run; store the response when it succeeds, release the claim when it fails |
+| the same request, finished | the stored response, without running again |
+| the same request, still running | `FAILED_PRECONDITION` ("already running") |
+| a different request (by BLAKE3 of its encoding) | `INVALID_ARGUMENT` |
+
+Responses are kept 24 hours and claims block duplicates for 5 minutes; a
+server task sweeps expired rows every 10 minutes. The claim is visible to
+the handler as a task-local `Scope`. The commit transaction records which
+version the request created in the claim, so if the server dies after
+committing and before storing the response, the retry takes over the
+expired claim, finds that version and returns it instead of storing a
+second one. A failed request whose claim recorded such an effect keeps the
+claim (expired at once) for that retry.
 
 ## Conversion rules
 
@@ -118,8 +144,9 @@ precondition), 409 (already exists or aborted), 503, and 500 for the rest.
 
 * `next_page_token` exists on list responses, but the server always returns
   `None`. `limit` truncates and there is no continuation.
-* Only workspace RPCs read `operation_id`, where it becomes the `Operation`
-  record id. Other writes ignore it, and there is no deduplication.
+* A request without an `operation_id` is not deduplicated. Only the
+  commit path records its effect in the claim; other handlers that fail
+  after writing can be redone by a retry.
 * `MergeBaseResponse.bases` is repeated, but the server returns at most one
   base.
 * `rill.v1` is the only version. A missing RPC surfaces as `UNIMPLEMENTED`.

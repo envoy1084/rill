@@ -1,12 +1,13 @@
 # Landing
 
 The lander takes a requested change version, rebases it onto the current
-trunk head if needed, optionally verifies it, and advances trunk with a
-compare-and-swap that assigns the next sequence number. Nothing is locked
-while a request is rebased or verified; the CAS on the trunk ref decides,
-and the loser rebases again. Trunk is one ref plus a gap-free sequence of
-positions `trunk/<seq>`, each written by exactly one successful
-`land_on_trunk` transaction.
+trunk head if needed, optionally verifies it, and advances trunk in one
+transaction that assigns the next sequence number, writes the landing
+record, marks the review `Landed` and records events. Nothing is locked
+while a request is rebased or verified; the compare-and-swap on the trunk
+head decides, and the loser rebases again. Trunk is a head row plus a
+gap-free sequence of positions, each written by exactly one successful
+land transaction.
 
 ```mermaid
 flowchart LR
@@ -16,7 +17,8 @@ flowchart LR
     P --> G2[group ...]
     G1 --> A[attempt: rebase, verify, CAS]
     A -->|trunk moved| A
-    A --> F[finalize: record, hooks, events]
+    A --> F[land transaction: positions, records, reviews, events]
+    F --> N[announce: ticket, hooks, bus]
     A -.->|conflict / failure| H[ReviewHooks.return_to_owner]
 ```
 
@@ -82,45 +84,60 @@ starting at the requested version:
 3. Unless the mode is `VerifyMode::None`: status `Verifying`, run the
    `Verifier` on the candidate's root under `max_wait`. Timeout, verifier
    error or red outcome fails the request.
-4. Status `Landing`, then `land_on_trunk(expected = head, candidate)`.
-   Success goes to finalize. A store `Conflict` ("trunk moved") retries
-   with `tip = candidate`. Any other error fails the request.
+4. Status `Landing`, `ensure_land_critical`, then `RepoStore::land` with
+   one entry: the candidate, the change's review as read, and the
+   lander's lease epoch. Success is announced. A `Conflict` retries with
+   `tip = candidate`, unless the lease moved on, which fails with
+   `Fenced`. Any other error first checks trunk: when the candidate has a
+   landing record for this change the land committed and only its reply
+   was lost, so it is announced as landed; otherwise the request fails.
 
 After the last attempt: `Failed("trunk moved N times while landing; giving
 up")`. Every `Failed` calls `return_to_owner` and publishes
 `LandEvent::Failed`. The rebase itself is described in
 [rebase](../03-core-algorithms/rebase.md).
 
-## CAS and sequence numbers
+## The land transaction
 
-`RepoStore::land_on_trunk(expected, hash)` reads the head and returns
-`Conflict` if its hash is not `expected`. Otherwise it submits one
-transaction with `seq = head_seq + 1`:
+`RepoStore::land(LandBatch { expected, entries, fence, actor })` reads the
+trunk-head row (`(thd, ns, repo)`: be64 seq ++ hash) and returns
+`Conflict` if its hash is not `expected`. Otherwise one transaction, for
+entries at `seq = head_seq + 1, + 2, ...`:
 
-* `expect(ref/trunk == expected)` and `expect_absent(trunk/<seq>)`;
-* `set(ref/trunk = hash)`, `set(trunk/<seq> = hash)`,
-  `set(trunkh/<hash> = seq)`.
+* checks: the head row equals what was read, the trunk ref equals
+  `expected`, each position is absent, the lease row equals the lander's
+  epoch, and each review's change record (and vote epoch) equals its
+  snapshot;
+* writes: each position and its reverse index, a `Landing` record at
+  `(land, ns, repo, seq)`, each review set to `Landed` with its
+  `landed_seq`, `Landed` and `StatusChanged` events, a landings charge per
+  requester, then the new head row and trunk ref.
 
-Two landers racing for the same slot get exactly one winner. The sequence
-is gap-free because the next number is derived from the head inside the
-same transaction that writes it. Key layout is in
-[storage and keyspace](../02-data/storage-and-keyspace.md).
+A review that is no longer `Landing` or `Landable` (abandoned meanwhile)
+stops the batch. Two landers racing for a slot get exactly one winner; the
+sequence is gap-free because it comes from the head inside the
+transaction that writes it. A batch lands several versions at once, which
+the sequencer's group commit (phase 9) uses. `land_on_trunk(expected,
+hash)` is a one-entry batch without review or lease, for imports and
+tools.
 
-## Finalize and land records
+**Fencing.** `Lander::epoch` takes the `lander` lease on first use
+(`acquire_lease` increments the epoch in `(lease, ns, repo, lander)`). A
+lander replaced by a newer one finds its epoch stale and every land fails,
+so two landers never both move one trunk.
 
-`finalize` writes a `Landing { seq, change_id, version, requested_version,
-requester, risk, landed_at }` record, then sets the ticket to `Landed`,
-calls `hooks.mark_landed`, publishes `LandEvent::Landed`, and publishes
-`DependentsReady` when `hooks.dependents_of` returns stack members above
-the change. Hook errors are logged, never fatal: trunk has already moved.
+## Announcing and land records
 
-The record is stored twice: as derived data `land@1` keyed by the landed
-version (`landing_of`), and appended to the `landings` misc row, a ring of
-the last `LANDINGS_RING` (1000) entries (`list_landings`). The ring update
-is a read-modify-write of one row, so it runs under `record_lock`, a
-process-local `tokio::sync::Mutex`, to keep concurrent groups from dropping
-entries. A version put on trunk without the lander (the git importer calls
-`land_on_trunk` directly) has no record.
+After the transaction, `announce` sets the ticket to `Landed`, calls
+`hooks.mark_landed` (a notification: the review service publishes its
+events, the record is already written), publishes `LandEvent::Landed`, and
+publishes `DependentsReady` when `hooks.dependents_of` returns stack
+members above the change. Hook errors are logged, never fatal.
+
+Every trunk position has a `Landing { seq, change_id, version,
+requested_version, requester, risk, landed_at }` record, written by the
+land transaction, imports included. `landing_of(version)` goes through the
+reverse index; `list_landings(limit)` scans the newest records.
 
 ## Configuration
 
@@ -139,9 +156,9 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 
 ## Limitations
 
-* Queue, tickets and `record_lock` are process-local. The deployment
-  assumes one lander per repository; a restart loses queued requests and
-  ticket status.
+* Queue and tickets are process-local; a restart loses queued requests
+  and ticket status (phase 9). The lease fences a replaced lander but is
+  never renewed or expired.
 * `RepoContext.tickets` is never pruned.
 * `VerifyMode::Affected` and `Full` call the same verifier; the mode is not
   passed through.
@@ -157,7 +174,7 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 
 * [rill-lander/src/land/lander.rs](../../crates/rill-lander/src/land/lander.rs), [pipeline.rs](../../crates/rill-lander/src/land/pipeline.rs), [record.rs](../../crates/rill-lander/src/land/record.rs)
 * [rill-lander/src/queue.rs](../../crates/rill-lander/src/queue.rs), [conflict_graph.rs](../../crates/rill-lander/src/conflict_graph.rs), [config.rs](../../crates/rill-lander/src/config.rs), [events.rs](../../crates/rill-lander/src/events.rs), [traits.rs](../../crates/rill-lander/src/traits.rs)
-* [rill-store/src/repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`land_on_trunk`, `trunk_head`, `trunk_seq_of`)
+* [rill-store/src/repo/landing.rs](../../crates/rill-store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records, leases), [repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)
 * [rill-server/src/services/review.rs](../../crates/rill-server/src/services/review.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-server/src/services/common.rs) (`ticket_status`), [state/registry.rs](../../crates/rill-server/src/state/registry.rs), [workers/mod.rs](../../crates/rill-server/src/workers/mod.rs)
 
 ---

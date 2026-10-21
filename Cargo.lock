@@ -4533,6 +4533,7 @@ dependencies = [
  "arc-swap",
  "async-trait",
  "axum",
+ "blake3",
  "bytes",
  "dashmap",
  "futures",

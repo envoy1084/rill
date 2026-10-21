@@ -177,9 +177,13 @@ trailing dots or spaces, `:*?"<>|`).
 
 ## Mutable records
 
-`Workspace` and `Operation`: [workspaces](../04-workflow/workspaces.md).
-`ReviewState`, `Label`, `LabelVote`, `Thread`:
-[review](../04-workflow/review.md). `Intent`, `RiskClass`:
+`Workspace` and `Operation` (which holds the whole resulting workspace):
+[workspaces](../04-workflow/workspaces.md). `ReviewState` (assembled from
+`ChangeRecord`, `LabelVote`, `ThreadHeader` and `Comment`), `Label`,
+`Thread`: [review](../04-workflow/review.md). `Landing`:
+[landing](../04-workflow/landing.md). `Event { kind, actor, at }`, with
+kinds `VersionStored`, `StatusChanged` and `Landed`, is written by the
+transaction that causes it. `Intent`, `RiskClass`:
 [intents](../04-workflow/intents.md). `Principal`:
 [identity and auth](../05-policy/identity-and-auth.md). `RefUpdate` is a
 compare-and-swap request: `expected: None` means the ref must not exist,

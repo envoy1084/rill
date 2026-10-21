@@ -3,8 +3,8 @@
 A workspace is a server-side record of one principal's in-progress state on
 a repository: a base version, a working change id, an optional snapshot
 tree and a sparse profile. Every mutation is an `Operation` appended to the
-workspace's log. Each operation records the resulting `base` and
-`snapshot`, so undo moves a pointer back and never computes an inverse.
+workspace's log. Each operation records the whole resulting workspace, so
+undo restores every field and never computes an inverse.
 
 Client checkouts in `.rill/` are a separate mechanism that may be attached
 to a workspace; see [checkouts](checkouts.md).
@@ -16,7 +16,7 @@ flowchart LR
     N -->|base := new version<br/>working_change := fresh id| S
     N --> U[UpdateBase]
     U -->|rebase working change| S
-    X[Undo] -.->|base, snapshot :=<br/>parent op's resulting_*| S
+    X[Undo] -.->|workspace :=<br/>parent op's resulting| S
 ```
 
 ## Record
@@ -35,17 +35,23 @@ flowchart LR
 
 ## Operation log and idempotency
 
-Every mutating RPC ends in `WorkspaceSvc::record`. It builds
-`Operation { id, workspace, parent: ws.head_op, actor, kind,
-resulting_base, resulting_snapshot, at }`, sets `head_op`, and calls
-`RepoStore::append_operation`. That is one metadata transaction:
-`Absent(opi op_id)`, a dense append to the workspace's `op` log, the `ws`
-record and the `opi` marker, so an operation and its idempotency marker
-commit together.
+Every mutating RPC builds `Operation { id, workspace, parent, actor,
+kind, resulting, at }`, where `resulting` is the workspace after the
+operation (with `head_op` pointing at it), and writes it with
+`RepoStore::operation_tx`: one transaction with `Absent(opi op_id)`,
+`Equals(ws record as the request read it)`, a stamped append to the
+workspace's `op` log, the new `ws` record and the `opi` marker. A
+workspace changed by someone else since the request read it fails the
+operation rather than being overwritten. `NewChange` and `UpdateBase`
+merge the operation into the commit transaction of the version they
+create, so the version never exists without the workspace pointing at it
+(see [changes and stacks](changes-and-stacks.md)).
 
-The `operation_id` in the request is the idempotency key. An empty id means
-the server generates one. A reused id fails the transaction and surfaces as
-`AlreadyExists` ("operation … was already applied"). The SDK exposes this
+The `operation_id` in the request is the idempotency key. A retry with the
+same id gets the first response back from the server's idempotency layer
+(see [API surface](../07-runtime/api-surface.md#retries)); the `opi` marker
+is a second guard inside the operation's own transaction. An empty id
+means the server generates one. The SDK exposes this
 through the `*_with_op` methods on `WorkspaceClient`.
 
 ## RPCs
@@ -98,32 +104,27 @@ After a `NewChange`, `working_change` is a fresh id with no versions, so
 ### Undo
 
 `Undo` reads the latest 1000 operations. It finds `target` (default
-`head_op`) and then the target's parent. It sets `base` and `snapshot` to
-the parent's `resulting_base` and `resulting_snapshot`, and records a new
+`head_op`) and then the target's parent, and makes the workspace equal to
+the parent's `resulting` state (base, snapshot, working change, sparse
+profile, owner, name), keeping only its identity, then records a new
 `Undo` operation. Undoing the first operation is `FailedPrecondition`. A
 target or parent outside the 1000-operation window is `NotFound`. Undo is
-itself an operation, so undoing an `Undo` restores the state it replaced.
-
-`owner`, `sparse` and `working_change` are not restored. Undoing a
-`NewChange` moves `base` back but keeps the fresh `working_change`, and the
-committed version stays in history.
+itself an operation, so undoing an `Undo` redoes. Undoing a `NewChange`
+restores the old base and working change; the committed version stays in
+history.
 
 ## Persistence
 
 | Key | Value |
 | --- | --- |
 | `(ws, ns, repo, ws)` (`RepoKeys::workspace`) | `Workspace` record |
-| `(op, ns, repo, ws, seq)` (`RepoKeys::operations`) | `Operation`, append-only |
+| `(op, ns, repo, ws, stamp)` (`RepoKeys::operations`) | `Operation`, append-only, versionstamped |
 | `(opi, ns, repo, op_id)` (`RepoKeys::operation_index`) | empty marker, for idempotency |
 
 ## Limitations
 
-* The `opi` row is written outside the append transaction. A failure
-  between the two writes leaves that operation id replayable.
-* No RPC returns the original response for a replayed operation id. A
-  replayed `NewChange` fails on the empty diff instead of `AlreadyExists`.
-* `Undo` sees only the latest 1000 operations and does not restore
-  `owner`, `sparse` or `working_change`.
+* `Undo` sees only the latest 1000 operations. Undoing a `Handoff`
+  returns the workspace to its previous owner.
 * `Snapshot` checks that the root tree exists. It does not check that the
   tree's blobs exist or that the tree respects the sparse profile. The
   server never filters a snapshot or a `NewChange` diff by profile.

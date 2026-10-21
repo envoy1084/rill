@@ -6,7 +6,14 @@ subscribe to. Background workers run next to the bus: the lander loop, the
 post-land verifier, the background deriver and the search indexer. The bus is lossy by design. The
 store is the source of truth, and anything that must be exact re-reads it.
 
-## Event bus
+## Event log and bus
+
+Durable events are rows in the repository's `evt` table, versionstamped
+and written by the transaction that causes them: `VersionStored` and
+`StatusChanged` by commits, `Landed` and `StatusChanged` by landings
+(`RepoStore::event`, `events_after(cursor, limit)`). Nothing reads them in
+the server yet; phase 7 moves watchers and workers onto this log. The
+in-process bus below is what streams use today.
 
 `EventBus` (`state/events.rs`) wraps one `tokio::sync::broadcast` channel of
 `RepoEvent`, with capacity `EVENT_CAPACITY` = 4096. `publish` drops the event
@@ -70,6 +77,9 @@ shutdown token.
 | Post-land verifier, `PostLandVerifier::run_forever` | timer, every `postland.interval_secs` (minimum 1 s) | polls trunk against a cursor stored in the repository, so missed events and restarts lose nothing |
 | Background deriver, `workers/deriver.rs` | its own `Lander::subscribe`, plus every 5 s | derives background kinds for trunk versions after a stored cursor (`derive_cursor`), so missed events and restarts lose nothing; see [derived data](../02-data/derived-data.md#when-values-are-computed) |
 | Search indexer, `workers/indexer.rs` | its own `Lander::subscribe` | on lag, re-indexes only the trunk head |
+
+One server-wide task, `workers::sweep_idempotency`, deletes expired
+idempotency records every 10 minutes (up to 10,000 per sweep).
 
 The verifier exists only when `postland.enabled` is set. Each sweep
 verifies up to `batch_size` landings after the stored cursor (default

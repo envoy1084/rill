@@ -46,6 +46,12 @@ and optional `token` and `timeout_secs`. The path is
 
 ## Repository API
 
+Repositories are named `org/name`, or by a bare name in the default org;
+`RepoInfo.org` names the org. `AdminClient::create_org` and `list_orgs`
+manage orgs (`OrgInfo`). Write methods send an `operation_id`, so a
+retried call returns the first call's result (see
+[API surface](../07-runtime/api-surface.md#retries)).
+
 `RepoClient` covers repository info, history (`log`, `log_page`,
 `path_history`, `blame`), trees and files (`list_dir`, `read_file`), blobs,
 diff and ancestry, refs and trunk, `grep`, derived data and `watch_*`

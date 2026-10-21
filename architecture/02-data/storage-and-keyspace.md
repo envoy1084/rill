@@ -70,8 +70,10 @@ Every key is a FoundationDB tuple. Repository rows are
 byte elements, names and kinds string elements, sequences integer
 elements. Tuple elements are self-delimiting, so no name is a prefix of a
 longer name's rows (`dir:/src` never matches `dir:/src/x`), one
-repository's rows in a table are one range, and a namespace (today always
-`DEFAULT_NAMESPACE`, `"default"`) is a larger one.
+repository's rows in a table are one range, and an org, whose name is the
+namespace, is a larger one. Repository names are unique per org; `Stores`
+is scoped to one org (`Stores::org(name)`, `"default"` by default), and
+`find_repo(id)` resolves an id through the global `repoid` index.
 
 | Table | Key after `(table, ns, repo)` | Value |
 | --- | --- | --- |
@@ -79,12 +81,20 @@ repository's rows in a table are one range, and a namespace (today always
 | `sig` | `hash` | signatures, tagged `signatures` |
 | `log` | `stamp` | version hash; every stored version, in commit order |
 | `chv` | `change, seq` | version hash; versions of one change |
-| `ch` | `change` | `ReviewState` record |
+| `ch` | `change` | `ChangeRecord` (review minus votes and threads) |
+| `vote` | `change, label, voter, version` | `LabelVote` |
+| `vep` | `change` | vote epoch, rewritten by every vote |
+| `thr` | `change, thread` | `ThreadHeader` |
+| `cmt` | `change, thread, stamp` | `Comment` |
+| `thd` | (none) | trunk head: be64 seq ++ version hash |
+| `land` | `seq` | `Landing` record |
+| `lease` | `role` | be64 epoch of the role's holder |
+| `evt` | `stamp` | `Event`, written by the transaction that causes it |
 | `trunk` | `seq` | version hash landed at that sequence |
 | `trunkh` | `hash` | be64 trunk sequence (reverse index) |
 | `ref` | `name` | version hash |
 | `ws` | `workspace` | `Workspace` record |
-| `op` | `workspace, seq` | `Operation` record |
+| `op` | `workspace, stamp` | `Operation`, with the whole resulting workspace |
 | `opi` | `operation` | empty; idempotency marker |
 | `in` | `intent` | `Intent` record |
 | `dd` | `kind, hash` | derived value (see below) |
@@ -92,19 +102,24 @@ repository's rows in a table are one range, and a namespace (today always
 | `misc` | `name` | named value (see below) |
 | `repo` | `(repo, ns, id)` | `RepoConfig` record |
 | `repon` | `(repon, ns, name)` | repo id |
+| `org` | `(org, name)` | `OrgConfig` |
+| `repoid` | `(repoid, id)` | the org a repository belongs to |
+| `quota` | `(quota, org, principal, metric, day, shard)` | usage counter (16 shards) |
+| `idem` | `(idem, principal, operation)` | a request's claim or stored response |
 | `meta` | `(meta, "format")` | store format |
 
 Change versions themselves live in the object store. A record is framed
 as `[schema u16][tag len u8][tag][postcard]`. Typed records implement
 `Record` (`TAG`, `SCHEMA = 1`) and use `encode_record` / `decode_record`:
-`review`, `workspace`, `operation`, `intent`, `change_info`, `repo`. Other
+`change`, `vote`, `thread`, `comment`, `workspace`, `operation`,
+`intent`, `change_info`, `repo`, `org`, `event`, `landing`, `idem`. Other
 values use `encode_tagged(tag, value)` with their storage kind as the tag
-(`signatures`, `land@1`, a derived kind, a misc row name). Decoding checks
+(`signatures`, a derived kind, a misc row name). Decoding checks
 the tag, so a row read as the wrong type fails with `Error::Codec` rather
 than decoding garbage.
 
-Derived and misc values can grow large (search postings, the import map,
-landing rings). Above `OFFLOAD_BYTES` (64 KiB) `RepoStore` stores the
+Derived and misc values can grow large (search postings, the import
+map). Above `OFFLOAD_BYTES` (64 KiB) `RepoStore` stores the
 value as a `Derived` object and keeps only its hash in the row; a marker
 byte (`0` inline, `1` object) tells the two apart. Callers see plain
 bytes either way.
@@ -127,17 +142,28 @@ recreated.
   because a concurrent put won, it returns the hash; a version is logged
   once however many writers store it.
 * `update_ref` is `Equals(expected)` plus set or delete.
-* `land_on_trunk(expected, hash)` reads the trunk head, fails with
-  `Conflict("trunk moved")` if it differs, then commits `Equals(ref trunk)`,
-  `Absent(trunk seq)`, and sets the ref, `trunk` and `trunkh` rows.
-  Sequences are gap-free. See [landing](../04-workflow/landing.md).
-* `put_review(state, expected)` adds an optional `Equals` on the previous
-  record encoding.
-* `append_operation` commits `Absent(opi)`, a dense append to `op`, the
-  `ws` record and the `opi` marker in one transaction.
+* **Commit.** `stage_version` writes the version object and returns the
+  transaction that makes it visible; the server's commit adds the
+  signatures, the review update, an event, a quota charge, the caller's
+  extras and the request's idempotency effect, and commits them together
+  (see [changes and stacks](../04-workflow/changes-and-stacks.md)).
+* **Land.** `land(LandBatch)` checks the trunk-head row, the trunk ref, the
+  lease epoch and each review snapshot, and writes positions, landing
+  records, `Landed` reviews, events, charges, the head row and the ref in
+  one transaction. Sequences are gap-free. See
+  [landing](../04-workflow/landing.md).
+* **Reviews.** `review_writes(snapshot, next)` checks the change record
+  read, writes only changed parts, and checks the vote epoch when the
+  record changes. See [review](../04-workflow/review.md).
+* `operation_tx(expected, op)` checks `Absent(opi)` and the workspace as
+  read, and writes the stamped operation, the resulting workspace and the
+  `opi` marker.
+* `create_org` uses `Absent(org)`; `acquire_lease` is a compare-and-swap
+  on the epoch.
 * `add_signatures` is a read and an `Equals` on what it read.
 * `put_derived`, `put_signatures`, `put_intent`, `set_misc` are plain sets.
-* `Stores::create_repo` uses `Absent(repon)` so names are unique.
+* `Stores::create_repo` uses `Present(org)` and `Absent(repon)`, and writes
+  the `repoid` index, so names are unique per org.
 
 ## Object backends
 
@@ -180,20 +206,21 @@ version or method.
 
 * No backend deletes objects or rows; there is no garbage collection, and
   an offloaded derived value that is overwritten leaves its old object.
-* The object put and meta transaction in `put_change_version` are not
-  atomic; a failure between them leaves an unreferenced object.
-* The trunk head is found by a reverse scan of `trunk`, not a single
-  head key, and landing records are separate writes (phase 6).
-* `op` and `chv` are dense logs: appenders to one workspace or one change
-  conflict, which is fine for their one writer at a time.
+* Objects are written before the transaction that makes them visible; a
+  commit that fails leaves an unreferenced object.
+* `chv` is a dense log: appenders to one change conflict, which is fine
+  for its one writer at a time.
+* Org names cannot change; quotas are counted but not enforced
+  (phase 10).
 * The `object_store` backend is tested only against in-process stores,
   never a real S3 endpoint.
-* Only one namespace is used and no encrypting sealer ships yet.
+* The object store uses one namespace for every org, and no encrypting
+  sealer ships yet.
 
 ## Code
 
 * [lib.rs](../../crates/rill-store/src/lib.rs), [error.rs](../../crates/rill-store/src/error.rs), [object.rs](../../crates/rill-store/src/object.rs), [meta.rs](../../crates/rill-store/src/meta.rs)
-* [keys.rs](../../crates/rill-store/src/keys.rs), [repo/](../../crates/rill-store/src/repo/mod.rs), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal.rs](../../crates/rill-store/src/seal.rs)
+* [keys.rs](../../crates/rill-store/src/keys.rs), [repo/](../../crates/rill-store/src/repo/mod.rs) ([landing.rs](../../crates/rill-store/src/repo/landing.rs), [reviews.rs](../../crates/rill-store/src/repo/reviews.rs), [idem.rs](../../crates/rill-store/src/repo/idem.rs), [orgs.rs](../../crates/rill-store/src/repo/orgs.rs), [events.rs](../../crates/rill-store/src/repo/events.rs)), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal.rs](../../crates/rill-store/src/seal.rs)
 * [memory.rs](../../crates/rill-store/src/memory.rs), [local/objects.rs](../../crates/rill-store/src/local/objects.rs), [s3.rs](../../crates/rill-store/src/s3.rs)
 * [tests/conformance/](../../crates/rill-store/tests/conformance/main.rs): every scenario on every backend
 * [rill-server state/stores.rs](../../crates/rill-server/src/state/stores.rs): `open_stores`

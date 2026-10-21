@@ -85,6 +85,24 @@ Laptop results against the embedded single-process server:
 
 Land latency is dominated by the lander's 2-second batch window.
 
+### On FoundationDB
+
+A release `rill-server` with metadata in a local single-node
+FoundationDB and `rill-load --percent 10` (3.5 commits, 5,000 reads a
+second) on one laptop:
+
+| Objects | Commit p50 | Commit p99 | Reads p99 |
+| --- | --- | --- | --- |
+| in memory | 22 ms | 30 ms | 2.4 ms |
+| local files | 41 ms | 318 ms | 41 ms |
+
+A commit is a handful of FoundationDB transactions (claim, commit,
+response) plus object writes. With local files the tail is the object
+store's fsync per file (macOS flushes the drive on every one), not the
+metadata. At 50% of D1 the one laptop running load, server and database
+saturates: reads are dropped and every latency rises, commits to 384 ms
+p99.
+
 ## Limitations
 
 - No benchmark covers search indexing, blame or path history yet.

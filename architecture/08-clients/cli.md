@@ -33,7 +33,8 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 
 | Group | Commands |
 | --- | --- |
-| Repositories | `repo list`, `repo create [--windows-safe]`, `repo info` |
+| Repositories | `repo list`, `repo create [--windows-safe]`, `repo info`; names are `org/name` or a name in the default org |
+| Orgs | `org list`, `org create <name> [--description]` |
 | Checkout | `checkout`, `status`, `diff` |
 | History | `log`, `blame`, `show`, `ls`, `cat`, `grep` |
 | Changes | `new`, `describe`, `amend`, `sync`, `resolve`, `undo` |

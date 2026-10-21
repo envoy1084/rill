@@ -65,17 +65,20 @@ flowchart LR
 
 **Trunk and landing**
 
-- Trunk moves only by compare-and-swap on the trunk ref, through
-  `RepoStore::land_on_trunk`; sequence numbers are gap-free. One transaction
-  checks the expected head, asserts the next sequence key is absent, and sets
-  the ref, the `seq -> hash` row and the `hash -> seq` row. In the server the
-  lander is the only caller; `RepoService.MoveRef` refuses `trunk`. The git importer
-  also calls `land_on_trunk` directly for imported mainline history. See
-  [landing](../04-workflow/landing.md).
-- One lander per repository per process; landing records are serialised by a
-  process-local lock (`Lander::record_lock`). The landings ring is a
-  read-modify-write, so without the lock concurrent landings would drop
-  entries.
+- Trunk moves only by one transaction, `RepoStore::land`, which
+  compares the trunk-head row with the head the lander expects, asserts
+  each next sequence key is absent, and writes the positions, their
+  landing records, the reviews marked `Landed`, events, the head row and
+  the trunk ref together. Sequence numbers are gap-free. In the server the
+  lander is the only caller; `RepoService.MoveRef` refuses `trunk`. The git
+  importer calls `land_on_trunk`, a one-entry batch, for imported mainline
+  history. See [landing](../04-workflow/landing.md).
+- A lander lands only while it holds the repository's `lander` lease: the
+  land transaction checks the lease epoch, so a replaced lander cannot
+  move trunk.
+- What a commit or a landing makes visible commits in one transaction;
+  objects and derived values, which are immutable, may be written before
+  it.
 
 **Crate boundaries**
 
@@ -104,11 +107,9 @@ flowchart LR
 
 ## Limitations
 
-- The O(size of change) rule has one bounded exception: recording a landing
-  rewrites the landings ring, up to `LANDINGS_RING` (1000) entries.
 - The single-lander invariant is a deployment assumption. Nothing stops two
-  processes from opening the same store; the CAS keeps trunk correct, but
-  the landing ring and tickets are not shared.
+  processes from opening the same store; the lease fences all but the
+  newest lander off trunk, but queued requests and tickets are not shared.
 - No test or lint enforces the postcard and layering rules mechanically.
 
 ## Code

@@ -40,15 +40,32 @@ read time from the `trunkh/` index.
 
 ## The single write path
 
-Every RPC that creates a version goes through `commit_version`
-([write.rs](../../crates/rill-server/src/services/repo/write.rs)). It
-checks that parents and predecessor exist, that no change targets the root
-path, and that every `Set` content exists. It then stores the version and
-derives the `RootTree` immediately, so a bad version fails the request
-rather than a later read. Next it calls `ReviewService::add_version`. A
-missing review is ignored. A review in a status that does not accept
-versions (`InvalidStatus`) is logged at debug level; the version is stored
-but not reviewed. Finally it publishes `RepoEvent::VersionCreated`.
+Every RPC that creates a version goes through `commit_version_with`
+([commit.rs](../../crates/rill-server/src/services/repo/commit.rs)). It
+checks the change limits and path rules, that parents and predecessor
+exist, that no change targets the root path, and that every `Set` content
+and copy source exists. It writes the version object and its
+land-critical derived values, which are immutable and harmless if the
+commit then fails. Then **one transaction** stores:
+
+* the version's info row, version-log and change-list entries
+  (`stage_version`, conditioned on the version being new);
+* its signatures: the server's attestation plus any client signatures;
+* the review update from `ReviewService::prepare_version` (votes copied or
+  dropped, threads re-anchored, risk and status recomputed), with a
+  `StatusChanged` event when the status moves;
+* a `VersionStored` event and a versions charge for the author;
+* the caller's extras: `NewChange` and `UpdateBase` add their workspace
+  operation, so the workspace and the version commit together;
+* for a request with an `operation_id`, the version hash in its claim.
+
+A missing review, or one that no longer takes versions, is skipped. If
+the review or workspace changed meanwhile the transaction conflicts and
+the commit is prepared again (up to 8 times); if an identical commit won,
+its hash is returned. Afterwards the review events are emitted and
+`RepoEvent::VersionCreated` is published. A retried request whose claim
+names a stored version gets that version back instead of storing another
+(see [API surface](../07-runtime/api-surface.md#retries)).
 
 ## Producing versions
 
@@ -142,7 +159,7 @@ rebases those dependents automatically.
 
 * [rill-types/src/objects/change.rs](../../crates/rill-types/src/objects/change.rs), [ids.rs](../../crates/rill-types/src/ids.rs)
 * [rill-store/src/repo/versions.rs](../../crates/rill-store/src/repo/versions.rs) (`put_change_version`, `change_versions`)
-* [rill-server/src/services/repo/write.rs](../../crates/rill-server/src/services/repo/write.rs)
+* [rill-server/src/services/repo/commit.rs](../../crates/rill-server/src/services/repo/commit.rs), [write.rs](../../crates/rill-server/src/services/repo/write.rs)
 * [rill-core/src/rebase.rs](../../crates/rill-core/src/rebase.rs), [builder.rs](../../crates/rill-core/src/builder.rs)
 * [rill-review/src/stacks.rs](../../crates/rill-review/src/stacks.rs)
 * [rill-server/src/workers/hooks.rs](../../crates/rill-server/src/workers/hooks.rs) (`dependents_of`)
