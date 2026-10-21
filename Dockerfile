@@ -31,9 +31,13 @@ RUN set -eu; \
     rm "${deb}"
 WORKDIR /src
 COPY . .
+# The cached target directory outlives the sources, whose copied mtimes
+# cargo cannot trust; touching them rebuilds the workspace crates every
+# time while dependencies stay cached.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
-    cargo build --release --locked -p rill-cli --features "$FEATURES" \
+    find crates -name '*.rs' -exec touch {} + \
+    && cargo build --release --locked -p rill-cli --features "$FEATURES" \
     && cp target/release/rill /usr/local/bin/rill
 
 FROM debian:bookworm-slim
