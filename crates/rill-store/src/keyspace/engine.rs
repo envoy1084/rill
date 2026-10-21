@@ -33,6 +33,24 @@ pub trait Engine: Send + Sync + 'static {
 
     /// Scan outside any transaction. One call is a consistent snapshot.
     async fn scan(&self, range: &RawRange) -> Result<Vec<(Bytes, Bytes)>>;
+
+    /// Return once the value at `key` is no longer `seen`, or after
+    /// `timeout`. The default polls; an engine that can watch a key
+    /// overrides it.
+    async fn wait_change(
+        &self,
+        key: &[u8],
+        seen: Option<Bytes>,
+        timeout: std::time::Duration,
+    ) -> Result<()> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            if self.get(key).await? != seen || tokio::time::Instant::now() >= deadline {
+                return Ok(());
+            }
+            tokio::time::sleep(crate::meta::POLL_INTERVAL.min(timeout)).await;
+        }
+    }
 }
 
 /// One transaction. Reads may not observe the transaction's own writes;

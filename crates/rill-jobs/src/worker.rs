@@ -13,9 +13,10 @@ use crate::error::{Error, Result};
 use crate::job::Job;
 use crate::queue::Queue;
 
-/// How long an idle worker waits for new work before looking again;
-/// retries whose backoff ran out do not wake it.
-const IDLE_WAIT: Duration = Duration::from_secs(1);
+/// How long an idle worker waits for new work before looking again; new
+/// jobs wake it at once, but retries whose backoff ran out do not, so they
+/// start up to this late.
+const IDLE_WAIT: Duration = Duration::from_secs(5);
 
 /// Why a job's attempt failed.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

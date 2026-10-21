@@ -17,6 +17,12 @@ use crate::keyspace::{Engine, EngineTxn, RawRange};
 
 /// FoundationDB's own limit on a transaction's lifetime.
 const TX_TIMEOUT_MS: i32 = 5_000;
+/// Watches a connection may have waiting: every tailer and idle worker
+/// holds one, so FoundationDB's default of 10,000 is too few.
+const MAX_WATCHES: i32 = 1_000_000;
+/// Pause after a watch fails before the caller looks again, so a failing
+/// watch never turns into a busy loop.
+const WATCH_RETRY: std::time::Duration = std::time::Duration::from_millis(50);
 
 /// An engine over a FoundationDB database.
 pub struct FdbEngine {
@@ -28,6 +34,8 @@ impl FdbEngine {
     /// An engine over `db` keeping every key under `root`.
     pub fn new(db: Database, root: &[u8]) -> Result<Self> {
         db.set_option(DatabaseOption::TransactionTimeout(TX_TIMEOUT_MS))
+            .map_err(backend)?;
+        db.set_option(DatabaseOption::MaxWatches(MAX_WATCHES))
             .map_err(backend)?;
         Ok(FdbEngine {
             db: Arc::new(db),
@@ -140,6 +148,37 @@ impl Engine for FdbEngine {
         scan_in(&trx, &self.root, range)
             .await
             .map_err(|e| classify(e, false))
+    }
+
+    /// A FoundationDB watch: the transaction that checks the value also
+    /// arms the watch, so no change between the two is missed, and waiting
+    /// costs no reads.
+    async fn wait_change(
+        &self,
+        key: &[u8],
+        seen: Option<Bytes>,
+        timeout: std::time::Duration,
+    ) -> Result<()> {
+        let key = prefixed(&self.root, key);
+        let trx = self.db.create_trx().map_err(backend)?;
+        let value = trx.get(&key, false).await.map_err(|e| classify(e, false))?;
+        if value.as_deref() != seen.as_deref() {
+            return Ok(());
+        }
+        let watch = trx.watch(&key);
+        if let Err(e) = trx.commit().await {
+            tracing::debug!(error = %e, "arming a watch failed");
+            tokio::time::sleep(WATCH_RETRY).await;
+            return Ok(());
+        }
+        match tokio::time::timeout(timeout, watch).await {
+            Ok(Ok(())) | Err(_) => {}
+            Ok(Err(e)) => {
+                tracing::debug!(error = %e, "a watch failed");
+                tokio::time::sleep(WATCH_RETRY.min(timeout)).await;
+            }
+        }
+        Ok(())
     }
 }
 

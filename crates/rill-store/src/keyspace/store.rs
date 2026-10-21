@@ -311,4 +311,20 @@ impl<E: Engine> MetaStore for Keyspace<E> {
         let raw = self.engine.get(&layout::counter_key(key)).await?;
         Ok(i64::from_le_bytes(super::engine::add_le(raw.as_deref(), 0)))
     }
+
+    async fn wait_counter(
+        &self,
+        key: &[u8],
+        seen: i64,
+        timeout: std::time::Duration,
+    ) -> Result<i64> {
+        let raw_key = layout::counter_key(key);
+        let raw = self.engine.get(&raw_key).await?;
+        let value = i64::from_le_bytes(super::engine::add_le(raw.as_deref(), 0));
+        if value != seen {
+            return Ok(value);
+        }
+        self.engine.wait_change(&raw_key, raw, timeout).await?;
+        self.counter(key).await
+    }
 }
