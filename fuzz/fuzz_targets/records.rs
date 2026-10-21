@@ -4,7 +4,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use rill_types::{decode_record, encode_record, Intent, ReviewState, Workspace};
+use rill_types::{decode_record, encode_record, ChangeRecord, Intent, Workspace};
 
 fn check<T: rill_types::Record + PartialEq + std::fmt::Debug>(data: &[u8]) {
     if let Ok(value) = decode_record::<T>(data) {
@@ -13,7 +13,7 @@ fn check<T: rill_types::Record + PartialEq + std::fmt::Debug>(data: &[u8]) {
 }
 
 fuzz_target!(|data: &[u8]| {
-    check::<ReviewState>(data);
+    check::<ChangeRecord>(data);
     check::<Workspace>(data);
     check::<Intent>(data);
 });
