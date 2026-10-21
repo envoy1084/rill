@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -16,9 +17,21 @@ use crate::keyspace::engine::add_le;
 use crate::keyspace::{Batch, Buffered, Keyspace, Op, RawRange};
 use crate::object::{verify, ObjectStore};
 
-#[derive(Default)]
+type ObjectMap = HashMap<(Arc<str>, ObjectKind, ObjectHash), Bytes>;
+
+/// Objects of every namespace in one map; each handle sees its own.
 pub struct MemoryObjectStore {
-    objects: RwLock<HashMap<(ObjectKind, ObjectHash), Bytes>>,
+    objects: Arc<RwLock<ObjectMap>>,
+    namespace: Arc<str>,
+}
+
+impl Default for MemoryObjectStore {
+    fn default() -> Self {
+        MemoryObjectStore {
+            objects: Arc::default(),
+            namespace: Arc::from(crate::seal::DEFAULT_NAMESPACE),
+        }
+    }
 }
 
 impl MemoryObjectStore {
@@ -26,29 +39,48 @@ impl MemoryObjectStore {
         Self::default()
     }
 
+    /// Objects in this handle's namespace.
     pub fn len(&self) -> usize {
-        self.objects.read().len()
+        self.objects
+            .read()
+            .keys()
+            .filter(|(ns, _, _)| *ns == self.namespace)
+            .count()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.objects.read().is_empty()
+        self.len() == 0
+    }
+
+    fn key(&self, kind: ObjectKind, hash: &ObjectHash) -> (Arc<str>, ObjectKind, ObjectHash) {
+        (self.namespace.clone(), kind, *hash)
     }
 }
 
 #[async_trait]
 impl ObjectStore for MemoryObjectStore {
     async fn get(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<Option<Bytes>> {
-        Ok(self.objects.read().get(&(kind, *hash)).cloned())
+        Ok(self.objects.read().get(&self.key(kind, hash)).cloned())
     }
 
     async fn has(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<bool> {
-        Ok(self.objects.read().contains_key(&(kind, *hash)))
+        Ok(self.objects.read().contains_key(&self.key(kind, hash)))
     }
 
     async fn put(&self, kind: ObjectKind, hash: &ObjectHash, bytes: Bytes) -> Result<()> {
         verify(kind, hash, &bytes)?;
-        self.objects.write().entry((kind, *hash)).or_insert(bytes);
+        self.objects
+            .write()
+            .entry(self.key(kind, hash))
+            .or_insert(bytes);
         Ok(())
+    }
+
+    fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
+        Arc::new(MemoryObjectStore {
+            objects: self.objects.clone(),
+            namespace: Arc::from(namespace),
+        })
     }
 }
 

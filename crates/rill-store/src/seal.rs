@@ -26,5 +26,5 @@ impl Sealer for Plaintext {
     }
 }
 
-/// Namespace objects live under until stores are split per organization.
+/// The namespace of the default org's objects; every org has its own.
 pub const DEFAULT_NAMESPACE: &str = "default";

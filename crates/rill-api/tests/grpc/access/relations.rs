@@ -5,8 +5,8 @@ use rill_types::identity::OrgRole;
 use rill_types::Principal;
 use tonic::metadata::MetadataValue;
 
-use super::fixture::*;
 use super::super::*;
+use super::fixture::*;
 
 fn tuple(path: &str, relation: &str, subject: &str) -> Option<pb::Relation> {
     Some(pb::Relation {
@@ -31,12 +31,7 @@ async fn list_root(c: &mut Clients, repo: &str) -> Result<(), Status> {
 #[tokio::test]
 async fn a_repository_without_tuples_is_closed_but_to_org_admins() {
     let server = TestServer::start(ServerConfig::default()).await;
-    server
-        .state
-        .stores
-        .create_repo("orphan", "")
-        .await
-        .unwrap();
+    server.state.stores.create_repo("orphan", "").await.unwrap();
     let olga = add_user(&server, "olga", vec![OrgRole::Admin], &[]).await;
     let mut stranger = clients(&server, Some(&server.token_for(&Principal::human("sam")))).await;
     assert_eq!(
@@ -217,7 +212,10 @@ async fn a_relation_version_from_the_future_is_refused() {
     };
     read(granted.relation_version).await.unwrap();
     assert_eq!(
-        read(granted.relation_version + 1000).await.unwrap_err().code(),
+        read(granted.relation_version + 1000)
+            .await
+            .unwrap_err()
+            .code(),
         Code::InvalidArgument
     );
     acl.server.stop().await;

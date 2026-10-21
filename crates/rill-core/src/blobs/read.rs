@@ -172,6 +172,9 @@ mod tests {
         ) -> rill_store::Result<()> {
             self.inner.put(kind, hash, bytes).await
         }
+        fn namespaced(&self, _: &str) -> Arc<dyn ObjectStore> {
+            unreachable!("the test uses one namespace")
+        }
     }
 
     #[tokio::test]

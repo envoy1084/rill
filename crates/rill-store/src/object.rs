@@ -31,6 +31,11 @@ pub trait ObjectStore: Send + Sync + 'static {
     /// not hash to `hash`. Storing an existing object is a no-op.
     async fn put(&self, kind: ObjectKind, hash: &ObjectHash, bytes: Bytes) -> Result<()>;
 
+    /// The same backend holding another organization's objects. Objects
+    /// are deduplicated within a namespace and invisible from every other,
+    /// so a hash learned in one org fetches nothing in another.
+    fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore>;
+
     /// Default batch implementation; backends with a native batch call
     /// override it.
     async fn has_many(&self, items: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {
@@ -117,6 +122,10 @@ impl<T: ObjectStore + ?Sized> ObjectStore for Arc<T> {
 
     async fn put(&self, kind: ObjectKind, hash: &ObjectHash, bytes: Bytes) -> Result<()> {
         (**self).put(kind, hash, bytes).await
+    }
+
+    fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
+        (**self).namespaced(namespace)
     }
 
     async fn has_many(&self, items: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {

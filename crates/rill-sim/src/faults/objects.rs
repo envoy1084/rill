@@ -51,6 +51,13 @@ impl ObjectStore for FaultyObjectStore {
         self.inner.has(kind, hash).await
     }
 
+    fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
+        Arc::new(FaultyObjectStore::new(
+            self.inner.namespaced(namespace),
+            self.plan.clone(),
+        ))
+    }
+
     async fn put(&self, kind: ObjectKind, hash: &ObjectHash, bytes: Bytes) -> Result<()> {
         match self.plan.write(("put", kind as u8, hash.as_bytes())) {
             Fault::None => self.inner.put(kind, hash, bytes).await,

@@ -43,6 +43,8 @@ pub enum PutStrategy {
 #[derive(Debug, Clone)]
 pub struct ObjectStoreBackend {
     store: Arc<dyn object_store::ObjectStore>,
+    /// The prefix holding every namespace.
+    base: Path,
     prefix: Path,
     sealer: Arc<dyn Sealer>,
     strategy: PutStrategy,
@@ -52,9 +54,11 @@ impl ObjectStoreBackend {
     /// Wrap `store`, placing every key under `prefix` (may be empty) and the
     /// default namespace.
     pub fn new(store: Arc<dyn object_store::ObjectStore>, prefix: impl AsRef<str>) -> Self {
+        let base = Path::from(prefix.as_ref());
         ObjectStoreBackend {
             store,
-            prefix: Path::from(prefix.as_ref()).join(DEFAULT_NAMESPACE),
+            prefix: base.clone().join(DEFAULT_NAMESPACE),
+            base,
             sealer: Arc::new(Plaintext),
             strategy: PutStrategy::Conditional,
         }
@@ -137,7 +141,8 @@ impl ObjectStoreBackend {
         }
         Ok(ObjectStoreBackend {
             store: Arc::from(store),
-            prefix: full.join(DEFAULT_NAMESPACE),
+            prefix: full.clone().join(DEFAULT_NAMESPACE),
+            base: full,
             sealer: Arc::new(Plaintext),
             strategy: PutStrategy::Conditional,
         })
@@ -229,6 +234,13 @@ impl ObjectStore for ObjectStoreBackend {
             Err(object_store::Error::AlreadyExists { .. }) => Ok(()),
             Err(e) => Err(Error::backend(e)),
         }
+    }
+
+    fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
+        Arc::new(ObjectStoreBackend {
+            prefix: self.base.clone().join(namespace),
+            ..self.clone()
+        })
     }
 
     async fn has_many(&self, items: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {

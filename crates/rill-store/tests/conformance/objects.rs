@@ -56,5 +56,45 @@ pub async fn scenario(name: &str, store: &Arc<dyn ObjectStore>) {
         .get_many(&[(ObjectKind::Blob, wrong), (ObjectKind::Blob, blob_hash)])
         .await
         .unwrap();
-    assert_eq!(got, vec![None, Some(small)], "{name}");
+    assert_eq!(got, vec![None, Some(small.clone())], "{name}");
+
+    // Each org's objects are its own: a hash known in one fetches nothing
+    // in another, and the same bytes stored twice are two copies.
+    let acme = store.namespaced("acme");
+    let globex = store.namespaced("globex");
+    assert!(
+        !acme.has(ObjectKind::Blob, &blob_hash).await.unwrap(),
+        "{name}: default is not acme"
+    );
+    let secret = b(b"acme only");
+    let secret_hash = ObjectHash::digest(ObjectKind::Blob, &secret);
+    acme.put(ObjectKind::Blob, &secret_hash, secret.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        globex.get(ObjectKind::Blob, &secret_hash).await.unwrap(),
+        None,
+        "{name}"
+    );
+    assert!(
+        !store.has(ObjectKind::Blob, &secret_hash).await.unwrap(),
+        "{name}"
+    );
+    assert_eq!(
+        store
+            .namespaced("acme")
+            .get(ObjectKind::Blob, &secret_hash)
+            .await
+            .unwrap(),
+        Some(secret),
+        "{name}: a namespace is the same wherever it is opened"
+    );
+    assert!(
+        store
+            .namespaced("default")
+            .has(ObjectKind::Blob, &blob_hash)
+            .await
+            .unwrap(),
+        "{name}: the base store is the default org's"
+    );
 }

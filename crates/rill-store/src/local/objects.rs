@@ -49,6 +49,8 @@ impl Default for LocalOptions {
 
 #[derive(Debug)]
 struct Inner {
+    /// The directory holding every namespace.
+    base: PathBuf,
     root: PathBuf,
     level: i32,
     sealer: Arc<dyn Sealer>,
@@ -76,13 +78,15 @@ impl LocalObjectStore {
 
     /// Open a store with explicit options.
     pub async fn open_with(root: impl Into<PathBuf>, options: LocalOptions) -> Result<Self> {
-        let root = root.into().join(&options.namespace);
+        let base = root.into();
+        let root = base.join(&options.namespace);
         let dir = root.clone();
         tokio::task::spawn_blocking(move || fs::create_dir_all(&dir))
             .await
             .map_err(Error::backend)??;
         Ok(LocalObjectStore {
             inner: Arc::new(Inner {
+                base,
                 root,
                 level: options.level,
                 sealer: options.sealer,
@@ -198,6 +202,18 @@ impl ObjectStore for LocalObjectStore {
             inner.write(kind, &hash, &bytes)
         })
         .await
+    }
+
+    fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
+        Arc::new(LocalObjectStore {
+            inner: Arc::new(Inner {
+                base: self.inner.base.clone(),
+                root: self.inner.base.join(namespace),
+                level: self.inner.level,
+                sealer: self.inner.sealer.clone(),
+                temp_counter: AtomicU64::new(0),
+            }),
+        })
     }
 
     async fn has_many(&self, items: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {

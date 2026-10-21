@@ -27,6 +27,7 @@ accepted one beyond fixing errors. Status is one of `accepted`,
 | [011](011-idempotent-api.md) | Every mutation is idempotent; every list is paginated | accepted |
 | [012](012-rust-server-generated-clients.md) | Rust on the server; generated clients elsewhere | accepted |
 | [013](013-p256-envelope-token-keys.md) | P-256 everywhere, with token keys wrapped by a key service | accepted |
+| [014](014-objects-per-organization.md) | Objects are stored and deduplicated per organization | accepted |
 
 ## Template
 

@@ -86,10 +86,11 @@ impl Stores {
         }
     }
 
-    /// The same stores scoped to the org `name`.
+    /// The same stores scoped to the org `name`: its metadata keys and its
+    /// objects.
     pub fn org(&self, name: &str) -> Stores {
         Stores {
-            objects: self.objects.clone(),
+            objects: self.objects.namespaced(name),
             meta: self.meta.clone(),
             namespace: Arc::from(name),
         }

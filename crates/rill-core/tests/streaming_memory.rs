@@ -24,6 +24,9 @@ impl ObjectStore for Discard {
     async fn put(&self, _: ObjectKind, _: &ObjectHash, _: Bytes) -> rill_store::Result<()> {
         Ok(())
     }
+    fn namespaced(&self, _: &str) -> std::sync::Arc<dyn ObjectStore> {
+        std::sync::Arc::new(Discard)
+    }
 }
 
 fn peak_rss_bytes() -> u64 {

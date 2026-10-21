@@ -106,3 +106,52 @@ async fn subtree_changes_need_write_on_the_target_and_read_on_the_source() {
         .unwrap();
     acl.server.stop().await;
 }
+
+#[tokio::test]
+async fn another_orgs_object_cannot_be_fetched_by_hash() {
+    let acl = Acl::start().await;
+    let stores = &acl.server.state.stores;
+    stores.create_org("acme", "").await.unwrap();
+    let acme = stores.org("acme");
+    acme.create_repo("vault", "").await.unwrap();
+    let secret = Bytes::from_static(b"acme's secret\n");
+    let hash = rill_types::ObjectHash::digest(rill_types::ObjectKind::Blob, &secret);
+    acme.objects
+        .put(rill_types::ObjectKind::Blob, &hash, secret)
+        .await
+        .unwrap();
+
+    // Alice owns a repository in the default org and knows the hash.
+    let token = acl.server.token_for(&alice());
+    let response = reqwest::Client::new()
+        .get(format!("http://{}/o/acl/blob/{}", acl.server.http, hash.to_hex()))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 404);
+    let mut c = acl.as_principal(&alice()).await;
+    let blob = c
+        .repo
+        .get_blob(pb::GetBlobRequest {
+            repo: "acl".into(),
+            content: Some(pb::ContentRef {
+                r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
+                    hash: Bytes::copy_from_slice(hash.as_bytes()),
+                    size: 14,
+                })),
+            }),
+            offset: None,
+            length: None,
+        })
+        .await;
+    let found = match blob {
+        Err(_) => false,
+        Ok(stream) => {
+            let mut stream = stream.into_inner();
+            matches!(stream.message().await, Ok(Some(_)))
+        }
+    };
+    assert!(!found, "GetBlob served another org's object");
+    acl.server.stop().await;
+}

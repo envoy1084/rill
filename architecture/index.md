@@ -94,7 +94,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 
 **10 Decisions**
 
-48. [Architecture decisions](10-decisions/README.md): the thirteen ADRs that
+48. [Architecture decisions](10-decisions/README.md): the fourteen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 

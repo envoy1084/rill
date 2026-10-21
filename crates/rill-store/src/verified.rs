@@ -49,6 +49,10 @@ impl ObjectStore for VerifiedObjectStore {
         self.inner.put(kind, hash, bytes).await
     }
 
+    fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
+        Arc::new(VerifiedObjectStore::new(self.inner.namespaced(namespace)))
+    }
+
     async fn has_many(&self, items: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {
         self.inner.has_many(items).await
     }

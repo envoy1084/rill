@@ -72,8 +72,9 @@ elements. Tuple elements are self-delimiting, so no name is a prefix of a
 longer name's rows (`dir:/src` never matches `dir:/src/x`), one
 repository's rows in a table are one range, and an org, whose name is the
 namespace, is a larger one. Repository names are unique per org; `Stores`
-is scoped to one org (`Stores::org(name)`, `"default"` by default), and
-`find_repo(id)` resolves an id through the global `repoid` index.
+is scoped to one org (`Stores::org(name)`, `"default"` by default) for both
+its metadata keys and its objects, and `find_repo(id)` resolves an id
+through the global `repoid` index.
 
 | Table | Key after `(table, ns, repo)` | Value |
 | --- | --- | --- |
@@ -183,7 +184,7 @@ recreated.
 
 | Backend | Feature | Storage |
 | --- | --- | --- |
-| `MemoryObjectStore` | always | `HashMap`, unframed bytes; reference semantics |
+| `MemoryObjectStore` | always | one `HashMap` keyed by namespace, unframed bytes; reference semantics |
 | `LocalObjectStore` | `local` (default) | `<root>/<namespace>/<kind>/<hh>/<hex>`, each file a codec frame |
 | `ObjectStoreBackend` | `s3` | `<prefix>/<namespace>/<kind>/<hh>/<hex>` on any `object_store` store (`s3://`, `file://`, `memory://` via `from_url`) |
 
@@ -202,8 +203,14 @@ second create also succeeds, the service ignores conditional puts and the
 server refuses to start unless `allow_unconditional_put` is set, in which
 case the backend falls back to check-then-put (`PutStrategy::CheckThenPut`).
 
-Object paths include a namespace, the seam for per-tenant isolation. Both
-persistent backends pass each frame through a `Sealer` (`seal` on write,
+Every org's objects live in their own namespace, the org's name.
+`ObjectStore::namespaced(name)` returns the same backend over another
+namespace, and `Stores::org` uses it, so a repository only ever reads and
+writes its org's objects. Objects are deduplicated within an org, never
+across orgs: a hash learned in one org fetches nothing in another, and
+identical content in two orgs is stored twice
+([ADR 014](../10-decisions/014-objects-per-organization.md)). Both persistent backends
+pass each frame through a `Sealer` (`seal` on write,
 `open` on read); the default `Plaintext` sealer is the identity, and an
 encrypting sealer can be plugged in without touching the layout.
 
@@ -228,8 +235,7 @@ version or method.
   (phase 10).
 * The `object_store` backend is tested only against in-process stores,
   never a real S3 endpoint.
-* The object store uses one namespace for every org, and no encrypting
-  sealer ships yet.
+* No encrypting sealer ships yet.
 
 ## Code
 
