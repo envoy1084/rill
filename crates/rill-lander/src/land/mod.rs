@@ -1,9 +1,11 @@
 //! The landing pipeline.
 
+mod domains;
 pub mod followups;
 mod lander;
 mod record;
 mod sequence;
+mod speculate;
 
 pub use lander::Lander;
 pub use lander::LANDER_LEASE;

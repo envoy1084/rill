@@ -255,8 +255,8 @@ fn lander_code(e: &rill_lander::Error) -> Code {
         E::NotLanded(_) | E::ChangeNotFound(_) | E::UnknownTicket(_) => Code::NotFound,
         E::Shutdown => Code::Unavailable,
         E::RevertFailed { .. } | E::Fenced => Code::Aborted,
-        E::TooManyRequests { .. } => Code::ResourceExhausted,
-        E::Types(_) => Code::InvalidArgument,
+        E::TooManyRequests { .. } | E::QueueFull { .. } => Code::ResourceExhausted,
+        E::Types(_) | E::Config(_) => Code::InvalidArgument,
         E::Core(c) => core_code(c),
         E::Store(s) | E::Jobs(rill_jobs::Error::Store(s)) => store_code(s),
         E::Jobs(rill_jobs::Error::Lost(_)) => Code::Aborted,
@@ -270,7 +270,20 @@ impl From<Error> for Status {
         if code == Code::Internal {
             tracing::error!(error = %err, "internal error in handler");
         }
-        Status::new(code, err.to_string())
+        let retry_after = match &err {
+            Error::Lander(rill_lander::Error::QueueFull {
+                retry_after_secs, ..
+            }) => Some(*retry_after_secs),
+            _ => None,
+        };
+        let mut status = Status::new(code, err.to_string());
+        if let Some(secs) = retry_after {
+            status.metadata_mut().insert(
+                "retry-after",
+                secs.to_string().parse().expect("digits are ASCII"),
+            );
+        }
+        status
     }
 }
 

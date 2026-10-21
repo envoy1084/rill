@@ -9,11 +9,13 @@ use rill_jobs::Queue;
 use rill_lander::land::followups::{DERIVE_QUEUE, INDEX_QUEUE};
 use tokio_util::sync::CancellationToken;
 
-use super::metrics::{QueueLabels, RepoLabels, RoleLabels};
+use super::metrics::{KeyLabels, QueueLabels, RepoLabels, RoleLabels};
 use crate::state::{AppState, RepoContext};
 
 /// How often gauges are refreshed.
 const INTERVAL: Duration = Duration::from_secs(15);
+/// Conflict domains and sponsors exported per repository, busiest first.
+const TOP_KEYS: usize = 20;
 /// The lease roles a repository has.
 const ROLES: [&str; 3] = [
     rill_lander::land::LANDER_LEASE,
@@ -57,6 +59,38 @@ async fn sample(state: &AppState, ctx: &RepoContext) -> crate::error::Result<()>
             .set(stats.retried);
     }
     let labels = RepoLabels { repo: repo.clone() };
+    let timings = ctx.lander.timings();
+    for (family, value) in [
+        (&metrics.land_wait_p50_ms, timings.p50),
+        (&metrics.land_wait_p99_ms, timings.p99),
+        (&metrics.land_interval_ms, timings.interval),
+    ] {
+        family
+            .get_or_create(&RepoLabels { repo: repo.clone() })
+            .set(value.as_millis() as i64);
+    }
+    let mut rates: Vec<_> = ctx.lander.conflict_rates().into_iter().collect();
+    rates.sort_by_key(|r| std::cmp::Reverse(r.1 .1));
+    for (domain, (rate, _)) in rates.into_iter().take(TOP_KEYS) {
+        metrics
+            .land_conflict_permille
+            .get_or_create(&KeyLabels {
+                repo: repo.clone(),
+                key: domain,
+            })
+            .set((rate * 1000.0) as i64);
+    }
+    let mut shares: Vec<_> = ctx.lander.queued_by_share().await?.into_iter().collect();
+    shares.sort_by_key(|s| std::cmp::Reverse(s.1));
+    for (share, n) in shares.into_iter().take(TOP_KEYS) {
+        metrics
+            .land_queued_by_share
+            .get_or_create(&KeyLabels {
+                repo: repo.clone(),
+                key: share,
+            })
+            .set(n as i64);
+    }
     let pending = ctx.repo.pending_land_requests(10_000).await?.len();
     metrics
         .land_requests_pending

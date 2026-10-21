@@ -64,6 +64,13 @@ pub struct LandPolicy {
     /// Unfinished requests one principal may have queued; more are refused
     /// until some finish. Reverts are exempt.
     pub max_in_flight: usize,
+    /// Unfinished requests charged to one sponsor (all its agents).
+    pub max_sponsor_in_flight: usize,
+    /// Unfinished requests in all; past it new ones are refused with a
+    /// time to retry.
+    pub max_queued: usize,
+    /// Shares of the agent lane by sponsor; 1 when unlisted.
+    pub sponsor_weights: std::collections::BTreeMap<String, u32>,
 }
 
 impl Default for LandPolicy {
@@ -76,6 +83,9 @@ impl Default for LandPolicy {
             revert_grace: Duration::from_secs(15 * 60),
             max_retries: 8,
             max_in_flight: 50,
+            max_sponsor_in_flight: 2_000,
+            max_queued: 10_000,
+            sponsor_weights: Default::default(),
         }
     }
 }

@@ -14,6 +14,7 @@ use crate::config::LandPolicy;
 use crate::error::Result;
 use crate::events::LandEvent;
 use crate::queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest, SWEEP_LIMIT};
+use crate::schedule::{serve_order, share_key, Eta, LandingRules, Thrash, Timings};
 use crate::traits::{ReviewHooks, Verifier};
 
 /// Capacity of the event channel; slow subscribers lag rather than block
@@ -36,6 +37,13 @@ pub struct Lander {
     events: broadcast::Sender<LandEvent>,
     /// The lander lease.
     lease: LeaseHolder,
+    /// Landing rules by the trunk head they were read at.
+    pub(super) rules:
+        parking_lot::Mutex<Option<(Option<rill_types::ChangeVersionHash>, Arc<LandingRules>)>>,
+    /// Recent rebase outcomes per domain.
+    pub(super) thrash: Thrash,
+    /// Recent queue-to-trunk times.
+    pub(super) timings: Timings,
 }
 
 /// The lease role landers fence their trunk writes with.
@@ -62,6 +70,9 @@ impl Lander {
             verifier,
             policy,
             events,
+            rules: parking_lot::Mutex::new(None),
+            thrash: Thrash::new(),
+            timings: Timings::new(),
         })
     }
 
@@ -140,18 +151,35 @@ impl Lander {
             return Ok(ticket);
         }
         if request.lane != rill_types::Lane::Emergency {
-            let queued = self
-                .queue
-                .pending(SWEEP_LIMIT.max(self.policy.max_in_flight * 4))
-                .await?
+            let pending = self.queue.pending(self.policy.max_queued + 1).await?;
+            if pending.len() >= self.policy.max_queued {
+                let wait = self.timings.snapshot().interval * pending.len() as u32;
+                return Err(crate::error::Error::QueueFull {
+                    pending: pending.len(),
+                    retry_after_secs: wait.as_secs().clamp(1, 600),
+                });
+            }
+            let mine = pending
                 .iter()
                 .filter(|q| q.request.requester.id == request.requester.id)
                 .count();
-            if queued >= self.policy.max_in_flight {
+            if mine >= self.policy.max_in_flight {
                 return Err(crate::error::Error::TooManyRequests {
                     requester: request.requester.name.clone(),
                     limit: self.policy.max_in_flight,
                 });
+            }
+            if let Some(sponsor) = &request.sponsor {
+                let sponsored = pending
+                    .iter()
+                    .filter(|q| q.request.sponsor.as_ref() == Some(sponsor))
+                    .count();
+                if sponsored >= self.policy.max_sponsor_in_flight {
+                    return Err(crate::error::Error::TooManyRequests {
+                        requester: sponsor.clone(),
+                        limit: self.policy.max_sponsor_in_flight,
+                    });
+                }
             }
         }
         let (ticket, new) = self.queue.enqueue(&request).await?;
@@ -192,7 +220,44 @@ impl Lander {
         if queued.is_empty() {
             return Ok(0);
         }
+        let queued = serve_order(queued, &self.policy.sponsor_weights);
         Ok(self.sequence(queued, &lease).await)
+    }
+
+    /// Where `ticket` stands: its place in the serve order (0 = next) and
+    /// when it should land at the recent rate. `None` once it is not
+    /// queued (or is past the first sweep's worth of requests).
+    pub async fn position(
+        &self,
+        ticket: LandTicket,
+    ) -> Result<Option<(usize, std::time::Duration)>> {
+        let queued = serve_order(
+            self.queue.pending(SWEEP_LIMIT).await?,
+            &self.policy.sponsor_weights,
+        );
+        Ok(queued
+            .iter()
+            .position(|q| q.ticket == ticket)
+            .map(|at| (at, self.timings.snapshot().wait(at))))
+    }
+
+    /// Recent landing rate and queue-to-trunk times.
+    pub fn timings(&self) -> Eta {
+        self.timings.snapshot()
+    }
+
+    /// Each domain's recent conflict rate and attempts, for metrics.
+    pub fn conflict_rates(&self) -> std::collections::BTreeMap<String, (f64, u32)> {
+        self.thrash.rates(std::time::Duration::from_secs(300))
+    }
+
+    /// Unfinished requests per share key (sponsor or requester).
+    pub async fn queued_by_share(&self) -> Result<std::collections::BTreeMap<String, usize>> {
+        let mut out = std::collections::BTreeMap::new();
+        for q in self.queue.pending(SWEEP_LIMIT).await? {
+            *out.entry(share_key(&q)).or_insert(0) += 1;
+        }
+        Ok(out)
     }
 
     /// Serve the queue until `shutdown` is cancelled: after each sweep,

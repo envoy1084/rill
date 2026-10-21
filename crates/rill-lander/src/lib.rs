@@ -18,6 +18,7 @@ pub mod land;
 pub mod postland;
 pub mod queue;
 pub mod revert;
+pub mod schedule;
 pub mod traits;
 
 pub use config::{LandPolicy, VerifyMode, VerifyModes};

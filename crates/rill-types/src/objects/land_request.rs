@@ -79,6 +79,9 @@ pub struct LandRequest {
     /// Overrides the policy's verification mode for this request; used by
     /// reverts, which land without pre-land verification.
     pub verify_override: Option<VerifyMode>,
+    /// Who an agent's request is charged to for fair sharing and limits
+    /// (`user:ann`, `team:core`), from its token.
+    pub sponsor: Option<String>,
 }
 
 impl LandRequest {
@@ -98,7 +101,14 @@ impl LandRequest {
             risk,
             requested_at: Timestamp::now(),
             verify_override: None,
+            sponsor: None,
         }
+    }
+
+    /// The same request charged to `sponsor`.
+    pub fn sponsored_by(mut self, sponsor: Option<String>) -> Self {
+        self.sponsor = sponsor;
+        self
     }
 
     /// The same request in `lane`.

@@ -176,6 +176,10 @@ message GetLandStatusResponse {
   optional uint64 seq = 2;
   optional bytes landed_hash = 3;
   optional string error = 4;
+  // While queued: its place in the serve order (0 = next) and the
+  // estimated wait at the recent landing rate.
+  optional uint32 position = 5;
+  optional uint64 eta_ms = 6;
 }
 
 message WatchReviewRequest {

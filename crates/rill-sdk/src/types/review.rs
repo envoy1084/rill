@@ -202,6 +202,10 @@ pub struct LandProgress {
     pub landed_hash: Option<ChangeVersionHash>,
     /// Failure detail, if the landing failed.
     pub error: Option<String>,
+    /// While queued: place in the serve order (0 = next).
+    pub position: Option<u32>,
+    /// While queued: estimated wait at the recent landing rate.
+    pub eta: Option<std::time::Duration>,
 }
 
 impl LandProgress {
@@ -223,6 +227,8 @@ impl TryFrom<pb::GetLandStatusResponse> for LandProgress {
                 r.landed_hash.as_ref(),
             )?,
             error: r.error,
+            position: r.position,
+            eta: r.eta_ms.map(std::time::Duration::from_millis),
         })
     }
 }

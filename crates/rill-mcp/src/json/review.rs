@@ -136,6 +136,8 @@ pub fn land_progress(p: &LandProgress) -> Value {
         "seq": p.seq.map(|s| s.get()),
         "landed_hash": opt(p.landed_hash.as_ref(), hash),
         "error": p.error,
+        "position": p.position,
+        "eta_ms": p.eta.map(|d| d.as_millis() as u64),
     })
 }
 

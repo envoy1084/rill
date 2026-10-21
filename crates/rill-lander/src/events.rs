@@ -32,6 +32,9 @@ pub enum LandEvent {
         landed: ChangeId,
         dependents: Vec<ChangeId>,
     },
+    /// Most rebases in `domain` conflict: it is served one request per
+    /// batch until that drops.
+    Throttled { domain: String, rate_permille: u32 },
     /// Post-land verification finished for a trunk position.
     Verification { seq: TrunkSeq, green: bool },
     /// Bisection identified the first red trunk position.

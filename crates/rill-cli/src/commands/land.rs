@@ -80,11 +80,19 @@ pub async fn land(ctx: &mut Ctx<'_>, args: LandArgs) -> Result<()> {
     let id = change_or_working(ctx, args.change.as_deref(), &repo).await?;
     let ticket = repo.reviews().request_land(id).await?;
     if !args.wait {
-        return ctx.emit(json::land_ticket(&ticket), |out| {
+        let progress = repo.reviews().land_status(&ticket.id).await?;
+        return ctx.emit(json::land_progress(&progress), |out| {
+            let place = match (progress.position, progress.eta) {
+                (Some(at), Some(eta)) if !eta.is_zero() => {
+                    format!(", {} ahead, about {} s", at, eta.as_secs().max(1))
+                }
+                (Some(at), _) => format!(", {at} ahead"),
+                _ => String::new(),
+            };
             out.line(format!(
-                "land requested: ticket {} ({:?}); poll with `rill land --wait` or the ticket",
+                "land requested: ticket {} ({:?}{place}); poll with `rill land --wait` or the ticket",
                 out.id(&ticket.id),
-                ticket.status
+                progress.status()
             ))
         });
     }

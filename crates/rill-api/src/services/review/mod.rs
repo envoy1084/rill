@@ -396,12 +396,12 @@ impl ReviewService for ReviewSvc {
                 let ticket = opened
                     .repo
                     .lander
-                    .enqueue(LandRequest::new(
-                        id,
-                        version,
-                        opened.principal().clone(),
-                        state.risk,
-                    ))
+                    .enqueue(
+                        LandRequest::new(id, version, opened.principal().clone(), state.risk)
+                            .sponsored_by(
+                                opened.ctx.claims.as_ref().and_then(|c| c.sponsor.clone()),
+                            ),
+                    )
                     .await?;
                 let (proto, _) = common::ticket_status(&opened.repo, ticket).await?;
                 Ok(Response::new(pb::RequestLandResponse {
@@ -443,11 +443,18 @@ impl ReviewService for ReviewSvc {
                 ),
                 _ => (None, None, None),
             };
+            let place = if status_is_queued(&proto) {
+                opened.repo.lander.position(ticket).await?
+            } else {
+                None
+            };
             Ok(Response::new(pb::GetLandStatusResponse {
                 ticket: Some(proto),
                 seq,
                 landed_hash,
                 error,
+                position: place.map(|(at, _)| at as u32),
+                eta_ms: place.map(|(_, wait)| wait.as_millis() as u64),
             }))
         }
         .await;
@@ -462,4 +469,8 @@ impl ReviewService for ReviewSvc {
     ) -> GrpcResult<Self::WatchReviewStream> {
         Ok(Response::new(self.watch_review_impl(request).await?))
     }
+}
+
+fn status_is_queued(ticket: &pb::LandTicket) -> bool {
+    ticket.status == pb::LandStatus::Queued as i32
 }

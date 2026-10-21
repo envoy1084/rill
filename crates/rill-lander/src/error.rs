@@ -43,6 +43,15 @@ pub enum Error {
     #[error("revert of {seq} did not land: {reason}")]
     RevertFailed { seq: TrunkSeq, reason: String },
 
+    #[error("{0}")]
+    Config(String),
+
+    #[error("the land queue is full ({pending} waiting); retry in {retry_after_secs} s")]
+    QueueFull {
+        pending: usize,
+        retry_after_secs: u64,
+    },
+
     #[error("codec error: {0}")]
     Codec(String),
 

@@ -638,6 +638,8 @@ impl ReviewService for MockReview {
         let landed = status == pb::LandStatus::Landed;
         let change_id = id_to_proto(&ChangeId::derived("ticket", &ticket));
         Ok(Response::new(pb::GetLandStatusResponse {
+            position: None,
+            eta_ms: None,
             ticket: Some(self.ticket(&ticket, change_id, status)),
             seq: landed.then_some(7),
             landed_hash: landed.then(|| hash_to_proto(&fake_hash("landed"))),

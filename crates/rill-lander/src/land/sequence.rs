@@ -1,90 +1,122 @@
-//! The sequencer: one ordered pipeline of requests, each rebased onto the
-//! head it will land on, approved on the review the landing commits
-//! against, and landed in groups of up to [`MAX_BATCH`] per transaction.
+//! The sequencer: requests served in fair order, placed by what they
+//! touch, speculated in parallel where they are independent, and landed
+//! in groups of up to [`MAX_BATCH`] per transaction.
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet, VecDeque};
 
 use rill_core::{rebase, RootTree};
 use rill_store::repo::{LandBatch, LandEntry, Lease};
-use rill_types::{ChangeVersion, ChangeVersionHash, LandStatus, LandTicket, Timestamp, TrunkSeq};
+use rill_types::{
+    ChangeVersion, ChangeVersionHash, LandStatus, LandTicket, RepoPathBuf, Timestamp, TrunkSeq,
+};
 
 use super::lander::{Lander, LANDER_LEASE};
 use crate::config::VerifyMode;
 use crate::error::{Error, Result};
 use crate::events::LandEvent;
 use crate::queue::QueuedRequest;
+use crate::schedule::Footprint;
 use crate::traits::Approval;
 
 /// Landings committed together at most.
 pub const MAX_BATCH: usize = 64;
 
 /// A request ready to land: rebased, verified and approved.
-struct Candidate {
-    queued: QueuedRequest,
-    version: ChangeVersionHash,
-    cv: ChangeVersion,
-    approval: Approval,
+pub(super) struct Candidate {
+    pub(super) queued: QueuedRequest,
+    pub(super) version: ChangeVersionHash,
+    pub(super) cv: ChangeVersion,
+    pub(super) approval: Approval,
+    /// The state it was rebased onto.
+    pub(super) base: Option<ChangeVersionHash>,
 }
 
 /// What became of preparing one request.
-enum Prepared {
+pub(super) enum Prepared {
     Ready(Box<Candidate>),
-    /// Finished without landing; its status is recorded.
+    /// Its rebase conflicted; its status is recorded.
+    Conflicted,
+    /// Finished without landing for another reason; its status is recorded.
     Dropped,
 }
 
+/// What became of one window.
+enum Window {
+    /// Done; these requests were held back for a later batch.
+    Done(Vec<QueuedRequest>),
+    /// The lease was lost.
+    Fenced,
+}
+
 impl Lander {
-    /// Serve `queued`, in order, in groups of up to [`MAX_BATCH`]. Returns
-    /// how many requests were taken up.
+    /// Serve `queued` (in serve order), in batches of up to [`MAX_BATCH`].
+    /// Returns how many requests were taken up.
     pub(super) async fn sequence(&self, queued: Vec<QueuedRequest>, lease: &Lease) -> usize {
         let count = queued.len();
         let mut marked = HashSet::new();
-        for window in queued.chunks(MAX_BATCH) {
-            if !self.land_window(window, lease, &mut marked).await {
-                break;
+        let mut pending: VecDeque<QueuedRequest> = queued.into();
+        while !pending.is_empty() {
+            let take = pending.len().min(MAX_BATCH);
+            let window: Vec<QueuedRequest> = pending.drain(..take).collect();
+            match self.land_window(window, lease, &mut marked).await {
+                Window::Fenced => break,
+                // Every window lands or finishes at least its first request,
+                // so what it held back is served in the next one.
+                Window::Done(held) => {
+                    for q in held.into_iter().rev() {
+                        pending.push_front(q);
+                    }
+                }
             }
         }
         count
     }
 
-    /// Land what can land of `window`; `false` once the lease is lost.
+    /// Land what can land of `window`.
     async fn land_window(
         &self,
-        window: &[QueuedRequest],
+        window: Vec<QueuedRequest>,
         lease: &Lease,
         marked: &mut HashSet<LandTicket>,
-    ) -> bool {
-        let mut live: Vec<QueuedRequest> = window.to_vec();
+    ) -> Window {
+        let mut live = window;
+        let mut held = Vec::new();
         for attempt in 0..=self.policy.max_retries {
             let head = match self.repo.trunk_head().await {
                 Ok(head) => head,
                 Err(e) => {
                     tracing::warn!(error = %e, "reading the trunk head failed");
-                    return true;
+                    return Window::Done(held);
                 }
             };
-            let mut chain: Vec<Candidate> = Vec::new();
-            let mut tip = head.map(|(_, h)| h);
+            let tip = head.map(|(_, h)| h);
+            let rules = match self.landing_rules(tip).await {
+                Ok(rules) => rules,
+                Err(e) => {
+                    tracing::warn!(error = %e, "reading the landing rules failed");
+                    return Window::Done(held);
+                }
+            };
+            let mut batch: Vec<(QueuedRequest, Footprint)> = Vec::new();
             for queued in &live {
                 if marked.insert(queued.ticket) && !self.accept(queued).await {
                     continue;
                 }
-                match self.prepare(queued, tip).await {
-                    Ok(Prepared::Ready(candidate)) => {
-                        tip = Some(candidate.version);
-                        chain.push(*candidate);
-                    }
-                    Ok(Prepared::Dropped) => {}
+                match self.footprint(queued, &rules).await {
+                    Ok(f) => batch.push((queued.clone(), f)),
                     Err(e) => self.fail(queued, e.to_string()).await,
                 }
             }
+            let (batch, later) = self.admit(batch, &rules.throttle);
+            held.extend(later);
+            let chain = self.speculate(tip, &batch).await;
             live = chain.iter().map(|c| c.queued.clone()).collect();
             if chain.is_empty() {
-                return true;
+                return Window::Done(held);
             }
             match self.commit(head, chain, lease).await {
-                Ok(()) => return true,
-                Err(Error::Fenced) => return false,
+                Ok(()) => return Window::Done(held),
+                Err(Error::Fenced) => return Window::Fenced,
                 Err(e) if is_conflict(&e) => {
                     tracing::debug!(attempt, "trunk or a review moved; sequencing again");
                 }
@@ -92,7 +124,7 @@ impl Lander {
                     for queued in &live {
                         self.fail(queued, e.to_string()).await;
                     }
-                    return true;
+                    return Window::Done(held);
                 }
             }
         }
@@ -106,7 +138,57 @@ impl Lander {
             )
             .await;
         }
-        true
+        Window::Done(held)
+    }
+
+    /// Split `batch` into what lands now and what waits: a configuration
+    /// change lands alone, and a throttled domain gets one request.
+    fn admit(
+        &self,
+        batch: Vec<(QueuedRequest, Footprint)>,
+        throttle: &crate::schedule::ThrottleRules,
+    ) -> (Vec<(QueuedRequest, Footprint)>, Vec<QueuedRequest>) {
+        let throttled = self.thrash.throttled(throttle);
+        let mut now = Vec::new();
+        let mut later = Vec::new();
+        let mut busy: BTreeSet<String> = BTreeSet::new();
+        let mut cut = false;
+        for (queued, footprint) in batch {
+            // A configuration change ends the batch before it, or is all of
+            // it: requests after it wait, so queue order is kept.
+            cut |= footprint.exclusive && !now.is_empty();
+            if cut {
+                later.push(queued);
+                continue;
+            }
+            if footprint.exclusive {
+                now.push((queued, footprint));
+                cut = true;
+                continue;
+            }
+            let domains = footprint.domains();
+            let hot: Vec<&String> = domains.intersection(&throttled).collect();
+            if hot.iter().any(|d| busy.contains(*d)) {
+                later.push(queued);
+                continue;
+            }
+            busy.extend(hot.into_iter().cloned());
+            now.push((queued, footprint));
+        }
+        if !throttled.is_empty() && !later.is_empty() {
+            let rates = self
+                .thrash
+                .rates(std::time::Duration::from_secs(throttle.window_secs));
+            for domain in &throttled {
+                let rate = rates.get(domain).map_or(0.0, |r| r.0);
+                tracing::info!(domain, rate, "domain throttled for swarm thrash");
+                self.publish(LandEvent::Throttled {
+                    domain: domain.clone(),
+                    rate_permille: (rate * 1000.0) as u32,
+                });
+            }
+        }
+        (now, later)
     }
 
     /// Take a request up: review must still let the lander have it.
@@ -132,7 +214,7 @@ impl Lander {
 
     /// Rebase `queued` onto `tip` (the head it will land on), verify and
     /// approve it.
-    async fn prepare(
+    pub(super) async fn prepare(
         &self,
         queued: &QueuedRequest,
         tip: Option<ChangeVersionHash>,
@@ -156,7 +238,7 @@ impl Lander {
                 }
                 match self.rebase_onto(queued, &requested, &tip).await? {
                     Some(rebased) => rebased,
-                    None => return Ok(Prepared::Dropped),
+                    None => return Ok(Prepared::Conflicted),
                 }
             }
             _ => (requested, cv),
@@ -187,6 +269,7 @@ impl Lander {
             version,
             cv,
             approval,
+            base: tip,
         })))
     }
 
@@ -257,6 +340,11 @@ impl Lander {
             }
         };
         tracing::info!(landed = landings.len(), first, "batch landed");
+        let now = Timestamp::now().millis();
+        for candidate in &chain {
+            self.timings
+                .landed(candidate.queued.request.requested_at.millis(), now);
+        }
         for (landing, candidate) in landings.into_iter().zip(&chain) {
             self.announce(&candidate.queued, landing, &candidate.cv)
                 .await;
@@ -291,25 +379,30 @@ impl Lander {
         let rebased = rebase(&self.derive, tip, head, Timestamp::now()).await?;
         if rebased.has_conflicts() {
             let paths: Vec<_> = rebased.conflicted_paths().cloned().collect();
-            let change_id = queued.request.change_id;
-            tracing::info!(%change_id, ?paths, "rebase conflicted");
-            self.set_status(
-                queued,
-                LandStatus::Conflict {
-                    paths: paths.clone(),
-                },
-            )
-            .await;
-            self.return_to_owner(
-                change_id,
-                format!("rebase onto trunk conflicts at {} path(s)", paths.len()),
-            )
-            .await;
-            self.publish(LandEvent::Conflict { change_id, paths });
+            self.conflicted(queued, paths).await;
             return Ok(None);
         }
         let hash = self.repo.put_change_version(&rebased).await?;
         Ok(Some((hash, rebased)))
+    }
+
+    /// Record that `queued` conflicts at `paths` and hand it back.
+    pub(super) async fn conflicted(&self, queued: &QueuedRequest, paths: Vec<RepoPathBuf>) {
+        let change_id = queued.request.change_id;
+        tracing::info!(%change_id, ?paths, "rebase conflicted");
+        self.set_status(
+            queued,
+            LandStatus::Conflict {
+                paths: paths.clone(),
+            },
+        )
+        .await;
+        self.return_to_owner(
+            change_id,
+            format!("rebase onto trunk conflicts at {} path(s)", paths.len()),
+        )
+        .await;
+        self.publish(LandEvent::Conflict { change_id, paths });
     }
 
     /// Run pre-land verification. Returns `false` after recording a

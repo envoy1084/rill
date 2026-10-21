@@ -1,10 +1,12 @@
 # Landing
 
 The lander, while it holds the repository's lease, serves stored land
-requests as one ordered sequence. Each request is rebased onto the head it
-will land on (the request before it in the sequence, or trunk), verified
-if its risk asks for it, and approved against the review as stored. Up to
-64 approved requests then land in one transaction that checks the trunk
+requests in fair order (lanes, then weighted shares per sponsor). Requests
+that touch nothing in common are rebased onto the trunk head and verified
+in parallel; a request that overlaps earlier ones is rebased on top of
+them. Each is approved against the review as stored, and the batch is
+lined up at commit, each version re-parented onto the one before it. Up
+to 64 approved requests then land in one transaction that checks the trunk
 head, the lease and every review it was approved on, assigns gap-free
 sequence numbers, and writes landing records, reviews, request statuses,
 events and follow-up jobs. A request whose approval no longer holds is
@@ -13,14 +15,12 @@ ejected with the reason.
 ```mermaid
 flowchart LR
     RL[RequestLand, any server] -->|admission, queue_land tx| Q[(stored requests)]
-    Q -->|lease holder: lane, then age| S[sequence]
-    S --> R[rebase onto predicted head]
-    R --> V[verify]
-    V --> A[approve on stored review]
-    A -->|next request| R
-    A -->|refused| E[Ejected + reason]
+    Q -->|lease holder: fair order| F[footprints, admit]
+    F --> R[speculate in waves: rebase, verify, approve]
+    R -->|refused| E[Ejected + reason]
     R -->|conflict| C[Conflict, return to owner]
-    A --> G[group commit, up to 64 per transaction]
+    R --> L[line up: re-parent onto the one before]
+    L --> G[group commit, up to 64 per transaction]
     G -->|trunk or a review moved| S
     G --> N[announce: hooks, lander events]
 ```
@@ -68,51 +68,106 @@ records.
 ## Admission
 
 `Lander::enqueue` returns the ticket of the change's unfinished request if
-it has one. Otherwise a requester may have at most `max_in_flight` (50)
-unfinished requests; more are refused with `TooManyRequests`
-(`RESOURCE_EXHAUSTED`) until some finish. The `emergency` lane is exempt.
+it has one. Otherwise, outside the `emergency` lane, it refuses with
+`RESOURCE_EXHAUSTED`:
+
+* `QueueFull` when `max_queued` (10,000) requests are unfinished, with a
+  `retry-after` header (seconds, from the recent landing rate);
+* `TooManyRequests` when the requester has `max_in_flight` (50), or its
+  sponsor (`sponsor` from the token, so all of one person's or team's
+  agents) has `max_sponsor_in_flight` (2,000) unfinished.
+
 The server evaluates the submit policy for the requester before queueing
-(`RequestLand`).
+(`RequestLand`), and records the token's sponsor on the request.
 
 ## Sequencing
 
-`run_once` reads up to 256 pending requests in lane-then-age order and
-`sequence` serves them in windows of `MAX_BATCH` (64). For each window:
+The pure decisions live in `rill-lander/src/schedule/`; the sequencer
+(`land/sequence.rs`, `land/speculate.rs`) does the I/O.
+
+**Order.** `run_once` reads up to 256 pending requests and `serve_order`
+puts them in lane order (`emergency`, `human`, `agent`, `bulk`), and
+within a lane by weighted fair queuing over share keys (the sponsor, or
+the requester): the n-th request of a key with weight w gets virtual time
+n/w (`sponsor_weights`, default 1), ties in queue order. One swarm cannot
+starve another sponsor or a human.
+
+**Footprints.** A request's conflict domains are the paths its version
+changed (the `changed-paths` derivation), the groups `.rill/landing.toml`
+declares for them, and whether it changes `.rill/` (configuration). Two
+requests interact when one is configuration, they share a group, or a path
+of one is or is under a path of the other; a shared parent directory does
+not count.
+
+```toml
+# .rill/landing.toml, on trunk (owner-only, like all of .rill/)
+[[serialize]]            # these always land one after another
+name = "db"
+paths = ["schema/**", "migrations/**"]
+
+[throttle]               # swarm thrash (defaults shown)
+conflict_rate = 0.5
+min_attempts = 10
+window_secs = 300
+```
+
+Each window of up to `MAX_BATCH` (64):
 
 1. **Accept.** The first time a request is taken up, `hooks.mark_landing`
    moves its review to `Landing` (or accepts it already `Landing`, when a
    lander that took over resumes it). A refusal fails the request.
-2. **Prepare** each request in order with `tip` = the previous request's
-   candidate, or the trunk head: a version already on trunk or already an
-   ancestor of it fails; a version not based on `tip` is rebased onto it
-   (`rill_core::rebase`), and a conflicted rebase sets `Conflict { paths }`
-   and returns the change to its owner; the candidate is verified unless
-   its mode is `None` (status `Verifying`; red, timeout or error fails it);
-   its land-critical values are stored.
-3. **Approve.** `hooks.approve(change, requested version, requester)`
+2. **Admit.** A configuration change ends the batch before it or is all of
+   it, and requests after it wait, so the rules in force never change
+   within a batch. In a throttled domain only the first request is taken;
+   the rest wait for the next batch, and `LandEvent::Throttled` says why.
+3. **Speculate** in waves (`Plan`): a request goes in the wave after every
+   earlier request it overlaps. Each is placed (`Slot`) on the trunk head
+   when no surviving earlier request overlaps it, after the latest one when
+   that one's chain holds all it overlaps, or else on the lined-up batch.
+   A wave's requests are prepared concurrently: a version already on trunk
+   or an ancestor of it fails; one not based on its slot is rebased
+   (`Conflict { paths }` returns it to its owner); it is verified unless its
+   mode is `None`; its land-critical values are stored; and it is approved.
+   A failure removes only what was speculated on top of it: later requests
+   are placed against the survivors.
+4. **Approve.** `hooks.approve(change, requested version, requester)`
    reads the review and judges it: it must still be `Landing` or
    `Landable`, its current version must still be the requested one, the
-   submit policy must still allow the requester, and the version's author
-   and the requester must still be allowed to act (`AuthorStanding`: a
-   suspended user, a killed or lapsed agent, a blocked model or a revoked
-   session that wrote it refuses). Outside dev mode the author must also
-   still hold write on every path the version writes (`WriteRights`, in
-   `workers/rights.rs`), so a revoke between commit and land keeps the
-   change off trunk. A refusal sets `Ejected
-   { reason }` and returns the change to its owner. An approval carries the
-   review snapshot, the policy's digest (BLAKE3 of its text) and the votes
-   it saw. Status `Landing`.
-4. **Commit** the chain in one `RepoStore::land` batch on the head read at
+   submit policy must still allow the requester, the version's author and
+   the requester must still be allowed to act (`AuthorStanding`), the
+   author must still hold write on every path it writes (`WriteRights`,
+   outside dev mode), and neither it nor an ancestor off trunk may be
+   quarantined by secret scanning. A refusal sets `Ejected { reason }`.
+   An approval carries the review snapshot, the policy digest and the
+   votes it saw.
+5. **Line up.** In commit order each candidate is re-parented onto the one
+   before it (`rebase` onto the batch tip). Everything it overlaps is
+   already in its base, so this adds only disjoint changes: it cannot
+   conflict and is not verified again. Requests placed on the lined-up
+   batch are prepared now.
+6. **Commit** the chain in one `RepoStore::land` batch on the head read at
    the start. A conflict (trunk moved, or a review changed after it was
-   approved) rebuilds the chain from step 2, up to `max_retries` times; a
-   conflict because the lease moved on stops the sweep (`Fenced`).
+   approved) rebuilds the window, up to `max_retries` times; a conflict
+   because the lease moved on stops the sweep (`Fenced`).
 
-Requests later in a window are rebased onto earlier ones, so a window
-lands in queue order and each version's first parent is the one before it.
-After the last attempt the rest fail with `trunk moved N times while
-landing; giving up`. Every `Failed` and `Ejected` returns the change to its
-owner and publishes `LandEvent::Failed`. The rebase itself is described in
+Every window lands or finishes at least its first request, so held-back
+requests are served by the next window. Trunk is one line: each landed
+version's first parent is the position before it. Every `Failed` and
+`Ejected` returns the change to its owner and publishes
+`LandEvent::Failed`. The rebase itself is described in
 [rebase](../03-core-algorithms/rebase.md).
+
+**Thrash.** Every rebase is recorded against its domains (top-level
+directories and declared groups). A domain whose conflict rate over
+`window_secs` reaches `conflict_rate` after `min_attempts` attempts is
+throttled to one request per batch until the rate falls.
+
+**Positions and ETAs.** `GetLandStatus` returns, while queued, the
+request's place in the serve order and an ETA from the mean time between
+recent landings. `rill land` prints both. The lease holder exports
+`land_wait_p50_ms`, `land_wait_p99_ms` (queue to trunk), `land_interval_ms`,
+`land_conflict_permille{key=domain}` and `land_queued_by_share{key}` (the
+busiest 20 of each).
 
 ## The land transaction
 
@@ -176,6 +231,9 @@ reverse index; `list_landings(limit)` scans the newest records.
 | `batch_window` | 2 s (longest pause; a new request starts a sweep at once) |
 | `max_retries` | 8 |
 | `max_in_flight` | 50 unfinished requests per requester |
+| `max_sponsor_in_flight` | 2,000 per sponsor |
+| `max_queued` | 10,000 in all |
+| `sponsor_weights` | empty (every sponsor 1) |
 | `auto_revert`, `revert_grace` | `false`, 15 min (see [post-land verification](post-land-verification.md)) |
 
 The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
@@ -186,9 +244,16 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 * `VerifyMode::Affected` and `Full` call the same verifier; the mode is not
   passed through.
 * A request keeps the risk class it was enqueued with.
-* A window is one chain: a request that fails verification or approval
-  is dropped and the rest are rebased again, but one slow verification
-  holds the whole window.
+* A slow verification holds its wave, and so its window: the batch commits
+  together.
+* Conflict domains are paths and declared groups; build-target domains
+  wait for build-graph data (remote execution).
+* A re-parented request is not verified again: under path domains its
+  verification still holds, under build-target domains it would not.
+* Requests queued in the same millisecond are served in ticket order,
+  which is random.
+* ETAs and wait percentiles live in the lease holder's memory and start
+  empty after a takeover.
 * A store failure inside `mark_landing` also refuses the request; the
   client has to request again.
 * After a failed landing the rebased version stays stored but is not the
@@ -196,7 +261,8 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 
 ## Code
 
-* [rill-lander/src/land/lander.rs](../../crates/rill-lander/src/land/lander.rs), [sequence.rs](../../crates/rill-lander/src/land/sequence.rs), [record.rs](../../crates/rill-lander/src/land/record.rs)
+* [rill-lander/src/land/lander.rs](../../crates/rill-lander/src/land/lander.rs), [sequence.rs](../../crates/rill-lander/src/land/sequence.rs), [speculate.rs](../../crates/rill-lander/src/land/speculate.rs), [domains.rs](../../crates/rill-lander/src/land/domains.rs), [record.rs](../../crates/rill-lander/src/land/record.rs)
+* [rill-lander/src/schedule/](../../crates/rill-lander/src/schedule/) (footprints, landing rules, fair order, plan, thrash, ETAs)
 * [rill-lander/src/queue.rs](../../crates/rill-lander/src/queue.rs), [config.rs](../../crates/rill-lander/src/config.rs), [events.rs](../../crates/rill-lander/src/events.rs), [traits.rs](../../crates/rill-lander/src/traits.rs)
 * [rill-lander/src/land/followups.rs](../../crates/rill-lander/src/land/followups.rs) (jobs a landing enqueues)
 * [rill-store/src/repo/landing.rs](../../crates/rill-store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records), [repo/leases.rs](../../crates/rill-store/src/repo/leases.rs), [repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)

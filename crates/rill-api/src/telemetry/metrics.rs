@@ -41,6 +41,13 @@ pub struct QueueLabels {
     pub queue: String,
 }
 
+/// One conflict domain, or one sponsor's share, of one repository.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+pub struct KeyLabels {
+    pub repo: String,
+    pub key: String,
+}
+
 /// One lease role of one repository.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 pub struct RoleLabels {
@@ -69,6 +76,15 @@ pub struct Metrics {
     pub trunk_head: Family<RepoLabels, Gauge>,
     pub events_written: Family<RepoLabels, Gauge>,
     pub lease_epoch: Family<RoleLabels, Gauge>,
+    /// Queue-to-trunk time of recent landings, p50 and p99, and the mean
+    /// time between landings (milliseconds; from the lease holder).
+    pub land_wait_p50_ms: Family<RepoLabels, Gauge>,
+    pub land_wait_p99_ms: Family<RepoLabels, Gauge>,
+    pub land_interval_ms: Family<RepoLabels, Gauge>,
+    /// Share of recent rebases that conflicted, per domain (per mille).
+    pub land_conflict_permille: Family<KeyLabels, Gauge>,
+    /// Unfinished land requests per sponsor (or requester).
+    pub land_queued_by_share: Family<KeyLabels, Gauge>,
 }
 
 impl Default for Metrics {
@@ -159,6 +175,41 @@ impl Metrics {
             "events_written",
             "events written to the log so far",
         );
+        let land_wait_p50_ms = repo_gauge(
+            &mut registry,
+            &mut names,
+            "land_wait_p50_ms",
+            "median queue-to-trunk time of recent landings",
+        );
+        let land_wait_p99_ms = repo_gauge(
+            &mut registry,
+            &mut names,
+            "land_wait_p99_ms",
+            "p99 queue-to-trunk time of recent landings",
+        );
+        let land_interval_ms = repo_gauge(
+            &mut registry,
+            &mut names,
+            "land_interval_ms",
+            "mean time between recent landings",
+        );
+        let key_gauge = |registry: &mut Registry, names: &mut Vec<String>, name, help| {
+            let family = Family::<KeyLabels, Gauge>::default();
+            register(registry, names, name, help, family.clone());
+            family
+        };
+        let land_conflict_permille = key_gauge(
+            &mut registry,
+            &mut names,
+            "land_conflict_permille",
+            "share of recent rebases in a conflict domain that conflicted",
+        );
+        let land_queued_by_share = key_gauge(
+            &mut registry,
+            &mut names,
+            "land_queued_by_share",
+            "unfinished land requests per sponsor or requester",
+        );
         let lease_epoch = Family::<RoleLabels, Gauge>::default();
         register(
             &mut registry,
@@ -181,6 +232,11 @@ impl Metrics {
             trunk_head,
             events_written,
             lease_epoch,
+            land_wait_p50_ms,
+            land_wait_p99_ms,
+            land_interval_ms,
+            land_conflict_permille,
+            land_queued_by_share,
         }
     }
 
