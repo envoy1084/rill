@@ -9,6 +9,20 @@ use crate::error::{Error, Result};
 use crate::keys::{table, tail};
 use crate::meta::{seq_from_key, KeyRange, Transaction};
 
+/// The trunk-head row: be64 sequence then the version hash.
+pub(super) fn head_row(seq: u64, version: &ChangeVersionHash) -> Bytes {
+    let mut row = seq.to_be_bytes().to_vec();
+    row.extend_from_slice(version.as_bytes());
+    Bytes::from(row)
+}
+
+pub(super) fn parse_head(row: &[u8]) -> Result<(TrunkSeq, ChangeVersionHash)> {
+    if row.len() != 40 {
+        return Err(Error::Codec("bad trunk head".into()));
+    }
+    Ok((TrunkSeq(parse_seq(&row[..8])?), parse_hash(&row[8..])?))
+}
+
 impl RepoStore {
     pub async fn get_ref(&self, name: &RefName) -> Result<Option<ChangeVersionHash>> {
         match self.meta().get(&self.keys().reference(name)).await? {
@@ -46,49 +60,10 @@ impl RepoStore {
             .collect()
     }
 
-    /// Advance trunk to `hash` if it currently points at `expected`, assigning
-    /// the next sequence number. The whole update is one transaction, so two
-    /// landers racing for the same slot see exactly one winner.
-    pub async fn land_on_trunk(
-        &self,
-        expected: Option<ChangeVersionHash>,
-        hash: ChangeVersionHash,
-    ) -> Result<TrunkSeq> {
-        let (head_seq, head_hash) = match self.trunk_head().await? {
-            Some((s, h)) => (s.get(), Some(h)),
-            None => (0, None),
-        };
-        if head_hash != expected {
-            return Err(Error::Conflict("trunk moved".into()));
-        }
-        let seq = head_seq + 1;
-        let keys = self.keys();
-        let ref_key = keys.reference(&RefName::trunk());
-        let tx = Transaction::new()
-            .expect(ref_key.clone(), expected.as_ref().map(hash_value))
-            .expect_absent(keys.trunk(seq))
-            .set(ref_key, hash_value(&hash))
-            .set(keys.trunk(seq), hash_value(&hash))
-            .set(
-                keys.trunk_by_hash(&hash),
-                Bytes::copy_from_slice(&seq.to_be_bytes()),
-            );
-        self.meta().transact(tx).await?;
-        Ok(TrunkSeq(seq))
-    }
-
+    /// The newest trunk position and the version there.
     pub async fn trunk_head(&self) -> Result<Option<(TrunkSeq, ChangeVersionHash)>> {
-        let prefix = self.keys().trunk_table();
-        let rows = self
-            .meta()
-            .scan(KeyRange::prefix(prefix.clone()).reverse().limit(1))
-            .await?;
-        match rows.first() {
-            Some((k, v)) => {
-                let seq = seq_from_key(prefix.len(), k)
-                    .ok_or_else(|| Error::Codec("bad trunk key".into()))?;
-                Ok(Some((TrunkSeq(seq), parse_hash(v)?)))
-            }
+        match self.meta().get(&self.keys().trunk_head()).await? {
+            Some(row) => Ok(Some(parse_head(&row)?)),
             None => Ok(None),
         }
     }

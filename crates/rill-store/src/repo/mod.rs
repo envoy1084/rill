@@ -4,6 +4,7 @@ mod codec;
 mod derived;
 mod events;
 mod idem;
+mod landing;
 mod orgs;
 mod quota;
 mod records;
@@ -16,6 +17,7 @@ mod versions;
 
 pub use codec::{decode_record, decode_tagged, encode_record, encode_tagged};
 pub use idem::{Claim, CLAIM_TTL_MS, IDEM_TTL_MS};
+pub use landing::{LandBatch, LandEntry};
 pub use orgs::{validate_org_name, validate_repo_name, OrgConfig, DEFAULT_ORG};
 pub use quota::{day_of, metric, QUOTA_SHARDS};
 pub use reviews::ReviewSnapshot;

@@ -38,6 +38,7 @@ pub use objects::change::{
 };
 pub use objects::event::{Event, EventKind};
 pub use objects::intent::{Intent, IntentKind, IntentStatus, RiskClass};
+pub use objects::landing::Landing;
 pub use objects::refs::{RefName, RefUpdate, TrunkSeq};
 pub use objects::review::{
     ChangeRecord, Comment, Label, LabelRange, LabelVote, ReviewState, ReviewStatus, Thread,

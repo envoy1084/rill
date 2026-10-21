@@ -2,9 +2,11 @@
 
 use std::collections::BTreeMap;
 
+use rill_store::repo::{LandBatch, LandEntry};
 use rill_store::Stores;
 use rill_types::{
-    ChangeId, ChangeVersion, ChangeVersionHash, Principal, Provenance, Timestamp, TrunkSeq,
+    ChangeId, ChangeVersion, ChangeVersionHash, Principal, Provenance, ReviewState, ReviewStatus,
+    RiskClass, Timestamp, TrunkSeq,
 };
 
 pub fn cv(msg: &str, parents: Vec<ChangeVersionHash>) -> ChangeVersion {
@@ -125,4 +127,126 @@ pub async fn scenario(name: &str, stores: &Stores) {
     repo.remove_relation("doc", "owner", "alice").await.unwrap();
     assert_eq!(repo.relations_of("doc").await.unwrap().len(), 1, "{name}");
     assert_eq!(repo.list_relations().await.unwrap().len(), 2, "{name}");
+}
+
+fn review_of(change: ChangeId, version: ChangeVersionHash, status: ReviewStatus) -> ReviewState {
+    ReviewState {
+        change_id: change,
+        versions: vec![version],
+        status,
+        intent: None,
+        owner: Principal::human("alice"),
+        votes: Vec::new(),
+        threads: Vec::new(),
+        risk: RiskClass::Normal,
+        risk_reasons: Vec::new(),
+        stack: Vec::new(),
+        landed_seq: None,
+        created_at: Timestamp::from_millis(1),
+        updated_at: Timestamp::from_millis(1),
+        extra: BTreeMap::new(),
+    }
+}
+
+/// The land transaction: batches, records, reviews and fencing.
+pub async fn landing(name: &str, stores: &Stores) {
+    let repo = stores.repo(stores.create_repo("landing", "").await.unwrap().id);
+    let root_cv = cv("root", vec![]);
+    let root = repo.put_change_version(&root_cv).await.unwrap();
+    assert_eq!(repo.land_on_trunk(None, root).await.unwrap(), TrunkSeq(1));
+
+    let mut entries = Vec::new();
+    for i in 0..3 {
+        let version = cv(&format!("v{i}"), vec![root]);
+        let hash = repo.put_change_version(&version).await.unwrap();
+        repo.create_review(&review_of(version.change_id, hash, ReviewStatus::Landing))
+            .await
+            .unwrap();
+        entries.push(LandEntry {
+            version: hash,
+            change_id: version.change_id,
+            requested_version: hash,
+            requester: Principal::agent("bot"),
+            risk: RiskClass::Normal,
+            review: repo.read_review(&version.change_id).await.unwrap(),
+        });
+    }
+    let epoch = repo.acquire_lease("lander").await.unwrap();
+    let batch = LandBatch {
+        expected: Some(root),
+        entries: entries.clone(),
+        fence: Some(("lander".into(), epoch)),
+        actor: None,
+    };
+    let landed = repo.land(batch.clone()).await.unwrap();
+    let seqs: Vec<_> = landed.iter().map(|l| l.seq).collect();
+    assert_eq!(seqs, vec![TrunkSeq(2), TrunkSeq(3), TrunkSeq(4)], "{name}");
+    assert_eq!(
+        repo.trunk_head().await.unwrap(),
+        Some((TrunkSeq(4), entries[2].version))
+    );
+    assert_eq!(repo.list_landings(10).await.unwrap().len(), 4, "{name}");
+    for e in &entries {
+        let review = repo.get_review(&e.change_id).await.unwrap().unwrap();
+        assert_eq!(review.status, ReviewStatus::Landed, "{name}");
+        assert_eq!(
+            repo.landing_of(&e.version)
+                .await
+                .unwrap()
+                .unwrap()
+                .change_id,
+            e.change_id
+        );
+    }
+    // Landing the same batch again finds trunk moved: nothing lands twice.
+    assert!(repo.land(batch).await.unwrap_err().is_conflict(), "{name}");
+
+    // A replaced lander is fenced off trunk.
+    let next = cv("next", vec![entries[2].version]);
+    let next_hash = repo.put_change_version(&next).await.unwrap();
+    repo.acquire_lease("lander").await.unwrap();
+    let stale = LandBatch {
+        expected: Some(entries[2].version),
+        entries: vec![LandEntry {
+            version: next_hash,
+            change_id: next.change_id,
+            requested_version: next_hash,
+            requester: Principal::agent("bot"),
+            risk: RiskClass::Normal,
+            review: None,
+        }],
+        fence: Some(("lander".into(), epoch)),
+        actor: None,
+    };
+    assert!(
+        repo.land(stale).await.unwrap_err().is_conflict(),
+        "{name}: fenced"
+    );
+
+    // A change abandoned meanwhile does not land.
+    repo.create_review(&review_of(
+        next.change_id,
+        next_hash,
+        ReviewStatus::Abandoned,
+    ))
+    .await
+    .unwrap();
+    let abandoned = LandBatch {
+        expected: Some(entries[2].version),
+        entries: vec![LandEntry {
+            version: next_hash,
+            change_id: next.change_id,
+            requested_version: next_hash,
+            requester: Principal::agent("bot"),
+            risk: RiskClass::Normal,
+            review: repo.read_review(&next.change_id).await.unwrap(),
+        }],
+        ..LandBatch::default()
+    };
+    assert!(repo.land(abandoned).await.is_err(), "{name}");
+    assert_eq!(
+        repo.trunk_head().await.unwrap().unwrap().0,
+        TrunkSeq(4),
+        "{name}"
+    );
 }

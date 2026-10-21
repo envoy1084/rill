@@ -16,7 +16,8 @@ pub trait ReviewHooks: Send + Sync {
     /// The change is being processed by the lander.
     async fn mark_landing(&self, change: ChangeId) -> Result<()>;
 
-    /// `version` of the change landed at `seq`.
+    /// `version` of the change landed at `seq`; the land transaction has
+    /// already recorded it, so this only notifies.
     async fn mark_landed(
         &self,
         change: ChangeId,

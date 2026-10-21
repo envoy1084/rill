@@ -139,6 +139,7 @@ async fn keyspace_layer_conforms() {
 async fn repo_stores_conform() {
     for f in fixtures().await {
         repo::scenario(f.name, &f.stores).await;
+        repo::landing(f.name, &f.stores).await;
         f.finish().await;
     }
 }

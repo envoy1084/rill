@@ -300,7 +300,8 @@ async fn independent_changes_land_in_one_run() {
     let root = fx.root(&head).await;
     assert_eq!(fx.file(root, "a.txt").await.as_deref(), Some("a"));
     assert_eq!(fx.file(root, "b.txt").await.as_deref(), Some("b"));
-    assert_eq!(lander.list_landings().await.unwrap().len(), 2);
+    // Every trunk position has a record, the directly landed base too.
+    assert_eq!(lander.list_landings().await.unwrap().len(), 3);
 }
 
 #[tokio::test]

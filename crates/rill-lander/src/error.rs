@@ -28,6 +28,9 @@ pub enum Error {
     #[error("review hook failed: {0}")]
     Hook(String),
 
+    #[error("another lander took over this repository")]
+    Fenced,
+
     #[error("verifier failed: {0}")]
     Verifier(String),
 

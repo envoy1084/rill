@@ -32,6 +32,12 @@ pub mod table {
     pub const COMMENT: &str = "cmt";
     /// `(evt, ns, repo, stamp)` → Event
     pub const EVENT: &str = "evt";
+    /// `(thd, ns, repo)` → be64 seq ++ version hash of the trunk head
+    pub const TRUNK_HEAD: &str = "thd";
+    /// `(land, ns, repo, seq)` → Landing
+    pub const LANDING: &str = "land";
+    /// `(lease, ns, repo, role)` → be64 epoch of the role's current holder
+    pub const LEASE: &str = "lease";
     /// `(log, ns, repo, stamp)` → version hash, every stored version
     pub const LOG: &str = "log";
     /// `(trunk, ns, repo, seq)` → version hash
@@ -205,6 +211,22 @@ impl RepoKeys {
 
     pub fn log_entry(&self, stamp: &Versionstamp) -> Bytes {
         stamp_key(&self.log(), stamp)
+    }
+
+    pub fn trunk_head(&self) -> Bytes {
+        self.table(table::TRUNK_HEAD)
+    }
+
+    pub fn landings(&self) -> Bytes {
+        self.table(table::LANDING)
+    }
+
+    pub fn landing(&self, seq: u64) -> Bytes {
+        seq_key(&self.landings(), seq)
+    }
+
+    pub fn lease(&self, role: &str) -> Bytes {
+        self.row(table::LEASE, &role)
     }
 
     pub fn trunk_table(&self) -> Bytes {

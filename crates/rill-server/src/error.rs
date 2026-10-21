@@ -212,7 +212,7 @@ fn lander_code(e: &rill_lander::Error) -> Code {
     match e {
         E::NotLanded(_) | E::ChangeNotFound(_) | E::UnknownTicket(_) => Code::NotFound,
         E::Shutdown => Code::Unavailable,
-        E::RevertFailed { .. } => Code::Aborted,
+        E::RevertFailed { .. } | E::Fenced => Code::Aborted,
         E::Types(_) => Code::InvalidArgument,
         E::Core(c) => core_code(c),
         E::Store(s) => store_code(s),

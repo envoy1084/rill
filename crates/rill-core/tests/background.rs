@@ -4,6 +4,7 @@ mod common;
 
 use rill_core::derive::{BackgroundDeriver, ChangeSummary, PathHistory, MAX_ATTEMPTS};
 use rill_core::ChangeBuilder;
+use rill_store::repo::{LandBatch, LandEntry};
 use rill_types::{ObjectHash, ObjectKind, TrunkSeq};
 
 use common::{fixture, t};
@@ -42,7 +43,21 @@ async fn derives_trunk_in_order_resumes_and_skips_what_keeps_failing() {
 
     // A trunk entry that cannot be derived is retried, then skipped.
     let missing = ObjectHash::digest(ObjectKind::ChangeVersion, b"never stored");
-    f.repo.land_on_trunk(tip, missing).await.unwrap();
+    f.repo
+        .land(LandBatch {
+            expected: tip,
+            entries: vec![LandEntry {
+                version: missing,
+                change_id: rill_types::ChangeId::new(),
+                requested_version: missing,
+                requester: f.alice.clone(),
+                risk: rill_types::RiskClass::Normal,
+                review: None,
+            }],
+            ..LandBatch::default()
+        })
+        .await
+        .unwrap();
     for _ in 1..MAX_ATTEMPTS {
         assert_eq!(restarted.pass(10).await.unwrap().versions, 0);
     }

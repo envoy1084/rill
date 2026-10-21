@@ -3,8 +3,10 @@
 use rill_core::{rebase, RootTree};
 use rill_types::{ChangeVersion, ChangeVersionHash, Timestamp, TrunkSeq};
 
-use super::lander::Lander;
-use super::record::{record_landing, Landing};
+use rill_store::repo::{LandBatch, LandEntry};
+
+use super::lander::{Lander, LANDER_LEASE};
+use super::record::Landing;
 use crate::config::VerifyMode;
 use crate::error::{Error, Result};
 use crate::events::LandEvent;
@@ -112,14 +114,48 @@ impl Lander {
 
         self.set_status(queued.ticket, LandStatus::Landing);
         self.derive.ensure_land_critical(&hash).await?;
-        let expected = head.map(|(_, h)| h);
-        match self.repo.land_on_trunk(expected, hash).await {
-            Ok(seq) => {
-                self.finalize(queued, seq, hash, &cv).await;
+        let epoch = self.epoch().await?;
+        let request = &queued.request;
+        let batch = LandBatch {
+            expected: head.map(|(_, h)| h),
+            entries: vec![LandEntry {
+                version: hash,
+                change_id: cv.change_id,
+                requested_version: request.version,
+                requester: request.requester.clone(),
+                risk: request.risk,
+                review: self.repo.read_review(&cv.change_id).await?,
+            }],
+            fence: Some((LANDER_LEASE.to_string(), epoch)),
+            actor: Some(crate::revert::lander_principal()),
+        };
+        match self.repo.land(batch).await {
+            Ok(landings) => {
+                let landing = landings.into_iter().next().ok_or_else(|| {
+                    Error::Store(rill_store::Error::Backend("land returned no record".into()))
+                })?;
+                let seq = landing.seq;
+                self.announce(queued, landing, &cv).await;
                 Ok(Attempt::Landed(seq))
             }
-            Err(e) if e.is_conflict() => Ok(Attempt::Retry { tip: hash }),
-            Err(e) => Err(e.into()),
+            Err(e) if e.is_conflict() => {
+                if self.repo.lease_epoch(LANDER_LEASE).await? != epoch {
+                    return Err(Error::Fenced);
+                }
+                Ok(Attempt::Retry { tip: hash })
+            }
+            Err(e) => {
+                // The land may have committed with its reply lost: trunk is
+                // the record of what happened.
+                if let Ok(Some(landing)) = self.repo.landing_of(&hash).await {
+                    if landing.change_id == cv.change_id {
+                        let seq = landing.seq;
+                        self.announce(queued, landing, &cv).await;
+                        return Ok(Attempt::Landed(seq));
+                    }
+                }
+                Err(e.into())
+            }
         }
     }
 
@@ -181,29 +217,10 @@ impl Lander {
         Ok(true)
     }
 
-    async fn finalize(
-        &self,
-        queued: &QueuedRequest,
-        seq: TrunkSeq,
-        version: ChangeVersionHash,
-        cv: &ChangeVersion,
-    ) {
-        let request = &queued.request;
-        let landing = Landing {
-            seq,
-            change_id: cv.change_id,
-            version,
-            requested_version: request.version,
-            requester: request.requester.clone(),
-            risk: request.risk,
-            landed_at: Timestamp::now(),
-        };
-        {
-            let _guard = self.record_lock.lock().await;
-            if let Err(e) = record_landing(&self.repo, &landing).await {
-                tracing::error!(%seq, error = %e, "failed to record landing");
-            }
-        }
+    /// Report a landing the land transaction recorded.
+    async fn announce(&self, queued: &QueuedRequest, landing: Landing, cv: &ChangeVersion) {
+        let seq = landing.seq;
+        let version = landing.version;
         self.set_status(queued.ticket, LandStatus::Landed { seq });
         if let Err(e) = self.hooks.mark_landed(cv.change_id, seq, version).await {
             tracing::error!(change_id = %cv.change_id, error = %e, "mark_landed hook failed");

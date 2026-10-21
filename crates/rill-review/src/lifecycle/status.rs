@@ -49,29 +49,17 @@ impl ReviewService {
         .await
     }
 
-    /// Record that the change landed at `seq`.
-    pub async fn mark_landed(&self, change_id: &ChangeId, seq: TrunkSeq) -> Result<ReviewState> {
-        let (state, transition) = self
-            .update(change_id, |s| {
-                if !matches!(s.status, ReviewStatus::Landing | ReviewStatus::Landable) {
-                    return Err(Error::InvalidStatus {
-                        change_id: *change_id,
-                        status: s.status,
-                        operation: "mark_landed",
-                    });
-                }
-                let from = s.status;
-                s.status = ReviewStatus::Landed;
-                s.landed_seq = Some(seq);
-                Ok((from, ReviewStatus::Landed))
-            })
-            .await?;
-        self.emit_transition(change_id, Some(transition));
+    /// Announce that the change landed at `seq`. The land transaction
+    /// already marked the review `Landed`; this publishes the events.
+    pub fn announce_landed(&self, change_id: &ChangeId, seq: TrunkSeq) {
+        self.emit_transition(
+            change_id,
+            Some((ReviewStatus::Landing, ReviewStatus::Landed)),
+        );
         self.emit(ReviewEvent::Landed {
             change_id: *change_id,
             seq,
         });
-        Ok(state)
     }
 
     /// Return a change the lander gave up on to the review queue.
@@ -149,10 +137,28 @@ mod tests {
         assert_eq!(s.status, ReviewStatus::Landing);
         let s = fx.service.landing_failed(&cid).await.unwrap();
         assert_eq!(s.status, ReviewStatus::Landable);
-        fx.service.mark_landing(&cid).await.unwrap();
-        let s = fx.service.mark_landed(&cid, TrunkSeq(7)).await.unwrap();
+        let landing = fx.service.mark_landing(&cid).await.unwrap();
+        // The land transaction marks the review landed.
+        let version = landing.current_version().unwrap();
+        let repo = fx.service.repo();
+        let head = repo.trunk_head().await.unwrap().map(|(_, h)| h);
+        repo.land(rill_store::repo::LandBatch {
+            expected: head,
+            entries: vec![rill_store::repo::LandEntry {
+                version,
+                change_id: cid,
+                requested_version: version,
+                requester: fx.alice.clone(),
+                risk: rill_types::RiskClass::Normal,
+                review: repo.read_review(&cid).await.unwrap(),
+            }],
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let s = fx.service.get(&cid).await.unwrap();
         assert_eq!(s.status, ReviewStatus::Landed);
-        assert_eq!(s.landed_seq, Some(TrunkSeq(7)));
+        assert!(s.landed_seq.is_some());
         assert!(matches!(
             fx.service.abandon(&cid, &fx.alice).await,
             Err(Error::InvalidStatus { .. })

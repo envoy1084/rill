@@ -48,10 +48,8 @@ impl ReviewHooks for ReviewHooksAdapter {
         seq: TrunkSeq,
         _version: ChangeVersionHash,
     ) -> rill_lander::Result<()> {
-        match self.service().mark_landed(&change, seq).await {
-            Ok(_) | Err(ReviewError::ReviewNotFound(_)) => Ok(()),
-            Err(e) => Err(hook_err(e)),
-        }
+        self.service().announce_landed(&change, seq);
+        Ok(())
     }
 
     async fn return_to_owner(&self, change: ChangeId, reason: String) -> rill_lander::Result<()> {

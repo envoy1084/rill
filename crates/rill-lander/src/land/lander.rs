@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rill_core::{CommitGraph, DeriveManager};
 use rill_store::RepoStore;
 use rill_types::ChangeId;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{broadcast, OnceCell};
 use tokio_util::sync::CancellationToken;
 
 use super::record::{list_landings, Landing};
@@ -30,9 +30,12 @@ pub struct Lander {
     pub(super) policy: LandPolicy,
     queue: Arc<LandQueue>,
     events: broadcast::Sender<LandEvent>,
-    /// Serializes landing-record writes (see `record_landing`).
-    pub(super) record_lock: Mutex<()>,
+    /// This lander's lease epoch, taken on first use.
+    epoch: OnceCell<u64>,
 }
+
+/// The lease role landers fence their trunk writes with.
+pub const LANDER_LEASE: &str = "lander";
 
 impl Lander {
     /// A lander over `repo`.
@@ -54,8 +57,17 @@ impl Lander {
             policy,
             queue: Arc::new(LandQueue::new()),
             events,
-            record_lock: Mutex::new(()),
+            epoch: OnceCell::new(),
         })
+    }
+
+    /// This lander's lease epoch. Taking it fences every earlier lander of
+    /// the repository off trunk.
+    pub async fn epoch(&self) -> Result<u64> {
+        Ok(*self
+            .epoch
+            .get_or_try_init(|| self.repo.acquire_lease(LANDER_LEASE))
+            .await?)
     }
 
     /// The repository this lander lands on.

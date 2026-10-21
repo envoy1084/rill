@@ -19,16 +19,6 @@ pub const KNOWN_ISSUES: &[KnownIssue] = &[
         cause: "the land queue and its tickets live in process memory, so a restart forgets queued requests",
         fixed_by_phase: 9,
     },
-    KnownIssue {
-        invariant: Invariant::ReviewMatchesTrunk,
-        cause: "the trunk write, the landing record and the review status are separate writes; a failure between them leaves the review out of step with trunk",
-        fixed_by_phase: 6,
-    },
-    KnownIssue {
-        invariant: Invariant::LandsOnce,
-        cause: "a trunk write whose acknowledgement is lost counts as a failure, so the change returns to its owner and can land again",
-        fixed_by_phase: 6,
-    },
 ];
 
 /// The known issue behind `invariant`, if any.
