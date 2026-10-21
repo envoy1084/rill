@@ -29,7 +29,7 @@ flowchart LR
 | `id` | `IntentId::new()` at creation. |
 | `title`, `body` | Free text. `title` must be non-blank on create. |
 | `kind` | `Feature` (default), `Bug`, `Refactor`, `Chore`, `Experiment`, `System`. |
-| `status` | `Open`, `InProgress`, `Done`, `Abandoned`. `is_closed()` is `Done` or `Abandoned`. |
+| `status` | `Open`, `InProgress`, `Done`, `Abandoned`. |
 | `owner` | The creating principal. |
 | `parent` | Optional `IntentId`. |
 | `risk_override` | Optional `RiskClass` that replaces the computed risk class. |

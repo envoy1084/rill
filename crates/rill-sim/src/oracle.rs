@@ -100,10 +100,6 @@ impl Oracle {
         self.requested.get(change).copied()
     }
 
-    pub fn is_abandoned(&self, change: &ChangeId) -> bool {
-        self.abandoned.contains(change)
-    }
-
     /// Positions observed on trunk so far.
     /// `agent` was suspended when trunk held `trunk_len` positions.
     pub fn killed(&mut self, agent: String, trunk_len: usize) {

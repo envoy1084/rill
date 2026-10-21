@@ -52,18 +52,7 @@ pub struct NewComment {
     pub to: Option<Principal>,
 }
 
-impl NewComment {
-    /// A change-level comment.
-    pub fn on_change(body: impl Into<String>) -> Self {
-        NewComment {
-            anchor: ThreadAnchor::Change,
-            body: body.into(),
-            category: None,
-            confidence: None,
-            to: None,
-        }
-    }
-}
+impl NewComment {}
 
 /// A reply on an existing thread.
 #[derive(Debug, Clone, PartialEq, Eq)]

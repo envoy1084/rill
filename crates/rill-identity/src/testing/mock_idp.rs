@@ -55,7 +55,6 @@ struct Code {
 }
 
 struct DeviceGrant {
-    user_code: String,
     client_id: String,
     approved: Option<String>,
 }
@@ -154,18 +153,6 @@ impl MockIdp {
     /// person did so in a browser.
     pub fn auto_approve_devices(&self, username: &str) {
         *self.idp.auto_approve.lock() = Some(username.into());
-    }
-
-    /// Approve the device grant shown as `user_code`, as `username`.
-    pub fn approve_device(&self, user_code: &str, username: &str) -> bool {
-        let mut devices = self.idp.devices.lock();
-        match devices.values_mut().find(|d| d.user_code == user_code) {
-            Some(grant) => {
-                grant.approved = Some(username.into());
-                true
-            }
-            None => false,
-        }
     }
 
     /// An ID token for `username`, issued to `audience`.
@@ -355,7 +342,6 @@ async fn device(State(idp): State<Arc<Idp>>, Form(f): Form<DeviceForm>) -> Respo
     idp.devices.lock().insert(
         device_code.clone(),
         DeviceGrant {
-            user_code: user_code.clone(),
             client_id: f.client_id,
             approved: idp.auto_approve.lock().clone(),
         },
@@ -373,9 +359,14 @@ async fn device(State(idp): State<Arc<Idp>>, Form(f): Form<DeviceForm>) -> Respo
 /// `client_id` and `client_secret` from an `Authorization: Basic` header,
 /// each form-urlencoded as RFC 6749 requires.
 fn basic_credentials(headers: &axum::http::HeaderMap) -> Option<(String, String)> {
-    let value = headers.get(axum::http::header::AUTHORIZATION)?.to_str().ok()?;
+    let value = headers
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?;
     let encoded = value.strip_prefix("Basic ")?;
-    let decoded = base64::engine::general_purpose::STANDARD.decode(encoded).ok()?;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .ok()?;
     let text = String::from_utf8(decoded).ok()?;
     let (id, secret) = text.split_once(':')?;
     let unescape = |s: &str| {

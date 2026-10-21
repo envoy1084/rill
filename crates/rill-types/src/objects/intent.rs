@@ -120,10 +120,6 @@ impl Intent {
             updated_at: now,
         }
     }
-
-    pub fn is_closed(&self) -> bool {
-        matches!(self.status, IntentStatus::Done | IntentStatus::Abandoned)
-    }
 }
 
 impl crate::Record for Intent {

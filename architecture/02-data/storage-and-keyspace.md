@@ -174,8 +174,7 @@ recreated.
   holder has.
 * Job claims move a `jobq` row to `jobl` and `jobt` under `Equals` on the
   row read; renew, complete and fail check the token.
-* `add_signatures` is a read and an `Equals` on what it read.
-* `put_derived`, `put_signatures`, `set_misc` are plain sets; `put_intent`
+* `put_derived`, `signatures_mutation`, `set_misc` are plain sets; `put_intent`
   is a set with its event.
 * `Stores::create_repo` uses `Present(org)` and `Absent(repon)`, and writes
   the `repoid` index, so names are unique per org.

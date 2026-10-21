@@ -22,7 +22,7 @@ flowchart LR
     H -->|"prefix rill:sig:"| M[message]
     K[Signer] -->|ECDSA P-256 sign| S[64-byte signature]
     S --> R["Signature {signer, public_key, signature, signed_at}"]
-    R -->|put_signatures| ST["sig/<repo>/<hash>"]
+    R -->|signatures_mutation| ST["sig/<repo>/<hash>"]
 ```
 
 | `Signature` field | Content |
@@ -73,8 +73,9 @@ bumps a change whose `resolved_by` is `agent`; see
 ## Server path
 
 `CreateChangeVersion` accepts `signatures` with the version. It converts each
-one with `Signature::try_from`, commits the version, and then calls
-`RepoStore::put_signatures(&hash, &signatures)` when the list is non-empty.
+one with `Signature::try_from` and adds
+`RepoStore::signatures_mutation(&hash, &signatures)` to the transaction that
+commits the version.
 `GetChangeVersion` returns `get_signatures(&hash)` with the version. The SDK
 exposes both. Signatures are stored as one record-encoded `Vec<Signature>`
 under `sig/<repo>/<hash>`.
@@ -87,9 +88,7 @@ versions.
 
 * `Signer` and `verify` have no callers outside `rill-policy`. The CLI, SDK
   and server do not sign or verify.
-* Signatures are written after the version commit. A failure between the two
-  leaves an unsigned version.
-* `put_signatures` replaces the whole list. A second `CreateChangeVersion` for
+* The mutation replaces the whole list. A second `CreateChangeVersion` for
   the same hash with different signatures overwrites the first list.
 * No key directory binds public keys to principals, so a stored signature
   proves possession of some key, not the identity in `signer`.
@@ -101,7 +100,7 @@ versions.
 
 * [`signing.rs`](../../crates/rill-policy/src/signing.rs): `Signer`, `verify`, `KeyFile`.
 * [`objects/change.rs`](../../crates/rill-types/src/objects/change.rs): `Signature`, `Provenance`.
-* [`rill-store/src/repo/versions.rs`](../../crates/rill-store/src/repo/versions.rs): `put_signatures`, `add_signatures`, `get_signatures`.
+* [`rill-store/src/repo/versions.rs`](../../crates/rill-store/src/repo/versions.rs): `signatures_mutation`, `get_signatures`.
 * [`services/repo/write.rs`](../../crates/rill-api/src/services/repo/write.rs): `create_change_version_impl`, provenance handling.
 * [`services/repo/history.rs`](../../crates/rill-api/src/services/repo/history.rs): signatures on read.
 * [`rill-sdk/src/repo/write.rs`](../../crates/rill-sdk/src/repo/write.rs), [`rill-sdk/src/repo/history.rs`](../../crates/rill-sdk/src/repo/history.rs): client surface.

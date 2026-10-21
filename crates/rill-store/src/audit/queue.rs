@@ -40,17 +40,6 @@ impl AuditStore {
             .await
     }
 
-    /// Wait until more records are queued than `seen`, or `timeout`.
-    pub async fn wait_queued(&self, seen: i64, timeout: std::time::Duration) -> Result<i64> {
-        self.meta
-            .wait_counter(
-                &keys::identity_table(table::AUDIT_PENDING_COUNT),
-                seen,
-                timeout,
-            )
-            .await
-    }
-
     /// The orgs with queued records.
     pub async fn pending_orgs(&self) -> Result<Vec<String>> {
         let prefix = keys::identity_table(table::AUDIT_PENDING);

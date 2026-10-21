@@ -150,39 +150,6 @@ impl RepoStore {
             .and_then(|(k, _)| stamp_from_key(prefix.len(), k)))
     }
 
-    pub async fn put_signatures(
-        &self,
-        hash: &ChangeVersionHash,
-        signatures: &[Signature],
-    ) -> Result<()> {
-        self.meta()
-            .set(
-                self.keys().signatures(hash),
-                encode_tagged("signatures", signatures)?,
-            )
-            .await
-    }
-
-    /// Append signatures to the ones already stored for `hash`.
-    pub async fn add_signatures(
-        &self,
-        hash: &ChangeVersionHash,
-        signatures: &[Signature],
-    ) -> Result<()> {
-        let key = self.keys().signatures(hash);
-        let current = self.meta().get(&key).await?;
-        let mut all: Vec<Signature> = match &current {
-            Some(bytes) => decode_tagged("signatures", bytes)?,
-            None => Vec::new(),
-        };
-        all.extend_from_slice(signatures);
-        let tx = Transaction::new()
-            .expect(key.clone(), current)
-            .set(key, encode_tagged("signatures", &all)?);
-        self.meta().transact(tx).await?;
-        Ok(())
-    }
-
     pub async fn get_signatures(&self, hash: &ChangeVersionHash) -> Result<Vec<Signature>> {
         match self.meta().get(&self.keys().signatures(hash)).await? {
             Some(bytes) => decode_tagged("signatures", &bytes),

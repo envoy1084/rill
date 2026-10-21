@@ -111,16 +111,6 @@ impl DeriveManager {
         Ok(())
     }
 
-    /// Whether every land-critical value of `hash` is stored.
-    pub async fn has_land_critical(self: &Arc<Self>, hash: &ChangeVersionHash) -> Result<bool> {
-        for kind in super::registry::scheduled(super::Schedule::LandCritical) {
-            if !kind.is_stored(self, *hash).await? {
-                return Ok(false);
-            }
-        }
-        Ok(true)
-    }
-
     /// Compute the built-in kind stored as `key` (`kind@version`) for
     /// `hash`. Returns `false` for a kind the registry does not know.
     pub async fn compute_kind(

@@ -31,9 +31,9 @@ flowchart LR
 
 Accessors: `num_sides()` (`len / 2 + 1`), `is_resolved()`, `as_resolved()`,
 `into_resolved()`, `adds()`, `removes()`, `first()` (add0, conventionally
-"ours"), and the shape-preserving `map`, `into_map`, `try_map`, `zip` (`zip`
-panics on mismatched shapes). For `Merge<Option<T>>`, `is_absent()` and
-`is_present_everywhere()` test every term. Serde encodes the interleaved
+"ours"), and the shape-preserving `map` and `zip` (`zip` panics on
+mismatched shapes). For `Merge<Option<T>>`, `is_present_everywhere()` tests
+every term. Serde encodes the interleaved
 vector as-is, so a conflict hashes deterministically inside a
 `ChangeVersion`.
 

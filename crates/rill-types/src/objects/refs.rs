@@ -66,10 +66,6 @@ impl RefName {
         RefName::new(format!("release/{name}"))
     }
 
-    pub fn bookmark(owner: &str, name: &str) -> Result<Self> {
-        RefName::new(format!("{owner}/{name}"))
-    }
-
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let name = name.into();
         let valid = !name.is_empty()

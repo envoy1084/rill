@@ -43,7 +43,7 @@ of one token:
 | `workspace: Option<WorkspaceId>` | When set, the Datalog check requires a matching `request_workspace`. |
 | `paths: Vec<RepoPathBuf>` | Prefixes covered. The root covers everything. Empty fails `validate`. |
 | `verbs: Vec<Verb>` | `Read`, `Write`, `Land`, `Review`, `Admin` (wire names lowercase). |
-| `expires_at: Timestamp` | `is_expired_at(now)` is `now >= expires_at`. |
+| `expires_at: Timestamp` | The token is refused once `now >= expires_at`. |
 
 `check_narrower_than(parent)` returns `Error::Widening` unless all of these
 hold:

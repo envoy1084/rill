@@ -123,11 +123,6 @@ impl Capability {
         self.verbs.contains(&verb)
     }
 
-    /// Whether the capability has expired as of `now`.
-    pub fn is_expired_at(&self, now: Timestamp) -> bool {
-        now >= self.expires_at
-    }
-
     /// Check that `self` grants no more than `parent`: same repository,
     /// same or newly-pinned workspace, verbs a subset, every path under one
     /// of the parent's, and an expiry no later than the parent's.

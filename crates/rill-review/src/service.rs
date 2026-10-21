@@ -154,11 +154,6 @@ impl ReviewService {
         &self.policy
     }
 
-    /// The compiled risk configuration.
-    pub fn risk_config(&self) -> &Arc<CompiledRiskConfig> {
-        &self.risk
-    }
-
     /// The configured labels.
     pub fn labels(&self) -> &Arc<LabelSet> {
         &self.labels

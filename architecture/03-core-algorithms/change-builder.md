@@ -87,7 +87,7 @@ it is hashed with the rest of the version; through the server, `author`,
 `created_at`, `sponsor` and `resolved_by` are replaced before hashing. The
 builder has no signing hook.
 Signatures are separate objects over the version hash, produced by
-`rill-policy` and stored with `RepoStore::put_signatures`. Signing never
+`rill-policy` and stored with `RepoStore::signatures_mutation`. Signing never
 changes a version's hash. See [signing](../05-policy/signing.md).
 
 ## Failure behaviour

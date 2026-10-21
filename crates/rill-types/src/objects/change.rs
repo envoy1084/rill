@@ -170,10 +170,6 @@ impl ChangeVersion {
         self.parents.is_empty()
     }
 
-    pub fn is_merge(&self) -> bool {
-        self.parents.len() > 1
-    }
-
     pub fn first_parent(&self) -> Option<ChangeVersionHash> {
         self.parents.first().copied()
     }

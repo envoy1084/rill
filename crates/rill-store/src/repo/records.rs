@@ -1,9 +1,7 @@
 //! Workspaces, operations and intents.
 
 use bytes::Bytes;
-use rill_types::{
-    EventKind, Intent, IntentId, Operation, OperationId, Principal, Workspace, WorkspaceId,
-};
+use rill_types::{EventKind, Intent, IntentId, Operation, Principal, Workspace, WorkspaceId};
 
 use super::codec::{decode_record, encode_record};
 use super::store::RepoStore;
@@ -70,14 +68,6 @@ impl RepoStore {
             at: op.at,
         })?);
         Ok(tx)
-    }
-
-    pub async fn has_operation(&self, op: &OperationId) -> Result<bool> {
-        Ok(self
-            .meta()
-            .get(&self.keys().operation_index(op))
-            .await?
-            .is_some())
     }
 
     /// The newest `limit` operations of a workspace, oldest first.

@@ -68,10 +68,6 @@ impl Principal {
             identity: None,
         }
     }
-
-    pub fn is_agent(&self) -> bool {
-        self.kind == PrincipalKind::Agent
-    }
 }
 
 impl fmt::Display for Principal {

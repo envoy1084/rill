@@ -80,10 +80,6 @@ impl<T> Merge<T> {
         &self.values
     }
 
-    pub fn into_vec(self) -> Vec<T> {
-        self.values
-    }
-
     /// Number of sides (adds).
     pub fn num_sides(&self) -> usize {
         self.values.len() / 2 + 1
@@ -131,23 +127,6 @@ impl<T> Merge<T> {
         Merge {
             values: self.values.iter().map(f).collect(),
         }
-    }
-
-    pub fn into_map<U>(self, f: impl FnMut(T) -> U) -> Merge<U> {
-        Merge {
-            values: self.values.into_iter().map(f).collect(),
-        }
-    }
-
-    pub fn try_map<U, E>(
-        &self,
-        mut f: impl FnMut(&T) -> std::result::Result<U, E>,
-    ) -> std::result::Result<Merge<U>, E> {
-        let mut values = Vec::with_capacity(self.values.len());
-        for v in &self.values {
-            values.push(f(v)?);
-        }
-        Ok(Merge { values })
     }
 
     /// Pair each term with the corresponding term of `other`.
@@ -254,11 +233,6 @@ impl<T> Merge<Merge<T>> {
 }
 
 impl<T> Merge<Option<T>> {
-    /// True if every term is absent.
-    pub fn is_absent(&self) -> bool {
-        self.values.iter().all(Option::is_none)
-    }
-
     /// Present on every side.
     pub fn is_present_everywhere(&self) -> bool {
         self.values.iter().all(Option::is_some)

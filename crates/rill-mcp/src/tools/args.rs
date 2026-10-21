@@ -182,20 +182,6 @@ impl Args {
             .collect()
     }
 
-    /// An optional array of parsed values.
-    pub fn opt_parse_list<T: FromStr>(&self, key: &str) -> ToolResult<Vec<T>>
-    where
-        T::Err: std::fmt::Display,
-    {
-        self.opt_str_list(key)?
-            .iter()
-            .map(|s| {
-                s.parse()
-                    .map_err(|e| ToolError::invalid(format!("`{key}`: {e}")))
-            })
-            .collect()
-    }
-
     /// A required array of objects.
     pub fn objects(&self, key: &str) -> ToolResult<Vec<Args>> {
         match self.get(key) {

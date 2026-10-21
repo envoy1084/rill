@@ -40,17 +40,7 @@ pub struct ChangeSummary {
     pub subtree_changes: u32,
 }
 
-impl ChangeSummary {
-    /// Total files touched.
-    pub fn files_touched(&self) -> u32 {
-        self.files_added + self.files_modified + self.files_deleted + self.files_conflicted
-    }
-
-    /// Net size change.
-    pub fn byte_delta(&self) -> i64 {
-        self.bytes_added as i64 - self.bytes_removed as i64
-    }
-}
+impl ChangeSummary {}
 
 #[async_trait]
 impl Derivable for ChangeSummary {
