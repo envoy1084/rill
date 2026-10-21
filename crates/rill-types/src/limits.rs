@@ -16,6 +16,8 @@ pub const MAX_FILE_BYTES: u64 = 5 << 30;
 /// Terms in one conflict (32 sides).
 pub const MAX_MERGE_TERMS: usize = 63;
 pub const MAX_SYMLINK_TARGET_BYTES: usize = 4096;
+/// A change message, a comment or a reason.
+pub const MAX_MESSAGE_BYTES: usize = 64 << 10;
 pub const MAX_EXTRA_ENTRIES: usize = 32;
 pub const MAX_EXTRA_VALUE_BYTES: usize = 4096;
 
@@ -50,6 +52,7 @@ pub fn check_change(cv: &ChangeVersion) -> Result<()> {
                 if content.size() > MAX_FILE_BYTES {
                     return Err(reject(format!("{path} is larger than 5 GiB")));
                 }
+                check_inline(path, content)?;
                 if is_reserved(path) {
                     return Err(reject(format!("{path} is reserved for client state")));
                 }
@@ -66,6 +69,9 @@ pub fn check_change(cv: &ChangeVersion) -> Result<()> {
                         "conflict at {path} has more than {MAX_MERGE_TERMS} terms"
                     )));
                 }
+                for (content, _) in terms.as_slice().iter().flatten() {
+                    check_inline(path, content)?;
+                }
                 if is_reserved(path) {
                     return Err(reject(format!("{path} is reserved for client state")));
                 }
@@ -78,6 +84,11 @@ pub fn check_change(cv: &ChangeVersion) -> Result<()> {
                 "copying into {path} would write reserved paths"
             )));
         }
+    }
+    if cv.message.len() > MAX_MESSAGE_BYTES {
+        return Err(reject(format!(
+            "the message is longer than {MAX_MESSAGE_BYTES} bytes"
+        )));
     }
     if cv.extra.len() > MAX_EXTRA_ENTRIES {
         return Err(reject(format!(
@@ -98,6 +109,21 @@ pub fn check_change(cv: &ChangeVersion) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+/// Inline content is for small files only; anything larger is a blob, so it
+/// is stored, scanned and fetched like every other file.
+fn check_inline(path: &RepoPath, content: &crate::ContentRef) -> Result<()> {
+    match content {
+        crate::ContentRef::Inline { bytes } if bytes.len() > crate::INLINE_THRESHOLD => {
+            Err(reject(format!(
+                "{path}: inline content of {} bytes exceeds {}; store it as a blob",
+                bytes.len(),
+                crate::INLINE_THRESHOLD
+            )))
+        }
+        _ => Ok(()),
+    }
 }
 
 /// A symlink at `link` pointing at `target` must stay inside the
@@ -187,5 +213,33 @@ mod tests {
         for name in ["console", "null.rs", "lpt10"] {
             assert!(!is_windows_reserved(name), "{name}");
         }
+    }
+
+    fn change(content: crate::ContentRef, message: &str) -> ChangeVersion {
+        let mut cv = ChangeVersion {
+            change_id: crate::ChangeId::new(),
+            parents: Vec::new(),
+            predecessor: None,
+            subtree_changes: Default::default(),
+            file_changes: Default::default(),
+            author: crate::Principal::human("ann"),
+            provenance: Default::default(),
+            intent: None,
+            message: message.into(),
+            created_at: crate::Timestamp::from_millis(1),
+            extra: Default::default(),
+        };
+        cv.file_changes
+            .insert(link("a.txt"), FileChange::set(content, FileKind::Regular));
+        cv
+    }
+
+    #[test]
+    fn inline_content_and_messages_are_bounded() {
+        let small = crate::ContentRef::inline(vec![b'x'; crate::INLINE_THRESHOLD]);
+        let large = crate::ContentRef::inline(vec![b'x'; crate::INLINE_THRESHOLD + 1]);
+        assert!(check_change(&change(small.clone(), "ok")).is_ok());
+        assert!(check_change(&change(large, "ok")).is_err());
+        assert!(check_change(&change(small, &"m".repeat(MAX_MESSAGE_BYTES + 1))).is_err());
     }
 }

@@ -15,6 +15,7 @@ mod keycloak;
 mod keycloak_saml;
 mod killswitch;
 mod kubernetes;
+mod limits;
 mod orgs;
 mod replicas;
 mod retries;

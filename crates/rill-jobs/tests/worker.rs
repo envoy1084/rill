@@ -26,8 +26,9 @@ impl Handler for Recorder {
         };
         match job.kind.as_str() {
             "flaky" if runs == 1 => Err(JobFailure::Retry("first try fails".into())),
+            // Several leases long, so only renewal keeps it claimed.
             "slow" => {
-                tokio::time::sleep(Duration::from_millis(300)).await;
+                tokio::time::sleep(Duration::from_millis(1500)).await;
                 Ok(())
             }
             _ => Ok(()),
@@ -43,7 +44,8 @@ async fn workers_retry_failures_and_keep_long_jobs_claimed() {
         max_attempts: 3,
         base_delay: Duration::ZERO,
         max_delay: Duration::ZERO,
-        lease: Duration::from_millis(90),
+        // Long enough that renewal is not starved by a busy test machine.
+        lease: Duration::from_millis(400),
     });
     let handler = Arc::new(Recorder::default());
     let shutdown = CancellationToken::new();

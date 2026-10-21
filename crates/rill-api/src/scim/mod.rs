@@ -20,6 +20,9 @@ use crate::services::identity::scim_credentials::{secret_hash, TOKEN_PREFIX};
 use crate::state::AppState;
 
 /// The SCIM routes.
+/// Largest SCIM request body.
+pub const MAX_SCIM_BODY: usize = 4 << 20;
+
 pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
         .route(
@@ -53,6 +56,9 @@ pub fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
                 .patch(resources::patch_group)
                 .delete(resources::delete_group),
         )
+        // SCIM bodies are single users and groups; a group's member list
+        // is the largest.
+        .layer(axum::extract::DefaultBodyLimit::max(MAX_SCIM_BODY))
         .layer(middleware::from_fn_with_state(
             state,
             require_scim_credential,

@@ -167,6 +167,29 @@ mirrors `AuthLayer` and answers 401. `ObjectError` maps server error codes
 to HTTP statuses: 404, 403, 401, 400 (invalid argument or failed
 precondition), 409 (already exists or aborted), 503, and 500 for the rest.
 
+## Input limits
+
+Every input is bounded. Exceeding a gRPC limit answers `OUT_OF_RANGE`
+(message size) or `INVALID_ARGUMENT`; exceeding an HTTP limit answers 413.
+
+| Limit | Value | Where |
+| --- | --- | --- |
+| gRPC request message | 16 MiB | `serve.rs` `MAX_REQUEST_BYTES`, every service |
+| gRPC response message | 64 MiB | `MAX_RESPONSE_BYTES` |
+| Requests in flight per connection | 1024 | `MAX_CONCURRENT_PER_CONNECTION` |
+| Paths changed by one version | 100,000 | `limits.rs` `MAX_FILES_PER_CHANGE`; also edits per `ApplyEdits`, checked before any work |
+| Encoded version | 8 MiB | `MAX_CHANGE_BYTES` |
+| Version message | 64 KiB | `MAX_MESSAGE_BYTES` |
+| File | 5 GiB | `MAX_FILE_BYTES`; `PutBlob` streams it |
+| Inline content | 256 bytes | `INLINE_THRESHOLD`: a raw version over it is refused; `ApplyEdits` and `Resolve` store larger inline content as a blob |
+| Path, component | 4096, 255 bytes | `MAX_PATH_BYTES`, `MAX_COMPONENT_BYTES` |
+| Conflict terms, extra fields | 63, 32 (64-byte keys, 4 KiB values) | `MAX_MERGE_TERMS`, `MAX_EXTRA_*` |
+| Object `PUT` body | 256 MiB | `objects/mod.rs` `MAX_PUT_BYTES` |
+| Object batch | 10,000 | `MAX_BATCH` |
+| SCIM body | 4 MiB | `scim/mod.rs` `MAX_SCIM_BODY` |
+| Other HTTP bodies | 2 MiB | axum's default |
+| Pages and results | log 10,000, grep 5,000, lander lists and workspace operations 1,000, diff 4 MiB and 1,000 files | each handler's `limit` |
+
 ## Limitations
 
 * `next_page_token` exists on list responses, but the server always returns

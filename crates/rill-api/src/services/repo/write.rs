@@ -82,6 +82,13 @@ impl RepoSvc {
             builder = builder.intent(intent);
         }
 
+        if req.edits.len() > rill_types::limits::MAX_FILES_PER_CHANGE {
+            return Err(Error::invalid(format!(
+                "{} edits; the limit is {}",
+                req.edits.len(),
+                rill_types::limits::MAX_FILES_PER_CHANGE
+            )));
+        }
         for edit in req.edits {
             let path = path("edits.path", &edit.path)?;
             if path.is_root() {
@@ -278,6 +285,14 @@ async fn set_content(
             .ok_or_else(|| Error::invalid("set_content.content is required"))?,
     )?;
     check_content_exists(objects, &content).await?;
+    // Clients may inline any small file; past the threshold it is stored
+    // as a blob, like the server stores everything else.
+    let content = match content {
+        ContentRef::Inline { bytes } if bytes.len() > rill_types::INLINE_THRESHOLD => {
+            store_content(objects, bytes).await?
+        }
+        other => other,
+    };
     let kind = rill_proto::convert::file_kind_from_proto("set_content.kind", set.kind)
         .unwrap_or(FileKind::Regular);
     let copy_from = match set.copy_from {

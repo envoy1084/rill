@@ -27,6 +27,22 @@ use crate::services::{
 };
 use crate::state::AppState;
 
+/// Largest gRPC request message: a change version (8 MiB) with room for
+/// its envelope; blobs stream in smaller pieces.
+pub const MAX_REQUEST_BYTES: usize = 16 << 20;
+/// Largest gRPC response message; listings and diffs stay well under it.
+pub const MAX_RESPONSE_BYTES: usize = 64 << 20;
+/// Requests one connection may have in flight.
+pub const MAX_CONCURRENT_PER_CONNECTION: usize = 1024;
+
+/// A generated service with the message size limits.
+macro_rules! limits {
+    ($svc:expr) => {
+        $svc.max_decoding_message_size(MAX_REQUEST_BYTES)
+            .max_encoding_message_size(MAX_RESPONSE_BYTES)
+    };
+}
+
 // Tonic routes by service name, which the auth wrapper must forward.
 impl<S: NamedService> NamedService for AuthService<S> {
     const NAME: &'static str = S::NAME;
@@ -130,6 +146,7 @@ async fn serve_grpc(
     });
 
     let mut builder = tonic::transport::Server::builder()
+        .concurrency_limit_per_connection(MAX_CONCURRENT_PER_CONNECTION)
         .layer(crate::telemetry::TelemetryLayer::new(state.metrics.clone()));
     if let Some(tls) = &state.config.tls {
         builder = builder
@@ -140,17 +157,33 @@ async fn serve_grpc(
         .add_service(reflection)
         .add_service(health)
         // Signing in needs no token; each RPC checks what it is given.
-        .add_service(SessionServiceServer::new(SessionSvc::new(state.clone())))
-        .add_service(auth.layer(RepoServiceServer::new(RepoSvc::new(state.clone()))))
-        .add_service(auth.layer(WorkspaceServiceServer::new(WorkspaceSvc::new(
-            state.clone(),
+        .add_service(limits!(SessionServiceServer::new(SessionSvc::new(
+            state.clone()
         ))))
-        .add_service(auth.layer(ReviewServiceServer::new(ReviewSvc::new(state.clone()))))
-        .add_service(auth.layer(IntentServiceServer::new(IntentSvc::new(state.clone()))))
-        .add_service(auth.layer(LanderServiceServer::new(LanderSvc::new(state.clone()))))
-        .add_service(auth.layer(IdentityServiceServer::new(IdentitySvc::new(state.clone()))))
-        .add_service(auth.layer(AccessServiceServer::new(AccessSvc::new(state.clone()))))
-        .add_service(auth.layer(AdminServiceServer::new(AdminSvc::new(state))))
+        .add_service(auth.layer(limits!(RepoServiceServer::new(RepoSvc::new(state.clone())))))
+        .add_service(
+            auth.layer(limits!(WorkspaceServiceServer::new(WorkspaceSvc::new(
+                state.clone()
+            )))),
+        )
+        .add_service(auth.layer(limits!(ReviewServiceServer::new(ReviewSvc::new(
+            state.clone()
+        )))))
+        .add_service(auth.layer(limits!(IntentServiceServer::new(IntentSvc::new(
+            state.clone()
+        )))))
+        .add_service(auth.layer(limits!(LanderServiceServer::new(LanderSvc::new(
+            state.clone()
+        )))))
+        .add_service(
+            auth.layer(limits!(IdentityServiceServer::new(IdentitySvc::new(
+                state.clone()
+            )))),
+        )
+        .add_service(auth.layer(limits!(AccessServiceServer::new(AccessSvc::new(
+            state.clone()
+        )))))
+        .add_service(auth.layer(limits!(AdminServiceServer::new(AdminSvc::new(state)))))
         .serve_with_incoming_shutdown(grpc_incoming(listener), shutdown.cancelled_owned())
         .await
         .map_err(|e| Error::Transport(format!("gRPC server: {e}")))
