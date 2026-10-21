@@ -126,7 +126,10 @@ The object protocol reuses this mapping through `ObjectError`; see
 
 `run` binds both listeners (port 0 picks a free port, reported by
 `Listeners::addrs`), calls `build_state`, then `serve_until` serves gRPC and
-HTTP until the signal (ctrl-c in the binary). Shutdown follows `[shutdown]`
+HTTP until the signal (ctrl-c in the binary). Accepted connections set
+`TCP_NODELAY`: with Nagle's algorithm a response spanning several segments
+waits for the client's delayed ACK, which added 40 ms to every log page on
+Linux. Shutdown follows `[shutdown]`
 (`state/lifecycle.rs`, `shutdown.rs`):
 
 1. **Drain.** `/readyz` answers 503 `draining` and gRPC health reports

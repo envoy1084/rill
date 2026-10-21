@@ -133,9 +133,16 @@ async fn serve_grpc(
         .add_service(auth.layer(IntentServiceServer::new(IntentSvc::new(state.clone()))))
         .add_service(auth.layer(LanderServiceServer::new(LanderSvc::new(state.clone()))))
         .add_service(auth.layer(AdminServiceServer::new(AdminSvc::new(state))))
-        .serve_with_incoming_shutdown(TcpIncoming::from(listener), shutdown.cancelled_owned())
+        .serve_with_incoming_shutdown(grpc_incoming(listener), shutdown.cancelled_owned())
         .await
         .map_err(|e| Error::Transport(format!("gRPC server: {e}")))
+}
+
+/// Connections on the gRPC listener, sent without Nagle's delay: a
+/// response spanning several segments otherwise waits on the client's
+/// delayed ACK, 40 ms on Linux.
+fn grpc_incoming(listener: TcpListener) -> TcpIncoming {
+    TcpIncoming::from(listener).with_nodelay(Some(true))
 }
 
 async fn serve_http(
@@ -145,6 +152,12 @@ async fn serve_http(
 ) -> Result<()> {
     let router = objects::router(state.clone(), state.config.roles.api);
     let Some(tls) = &state.config.tls else {
+        use axum::serve::ListenerExt;
+        let listener = listener.tap_io(|tcp| {
+            if let Err(e) = tcp.set_nodelay(true) {
+                tracing::debug!(error = %e, "setting TCP_NODELAY failed");
+            }
+        });
         return axum::serve(listener, router)
             .with_graceful_shutdown(shutdown.cancelled_owned())
             .await
@@ -185,5 +198,22 @@ async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bo
         <AdminServiceServer<AdminSvc> as tonic::server::NamedService>::NAME,
     ] {
         reporter.set_service_status(name, status).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio_stream::StreamExt;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn grpc_connections_disable_nagle() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut incoming = grpc_incoming(listener);
+        let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let accepted = incoming.next().await.unwrap().unwrap();
+        assert!(accepted.nodelay().unwrap());
     }
 }
