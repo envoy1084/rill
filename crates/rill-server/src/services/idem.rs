@@ -67,6 +67,26 @@ idempotent!(
     RequestLandRequest,
 );
 
+/// The idempotency key of the request being handled, for work that
+/// records what it committed in the same transaction.
+#[derive(Debug, Clone)]
+pub struct Scope {
+    pub principal: String,
+    pub operation: Vec<u8>,
+    pub digest: [u8; 32],
+    /// What an earlier attempt of this request already committed.
+    pub prior: Option<bytes::Bytes>,
+}
+
+tokio::task_local! {
+    static SCOPE: Scope;
+}
+
+/// The scope of the request this task is handling, if it has one.
+pub fn current() -> Option<Scope> {
+    SCOPE.try_with(Clone::clone).ok()
+}
+
 /// Run `handler` for `request` at most once per caller and operation id.
 /// Requests without an id run every time.
 pub async fn once<Req, Resp, F, Fut>(
@@ -87,8 +107,8 @@ where
     let principal = caller(&request)?.principal.id.to_string();
     let digest = *blake3::hash(&request.get_ref().encode_to_vec()).as_bytes();
     let stores = &state.stores;
-    match stores.idem_claim(&principal, &operation, digest).await? {
-        Claim::Fresh => {}
+    let prior = match stores.idem_claim(&principal, &operation, digest).await? {
+        Claim::Fresh { prior } => prior,
         Claim::Replay(bytes) => {
             let response = Resp::decode(bytes)
                 .map_err(|e| Error::Internal(format!("stored response: {e}")))?;
@@ -104,8 +124,14 @@ where
                 "operation_id was already used for a different request".into(),
             ))
         }
-    }
-    match handler(request).await {
+    };
+    let scope = Scope {
+        principal: principal.clone(),
+        operation: operation.clone(),
+        digest,
+        prior,
+    };
+    match SCOPE.scope(scope, handler(request)).await {
         Ok(response) => {
             stores
                 .idem_finish(

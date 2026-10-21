@@ -61,3 +61,49 @@ async fn a_retried_mutation_returns_the_first_response() {
     c.repo.apply_edits(edit(3, b"three\n")).await.unwrap();
     server.stop().await;
 }
+
+#[tokio::test]
+async fn a_retry_after_a_crash_returns_the_version_already_committed() {
+    let server = TestServer::start(dev_config()).await;
+    let mut c = clients(&server, None).await;
+    c.repo
+        .create_repo(pb::CreateRepoRequest {
+            operation_id: Bytes::new(),
+            repo: "crash".into(),
+            description: None,
+            windows_safe: false,
+        })
+        .await
+        .unwrap();
+    let edit = pb::ApplyEditsRequest {
+        operation_id: Bytes::from_static(&[9; 16]),
+        repo: "crash".into(),
+        base: None,
+        edits: vec![set_edit("a.txt", b"once\n")],
+        message: "edit".into(),
+        intent: None,
+        provenance: None,
+        change_id: None,
+    };
+    let first = c.repo.apply_edits(edit.clone()).await.unwrap().into_inner();
+
+    // The server committed the version, then died before replying.
+    let dev = rill_types::Principal::human("dev").id.to_string();
+    server
+        ._state
+        .stores
+        .idem_rewind(&dev, &[9; 16], &first.hash)
+        .await
+        .unwrap();
+    let retried = c.repo.apply_edits(edit).await.unwrap().into_inner();
+    assert_eq!(retried.hash, first.hash);
+
+    let stores = &server._state.stores;
+    let repo = stores.repo(stores.get_repo_by_name("crash").await.unwrap().unwrap().id);
+    assert_eq!(
+        repo.log_after(None, 10).await.unwrap().len(),
+        1,
+        "one version, not two"
+    );
+    server.stop().await;
+}

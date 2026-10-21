@@ -2,6 +2,7 @@
 
 mod codec;
 mod derived;
+mod events;
 mod idem;
 mod orgs;
 mod quota;

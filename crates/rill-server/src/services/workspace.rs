@@ -12,16 +12,18 @@ use rill_core::{diff_trees, rebase};
 use rill_proto::convert::{hash_to_proto, id_from_proto, id_to_proto, opt_id_from_proto};
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::workspace_service_server::WorkspaceService;
+use rill_store::ObjectStoreExt;
 use rill_types::{
-    ChangeId, ChangeVersionHash, ObjectHash, Operation, OperationId, OperationKind, Principal,
-    RepoPathBuf, SparseProfile, Timestamp, TreeHash, Workspace, WorkspaceId,
+    ChangeId, ChangeVersion, ChangeVersionHash, Encodable, ObjectHash, Operation, OperationId,
+    OperationKind, Principal, RepoPathBuf, SparseProfile, Timestamp, TreeHash, Workspace,
+    WorkspaceId,
 };
 use tonic::{Request, Response, Status};
 
 use super::common::{self, open, operation_id, provenance, resolve_version, GrpcResult, Opened};
 use super::diff::{file_diffs, DiffOptions};
 use super::idem;
-use super::repo::{commit_version, version_from_diff};
+use super::repo::{commit_version_with, version_from_diff, CommitExtras};
 use crate::error::{Error, Result};
 use crate::state::AppState;
 
@@ -70,18 +72,7 @@ impl WorkspaceSvc {
         op_id: OperationId,
         kind: OperationKind,
     ) -> Result<Operation> {
-        let at = Timestamp::now();
-        ws.head_op = Some(op_id);
-        ws.updated_at = at;
-        let op = Operation {
-            id: op_id,
-            workspace: ws.id,
-            parent: before.and_then(|b| b.head_op),
-            actor: opened.principal().clone(),
-            kind,
-            resulting: ws.clone(),
-            at,
-        };
+        let op = operation(opened, before, ws, op_id, kind);
         opened
             .repo
             .repo
@@ -99,6 +90,55 @@ impl WorkspaceSvc {
             })?;
         Ok(op)
     }
+}
+
+/// The next operation on `ws`, which it updates to point at.
+fn operation(
+    opened: &Opened,
+    before: Option<&Workspace>,
+    ws: &mut Workspace,
+    id: OperationId,
+    kind: OperationKind,
+) -> Operation {
+    let at = Timestamp::now();
+    ws.head_op = Some(id);
+    ws.updated_at = at;
+    Operation {
+        id,
+        workspace: ws.id,
+        parent: before.and_then(|b| b.head_op),
+        actor: opened.principal().clone(),
+        kind,
+        resulting: ws.clone(),
+        at,
+    }
+}
+
+/// Store `cv` and the workspace operation together, so the version never
+/// exists without the workspace pointing at it.
+async fn commit_with_operation(
+    opened: &Opened,
+    cv: ChangeVersion,
+    before: &Workspace,
+    op: &Operation,
+) -> Result<(ChangeVersionHash, ChangeVersion)> {
+    let tx = opened.repo.repo.operation_tx(Some(before), op)?;
+    commit_version_with(
+        opened,
+        cv,
+        CommitExtras {
+            tx,
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(|e| match e {
+        Error::Store(s) if s.is_conflict() => Error::AlreadyExists(format!(
+            "operation {} was already applied, or the workspace changed meanwhile",
+            op.id
+        )),
+        other => other,
+    })
 }
 
 fn base_of(ws: &Workspace) -> Option<ChangeVersionHash> {
@@ -321,20 +361,18 @@ impl WorkspaceService for WorkspaceSvc {
                     provenance(req.provenance)?,
                     opt_id_from_proto("intent", req.intent.as_ref())?,
                 );
-                let (hash, cv) = commit_version(&opened, cv).await?;
                 let change = cv.change_id;
                 let base = ws.base;
-                ws.base = hash;
+                ws.base = cv.hash();
                 ws.working_change = ChangeId::new();
-                let op = self
-                    .record(
-                        &opened,
-                        Some(&before),
-                        &mut ws,
-                        operation_id(&req.operation_id)?,
-                        OperationKind::NewChange { change, base },
-                    )
-                    .await?;
+                let op = operation(
+                    &opened,
+                    Some(&before),
+                    &mut ws,
+                    operation_id(&req.operation_id)?,
+                    OperationKind::NewChange { change, base },
+                );
+                let (hash, cv) = commit_with_operation(&opened, cv, &before, &op).await?;
                 Ok(Response::new(pb::NewChangeResponse {
                     change_id: id_to_proto(&change),
                     version_hash: hash_to_proto(&hash),
@@ -369,30 +407,34 @@ impl WorkspaceService for WorkspaceSvc {
                     .await?
                     .last()
                     .copied();
-                let (version, version_hash) = match current {
+                ws.base = new_base;
+                let op_id = operation_id(&req.operation_id)?;
+                let kind = OperationKind::Rebase { from, to: new_base };
+                let (op, version, version_hash) = match current {
                     Some(current) if new_base != from => {
                         let rebased =
                             rebase(&opened.repo.derive, &current, &new_base, Timestamp::now())
                                 .await?;
-                        let (hash, cv) = commit_version(&opened, rebased).await?;
+                        // The snapshot is the rebased version's tree, which
+                        // needs the version object stored first.
+                        let hash = opened.repo.repo.objects().put_object(&rebased).await?;
                         ws.snapshot = Some(common::root_of(&opened.repo, &hash).await?);
+                        let op = operation(&opened, Some(&before), &mut ws, op_id, kind);
+                        let (hash, cv) =
+                            commit_with_operation(&opened, rebased, &before, &op).await?;
                         (
+                            op,
                             Some(pb::ChangeVersion::from(cv)),
                             Some(hash_to_proto(&hash)),
                         )
                     }
-                    _ => (None, None),
+                    _ => (
+                        self.record(&opened, Some(&before), &mut ws, op_id, kind)
+                            .await?,
+                        None,
+                        None,
+                    ),
                 };
-                ws.base = new_base;
-                let op = self
-                    .record(
-                        &opened,
-                        Some(&before),
-                        &mut ws,
-                        operation_id(&req.operation_id)?,
-                        OperationKind::Rebase { from, to: new_base },
-                    )
-                    .await?;
                 let (workspace, operation) = response_pair(&ws, &op);
                 Ok(Response::new(pb::UpdateBaseResponse {
                     workspace,

@@ -16,6 +16,8 @@ local = ["dep:redb"]
 s3 = ["dep:object_store", "dep:url", "dep:futures"]
 # FoundationDB metadata store. Needs the FoundationDB client library.
 fdb = ["dep:foundationdb", "dep:futures"]
+# Hooks for crash and recovery tests.
+testing = []
 
 [dependencies]
 rill-types = { workspace = true }

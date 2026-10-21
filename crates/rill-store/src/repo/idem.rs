@@ -25,7 +25,12 @@ pub const CLAIM_TTL_MS: i64 = 5 * 60 * 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 enum Outcome {
-    Running,
+    /// Claimed and not finished. `effect` is what the request already
+    /// committed (a version hash, say), written in the same transaction as
+    /// that work, so a takeover after a crash does not redo it.
+    Running {
+        effect: Option<Vec<u8>>,
+    },
     Done(Vec<u8>),
 }
 
@@ -43,8 +48,10 @@ impl Record for IdemRecord {
 /// What claiming an operation id found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Claim {
-    /// The id is new: do the work, then [`Stores::idem_finish`].
-    Fresh,
+    /// The id is new, or its claim expired: do the work, then
+    /// [`Stores::idem_finish`]. `prior` is the effect an expired claim had
+    /// already committed.
+    Fresh { prior: Option<Bytes> },
     /// The request already finished with this response.
     Replay(Bytes),
     /// The same request is still running elsewhere.
@@ -64,6 +71,7 @@ impl Stores {
         let key = keys::idem(principal, operation);
         let now = Timestamp::now();
         let current = self.meta.get(&key).await?;
+        let mut prior = None;
         if let Some(bytes) = &current {
             let record: IdemRecord = decode_record(bytes)?;
             let expired = record.expires_at <= now;
@@ -73,20 +81,31 @@ impl Stores {
                 }
                 return Ok(match record.outcome {
                     Outcome::Done(response) => Claim::Replay(Bytes::from(response)),
-                    Outcome::Running => Claim::Running,
+                    Outcome::Running { .. } => Claim::Running,
                 });
+            }
+            if let (
+                true,
+                Outcome::Running {
+                    effect: Some(effect),
+                },
+            ) = (record.request == request, record.outcome)
+            {
+                prior = Some(Bytes::from(effect));
             }
         }
         let claim = IdemRecord {
             request,
-            outcome: Outcome::Running,
+            outcome: Outcome::Running {
+                effect: prior.as_ref().map(|b| b.to_vec()),
+            },
             expires_at: Timestamp::from_millis(now.millis() + CLAIM_TTL_MS),
         };
         let tx = Transaction::new()
             .expect(key.clone(), current)
             .set(key, encode_record(&claim)?);
         match self.meta.transact(tx).await {
-            Ok(_) => Ok(Claim::Fresh),
+            Ok(_) => Ok(Claim::Fresh { prior }),
             // Someone claimed it between the read and the write.
             Err(Error::Conflict(_)) => Ok(Claim::Running),
             Err(e) => Err(e),
@@ -113,6 +132,28 @@ impl Stores {
         })
     }
 
+    /// The mutation noting that a claimed operation committed `effect`,
+    /// for the transaction that commits it.
+    pub fn idem_effect(
+        &self,
+        principal: &str,
+        operation: &[u8],
+        request: [u8; 32],
+        effect: &[u8],
+    ) -> Result<Mutation> {
+        let record = IdemRecord {
+            request,
+            outcome: Outcome::Running {
+                effect: Some(effect.to_vec()),
+            },
+            expires_at: Timestamp::from_millis(Timestamp::now().millis() + CLAIM_TTL_MS),
+        };
+        Ok(Mutation::Set {
+            key: keys::idem(principal, operation),
+            value: encode_record(&record)?,
+        })
+    }
+
     /// Record `response` for a claimed operation.
     pub async fn idem_finish(
         &self,
@@ -128,12 +169,53 @@ impl Stores {
         Ok(())
     }
 
-    /// Release a claim after the request failed.
+    /// Release a claim after the request failed. A claim whose request
+    /// already committed its effect is not dropped: it expires at once, so
+    /// a retry takes it over and learns the effect instead of redoing it.
     pub async fn idem_release(&self, principal: &str, operation: &[u8]) -> Result<()> {
-        self.meta
-            .transact(Transaction::new().delete(keys::idem(principal, operation)))
-            .await?;
-        Ok(())
+        let key = keys::idem(principal, operation);
+        let Some(bytes) = self.meta.get(&key).await? else {
+            return Ok(());
+        };
+        let mut record: IdemRecord = decode_record(&bytes)?;
+        let tx = match record.outcome {
+            Outcome::Running { effect: Some(_) } => {
+                record.expires_at = Timestamp::now();
+                Transaction::new()
+                    .expect(key.clone(), Some(bytes))
+                    .set(key, encode_record(&record)?)
+            }
+            _ => Transaction::new()
+                .expect(key.clone(), Some(bytes))
+                .delete(key),
+        };
+        match self.meta.transact(tx).await {
+            Ok(_) | Err(Error::Conflict(_)) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Make a finished request look as if its server died after committing
+    /// `effect` and before replying, for crash tests.
+    #[cfg(feature = "testing")]
+    pub async fn idem_rewind(
+        &self,
+        principal: &str,
+        operation: &[u8],
+        effect: &[u8],
+    ) -> Result<()> {
+        let key = keys::idem(principal, operation);
+        let bytes = self
+            .meta
+            .get(&key)
+            .await?
+            .ok_or_else(|| Error::NotFound("no such operation".into()))?;
+        let mut record: IdemRecord = decode_record(&bytes)?;
+        record.outcome = Outcome::Running {
+            effect: Some(effect.to_vec()),
+        };
+        record.expires_at = Timestamp::from_millis(0);
+        self.meta.set(key, encode_record(&record)?).await
     }
 
     /// Delete up to `limit` expired records; returns how many.
@@ -167,7 +249,10 @@ mod tests {
     async fn claims_replay_refuse_and_release() {
         let stores = Stores::memory();
         let (who, op, req) = ("pr_alice", b"op-1".as_slice(), [1u8; 32]);
-        assert_eq!(stores.idem_claim(who, op, req).await.unwrap(), Claim::Fresh);
+        assert_eq!(
+            stores.idem_claim(who, op, req).await.unwrap(),
+            Claim::Fresh { prior: None }
+        );
         assert_eq!(
             stores.idem_claim(who, op, req).await.unwrap(),
             Claim::Running
@@ -184,14 +269,49 @@ mod tests {
         // Another principal's id space is separate.
         assert_eq!(
             stores.idem_claim("pr_bob", op, req).await.unwrap(),
-            Claim::Fresh
+            Claim::Fresh { prior: None }
         );
         // A released claim can be taken again.
         stores.idem_release("pr_bob", op).await.unwrap();
         assert_eq!(
             stores.idem_claim("pr_bob", op, req).await.unwrap(),
-            Claim::Fresh
+            Claim::Fresh { prior: None }
         );
         assert_eq!(stores.idem_sweep(100).await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_takeover_after_a_crash_learns_what_was_committed() {
+        let stores = Stores::memory();
+        let (who, op, req) = ("pr_alice", b"op-2".as_slice(), [3u8; 32]);
+        stores.idem_claim(who, op, req).await.unwrap();
+        let mut tx = Transaction::new();
+        tx.mutations
+            .push(stores.idem_effect(who, op, req, b"version-hash").unwrap());
+        stores.meta.transact(tx).await.unwrap();
+        // The server dies; the claim expires.
+        let expired = IdemRecord {
+            request: req,
+            outcome: Outcome::Running {
+                effect: Some(b"version-hash".to_vec()),
+            },
+            expires_at: Timestamp::from_millis(0),
+        };
+        stores
+            .meta
+            .set(keys::idem(who, op), encode_record(&expired).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(
+            stores.idem_claim(who, op, req).await.unwrap(),
+            Claim::Fresh {
+                prior: Some(Bytes::from_static(b"version-hash"))
+            }
+        );
+        assert_eq!(
+            stores.idem_sweep(100).await.unwrap(),
+            0,
+            "the new claim is live"
+        );
     }
 }

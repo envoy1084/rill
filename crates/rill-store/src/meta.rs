@@ -129,6 +129,14 @@ impl Transaction {
         self
     }
 
+    /// Add `other`'s conditions and mutations, so separately built parts
+    /// commit as one transaction.
+    pub fn merge(mut self, other: Transaction) -> Self {
+        self.conditions.extend(other.conditions);
+        self.mutations.extend(other.mutations);
+        self
+    }
+
     pub fn is_empty(&self) -> bool {
         self.conditions.is_empty() && self.mutations.is_empty()
     }

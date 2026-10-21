@@ -7,17 +7,16 @@ use bytes::Bytes;
 use rill_core::{merge_changes, rebase, store_content, ChangeBuilder, MergeChangeOptions};
 use rill_proto::convert::{hash_to_proto, id_from_proto, opt_id_from_proto};
 use rill_proto::rill::v1 as pb;
-use rill_review::error::Error as ReviewError;
 use rill_types::{
     ChangeId, ChangeVersion, ChangeVersionHash, ContentRef, FileChange, FileKind, IntentId,
     Provenance, RepoPathBuf, Signature, Timestamp, TreeHash,
 };
 
+use super::commit::commit_version;
 use super::trees::{check_content_exists, content_bytes};
 use super::RepoSvc;
 use crate::error::{Error, Result};
 use crate::services::common::{self, hash, open, path, provenance, resolve_root, Opened};
-use crate::state::RepoEvent;
 
 impl RepoSvc {
     pub(super) async fn create_change_version_impl(
@@ -46,10 +45,15 @@ impl RepoSvc {
             .into_iter()
             .map(Signature::try_from)
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        let (hash, _) = commit_version(&opened, cv).await?;
-        if !signatures.is_empty() {
-            opened.repo.repo.add_signatures(&hash, &signatures).await?;
-        }
+        let (hash, _) = super::commit_version_with(
+            &opened,
+            cv,
+            super::CommitExtras {
+                signatures,
+                ..Default::default()
+            },
+        )
+        .await?;
         Ok(pb::CreateChangeVersionResponse {
             hash: hash_to_proto(&hash),
         })
@@ -312,64 +316,6 @@ fn merge_provenance(target: &mut Provenance, previous: &Provenance) {
     }
 }
 
-/// Validate and store a change version, tell review about the new
-/// version when the change is under review, and publish the event.
-pub async fn commit_version(
-    opened: &Opened,
-    cv: ChangeVersion,
-) -> Result<(ChangeVersionHash, ChangeVersion)> {
-    let ctx = &opened.repo;
-    let rules = rill_core::PathRules {
-        windows_safe: ctx.config.settings.windows_safe,
-    };
-    rill_core::validate_version(ctx.repo.objects().as_ref(), &cv, rules).await?;
-    for parent in &cv.parents {
-        if !ctx.repo.has_change_version(parent).await? {
-            return Err(Error::precondition(format!(
-                "parent {parent} does not exist"
-            )));
-        }
-    }
-    if let Some(pred) = &cv.predecessor {
-        if !ctx.repo.has_change_version(pred).await? {
-            return Err(Error::precondition(format!(
-                "predecessor {pred} does not exist"
-            )));
-        }
-    }
-    for (path, change) in &cv.file_changes {
-        if path.is_root() {
-            return Err(Error::invalid("file change at the repository root"));
-        }
-        if let FileChange::Set {
-            content, copy_from, ..
-        } = change
-        {
-            check_content_exists(ctx.repo.objects().as_ref(), content).await?;
-            if let Some(source) = copy_from {
-                check_copy_source(ctx, source).await?;
-            }
-        }
-    }
-    let hash = ctx.repo.put_change_version(&cv).await?;
-    let attestation = ctx
-        .attestor
-        .sign(&hash, &rill_types::Principal::service("rill-server"));
-    ctx.repo.add_signatures(&hash, &[attestation]).await?;
-    // Derive what landing needs now, so a bad change fails the request
-    // rather than a later read and the lander never derives it.
-    ctx.derive.ensure_land_critical(&hash).await?;
-    match ctx.review().add_version(&cv.change_id, hash).await {
-        Ok(_) | Err(ReviewError::ReviewNotFound(_)) => {}
-        Err(ReviewError::InvalidStatus { status, .. }) => {
-            tracing::debug!(change = %cv.change_id, ?status, "review not updated with new version");
-        }
-        Err(e) => return Err(e.into()),
-    }
-    ctx.events.publish(RepoEvent::VersionCreated { hash });
-    Ok((hash, cv))
-}
-
 /// Build a change version from a tree diff, for workspace `NewChange`.
 #[allow(clippy::too_many_arguments)]
 pub fn version_from_diff(
@@ -404,29 +350,5 @@ pub fn version_from_diff(
         message,
         created_at: Timestamp::now(),
         extra: BTreeMap::new(),
-    }
-}
-
-/// A copy source must name a file that exists in the version it cites.
-async fn check_copy_source(
-    ctx: &crate::state::RepoContext,
-    source: &rill_types::objects::change::CopySource,
-) -> Result<()> {
-    let missing = || {
-        Error::precondition(format!(
-            "copy source {} does not exist in {}",
-            source.path, source.version
-        ))
-    };
-    if !ctx.repo.has_change_version(&source.version).await? {
-        return Err(missing());
-    }
-    let root = ctx
-        .derive
-        .get::<rill_core::RootTree>(&source.version)
-        .await?;
-    match ctx.trees.lookup(root, &source.path).await? {
-        Some(rill_types::EntryKind::File { .. }) => Ok(()),
-        _ => Err(missing()),
     }
 }

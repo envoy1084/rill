@@ -22,22 +22,42 @@ impl RepoStore {
         if self.has_change_version(&hash).await? {
             return Ok(hash);
         }
-        self.objects().put_object(cv).await?;
+        let tx = self.stage_version(cv).await?;
+        match self.meta().transact(tx).await {
+            Ok(_) => Ok(hash),
+            Err(Error::Conflict(_)) if self.has_change_version(&hash).await? => Ok(hash),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Store `cv`'s object and return the transaction that makes it
+    /// visible: its info row, version-log entry and place in its change's
+    /// version list, conditioned on the version being new. Callers add
+    /// what else must commit with it.
+    pub async fn stage_version(&self, cv: &ChangeVersion) -> Result<Transaction> {
+        let hash = self.objects().put_object(cv).await?;
         let info = ChangeInfo::from_version(cv, None);
         let info_key = self.keys().change_info(&hash);
-        let tx = Transaction::new()
+        Ok(Transaction::new()
             .expect_absent(info_key.clone())
             .set(info_key, encode_record(&info)?)
             .append_stamped(self.keys().log(), hash_value(&hash))
             .append_log(
                 self.keys().change_versions(&cv.change_id),
                 hash_value(&hash),
-            );
-        match self.meta().transact(tx).await {
-            Ok(_) => Ok(hash),
-            Err(Error::Conflict(_)) if self.has_change_version(&hash).await? => Ok(hash),
-            Err(e) => Err(e),
-        }
+            ))
+    }
+
+    /// The mutation storing `signatures` as all of `hash`'s signatures.
+    pub fn signatures_mutation(
+        &self,
+        hash: &ChangeVersionHash,
+        signatures: &[Signature],
+    ) -> Result<crate::meta::Mutation> {
+        Ok(crate::meta::Mutation::Set {
+            key: self.keys().signatures(hash),
+            value: encode_tagged("signatures", signatures)?,
+        })
     }
 
     pub async fn get_change_version(

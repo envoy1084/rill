@@ -50,4 +50,5 @@ http = { workspace = true }
 http-body-util = { workspace = true }
 
 [dev-dependencies]
+rill-store = { workspace = true, features = ["s3", "testing"] }
 tempfile = { workspace = true }

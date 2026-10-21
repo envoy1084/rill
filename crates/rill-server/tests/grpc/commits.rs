@@ -150,4 +150,20 @@ async fn server_stamps_authorship_and_attests_commits() {
             kind.key
         );
     }
+
+    // The commit's event and quota charge were written with it.
+    let events = repo.events_after(None, 100).await.unwrap();
+    assert!(events.iter().any(|(_, e)| matches!(
+        e.kind,
+        rill_types::EventKind::VersionStored { version, .. } if version == hash
+    )));
+    let dev = rill_types::Principal::human("dev");
+    let today = rill_store::repo::day_of(rill_types::Timestamp::now());
+    assert!(
+        stores
+            .usage(&dev, rill_store::repo::metric::VERSIONS, today)
+            .await
+            .unwrap()
+            >= 1
+    );
 }

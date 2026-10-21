@@ -2,6 +2,7 @@
 //! watches. The trait impl only dispatches; each group of RPCs lives in
 //! its own file.
 
+mod commit;
 mod grep;
 mod history;
 mod refs;
@@ -17,9 +18,10 @@ use tonic::{Request, Response, Streaming};
 
 use super::common::GrpcResult;
 
+pub use commit::{commit_version, commit_version_with, CommitExtras};
 pub use trees::BlobStream;
 pub use watch::EventStream;
-pub use write::{commit_version, version_from_diff};
+pub use write::version_from_diff;
 
 use crate::state::AppState;
 

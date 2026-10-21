@@ -30,6 +30,8 @@ pub mod table {
     pub const THREAD: &str = "thr";
     /// `(cmt, ns, repo, change, thread, stamp)` → Comment
     pub const COMMENT: &str = "cmt";
+    /// `(evt, ns, repo, stamp)` → Event
+    pub const EVENT: &str = "evt";
     /// `(log, ns, repo, stamp)` → version hash, every stored version
     pub const LOG: &str = "log";
     /// `(trunk, ns, repo, seq)` → version hash

@@ -43,17 +43,27 @@ impl RepoStore {
         expected: Option<&Workspace>,
         op: &Operation,
     ) -> Result<()> {
+        let tx = self.operation_tx(expected, op)?;
+        self.meta().transact(tx).await?;
+        Ok(())
+    }
+
+    /// The transaction [`RepoStore::append_operation`] commits, to merge
+    /// into a larger one.
+    pub fn operation_tx(
+        &self,
+        expected: Option<&Workspace>,
+        op: &Operation,
+    ) -> Result<Transaction> {
         let keys = self.keys();
         let index = keys.operation_index(&op.id);
         let ws_key = keys.workspace(&op.workspace);
-        let tx = Transaction::new()
+        Ok(Transaction::new()
             .expect_absent(index.clone())
             .expect(ws_key.clone(), expected.map(encode_record).transpose()?)
             .append_stamped(keys.operations(&op.workspace), encode_record(op)?)
             .set(ws_key, encode_record(&op.resulting)?)
-            .set(index, Bytes::new());
-        self.meta().transact(tx).await?;
-        Ok(())
+            .set(index, Bytes::new()))
     }
 
     pub async fn has_operation(&self, op: &OperationId) -> Result<bool> {

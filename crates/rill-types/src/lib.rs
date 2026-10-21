@@ -36,6 +36,7 @@ pub use objects::change::{
     ChangeInfo, ChangeVersion, ChangeVersionHash, FileChange, FileKind, Provenance, Signature,
     SubtreeChange,
 };
+pub use objects::event::{Event, EventKind};
 pub use objects::intent::{Intent, IntentKind, IntentStatus, RiskClass};
 pub use objects::refs::{RefName, RefUpdate, TrunkSeq};
 pub use objects::review::{

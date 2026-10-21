@@ -3,6 +3,7 @@
 
 pub mod blob;
 pub mod change;
+pub mod event;
 pub mod intent;
 pub mod refs;
 pub mod review;
