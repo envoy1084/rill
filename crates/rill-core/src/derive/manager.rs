@@ -16,7 +16,7 @@ use super::ctx::DeriveCtx;
 use super::traits::{derived_kind_key, Derivable};
 use crate::error::{Error, Result};
 use crate::tree::TreeOps;
-use crate::util::LruCache;
+use moka::sync::Cache;
 
 type Key = (String, ObjectHash);
 
@@ -24,7 +24,7 @@ type Key = (String, ObjectHash);
 pub struct DeriveManager {
     repo: RepoStore,
     trees: TreeOps,
-    cache: LruCache<Key, Bytes>,
+    cache: Cache<Key, Bytes>,
     /// One lock per key being derived, so concurrent requests for the same
     /// value compute it once and the rest read it from the store.
     in_flight: DashMap<Key, Arc<Mutex<()>>>,
@@ -38,7 +38,7 @@ impl DeriveManager {
         Arc::new(DeriveManager {
             repo,
             trees,
-            cache: LruCache::new(cache_size),
+            cache: Cache::new(cache_size as u64),
             in_flight: DashMap::new(),
             merger: std::sync::OnceLock::new(),
         })
@@ -177,7 +177,7 @@ impl DeriveManager {
             None => {
                 let fetched = self.repo.get_derived(kind, hash).await?;
                 if let Some(b) = &fetched {
-                    self.cache.put(key, b.clone());
+                    self.cache.insert(key, b.clone());
                 }
                 fetched
             }
@@ -191,7 +191,7 @@ impl DeriveManager {
     async fn store<V: Serialize>(&self, kind: &str, hash: &ObjectHash, value: &V) -> Result<()> {
         let bytes = encode_tagged(kind, value)?;
         self.repo.put_derived(kind, hash, bytes.clone()).await?;
-        self.cache.put((kind.to_string(), *hash), bytes);
+        self.cache.insert((kind.to_string(), *hash), bytes);
         Ok(())
     }
 

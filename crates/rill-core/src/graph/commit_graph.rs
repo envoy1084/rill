@@ -9,7 +9,7 @@ use rill_types::{ChangeInfo, ChangeVersionHash};
 
 use crate::derive::{Ancestry, AncestryInfo, DeriveManager};
 use crate::error::{Error, Result};
-use crate::util::LruCache;
+use moka::sync::Cache;
 
 /// Versions whose parents and ancestry are kept in memory.
 const GRAPH_CACHE: usize = 200_000;
@@ -21,9 +21,9 @@ const INFO_CACHE: usize = 20_000;
 pub struct CommitGraph {
     repo: RepoStore,
     derive: Arc<DeriveManager>,
-    parents: LruCache<ChangeVersionHash, Arc<[ChangeVersionHash]>>,
-    ancestry: LruCache<ChangeVersionHash, AncestryInfo>,
-    infos: LruCache<ChangeVersionHash, ChangeInfo>,
+    parents: Cache<ChangeVersionHash, Arc<[ChangeVersionHash]>>,
+    ancestry: Cache<ChangeVersionHash, AncestryInfo>,
+    infos: Cache<ChangeVersionHash, ChangeInfo>,
 }
 
 /// Walk colors for the merge-base search.
@@ -37,9 +37,9 @@ impl CommitGraph {
         CommitGraph {
             repo,
             derive,
-            parents: LruCache::new(GRAPH_CACHE),
-            ancestry: LruCache::new(GRAPH_CACHE),
-            infos: LruCache::new(INFO_CACHE),
+            parents: Cache::new(GRAPH_CACHE as u64),
+            ancestry: Cache::new(GRAPH_CACHE as u64),
+            infos: Cache::new(INFO_CACHE as u64),
         }
     }
 
@@ -53,11 +53,11 @@ impl CommitGraph {
             .get_change_info(hash)
             .await?
             .ok_or(Error::ChangeNotFound(*hash))?;
-        self.parents.put(*hash, info.parents.clone().into());
+        self.parents.insert(*hash, info.parents.clone().into());
         // A version's metadata never changes once it is on trunk; before
         // that its trunk position is still to come.
         if info.trunk_seq.is_some() {
-            self.infos.put(*hash, info.clone());
+            self.infos.insert(*hash, info.clone());
         }
         Ok(info)
     }
@@ -77,7 +77,7 @@ impl CommitGraph {
             return Ok(a);
         }
         let a = self.derive.get::<Ancestry>(hash).await?;
-        self.ancestry.put(*hash, a);
+        self.ancestry.insert(*hash, a);
         Ok(a)
     }
 

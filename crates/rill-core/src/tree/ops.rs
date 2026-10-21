@@ -11,7 +11,7 @@ use rill_types::{
 };
 
 use crate::error::{Error, Result};
-use crate::util::LruCache;
+use moka::sync::Cache;
 
 /// Default number of decoded tree nodes kept in memory.
 pub const DEFAULT_TREE_CACHE: usize = 4096;
@@ -50,7 +50,7 @@ impl From<TreeNode> for NodeRef {
 #[derive(Clone)]
 pub struct TreeOps {
     objects: Arc<dyn ObjectStore>,
-    cache: Arc<LruCache<TreeHash, NodeRef>>,
+    cache: Arc<Cache<TreeHash, NodeRef>>,
     written: Arc<AtomicU64>,
 }
 
@@ -59,7 +59,7 @@ impl TreeOps {
     pub fn new(objects: Arc<dyn ObjectStore>, cache_size: usize) -> Self {
         TreeOps {
             objects,
-            cache: Arc::new(LruCache::new(cache_size)),
+            cache: Arc::new(Cache::new(cache_size as u64)),
             written: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -86,7 +86,7 @@ impl TreeOps {
             .await?
             .ok_or(Error::TreeNotFound(*hash))?;
         let node = NodeRef::from(node);
-        self.cache.put(*hash, node.clone());
+        self.cache.insert(*hash, node.clone());
         Ok(node)
     }
 
@@ -103,7 +103,7 @@ impl TreeOps {
             .put(ObjectKind::Tree, &hash, Bytes::from(bytes))
             .await?;
         self.written.fetch_add(1, Ordering::Relaxed);
-        self.cache.put(hash, NodeRef::from(node));
+        self.cache.insert(hash, NodeRef::from(node));
         Ok(hash)
     }
 
