@@ -3,18 +3,21 @@
 use std::sync::Arc;
 
 use axum::body::Bytes;
-use axum::extract::{Extension, Path, State};
+use axum::extract::{Extension, Path, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use rill_policy::AuthContext;
 use rill_types::{ObjectHash, ObjectKind, RepoPathBuf};
 
+use super::authorize::{self, grant_of, FetchQuery};
 use super::{error_response, ObjectError};
 use crate::services::common::opened;
 use crate::state::AppState;
 
-/// Objects never change, so caches may keep them for a year.
-pub const CACHE_CONTROL: &str = "public, immutable, max-age=31536000";
+/// Objects never change, so a client may keep them for a year; shared
+/// caches must not, since each fetch needs a read grant (the Rill cache
+/// tier checks grants itself).
+pub const CACHE_CONTROL: &str = "private, immutable, max-age=31536000";
 
 /// Parse the `{kind}/{hash}` path segments.
 pub fn parse_ref(kind: &str, hash: &str) -> Result<(ObjectKind, ObjectHash), ObjectError> {
@@ -49,8 +52,10 @@ pub async fn get_object(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<AuthContext>,
     Path((repo, kind, hash)): Path<(String, String, String)>,
+    Query(query): Query<FetchQuery>,
+    headers: HeaderMap,
 ) -> Response {
-    match fetch(&state, ctx, &repo, &kind, &hash).await {
+    match fetch(&state, ctx, &repo, &kind, &hash, &headers, &query).await {
         Ok((hash, bytes)) => {
             (StatusCode::OK, object_headers(&hash, bytes.len()), bytes).into_response()
         }
@@ -63,8 +68,10 @@ pub async fn head_object(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<AuthContext>,
     Path((repo, kind, hash)): Path<(String, String, String)>,
+    Query(query): Query<FetchQuery>,
+    headers: HeaderMap,
 ) -> Response {
-    match fetch(&state, ctx, &repo, &kind, &hash).await {
+    match fetch(&state, ctx, &repo, &kind, &hash, &headers, &query).await {
         Ok((hash, bytes)) => (StatusCode::OK, object_headers(&hash, bytes.len())).into_response(),
         Err(e) => error_response(e),
     }
@@ -76,11 +83,20 @@ async fn fetch(
     repo: &str,
     kind: &str,
     hash: &str,
+    headers: &HeaderMap,
+    query: &FetchQuery,
 ) -> Result<(ObjectHash, Bytes), ObjectError> {
     let (kind, hash) = parse_ref(kind, hash)?;
     let repo = state.repos.resolve(repo).await?;
     let opened = opened(state, ctx, repo);
-    opened.permit().read(&RepoPathBuf::root()).await?;
+    authorize::fetch(
+        &opened,
+        grant_of(headers, query),
+        kind,
+        &hash,
+        query.via.as_deref(),
+    )
+    .await?;
     let bytes = opened
         .repo
         .repo

@@ -7,8 +7,9 @@ use rill_proto::convert::{hash_to_proto, id_from_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeId, ChangeVersionHash, FileChange, TrunkSeq};
 
-use super::RepoSvc;
+use super::{visible, RepoSvc};
 use crate::error::{Error, Result};
+use crate::grants::GrantBuilder;
 use crate::services::common::{self, hash, limit, open, path, resolve_version};
 
 /// Default and maximum page sizes for history walks.
@@ -22,21 +23,33 @@ impl RepoSvc {
     ) -> Result<pb::GetChangeVersionResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        opened
-            .permit()
-            .read(&rill_types::RepoPathBuf::root())
-            .await?;
+        let filter = opened.permit().read_any().await?;
         let hash = hash("hash", &req.hash)?;
+        let missing = || Error::not_found(format!("change version {hash}"));
         let cv = opened
             .repo
             .repo
             .get_change_version(&hash)
             .await?
-            .ok_or_else(|| Error::not_found(format!("change version {hash}")))?;
+            .ok_or_else(missing)?;
+        if !visible::touches(&cv, &filter) {
+            return Err(missing());
+        }
+        let cv = visible::version(cv, &filter);
+        let mut grant = GrantBuilder::new(filter.clone());
+        if filter.is_all() {
+            grant.version(hash);
+        }
+        for (path, change) in &cv.file_changes {
+            if let FileChange::Set { content, .. } = change {
+                grant.content(content, path);
+            }
+        }
         let signatures = opened.repo.repo.get_signatures(&hash).await?;
         Ok(pb::GetChangeVersionResponse {
             version: Some(pb::ChangeVersion::from(cv)),
             signatures: signatures.into_iter().map(pb::Signature::from).collect(),
+            read_grant: grant.sign(&opened)?,
         })
     }
 
@@ -46,13 +59,13 @@ impl RepoSvc {
     ) -> Result<pb::GetChangeInfoResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        opened
-            .permit()
-            .read(&rill_types::RepoPathBuf::root())
-            .await?;
+        let filter = opened.permit().read_any().await?;
         let hash = hash("hash", &req.hash)?;
+        let info = visible::info_of(&opened.repo, &filter, &hash)
+            .await?
+            .ok_or_else(|| Error::not_found(format!("change version {hash}")))?;
         Ok(pb::GetChangeInfoResponse {
-            info: Some(common::change_info(&opened.repo, &hash).await?),
+            info: Some(pb::ChangeInfo::from(info)),
         })
     }
 
@@ -62,14 +75,13 @@ impl RepoSvc {
     ) -> Result<pb::GetChangeVersionsResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        opened
-            .permit()
-            .read(&rill_types::RepoPathBuf::root())
-            .await?;
+        let filter = opened.permit().read_any().await?;
         let change_id: ChangeId = id_from_proto("change_id", &req.change_id)?;
         let mut versions = Vec::new();
         for hash in opened.repo.repo.change_versions(&change_id).await? {
-            versions.push(common::change_info(&opened.repo, &hash).await?);
+            if let Some(info) = visible::info_of(&opened.repo, &filter, &hash).await? {
+                versions.push(pb::ChangeInfo::from(info));
+            }
         }
         Ok(pb::GetChangeVersionsResponse { versions })
     }
@@ -80,10 +92,7 @@ impl RepoSvc {
     ) -> Result<pb::LogResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        opened
-            .permit()
-            .read(&rill_types::RepoPathBuf::root())
-            .await?;
+        let filter = opened.permit().read_any().await?;
         let ctx = &opened.repo;
         let limit = limit(req.limit, DEFAULT_LOG_LIMIT, MAX_LOG_LIMIT);
         let Some(start) = resolve_version(ctx, req.start.as_ref()).await? else {
@@ -133,14 +142,19 @@ impl RepoSvc {
         } else {
             None
         };
+        let filter = &filter;
         let entries =
             futures::future::try_join_all(walked.into_iter().map(|(hash, info)| async move {
                 match info {
-                    Some(info) => Ok(pb::ChangeInfo::from(info)),
-                    None => common::change_info(ctx, &hash).await,
+                    Some(info) => visible::info(ctx, filter, info).await,
+                    None => visible::info_of(ctx, filter, &hash).await,
                 }
             }))
-            .await?;
+            .await?
+            .into_iter()
+            .flatten()
+            .map(pb::ChangeInfo::from)
+            .collect();
         Ok(pb::LogResponse {
             entries,
             next_start,

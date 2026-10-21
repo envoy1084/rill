@@ -27,7 +27,11 @@ interceptor adds `authorization: Bearer <token>` when a token is set, and
 (`Client::relations_seen`, shared by clones). `AccessClient::grant` and
 `revoke` record the version they produce, so every server honours a change
 on the client's next request
-([permissions](../05-policy/permissions.md#consistency-across-servers)). `Client::repo(name_or_id)` returns a `RepoClient`, which
+([permissions](../05-policy/permissions.md#consistency-across-servers)).
+Listings, path resolution, diffs and version reads return read grants; the
+client keeps them by object hash (`Client::read_grants`, nine minutes) and
+`get_blob` and `tree` send the one naming the object they fetch
+([read grants](../05-policy/permissions.md#read-grants)). `Client::repo(name_or_id)` returns a `RepoClient`, which
 puts the repository on every request and hands out the per-service clients.
 Inputs and outputs are `rill-types` values where one exists. Otherwise they
 are small structs in `types/`.

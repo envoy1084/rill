@@ -42,6 +42,11 @@ impl Opened {
     pub fn principal(&self) -> &Principal {
         &self.ctx.principal
     }
+
+    /// Whether the server runs without access control.
+    pub fn dev_mode(&self) -> bool {
+        self.dev_mode
+    }
 }
 
 /// Resolve the caller and the repository named by `repo`.

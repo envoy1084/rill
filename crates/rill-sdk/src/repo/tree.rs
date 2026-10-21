@@ -7,6 +7,7 @@ use rill_types::{EntryKind, RepoPath, Tree, TreeEntry, TreeHash};
 
 use super::RepoClient;
 use crate::error::{Error, Result};
+use crate::grants::entry_hash;
 use crate::types::Root;
 
 /// A directory listing with the hash of the listed tree.
@@ -21,17 +22,24 @@ pub struct DirListing {
 impl RepoClient {
     /// A tree object by hash.
     pub async fn tree(&self, hash: TreeHash) -> Result<Tree> {
+        let grant = self.grants().for_hash(&hash);
         let resp = crate::client::retry_idempotent(|| {
             let mut svc = self.svc();
             let request = pb::GetTreeRequest {
                 repo: self.repo.clone(),
                 hash: hash_to_proto(&hash),
+                grant: grant.clone(),
             };
             async move { svc.get_tree(request).await }
         })
         .await?
         .into_inner();
-        Ok(required("get_tree.tree", resp.tree)?.try_into()?)
+        let tree: Tree = required("get_tree.tree", resp.tree)?.try_into()?;
+        self.grants().record(
+            &resp.read_grant,
+            tree.entries.values().filter_map(|e| entry_hash(&e.kind)),
+        );
+        Ok(tree)
     }
 
     /// Entries of the directory at `path` under `root`, sorted by name.
@@ -59,11 +67,16 @@ impl RepoClient {
                 let entry: TreeEntry = required("list_dir.entry", e.entry)?.try_into()?;
                 Ok((e.name, entry.kind))
             })
-            .collect::<Result<_>>()?;
-        Ok(DirListing {
-            tree_hash: hash_from_proto("list_dir.tree_hash", &resp.tree_hash)?,
-            entries,
-        })
+            .collect::<Result<Vec<(String, EntryKind)>>>()?;
+        let tree_hash = hash_from_proto("list_dir.tree_hash", &resp.tree_hash)?;
+        self.grants().record(
+            &resp.read_grant,
+            entries
+                .iter()
+                .filter_map(|(_, kind)| entry_hash(kind))
+                .chain([tree_hash]),
+        );
+        Ok(DirListing { tree_hash, entries })
     }
 
     /// The entry at `path` under `root`, or `None` if it does not exist.
@@ -81,7 +94,11 @@ impl RepoClient {
         .into_inner();
         match resp.entry {
             None => Ok(None),
-            Some(e) => Ok(Some(TreeEntry::try_from(e)?.kind)),
+            Some(e) => {
+                let kind = TreeEntry::try_from(e)?.kind;
+                self.grants().record(&resp.read_grant, entry_hash(&kind));
+                Ok(Some(kind))
+            }
         }
     }
 

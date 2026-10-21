@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rill_events::{EventFilter, Start};
 use rill_proto::convert::{hash_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
-use rill_types::{EventKind, RefName, RepoPathBuf, TrunkSeq};
+use rill_types::{EventKind, RefName, TrunkSeq};
 
 use super::{forward, EventStream};
 use crate::error::Result;
@@ -19,7 +19,7 @@ impl RepoSvc {
         request: tonic::Request<pb::WatchRefsRequest>,
     ) -> Result<EventStream<pb::RefEvent>> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         let prefix = request.get_ref().prefix.clone().unwrap_or_default();
         let trunk = RefName::trunk().to_string();
         let filter = EventFilter::kinds(["ref_moved", "landed"]);

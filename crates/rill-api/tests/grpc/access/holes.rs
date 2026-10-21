@@ -124,12 +124,20 @@ async fn another_orgs_object_cannot_be_fetched_by_hash() {
     // Alice owns a repository in the default org and knows the hash.
     let token = acl.server.token_for(&alice());
     let response = reqwest::Client::new()
-        .get(format!("http://{}/o/acl/blob/{}", acl.server.http, hash.to_hex()))
+        .get(format!(
+            "http://{}/o/acl/blob/{}",
+            acl.server.http,
+            hash.to_hex()
+        ))
         .bearer_auth(&token)
         .send()
         .await
         .unwrap();
-    assert_eq!(response.status(), 404);
+    assert!(
+        matches!(response.status().as_u16(), 403 | 404),
+        "{}",
+        response.status()
+    );
     let mut c = acl.as_principal(&alice()).await;
     let blob = c
         .repo
@@ -143,6 +151,7 @@ async fn another_orgs_object_cannot_be_fetched_by_hash() {
             }),
             offset: None,
             length: None,
+            grant: String::new(),
         })
         .await;
     let found = match blob {

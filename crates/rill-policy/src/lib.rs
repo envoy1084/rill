@@ -11,6 +11,7 @@
 //! relationship tuples from a [`rill_store::RepoStore`].
 
 pub mod error;
+pub mod grants;
 pub mod identity;
 pub mod rebac;
 pub mod risk;

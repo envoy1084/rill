@@ -8,6 +8,16 @@ use super::super::*;
 /// A string that only exists under `secret/`.
 pub const CANARY: &str = "canary-7f3a9c";
 
+/// The content of `pub/a.txt`: past the inline threshold, so a blob.
+pub fn public_bytes() -> Vec<u8> {
+    "public\n".repeat(64).into_bytes()
+}
+
+/// The content of `secret/s.txt`, a blob holding the canary.
+pub fn secret_bytes() -> Vec<u8> {
+    format!("{CANARY}\n").repeat(32).into_bytes()
+}
+
 pub struct Acl {
     pub server: TestServer,
     pub repo_id: rill_types::RepoId,
@@ -56,6 +66,33 @@ pub async fn add_user(
     user.principal
 }
 
+/// An edit setting `path` to `bytes` stored as a blob, not inline.
+pub async fn blob_edit(server: &TestServer, path: &str, bytes: Vec<u8>) -> pb::Edit {
+    let kind = rill_types::ObjectKind::Blob;
+    let hash = rill_types::ObjectHash::digest(kind, &bytes);
+    let size = bytes.len() as u64;
+    server
+        .state
+        .stores
+        .objects
+        .put(kind, &hash, Bytes::from(bytes))
+        .await
+        .unwrap();
+    pb::Edit {
+        path: path.into(),
+        op: Some(pb::edit::Op::SetContent(pb::SetContent {
+            content: Some(pb::ContentRef {
+                r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
+                    hash: Bytes::copy_from_slice(hash.as_bytes()),
+                    size,
+                })),
+            }),
+            kind: pb::FileKind::Regular as i32,
+            copy_from: None,
+        })),
+    }
+}
+
 impl Acl {
     pub async fn start() -> Self {
         let server = TestServer::start(ServerConfig::default()).await;
@@ -77,8 +114,8 @@ impl Acl {
                 repo: "acl".into(),
                 base: None,
                 edits: vec![
-                    set_edit("pub/a.txt", b"public\n"),
-                    set_edit("secret/s.txt", format!("{CANARY}\n").as_bytes()),
+                    blob_edit(&server, "pub/a.txt", public_bytes()).await,
+                    blob_edit(&server, "secret/s.txt", secret_bytes()).await,
                 ],
                 message: "seed".into(),
                 intent: None,

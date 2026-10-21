@@ -19,6 +19,7 @@
 pub mod auth;
 pub mod config;
 pub mod error;
+pub mod grants;
 pub mod identity;
 pub mod objects;
 pub mod scim;

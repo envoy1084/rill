@@ -23,6 +23,9 @@ pub struct TokenKeyRecord {
     pub id: u32,
     /// Compressed SEC1 public key.
     pub public_key: Vec<u8>,
+    /// The public half of the read-grant key derived from this key's
+    /// secret; grants carry this record's id.
+    pub grant_public_key: Vec<u8>,
     pub secret: WrappedSecret,
     pub created_at: Timestamp,
     /// Servers sign with the newest active key; verifiers learn a key

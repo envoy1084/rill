@@ -13,6 +13,7 @@ use tonic::{Status, Streaming};
 
 use super::RepoSvc;
 use crate::error::{Error, Result};
+use crate::grants::{self, GrantBuilder};
 use crate::services::common::{hash, open, path, resolve_root};
 use crate::services::diff::{file_diffs, DiffOptions};
 
@@ -30,13 +31,21 @@ impl RepoSvc {
     ) -> Result<pb::GetTreeResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        // Trees are addressed by hash, not path, so they need repo-wide
-        // read: a path-scoped reader cannot be kept out of a subtree hash.
-        opened.permit().read(&RepoPathBuf::root()).await?;
         let hash = hash("hash", &req.hash)?;
+        // A tree is granted only to callers who may read all of it, so
+        // its entries need no filtering; they are granted in turn.
+        let at = grants::require(&opened, Some(&req.grant), ObjectKind::Tree, &hash)?
+            .unwrap_or_else(RepoPathBuf::root);
         let tree = opened.repo.trees.get_tree(&hash).await?;
+        let mut grant = GrantBuilder::new(opened.permit().read_any().await?);
+        for (name, entry) in &tree.entries {
+            if let Ok(child) = at.join(name) {
+                grant_entry(&mut grant, &entry.kind, &child);
+            }
+        }
         Ok(pb::GetTreeResponse {
             tree: Some(pb::Tree::from(&*tree)),
+            read_grant: grant.sign(&opened)?,
         })
     }
 
@@ -47,8 +56,10 @@ impl RepoSvc {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
         let path = path("path", &req.path)?;
-        opened.permit().read(&path).await?;
-        let filter = opened.permit().read_filter().await?;
+        let filter = opened.permit().read_any().await?;
+        if !filter.sees_into(&path) {
+            opened.permit().read(&path).await?;
+        }
         let ctx = &opened.repo;
         let resolved = resolve_root(ctx, req.root.as_ref()).await?;
         let dir = ctx
@@ -56,20 +67,41 @@ impl RepoSvc {
             .dir_hash(resolved.root, &path)
             .await?
             .ok_or_else(|| Error::not_found(format!("directory {path:?}")))?;
-        let entries = ctx
-            .trees
-            .list_dir(resolved.root, &path)
-            .await?
-            .into_iter()
-            .filter(|(name, _)| path.join(name).map(|p| filter.allows(&p)).unwrap_or(false))
-            .map(|(name, kind)| pb::NamedTreeEntry {
+        let mut grant = GrantBuilder::new(filter.clone());
+        grant.tree(dir, &path);
+        let mut entries = Vec::new();
+        for (name, kind) in ctx.trees.list_dir(resolved.root, &path).await? {
+            let Ok(child) = path.join(&name) else {
+                continue;
+            };
+            let kind = match kind {
+                rill_types::EntryKind::Dir { hash, .. } if filter.allows(&child) => {
+                    grant.tree(hash, &child);
+                    kind
+                }
+                // On the way to something readable: named, but its
+                // summary would count what the caller cannot see.
+                rill_types::EntryKind::Dir { hash, .. } if filter.sees_into(&child) => {
+                    rill_types::EntryKind::Dir {
+                        hash,
+                        summary: Default::default(),
+                    }
+                }
+                rill_types::EntryKind::File { ref content, .. } if filter.allows(&child) => {
+                    grant.content(content, &child);
+                    kind
+                }
+                _ => continue,
+            };
+            entries.push(pb::NamedTreeEntry {
                 name,
                 entry: Some(pb::TreeEntry::from(rill_types::TreeEntry { kind })),
-            })
-            .collect();
+            });
+        }
         Ok(pb::ListDirResponse {
             tree_hash: hash_to_proto(&dir),
             entries,
+            read_grant: grant.sign(&opened)?,
         })
     }
 
@@ -83,8 +115,13 @@ impl RepoSvc {
         opened.permit().read(&path).await?;
         let resolved = resolve_root(&opened.repo, req.root.as_ref()).await?;
         let entry = opened.repo.trees.lookup(resolved.root, &path).await?;
+        let mut grant = GrantBuilder::new(opened.permit().read_filter().await?);
+        if let Some(kind) = &entry {
+            grant_entry(&mut grant, kind, &path);
+        }
         Ok(pb::ResolvePathResponse {
             entry: entry.map(|kind| pb::TreeEntry::from(rill_types::TreeEntry { kind })),
+            read_grant: grant.sign(&opened)?,
         })
     }
 
@@ -94,14 +131,20 @@ impl RepoSvc {
     ) -> Result<BlobStream> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        // Blobs are content-addressed and not tied to a path, so reading
-        // one needs repo-wide read (see `GetTree`).
-        opened.permit().read(&RepoPathBuf::root()).await?;
         let content = ContentRef::try_from(
             req.content
                 .clone()
                 .ok_or_else(|| Error::invalid("content is required"))?,
         )?;
+        match &content {
+            ContentRef::Inline { .. } => {}
+            ContentRef::Blob { hash, .. } => {
+                grants::require(&opened, Some(&req.grant), ObjectKind::Blob, hash)?;
+            }
+            ContentRef::Chunked { hash, .. } => {
+                grants::require(&opened, Some(&req.grant), ObjectKind::BlobManifest, hash)?;
+            }
+        }
         let objects = opened.repo.repo.objects().clone();
         let offset = req.offset.unwrap_or(0);
         let length = req.length.unwrap_or(u64::MAX);
@@ -194,7 +237,8 @@ impl RepoSvc {
     ) -> Result<pb::HasObjectsResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        // Existence answers only to someone about to upload.
+        opened.permit().write_any().await?;
         let mut items = Vec::with_capacity(req.objects.len());
         for o in &req.objects {
             let kind = pb::ObjectKind::try_from(o.kind)
@@ -213,8 +257,7 @@ impl RepoSvc {
     ) -> Result<pb::DiffResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
-        let filter = opened.permit().read_filter().await?;
+        let filter = opened.permit().read_any().await?;
         let ctx = &opened.repo;
         let base = resolve_root(ctx, req.base.as_ref()).await?;
         let target = resolve_root(ctx, req.target.as_ref()).await?;
@@ -222,8 +265,13 @@ impl RepoSvc {
             Some(v) => Some(ctx.derive.change(&v).await?),
             None => None,
         };
-        let options =
-            DiffOptions::new(&req.paths, req.format, req.context_lines, req.limit, filter)?;
+        let options = DiffOptions::new(
+            &req.paths,
+            req.format,
+            req.context_lines,
+            req.limit,
+            filter.clone(),
+        )?;
         let (files, truncated) = file_diffs(
             ctx,
             Some(base.root),
@@ -232,7 +280,13 @@ impl RepoSvc {
             &options,
         )
         .await?;
-        Ok(pb::DiffResponse { files, truncated })
+        let mut grant = GrantBuilder::new(filter);
+        grant_diffs(&mut grant, &files);
+        Ok(pb::DiffResponse {
+            files,
+            truncated,
+            read_grant: grant.sign(&opened)?,
+        })
     }
 
     pub(super) async fn merge_base_impl(
@@ -241,7 +295,7 @@ impl RepoSvc {
     ) -> Result<pb::MergeBaseResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         let a = hash("a", &req.a)?;
         let b = hash("b", &req.b)?;
         let base = opened.repo.graph.merge_base(&a, &b).await?;
@@ -256,7 +310,7 @@ impl RepoSvc {
     ) -> Result<pb::IsAncestorResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         let ancestor = hash("ancestor", &req.ancestor)?;
         let descendant = hash("descendant", &req.descendant)?;
         Ok(pb::IsAncestorResponse {
@@ -295,4 +349,34 @@ pub const MAX_INLINE: usize = 1024 * 1024;
 /// Bytes of a content ref, for patching.
 pub async fn content_bytes(objects: &dyn ObjectStore, content: &ContentRef) -> Result<Bytes> {
     Ok(read_content(objects, content).await?)
+}
+
+/// Grant what a tree entry at `path` names.
+fn grant_entry(
+    grant: &mut GrantBuilder,
+    kind: &rill_types::EntryKind,
+    path: &rill_types::RepoPath,
+) {
+    match kind {
+        rill_types::EntryKind::File { content, .. } => grant.content(content, path),
+        rill_types::EntryKind::Dir { hash, .. } => grant.tree(*hash, path),
+    }
+}
+
+/// Grant the content on both sides of each file diff.
+pub(crate) fn grant_diffs(grant: &mut GrantBuilder, files: &[pb::FileDiff]) {
+    for file in files {
+        let Ok(path) = RepoPathBuf::new(file.path.as_str()) else {
+            continue;
+        };
+        for state in [&file.before, &file.after].into_iter().flatten() {
+            if let Some(content) = state
+                .content
+                .clone()
+                .and_then(|c| ContentRef::try_from(c).ok())
+            {
+                grant.content(&content, &path);
+            }
+        }
+    }
 }

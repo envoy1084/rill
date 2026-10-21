@@ -48,12 +48,21 @@ impl RepoClient {
         })
         .await?
         .into_inner();
+        let files: Vec<FileDiff> = resp
+            .files
+            .into_iter()
+            .map(FileDiff::try_from)
+            .collect::<Result<_>>()?;
+        self.grants().record(
+            &resp.read_grant,
+            files
+                .iter()
+                .flat_map(|f| [&f.before, &f.after])
+                .flatten()
+                .filter_map(|(content, _)| crate::grants::content_hash(content)),
+        );
         Ok(DiffResult {
-            files: resp
-                .files
-                .into_iter()
-                .map(FileDiff::try_from)
-                .collect::<Result<_>>()?,
+            files,
             truncated: resp.truncated,
         })
     }

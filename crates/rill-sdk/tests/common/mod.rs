@@ -276,6 +276,7 @@ impl RepoService for MockRepo {
                     entry: Some(entry),
                 })
                 .collect(),
+            read_grant: String::new(),
         }))
     }
 
@@ -287,6 +288,7 @@ impl RepoService for MockRepo {
         let tree = self.tree(req.root.as_ref())?;
         Ok(Response::new(pb::ResolvePathResponse {
             entry: tree.get(&req.path).map(|f| self.entry(f)),
+            read_grant: String::new(),
         }))
     }
 

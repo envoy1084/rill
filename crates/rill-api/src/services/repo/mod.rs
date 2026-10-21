@@ -8,6 +8,7 @@ mod history;
 mod refs;
 mod stamp;
 mod trees;
+pub(crate) mod visible;
 mod watch;
 mod write;
 

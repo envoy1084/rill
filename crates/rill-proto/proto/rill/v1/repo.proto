@@ -100,8 +100,11 @@ message GetChangeVersionRequest {
   bytes hash = 2;
 }
 message GetChangeVersionResponse {
+  // Only the changes under paths the caller may read.
   ChangeVersion version = 1;
   repeated Signature signatures = 2;
+  // A read grant for the content the version names (see GetBlob).
+  string read_grant = 3;
 }
 
 message GetChangeInfoRequest {
@@ -201,9 +204,13 @@ message BlameLine {
 message GetTreeRequest {
   string repo = 1;
   bytes hash = 2;
+  // A read grant naming the tree, from the listing that revealed it.
+  string grant = 3;
 }
 message GetTreeResponse {
   Tree tree = 1;
+  // A read grant for every entry of the tree.
+  string read_grant = 2;
 }
 
 message ListDirRequest {
@@ -213,7 +220,11 @@ message ListDirRequest {
 }
 message ListDirResponse {
   bytes tree_hash = 1;
+  // Entries the caller may read, and directories on the way to them.
   repeated NamedTreeEntry entries = 2;
+  // A read grant for the readable entries, and for the listed tree when
+  // the caller may read all of it.
+  string read_grant = 3;
 }
 
 message ResolvePathRequest {
@@ -224,6 +235,8 @@ message ResolvePathRequest {
 message ResolvePathResponse {
   // Absent if the path does not exist.
   optional TreeEntry entry = 1;
+  // A read grant for the entry's object.
+  string read_grant = 2;
 }
 
 message GetBlobRequest {
@@ -232,6 +245,10 @@ message GetBlobRequest {
   // Byte range; defaults to the whole blob.
   optional uint64 offset = 3;
   optional uint64 length = 4;
+  // A read grant naming the content, from the response that revealed its
+  // hash (a listing, path resolution, diff or version). Outside dev mode
+  // content is never served by hash alone.
+  string grant = 5;
 }
 message BlobChunk {
   bytes data = 1;
@@ -283,6 +300,8 @@ message DiffRequest {
 message DiffResponse {
   repeated FileDiff files = 1;
   bool truncated = 2;
+  // A read grant for the content on both sides.
+  string read_grant = 3;
 }
 
 message MergeBaseRequest {

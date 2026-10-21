@@ -132,6 +132,48 @@ impl<'a> Permit<'a> {
         )))
     }
 
+    /// Read access to something in the repository: the filter of what.
+    /// Listings, history and searches answer through it.
+    pub async fn read_any(&self) -> Result<PathFilter> {
+        let filter = self.read_filter().await?;
+        if filter.is_empty() {
+            return Err(Error::denied(format!(
+                "{} may read nothing in repository {}",
+                self.ctx.principal, self.repo.config.name
+            )));
+        }
+        Ok(filter)
+    }
+
+    /// Write access to some path, for uploads that precede a commit
+    /// naming the paths (which are checked then).
+    pub async fn write_any(&self) -> Result<()> {
+        let cap_ok = self.ctx.capability.as_ref().is_none_or(|c| {
+            c.repo == self.repo.id() && c.allows(Verb::Write) && !c.paths.is_empty()
+        });
+        let config = &self.repo.config;
+        let scope_ok = self
+            .ctx
+            .scope
+            .as_ref()
+            .is_none_or(|s| s.covers_repo(&config.org, &config.name));
+        let relations_ok = self.dev_mode
+            || !self
+                .snapshot()
+                .await?
+                .granted_dirs(&self.ctx.principal, &self.ctx.teams, Relation::Writer)
+                .is_empty()
+            || self.org_admin().await?;
+        if cap_ok && scope_ok && relations_ok {
+            Ok(())
+        } else {
+            Err(Error::denied(format!(
+                "{} may write nothing in repository {}",
+                self.ctx.principal, config.name
+            )))
+        }
+    }
+
     /// A filter over paths the caller may read, for listings and diffs
     /// that must not leak names of directories the caller cannot see.
     pub async fn read_filter(&self) -> Result<PathFilter> {
@@ -151,7 +193,7 @@ impl<'a> Permit<'a> {
                 if cap.repo != self.repo.id() || !cap.allows(Verb::Read) {
                     return Ok(PathFilter::deny_all());
                 }
-                relations.and(PathFilter::new(move |p| cap.covers_path(p)))
+                relations.and(PathFilter::under(cap.paths.clone()))
             }
         };
         Ok(match self.ctx.scope.clone() {
@@ -161,7 +203,11 @@ impl<'a> Permit<'a> {
                 if !scope.covers_repo(&config.org, &config.name) {
                     return Ok(PathFilter::deny_all());
                 }
-                relations.and(PathFilter::new(move |p| scope.covers_path(p)))
+                if scope.paths.is_empty() {
+                    relations
+                } else {
+                    relations.and(PathFilter::under(scope.paths.clone()))
+                }
             }
         })
     }

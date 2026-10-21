@@ -31,6 +31,13 @@ impl RepoClient {
         .into_inner();
         let version: ChangeVersion =
             required("get_change_version.version", resp.version)?.try_into()?;
+        self.grants().record(
+            &resp.read_grant,
+            version.file_changes.values().filter_map(|c| match c {
+                rill_types::FileChange::Set { content, .. } => crate::grants::content_hash(content),
+                _ => None,
+            }),
+        );
         let signatures = resp
             .signatures
             .into_iter()

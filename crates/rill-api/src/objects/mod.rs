@@ -15,6 +15,7 @@
 //! * `POST /o/{repo}/batch`: many objects, length-prefixed (see [`batch`]);
 //! * `GET /healthz`, `GET /readyz`: liveness and readiness, no auth.
 
+pub mod authorize;
 pub mod batch;
 pub mod handlers;
 
@@ -103,7 +104,8 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
     let health = Router::new()
         .route("/livez", get(livez))
         .route("/readyz", get(readyz))
-        .route("/metrics", get(metrics));
+        .route("/metrics", get(metrics))
+        .route("/grant-keys", get(grant_keys));
     let router = if serve_objects {
         health
             .merge(objects)
@@ -117,6 +119,25 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
 
 /// Largest object accepted by `PUT`.
 pub const MAX_PUT_BYTES: usize = 256 * 1024 * 1024;
+
+/// The public keys read grants verify with, for cache tiers. Retired keys
+/// are listed with the time they stopped verifying.
+async fn grant_keys(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
+    let keys: Vec<_> = state
+        .identity
+        .grant_keys()
+        .public_keys()
+        .into_iter()
+        .map(|(id, key, not_after)| {
+            serde_json::json!({
+                "id": id,
+                "public_key": hex::encode(key),
+                "not_after": not_after.map(|t| t.millis()),
+            })
+        })
+        .collect();
+    axum::Json(serde_json::json!({ "keys": keys })).into_response()
+}
 
 /// The process is up and serving HTTP.
 async fn livez() -> &'static str {

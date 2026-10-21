@@ -90,16 +90,76 @@ version the store has not reached is refused with `INVALID_ARGUMENT`.
 
 ## Read filtering
 
-[`PathFilter`](../../crates/rill-policy/src/rebac/path_filter.rs) is a cheap
-predicate built once per request. `under(roots)` allows paths at or below any
-root. A root entry means allow all; an empty list means deny all.
-`Permit::read_filter()` returns `allow_all` in dev mode or for an org
-administrator, and otherwise the caller's `Reader` directories, narrowed by the token's paths
-(a token for another repository, or without `read`, denies all) and the
-agent's registered scope. Listings and searches use it so
-that names of unreadable directories do not leak: `ListDir` and `Diff`
-(`services/repo/trees.rs`), `WorkspaceDiff`, and `Grep`. Point reads such as
-file content, history and blame call `permit().read(path)` instead.
+[`PathFilter`](../../crates/rill-policy/src/rebac/path_filter.rs) is a set of
+path prefixes, built once per request. Relations, token paths and agent
+scopes are all prefix sets, so `and` intersects them exactly.
+
+* `allows(path)` covers a path and its subtree.
+* `sees_into(dir)` also covers the directories on the way to an allowed
+  one.
+
+`Permit::read_filter()` is `allow_all` in dev mode or for an org
+administrator. Otherwise it is the caller's `Reader` directories, narrowed by
+the token's paths (a token for another repository, or without `read`, denies
+all) and the agent's registered scope. `Permit::read_any()` is the same
+filter, refused when it is empty.
+
+A reader of one directory therefore sees a repository as just that
+directory:
+
+| Surface | Behaviour for a path-limited reader |
+| --- | --- |
+| `ListDir` | Lists any directory it `sees_into`. Entries are readable ones, plus directories on the way to them (with a blank summary, so hidden files are not counted). |
+| `ResolvePath`, `PathHistory`, `Blame` | `read(path)` |
+| `Diff`, `Grep` | Only readable paths. |
+| `GetChangeVersion`, `GetChangeInfo`, `GetChangeVersions`, `Log`, `WatchLog` | A version that changes nothing readable is not found or skipped: its message and author would describe hidden work. Others show only readable changes, with `files_changed` counting those. |
+| `GetRepo`, `ListRepos`, refs, `TrunkHead`, `TrunkRange`, `WatchTrunk`, `WatchRefs`, `MergeBase`, `IsAncestor` | `read_any`: hashes and names only |
+| `GetTree`, `GetBlob`, object `GET`/`HEAD`/batch | A read grant (below) |
+| `HasObjects` | Write access somewhere (`write_any`): existence answers only to an uploader |
+| `WatchEvents`, `GetDerived`, `WaitDerived`, reviews, intents, lander status, policies, workspaces | Read on the repository root |
+
+## Read grants
+
+[Grants](../../crates/rill-policy/src/grants/mod.rs) close the gap that
+content addressing opens: an object is named by its hash, and a hash says
+nothing about the path it was reached through.
+
+A response that reveals object hashes carries a signed `read_grant` for the
+objects under paths the caller may read:
+
+* `ListDir` grants file content and directories;
+* `ResolvePath` grants the entry;
+* `GetTree` grants every entry of the granted tree;
+* `Diff` grants both sides of each file;
+* `GetChangeVersion` grants the content of readable changes.
+
+A grant (`ReadGrant`) lists `(kind, hash, path)` entries for one principal
+and repository, and expires within ten minutes (sooner if the token does).
+[`GrantBuilder`](../../crates/rill-api/src/grants/issue.rs) adds a
+directory's tree only when the caller may read the whole directory, because
+a tree object names every child. A version object is added only for readers
+of the whole repository.
+
+Every fetch by hash requires a grant naming the object, for the caller and
+repository ([`grants::require`](../../crates/rill-api/src/grants/require.rs)):
+
+* `GetBlob` and `GetTree` take it as `grant`;
+* the object protocol takes `x-rill-grant` or `?grant=`;
+* a chunk is fetched through a granted manifest that lists it (`?via=`).
+
+Dev mode skips the check. `GetTree` continues the walk from the path in the
+grant entry. The SDK records each response's grant for the hashes in it and
+sends it when fetching them (`Client::read_grants`).
+
+Grants are signed with ECDSA P-256 by a key derived from the active token
+key (`GrantSigner::derive`), so grant keys are wrapped by the same key
+service and rotate and retire with token keys. `TokenKeyRecord` stores the
+grant public key. `GET /grant-keys` publishes the public keys so a cache tier
+can verify grants without the metadata store.
+
+Content identical in a readable and a hidden path is readable through the
+readable path; content is content. Across organizations, objects are never
+shared ([ADR 014](../10-decisions/014-objects-per-organization.md)).
 
 ## Enforcement
 
@@ -153,6 +213,11 @@ The CLI is `rill access grant/revoke/list/check/who/where`
 * A snapshot reload reads every tuple of the repository. Changes are rare
   next to checks, but a repository with very many tuples pays for each
   reload.
+* Grants list hashes exactly. A listing of a very large directory carries
+  a large grant; compact grants for whole subtrees come with the VFS.
+* Event streams, derived values, reviews, intents, lander status and
+  workspaces need read on the whole repository rather than filtering for
+  path-limited readers.
 
 ## Code
 

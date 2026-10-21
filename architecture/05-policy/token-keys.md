@@ -16,6 +16,7 @@ key, in the instance-wide `idk` table:
 | --- | --- |
 | `id` | The root key id tokens carry. Ids only grow. |
 | `public_key` | Compressed P-256 point, in clear. |
+| `grant_public_key` | The public half of the [read-grant](permissions.md#read-grants) key derived from the secret (`GrantSigner::derive`); grants carry this record's `id`. |
 | `secret` | `WrappedSecret { backend, key_ref, ciphertext }`. |
 | `created_at` | When it was stored. |
 | `active_from` | Servers sign with the newest active key. |

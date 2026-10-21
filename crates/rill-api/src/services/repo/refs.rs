@@ -20,7 +20,7 @@ impl RepoSvc {
         request: tonic::Request<pb::GetRepoRequest>,
     ) -> Result<pb::GetRepoResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         Ok(pb::GetRepoResponse {
             repo: Some(common::repo_proto(&opened.repo).await?),
         })
@@ -36,7 +36,7 @@ impl RepoSvc {
         for config in self.state.repos.list().await? {
             let repo = self.state.repos.get(config.id).await?;
             let opened = common::opened(&self.state, ctx.clone(), repo);
-            if opened.permit().read(&RepoPathBuf::root()).await.is_ok() {
+            if opened.permit().read_any().await.is_ok() {
                 repos.push(common::repo_proto(&opened.repo).await?);
             }
             if repos.len() >= limit {
@@ -92,7 +92,7 @@ impl RepoSvc {
         request: tonic::Request<pb::ResolveRefRequest>,
     ) -> Result<pb::ResolveRefResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         let name = ref_name_from_proto("name", &request.get_ref().name)?;
         let hash = opened
             .repo
@@ -121,7 +121,7 @@ impl RepoSvc {
         request: tonic::Request<pb::ListRefsRequest>,
     ) -> Result<pb::ListRefsResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         let prefix = request.get_ref().prefix.clone().unwrap_or_default();
         let mut refs = Vec::new();
         for (name, target) in opened.repo.repo.list_refs().await? {
@@ -204,7 +204,7 @@ impl RepoSvc {
         request: tonic::Request<pb::TrunkHeadRequest>,
     ) -> Result<pb::TrunkHeadResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         let head = opened
             .repo
             .repo
@@ -222,7 +222,7 @@ impl RepoSvc {
         request: tonic::Request<pb::TrunkRangeRequest>,
     ) -> Result<pb::TrunkRangeResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         let req = request.get_ref();
         if req.to < req.from {
             return Err(Error::invalid("to must not be less than from"));

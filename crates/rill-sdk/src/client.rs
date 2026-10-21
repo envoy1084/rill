@@ -151,6 +151,7 @@ pub struct Client {
     config: ClientConfig,
     channel: Channel,
     auth: AuthInterceptor,
+    grants: crate::grants::ReadGrants,
 }
 
 impl std::fmt::Debug for Client {
@@ -179,6 +180,7 @@ impl Client {
                         source: Some(source),
                         seen: RelationsSeen::default(),
                     },
+                    grants: Default::default(),
                 });
             }
         }
@@ -224,6 +226,7 @@ impl Client {
             config,
             channel,
             auth,
+            grants: Default::default(),
         })
     }
 
@@ -269,6 +272,11 @@ impl Client {
     /// Relationship tuples and questions about them.
     pub fn access(&self) -> AccessClient {
         AccessClient::new(self.clone())
+    }
+
+    /// Read grants this client has been given; shared by its clones.
+    pub fn read_grants(&self) -> &crate::grants::ReadGrants {
+        &self.grants
     }
 
     /// Relation versions this client has seen; shared by its clones.

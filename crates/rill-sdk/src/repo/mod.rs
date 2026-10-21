@@ -81,6 +81,10 @@ impl RepoClient {
         self.client.repo_svc()
     }
 
+    pub(crate) fn grants(&self) -> &crate::grants::ReadGrants {
+        self.client.read_grants()
+    }
+
     /// The repository record.
     pub async fn info(&self) -> Result<RepoInfo> {
         let resp = crate::client::retry_idempotent(|| {

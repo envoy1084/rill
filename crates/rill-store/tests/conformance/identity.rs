@@ -11,6 +11,7 @@ fn key(id: u32) -> TokenKeyRecord {
     TokenKeyRecord {
         id,
         public_key: vec![id as u8; 33],
+        grant_public_key: vec![id as u8; 33],
         secret: WrappedSecret {
             backend: "local".into(),
             key_ref: "test".into(),

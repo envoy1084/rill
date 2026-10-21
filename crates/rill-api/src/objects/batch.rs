@@ -1,6 +1,9 @@
 //! `POST /o/{repo}/batch`: many objects in one length-prefixed stream.
 //!
-//! Request: a JSON array of `{"kind": "<kind>", "hash": "<hex>"}`.
+//! Request: a JSON array of `{"kind": "<kind>", "hash": "<hex>"}` (with
+//! `"via": "<manifest hex>"` for a chunk), the read grant naming them in
+//! the `x-rill-grant` header. Objects the grant does not name are reported
+//! missing.
 //! Response body (`application/vnd.rill.objects`): for each requested
 //! object, in request order, one frame of
 //!
@@ -18,13 +21,14 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Extension, Json, Path, State};
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use bytes::{BufMut, Bytes, BytesMut};
 use rill_policy::AuthContext;
-use rill_types::{ObjectHash, ObjectKind, RepoPathBuf};
+use rill_types::{ObjectHash, ObjectKind};
 use serde::Deserialize;
 
+use super::authorize;
 use super::handlers::parse_ref;
 use super::{error_response, ObjectError};
 use crate::services::common::opened;
@@ -46,6 +50,9 @@ pub struct BatchItem {
     pub kind: String,
     /// Hex hash.
     pub hash: String,
+    /// For a chunk, the manifest it is fetched through.
+    #[serde(default)]
+    pub via: Option<String>,
 }
 
 /// Encode one frame.
@@ -68,6 +75,7 @@ pub async fn batch(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<AuthContext>,
     Path(repo): Path<String>,
+    headers: HeaderMap,
     Json(items): Json<Vec<BatchItem>>,
 ) -> Response {
     let prepared: Result<_, ObjectError> = async {
@@ -83,8 +91,18 @@ pub async fn batch(
             .collect::<Result<Vec<_>, _>>()?;
         let repo = state.repos.resolve(&repo).await?;
         let opened = opened(&state, ctx, repo);
-        opened.permit().read(&RepoPathBuf::root()).await?;
-        Ok((opened.repo.clone(), refs))
+        opened.permit().read_any().await?;
+        let grant = headers
+            .get(rill_policy::grants::GRANT_HEADER)
+            .and_then(|v| v.to_str().ok());
+        let mut allowed = Vec::with_capacity(refs.len());
+        for ((kind, hash), item) in refs.into_iter().zip(&items) {
+            let ok = authorize::fetch(&opened, grant, kind, &hash, item.via.as_deref())
+                .await
+                .is_ok();
+            allowed.push((kind, hash, ok));
+        }
+        Ok((opened.repo.clone(), allowed))
     }
     .await;
     let (repo, refs) = match prepared {
@@ -92,13 +110,16 @@ pub async fn batch(
         Err(e) => return error_response(e),
     };
     let stream = futures::stream::unfold((repo, refs.into_iter()), |(repo, mut refs)| async move {
-        let (kind, hash) = refs.next()?;
-        let bytes = match repo.repo.get_bytes(kind, &hash).await {
-            Ok(b) => b,
-            Err(e) => {
-                tracing::warn!(error = %e, %kind, %hash, "batch read failed");
-                None
-            }
+        let (kind, hash, allowed) = refs.next()?;
+        let bytes = match allowed {
+            false => None,
+            true => match repo.repo.get_bytes(kind, &hash).await {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::warn!(error = %e, %kind, %hash, "batch read failed");
+                    None
+                }
+            },
         };
         Some((
             Ok::<Bytes, std::convert::Infallible>(frame(kind, &hash, bytes.as_ref())),

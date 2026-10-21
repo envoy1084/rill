@@ -132,6 +132,20 @@ impl IdentityView {
             .ok_or_else(|| Error::Unavailable("no token signing key is active".into()))
     }
 
+    /// What signs read grants on this server.
+    pub fn grant_signer(&self) -> Result<rill_policy::grants::GrantSigner> {
+        self.set
+            .load()
+            .grant_signer
+            .clone()
+            .ok_or_else(|| Error::Unavailable("no token signing key is active".into()))
+    }
+
+    /// The public keys read grants verify with.
+    pub fn grant_keys(&self) -> rill_policy::grants::GrantKeys {
+        self.set.load().grant_keys.clone()
+    }
+
     /// Whether `principal` administers the instance by configuration.
     pub fn is_configured_admin(&self, principal: &Principal) -> bool {
         self.admins.contains(&principal.name)

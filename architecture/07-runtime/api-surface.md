@@ -140,13 +140,17 @@ listener serves the sign-in routes (`/auth/*`, `/oauth/token`; see
 (`/scim/v2/<org>/…`; see
 [provisioning](../05-policy/identity-and-auth.md#provisioning-scim-20)). An object URL
 names exactly one byte string forever, so responses carry
-`ETag: "<hash>"` and `Cache-Control: public, immutable, max-age=31536000`.
+`ETag: "<hash>"` and `Cache-Control: private, immutable, max-age=31536000`.
+They are `private` because each fetch needs a read grant: a shared cache that
+does not check grants must not serve them. The Rill cache tier checks grants
+itself ([read grants](../05-policy/permissions.md#read-grants)).
 
 | Route | Permission | Behaviour |
 | --- | --- | --- |
-| `GET`/`HEAD /o/{repo}/{kind}/{hash}` | read on root | raw bytes as `application/octet-stream`; 404 when absent |
+| `GET`/`HEAD /o/{repo}/{kind}/{hash}` | a read grant naming the object (`x-rill-grant` header or `?grant=`); a chunk is fetched with `?via=<manifest>` and a grant naming the manifest; `derived` needs read on root | raw bytes as `application/octet-stream`; 403 without a covering grant, 404 when absent |
 | `PUT /o/{repo}/{kind}/{hash}` | write on root | `rill_store::object::verify` checks the body hashes to `{hash}` (400 otherwise); 201 when new, 200 when it existed; body limit `MAX_PUT_BYTES` (256 MiB) |
-| `POST /o/{repo}/batch` | read on root | JSON `[{"kind","hash"}]`, at most `MAX_BATCH` (10 000), streamed back as `application/vnd.rill.objects` |
+| `POST /o/{repo}/batch` | read on something, and a grant in `x-rill-grant` | JSON `[{"kind","hash","via"?}]`, at most `MAX_BATCH` (10 000), streamed back as `application/vnd.rill.objects`; objects the grant does not name come back missing |
+| `GET /grant-keys` | none | the public grant keys as JSON `{"keys":[{"id","public_key","not_after"}]}` |
 | `GET /healthz` | none | `ok` |
 | `GET /readyz` | none | 200 when every `health_components` entry is ok, else 503 listing the failures |
 
@@ -174,8 +178,6 @@ precondition), 409 (already exists or aborted), 503, and 500 for the rest.
   base.
 * `rill.v1` is the only version. A missing RPC surfaces as `UNIMPLEMENTED`.
   The only client that handles this is the `Grep` fallback in `rill-mcp`.
-* The object protocol checks read or write permission on the repository
-  root only. Path-scoped relations do not apply to objects.
 * A batch read error is reported as a missing frame, not as an error.
 * `PUT` stores any object kind after hash verification only. It does not run
   the existence checks of `commit_version`.

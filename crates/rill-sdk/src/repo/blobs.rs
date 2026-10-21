@@ -36,6 +36,9 @@ impl RepoClient {
                 .unwrap_or(bytes.len());
             return Ok(bytes.slice(start..end));
         }
+        let grant = crate::grants::content_hash(content)
+            .map(|h| self.grants().for_hash(&h))
+            .unwrap_or_default();
         let mut stream = crate::client::retry_idempotent(|| {
             let mut svc = self.svc();
             let request = pb::GetBlobRequest {
@@ -43,6 +46,7 @@ impl RepoClient {
                 content: Some(pb::ContentRef::from(content)),
                 offset,
                 length,
+                grant: grant.clone(),
             };
             async move { svc.get_blob(request).await }
         })

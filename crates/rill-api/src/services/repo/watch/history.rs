@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use rill_proto::rill::v1 as pb;
-use rill_types::{RepoPathBuf, TrunkSeq, Versionstamp};
+use rill_types::{TrunkSeq, Versionstamp};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
@@ -27,7 +27,7 @@ impl RepoSvc {
         request: tonic::Request<pb::WatchTrunkRequest>,
     ) -> Result<EventStream<pb::LandEvent>> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        opened.permit().read_any().await?;
         let ctx = opened.repo.clone();
         // Without `after_seq` the watch starts at the current head: only
         // new landings are delivered.
@@ -66,7 +66,7 @@ impl RepoSvc {
         request: tonic::Request<pb::WatchLogRequest>,
     ) -> Result<EventStream<pb::LogEntry>> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read(&RepoPathBuf::root()).await?;
+        let filter = opened.permit().read_any().await?;
         let ctx = opened.repo.clone();
         let mut cursor = match start_from(request.get_ref().after.as_ref())? {
             rill_events::Start::Now => ctx.repo.log_head().await?,
@@ -78,7 +78,7 @@ impl RepoSvc {
             let result: Result<()> = async {
                 loop {
                     let seen = ctx.repo.event_count().await?;
-                    if !drain_log(&ctx, &mut cursor, &tx).await? {
+                    if !drain_log(&ctx, &filter, &mut cursor, &tx).await? {
                         return Ok(());
                     }
                     if !wait_for_events(&ctx, seen).await? {
@@ -120,6 +120,7 @@ async fn drain_trunk(
 /// Send the log entries after `cursor`; `false` once the client is gone.
 async fn drain_log(
     ctx: &Arc<RepoContext>,
+    filter: &rill_policy::PathFilter,
     cursor: &mut Option<Versionstamp>,
     tx: &Sender<pb::LogEntry>,
 ) -> Result<bool> {
@@ -129,14 +130,18 @@ async fn drain_log(
             return Ok(true);
         }
         for (stamp, hash) in page {
+            *cursor = Some(stamp);
+            let Some(info) = crate::services::repo::visible::info_of(ctx, filter, &hash).await?
+            else {
+                continue;
+            };
             let entry = pb::LogEntry {
                 cursor: Bytes::copy_from_slice(stamp.as_bytes()),
-                info: Some(common::change_info(ctx, &hash).await?),
+                info: Some(pb::ChangeInfo::from(info)),
             };
             if tx.send(Ok(entry)).await.is_err() {
                 return Ok(false);
             }
-            *cursor = Some(stamp);
         }
     }
 }

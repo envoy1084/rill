@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use rill_policy::grants::{GrantKeys, GrantSigner};
 use rill_policy::{Issuer, KeyRing, SigningKey, TokenLifetimes};
 use rill_store::identity::IdentityStore;
 use rill_types::identity::TokenKeyRecord;
@@ -46,6 +47,10 @@ pub struct KeySet {
     pub ring: KeyRing,
     /// `None` while no key this server can unwrap is active.
     pub issuer: Option<Arc<Issuer>>,
+    /// Public grant keys of every stored key.
+    pub grant_keys: GrantKeys,
+    /// Signs grants with the key derived from the issuer's.
+    pub grant_signer: Option<GrantSigner>,
     /// When a stored key next becomes active; reload then.
     pub next_activation: Option<Timestamp>,
 }
@@ -128,6 +133,7 @@ impl KeyManager {
         let record = TokenKeyRecord {
             id,
             public_key: key.public_key_bytes(),
+            grant_public_key: GrantSigner::derive(id, &key.secret_bytes())?.public_key(),
             secret,
             created_at: now,
             active_from,
@@ -178,27 +184,35 @@ impl KeyManager {
     pub async fn load(&self, now: Timestamp) -> Result<KeySet> {
         let keys = self.identity.token_keys().await?;
         let mut ring = KeyRing::new();
+        let mut grant_keys = GrantKeys::new();
         for key in &keys {
             ring.insert_bytes(key.id, &key.public_key, key.not_after)?;
+            grant_keys.insert(key.id, &key.grant_public_key, key.not_after)?;
         }
         let signer = keys
             .iter()
             .filter(|k| k.active_from <= now && k.not_after.is_none_or(|t| now < t))
             .filter(|k| self.wrapper.can_unwrap(&k.secret))
             .max_by_key(|k| (k.active_from, k.id));
-        let issuer = match signer {
+        let (issuer, grant_signer) = match signer {
             Some(key) => {
                 let secret = self.secret(key).await?;
                 let signing = SigningKey::from_secret_bytes(key.id, &secret)?;
-                if signing.public_key_bytes() != key.public_key {
+                let grants = GrantSigner::derive(key.id, &secret)?;
+                if signing.public_key_bytes() != key.public_key
+                    || grants.public_key() != key.grant_public_key
+                {
                     return Err(Error::Config(format!(
-                        "token key {} does not match its public key",
+                        "token key {} does not match its public keys",
                         key.id
                     )));
                 }
-                Some(Arc::new(Issuer::new(signing, self.lifetimes)))
+                (
+                    Some(Arc::new(Issuer::new(signing, self.lifetimes))),
+                    Some(grants),
+                )
             }
-            None => None,
+            None => (None, None),
         };
         let next_activation = keys
             .iter()
@@ -208,6 +222,8 @@ impl KeyManager {
         Ok(KeySet {
             ring,
             issuer,
+            grant_keys,
+            grant_signer,
             next_activation,
         })
     }
