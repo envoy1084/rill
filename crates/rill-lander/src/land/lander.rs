@@ -68,6 +68,11 @@ impl Lander {
         Ok(self.lease.current().await?)
     }
 
+    /// The lease this lander believes it has, without renewing it.
+    pub async fn held_lease(&self) -> Option<Lease> {
+        self.lease.held().await
+    }
+
     /// Drop the lease after it was found lost.
     pub(super) async fn lost_lease(&self) {
         self.lease.lost().await;

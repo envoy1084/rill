@@ -23,6 +23,9 @@ pub struct World {
     pub review: Arc<ArcSwap<ReviewService>>,
     pub lander: Arc<Lander>,
     pub plan: Arc<FaultPlan>,
+    /// The lease a lander held when its process was restarted: what a
+    /// paused process that wakes up after being replaced still has.
+    pub zombie: Option<rill_store::repo::Lease>,
 }
 
 impl World {
@@ -45,12 +48,16 @@ impl World {
             review,
             lander,
             plan,
+            zombie: None,
         }
     }
 
     /// Simulate a process restart: every in-memory structure (caches, the
     /// land queue, tickets) is rebuilt; only the stores survive.
-    pub fn restart(&mut self) {
+    pub async fn restart(&mut self) {
+        if let Some(lease) = self.lander.held_lease().await {
+            self.zombie = Some(lease);
+        }
         let (derive, review, lander) = services(&self.repo);
         self.derive = derive;
         self.review = review;

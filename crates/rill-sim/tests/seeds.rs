@@ -47,10 +47,12 @@ fn contended_runs_keep_every_invariant() {
 #[test]
 fn faulty_runs_break_only_known_invariants() {
     let scenario = Scenario::faulty();
-    let mut faults = 0;
+    let (mut faults, mut killed, mut fenced) = (0, 0, 0);
     for seed in seeds(1000) {
         let report = run(seed, &scenario);
         faults += report.faults_injected;
+        killed += report.killed_jobs;
+        fenced += report.fenced_attempts;
         for v in &report.violations {
             assert!(
                 known(v.invariant).is_some(),
@@ -59,6 +61,8 @@ fn faulty_runs_break_only_known_invariants() {
         }
     }
     assert!(faults > 0, "the faulty scenario injected no faults");
+    assert!(killed > 0, "no worker died holding a job");
+    assert!(fenced > 0, "no replaced lander tried to land");
 }
 
 #[test]

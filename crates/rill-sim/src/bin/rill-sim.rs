@@ -46,9 +46,11 @@ fn main() -> ExitCode {
         };
     }
     let mut counts: BTreeMap<String, (usize, u64)> = BTreeMap::new();
-    let mut unknown = 0;
+    let (mut unknown, mut killed, mut fenced) = (0, 0, 0);
     for seed in args.from..args.from + args.seeds {
         let report = run(seed, &scenario);
+        killed += report.killed_jobs;
+        fenced += report.fenced_attempts;
         for v in report.violations {
             if known(v.invariant).is_none() {
                 unknown += 1;
@@ -59,7 +61,10 @@ fn main() -> ExitCode {
                 .0 += 1;
         }
     }
-    println!("{} seeds of {}", args.seeds, scenario.name);
+    println!(
+        "{} seeds of {}: {killed} jobs rerun after their worker died, {fenced} landings by replaced landers refused",
+        args.seeds, scenario.name
+    );
     for (invariant, (count, first_seed)) in &counts {
         println!("  {invariant}: {count} (first at seed {first_seed})");
     }

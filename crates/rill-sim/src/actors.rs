@@ -27,6 +27,8 @@ pub enum Action {
     Sweep,
     Sync,
     Abandon,
+    DeriveWork,
+    ZombieLand,
 }
 
 impl Action {
@@ -39,6 +41,8 @@ impl Action {
         (Action::Sweep, 12),
         (Action::Sync, 6),
         (Action::Abandon, 3),
+        (Action::DeriveWork, 8),
+        (Action::ZombieLand, 3),
     ];
 
     /// Draw an action by weight.
@@ -104,6 +108,8 @@ impl Ctx<'_> {
             Action::Sweep => self.sweep().await,
             Action::Sync => self.sync(agent).await,
             Action::Abandon => self.abandon(agent).await,
+            Action::DeriveWork => self.derive_work().await,
+            Action::ZombieLand => self.zombie_land().await,
         }
     }
 

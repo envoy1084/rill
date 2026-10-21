@@ -27,6 +27,14 @@ pub enum Invariant {
     LandRequestsResolve,
     /// A landed change's review record says so.
     ReviewMatchesTrunk,
+    /// The event log holds exactly one event per stored version and per
+    /// trunk position.
+    EventsMatchState,
+    /// Every job finishes once faults stop, including those whose worker
+    /// died holding them.
+    JobsFinish,
+    /// A lease holder that was replaced cannot land.
+    DeposedHolderFenced,
 }
 
 /// One broken invariant with context.
@@ -49,6 +57,10 @@ pub struct Oracle {
     acknowledged: Vec<ChangeVersionHash>,
     requested: BTreeMap<ChangeId, LandTicket>,
     abandoned: BTreeSet<ChangeId>,
+    /// Jobs whose worker died holding them.
+    pub killed_jobs: BTreeSet<rill_types::JobId>,
+    /// Writes a deposed lease holder tried, all of which must fail.
+    pub fenced_attempts: usize,
     pub violations: Vec<Violation>,
 }
 
@@ -63,6 +75,16 @@ impl Oracle {
 
     pub fn abandoned(&mut self, change: ChangeId) {
         self.abandoned.insert(change);
+    }
+
+    /// A version some write acknowledged, picked by `roll`.
+    pub fn acknowledged_at(&self, roll: usize) -> Option<ChangeVersionHash> {
+        (!self.acknowledged.is_empty()).then(|| self.acknowledged[roll % self.acknowledged.len()])
+    }
+
+    /// The trunk observed last.
+    pub fn trunk(&self) -> &[ChangeVersionHash] {
+        &self.trunk
     }
 
     pub fn ticket(&self, change: &ChangeId) -> Option<LandTicket> {

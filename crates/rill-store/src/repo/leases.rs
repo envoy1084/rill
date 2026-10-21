@@ -208,6 +208,11 @@ impl LeaseHolder {
         Ok(held.clone())
     }
 
+    /// The lease this holder believes it has, without renewing it.
+    pub async fn held(&self) -> Option<Lease> {
+        self.held.lock().await.clone()
+    }
+
     /// Forget the lease after a fenced write found it lost.
     pub async fn lost(&self) {
         *self.held.lock().await = None;

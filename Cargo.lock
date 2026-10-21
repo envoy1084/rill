@@ -4609,6 +4609,7 @@ dependencies = [
  "clap",
  "parking_lot",
  "rill-core",
+ "rill-jobs",
  "rill-lander",
  "rill-policy",
  "rill-review",

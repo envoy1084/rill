@@ -7,13 +7,16 @@
 //! reproducible bug report.
 
 pub mod actors;
+pub mod event_log;
 pub mod faults;
+pub mod jobs;
 pub mod known;
 pub mod oracle;
 pub mod rng;
 pub mod run;
 pub mod scenario;
 pub mod world;
+pub mod zombie;
 
 pub use known::{known, KnownIssue, KNOWN_ISSUES};
 pub use oracle::{Invariant, Violation};

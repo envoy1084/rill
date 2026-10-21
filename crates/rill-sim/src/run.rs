@@ -19,6 +19,10 @@ use crate::world::World;
 /// Simulated wall-clock time at the start of every run.
 pub const START_MILLIS: i64 = 1_700_000_000_000;
 
+/// How far past the last step the clock jumps to settle jobs: beyond
+/// every lease and backoff.
+const SETTLE_MILLIS: i64 = 3_600_000;
+
 /// Sweeps allowed for the queue to drain once faults stop.
 const SETTLE_SWEEPS: usize = 20;
 
@@ -31,6 +35,10 @@ pub struct Report {
     pub faults_injected: u64,
     pub restarts: usize,
     pub trunk_length: usize,
+    /// Derive jobs whose worker died holding them.
+    pub killed_jobs: usize,
+    /// Landings a replaced lander tried with its stale lease.
+    pub fenced_attempts: usize,
     pub violations: Vec<Violation>,
     /// Hash of every action and outcome; equal seeds give equal digests.
     pub digest: u64,
@@ -73,7 +81,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
     plan.set_enabled(true);
     for step in 0..scenario.steps {
         if rng.chance(scenario.restart_rate) {
-            world.restart();
+            world.restart().await;
             restarts += 1;
             ("restart", step).hash(&mut trace);
             continue;
@@ -108,6 +116,11 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
     oracle
         .check_settled(&world.repo, |ticket| queue.status(ticket))
         .await;
+    oracle.check_event_log(&world.repo).await;
+    let settle_at = START_MILLIS + scenario.steps as i64 * 1_000 + SETTLE_MILLIS;
+    oracle
+        .check_jobs(&world, settle_at, settle_at + SETTLE_MILLIS)
+        .await;
     oracle.trunk_len().hash(&mut trace);
 
     set_clock(None);
@@ -119,6 +132,8 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
         faults_injected: plan.injected(),
         restarts,
         trunk_length: oracle.trunk_len(),
+        killed_jobs: oracle.killed_jobs.len(),
+        fenced_attempts: oracle.fenced_attempts,
         violations: oracle.violations,
         digest: trace.finish(),
     }
