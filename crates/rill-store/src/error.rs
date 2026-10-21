@@ -27,6 +27,10 @@ pub enum Error {
         hash: rill_types::ObjectHash,
     },
 
+    /// A sealed object could not be sealed or opened.
+    #[error("encryption: {0}")]
+    Sealed(String),
+
     #[error("key not found: {0}")]
     KeyNotFound(String),
 

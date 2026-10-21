@@ -55,5 +55,7 @@ pub use object::{ObjectStore, ObjectStoreExt, StoredObject};
 pub use repo::{OrgConfig, RepoSettings, RepoStore, Stores, DEFAULT_ORG, STORE_FORMAT};
 #[cfg(feature = "s3")]
 pub use s3::ObjectStoreBackend;
-pub use seal::{Plaintext, Sealer, DEFAULT_NAMESPACE};
+pub use seal::{
+    DataKey, DataKeySource, ObjectAt, OrgSealer, Plaintext, Sealer, DEFAULT_NAMESPACE, KEY_REFRESH,
+};
 pub use verified::VerifiedObjectStore;

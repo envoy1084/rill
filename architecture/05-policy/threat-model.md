@@ -58,12 +58,13 @@ flowchart LR
 | T10 | Leaked token stays valid | Fixed: tokens and sessions are revoked through the identity log and refused by every server within seconds; lifetimes are capped per principal kind (1 h human, 15 min agent, 12 h service); signing keys are wrapped by a key service and rotate | — | 10 (done) |
 | T11 | Agent approves its own swarm's work | Votes from any agent count toward agent quorums | Independence rules (session, sponsor, model) in policy facts | 23 |
 | T12 | Compromised model or session lands bad code at scale | Partly fixed: the kill switch stops an agent, session, sponsor or model at once and the lander ejects its queued work; provenance (session, sponsor, model) is stamped from the token. No blast-radius revert yet | Blast-radius revert by provenance | 10 (done), 18 |
-| T13 | Memory exhaustion by one request | Partly fixed: `PutBlob` streams in bounded memory with a 5 GiB cap, chunked reads check manifest sizes, change versions are capped at 8 MiB and 100k paths. Other RPCs have no message-size limits | Input limits on every RPC | 12 |
+| T13 | Memory exhaustion by one request | Fixed: every gRPC message is capped (16 MiB in, 64 MiB out, 1024 streams per connection), inline content, messages and edit counts are bounded, `PutBlob` streams in bounded memory with a 5 GiB cap, change versions are capped at 8 MiB and 100k paths ([input limits](../07-runtime/api-surface.md#input-limits)) | — | 12 (done) |
 | T14 | Repository open to everyone | Fixed: a repository with no relation tuples is closed to all but org administrators, who can recover one whose last owner left | — | 11 (done) |
 | T15 | Secret committed to history | Fixed: every stored version is scanned (block by default, warn or quarantine per repository), and redaction approved by two administrators stops every tier serving an object ([data protection](data-protection.md)) | — | 12 (done) |
 | T16 | Silent tampering by an admin | Fixed: a hash-chained audit log per org built from the logs every change writes, sealed with signed roots and verifiable offline (`rill admin audit verify`); anchoring outside Rill is the operator's (S3 object lock) | — | 12 (done) |
 | T17 | Backdoored release | No release pipeline | Reproducible builds, SBOM, signed releases | 30 |
 | T18 | Stale snapshot overwrites concurrent landings | Fixed: checkouts snapshot against the pinned `base_version` | Workspace-authoritative clients | — |
+| T19 | Stolen disk, bucket or backup | Fixed for objects: sealed with AES-256-GCM under per-org data keys wrapped by the key service, bound to their org and hash ([data protection](data-protection.md#encryption-at-rest)). Metadata other than secrets relies on disk encryption | Re-encryption under rotated keys | 12 (done), 28 |
 
 ## Assumptions
 

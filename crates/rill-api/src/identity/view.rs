@@ -253,7 +253,8 @@ impl IdentityView {
             | IdentityChange::OrgCreated { .. }
             | IdentityChange::ScimCredentialChanged { .. }
             | IdentityChange::RedactionRequested { .. }
-            | IdentityChange::QuarantineCleared { .. } => false,
+            | IdentityChange::QuarantineCleared { .. }
+            | IdentityChange::DataKeysChanged { .. } => false,
             IdentityChange::RedactionApplied { org, hash, .. } => {
                 self.redacted.insert((org.clone(), *hash));
                 false

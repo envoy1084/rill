@@ -14,4 +14,4 @@ pub use follower::follow;
 pub use maintenance::maintain_forever;
 pub use mint::mint_token;
 pub use standing::AuthorStanding;
-pub use view::IdentityView;
+pub use view::{system_actor, IdentityView};

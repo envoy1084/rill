@@ -112,6 +112,9 @@ pub fn identity(event: &IdentityEvent) -> AuditRecord {
             format!("object:{hash}"),
             &[("redaction", id.clone())],
         ),
+        IdentityChange::DataKeysChanged { org } => {
+            mine(org, "datakey.change", format!("org:{org}"), &[])
+        }
         IdentityChange::QuarantineCleared { org, repo, version } => mine(
             org,
             "quarantine.clear",

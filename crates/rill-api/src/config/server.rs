@@ -43,6 +43,8 @@ pub struct ServerConfig {
     pub identity: IdentityConfig,
     /// The audit log.
     pub audit: super::AuditConfig,
+    /// Encryption of stored objects.
+    pub encryption: super::EncryptionConfig,
     /// Landing pipeline policy (verification modes, retries, auto-revert).
     pub lander: LandPolicy,
     /// Risk classification rules applied to every change under review.
@@ -81,6 +83,7 @@ impl Default for ServerConfig {
             auth: AuthConfig::default(),
             identity: IdentityConfig::default(),
             audit: super::AuditConfig::default(),
+            encryption: super::EncryptionConfig::default(),
             lander: LandPolicy::default(),
             risk: RiskConfig::default(),
             labels: LabelSet::default(),

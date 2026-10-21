@@ -4,6 +4,7 @@
 
 mod agents;
 mod budgets;
+mod data_keys;
 mod log;
 mod logins;
 mod providers;

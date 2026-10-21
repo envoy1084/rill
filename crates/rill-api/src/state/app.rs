@@ -30,6 +30,8 @@ pub struct AppState {
     pub shutdown: CancellationToken,
     /// Draining, stopping and aborting.
     pub lifecycle: Arc<super::Lifecycle>,
+    /// Each org's data keys, when objects are sealed at rest.
+    pub data_keys: Option<Arc<rill_identity::keys::DataKeyManager>>,
     /// Every metric the server keeps.
     pub metrics: Arc<crate::telemetry::Metrics>,
     /// Process start time, for health reporting.
@@ -40,14 +42,31 @@ impl AppState {
     /// Open the configured storage and build the state. Workers are
     /// spawned lazily per repository (or eagerly via [`RepoRegistry::warm`]).
     pub async fn new(config: ServerConfig, shutdown: CancellationToken) -> Result<Arc<Self>> {
-        let stores = open_stores(&config.storage, &config.metadata).await?;
-        Self::with_stores(config, stores, shutdown).await
+        let sealer = (config.encryption.enabled(config.dev_mode)
+            && !matches!(config.storage, crate::config::StorageConfig::Memory))
+        .then(|| Arc::new(rill_store::OrgSealer::new()));
+        let stores = open_stores(
+            &config.storage,
+            &config.metadata,
+            sealer.clone().map(|s| s as Arc<dyn rill_store::Sealer>),
+        )
+        .await?;
+        Self::build(config, stores, sealer, shutdown).await
     }
 
     /// Build the state over already-open stores.
     pub async fn with_stores(
         config: ServerConfig,
         stores: Stores,
+        shutdown: CancellationToken,
+    ) -> Result<Arc<Self>> {
+        Self::build(config, stores, None, shutdown).await
+    }
+
+    async fn build(
+        config: ServerConfig,
+        stores: Stores,
+        sealer: Option<Arc<rill_store::OrgSealer>>,
         shutdown: CancellationToken,
     ) -> Result<Arc<Self>> {
         let config = Arc::new(config);
@@ -58,6 +77,16 @@ impl AppState {
         )));
         let static_tokens = auth::static_tokens(&config)?;
         let identity = crate::identity::IdentityView::open(&stores, &config.identity).await?;
+        let data_keys = sealer.map(|sealer| {
+            let keys = Arc::new(rill_identity::keys::DataKeyManager::new(
+                stores.identity(),
+                identity.keys().key_service().clone(),
+                crate::identity::system_actor(),
+            ));
+            sealer.set_source(keys.clone());
+            tracing::info!("objects are encrypted at rest under per-org data keys");
+            keys
+        });
         let attestor = Arc::new(load_attestor(&config)?);
         let lifecycle = Arc::new(super::Lifecycle::new(shutdown.clone()));
         let repos = RepoRegistry::new(
@@ -76,6 +105,7 @@ impl AppState {
             attestor,
             shutdown,
             lifecycle,
+            data_keys,
             metrics,
             started_at: std::time::Instant::now(),
         }))

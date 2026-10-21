@@ -20,7 +20,7 @@ use rill_types::{ObjectHash, ObjectKind};
 use crate::codec;
 use crate::error::{Error, Result};
 use crate::object::{verify, ObjectStore};
-use crate::seal::{Plaintext, Sealer, DEFAULT_NAMESPACE};
+use crate::seal::{ObjectAt, Plaintext, Sealer, DEFAULT_NAMESPACE};
 
 /// Filesystem-backed [`ObjectStore`].
 #[derive(Debug, Clone)]
@@ -51,6 +51,7 @@ impl Default for LocalOptions {
 struct Inner {
     /// The directory holding every namespace.
     base: PathBuf,
+    namespace: String,
     root: PathBuf,
     level: i32,
     sealer: Arc<dyn Sealer>,
@@ -87,6 +88,7 @@ impl LocalObjectStore {
         Ok(LocalObjectStore {
             inner: Arc::new(Inner {
                 base,
+                namespace: options.namespace,
                 root,
                 level: options.level,
                 sealer: options.sealer,
@@ -113,6 +115,14 @@ impl LocalObjectStore {
 }
 
 impl Inner {
+    fn at<'a>(&'a self, kind: ObjectKind, hash: &'a ObjectHash) -> ObjectAt<'a> {
+        ObjectAt {
+            namespace: &self.namespace,
+            kind,
+            hash,
+        }
+    }
+
     fn path_for(&self, kind: ObjectKind, hash: &ObjectHash) -> PathBuf {
         let hex = hash.to_hex();
         self.root.join(kind.as_str()).join(&hex[..2]).join(hex)
@@ -121,7 +131,7 @@ impl Inner {
     fn read(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<Option<Bytes>> {
         match fs::read(self.path_for(kind, hash)) {
             Ok(stored) => {
-                let frame = self.sealer.open(stored)?;
+                let frame = self.sealer.open(self.at(kind, hash), stored)?;
                 Ok(Some(Bytes::from(codec::decompress(&frame)?)))
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -145,9 +155,10 @@ impl Inner {
         })?;
         fs::create_dir_all(dir)?;
 
-        let frame = self
-            .sealer
-            .seal(codec::compress_with_level(bytes, self.level))?;
+        let frame = self.sealer.seal(
+            self.at(kind, hash),
+            codec::compress_with_level(bytes, self.level),
+        )?;
         let tmp = dir.join(format!(
             ".tmp-{}-{}-{}",
             std::process::id(),
@@ -187,6 +198,7 @@ fn write_temp(tmp: &Path, frame: &[u8]) -> Result<()> {
 impl ObjectStore for LocalObjectStore {
     async fn get(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<Option<Bytes>> {
         let hash = *hash;
+        self.inner.sealer.ready(&self.inner.namespace).await?;
         self.blocking(move |inner| inner.read(kind, &hash)).await
     }
 
@@ -197,6 +209,7 @@ impl ObjectStore for LocalObjectStore {
 
     async fn put(&self, kind: ObjectKind, hash: &ObjectHash, bytes: Bytes) -> Result<()> {
         let hash = *hash;
+        self.inner.sealer.ready(&self.inner.namespace).await?;
         self.blocking(move |inner| {
             verify(kind, &hash, &bytes)?;
             inner.write(kind, &hash, &bytes)
@@ -208,6 +221,7 @@ impl ObjectStore for LocalObjectStore {
         Arc::new(LocalObjectStore {
             inner: Arc::new(Inner {
                 base: self.inner.base.clone(),
+                namespace: namespace.to_string(),
                 root: self.inner.base.join(namespace),
                 level: self.inner.level,
                 sealer: self.inner.sealer.clone(),

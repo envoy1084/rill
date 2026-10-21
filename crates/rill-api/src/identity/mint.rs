@@ -18,7 +18,7 @@ pub async fn mint_token(
     org: &str,
     ttl_secs: Option<u64>,
 ) -> Result<String> {
-    let stores = open_stores(&config.storage, &config.metadata).await?;
+    let stores = open_stores(&config.storage, &config.metadata, None).await?;
     let view = IdentityView::open(&stores, &config.identity).await?;
     let issuer = view.issuer()?;
     let longest = issuer.lifetimes().max_for(principal.kind);

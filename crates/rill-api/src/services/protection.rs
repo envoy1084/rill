@@ -12,7 +12,7 @@ use tonic::{Request, Response, Status};
 
 use super::common::{hash, open};
 use super::idem;
-use crate::auth::{caller, require_org_admin};
+use crate::auth::{caller, require_instance_admin, require_org_admin};
 use crate::error::{Error, Result};
 use crate::state::AppState;
 
@@ -53,6 +53,38 @@ fn redaction_proto(r: &Redaction) -> pb::RedactionRecord {
 }
 
 impl ProtectionSvc {
+    async fn rotate(
+        &self,
+        request: Request<pb::RotateDataKeysRequest>,
+    ) -> Result<pb::RotateDataKeysResponse> {
+        let ctx = caller(&request)?;
+        require_instance_admin(&self.state, &ctx)?;
+        let keys = self.state.data_keys.as_ref().ok_or_else(|| {
+            Error::FailedPrecondition("objects are not encrypted at rest on this server".into())
+        })?;
+        let r = request.into_inner();
+        if r.rewrap {
+            let rewrapped = keys.rewrap().await?;
+            tracing::info!(by = %ctx.principal, rewrapped, "data keys rewrapped");
+            return Ok(pb::RotateDataKeysResponse {
+                key_id: None,
+                active_from: 0,
+                rewrapped: rewrapped as u32,
+            });
+        }
+        let org = org_of(&r.org);
+        let now = Timestamp::now();
+        let key_id = keys.rotate(&org).await?;
+        tracing::info!(by = %ctx.principal, org, key = ?key_id, "data key rotated");
+        Ok(pb::RotateDataKeysResponse {
+            key_id,
+            active_from: timestamp_to_proto(Timestamp::from_millis(
+                now.millis() + rill_identity::keys::DATA_KEY_ACTIVATION_MS,
+            )),
+            rewrapped: 0,
+        })
+    }
+
     async fn request(
         &self,
         request: Request<pb::RequestRedactionRequest>,
@@ -199,6 +231,17 @@ impl ProtectionService for ProtectionSvc {
     ) -> GrpcResult<pb::ClearQuarantineResponse> {
         idem::once(&self.state, request, |r| async move {
             self.clear(r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn rotate_data_keys(
+        &self,
+        request: Request<pb::RotateDataKeysRequest>,
+    ) -> GrpcResult<pb::RotateDataKeysResponse> {
+        idem::once(&self.state, request, |r| async move {
+            self.rotate(r).await.map(Response::new)
         })
         .await
         .map_err(Status::from)

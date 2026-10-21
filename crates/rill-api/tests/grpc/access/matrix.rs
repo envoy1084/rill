@@ -56,6 +56,7 @@ const MATRIX: &[(&str, Class)] = &[
     ("ProtectionService/ApproveRedaction", Admin),
     ("ProtectionService/ListRedactions", Admin),
     ("ProtectionService/ClearQuarantine", Owner),
+    ("ProtectionService/RotateDataKeys", Admin),
     ("AccessService/AddRelation", Owner),
     ("AccessService/RemoveRelation", Owner),
     ("AccessService/ListRelations", Owner),

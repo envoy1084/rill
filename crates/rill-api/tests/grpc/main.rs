@@ -7,6 +7,7 @@ mod audit;
 mod auth;
 mod cluster;
 mod commits;
+mod encryption;
 mod end_to_end;
 mod events;
 mod history;

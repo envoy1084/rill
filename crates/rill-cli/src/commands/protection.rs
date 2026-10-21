@@ -1,5 +1,5 @@
-//! `rill admin protect`: redacting objects and releasing versions secret
-//! scanning quarantined.
+//! `rill admin protect`: redacting objects, releasing versions secret
+//! scanning quarantined, and rotating data keys.
 
 use clap::{Args, Subcommand};
 use rill_proto::rill::v1 as pb;
@@ -23,6 +23,20 @@ pub enum ProtectCmd {
     Redactions(OrgArg),
     /// Release a quarantined version so it may land.
     Release(ReleaseArgs),
+    /// Add a data key to an org, or wrap every data key again.
+    RotateKey(RotateKeyArgs),
+}
+
+/// `rill admin protect rotate-key`.
+#[derive(Args, Debug)]
+pub struct RotateKeyArgs {
+    /// The org.
+    #[command(flatten)]
+    pub org: OrgArg,
+    /// Wrap every org's data keys again under the key service's current
+    /// key, instead of adding a key.
+    #[arg(long)]
+    pub rewrap: bool,
 }
 
 /// `rill admin protect redact`.
@@ -58,7 +72,8 @@ pub struct ReleaseArgs {
     #[arg(long)]
     pub repo: String,
     /// The quarantined version, hex.
-    pub version: String,
+    #[arg(value_name = "VERSION")]
+    pub held: String,
 }
 
 fn hash(text: &str) -> Result<ObjectHash> {
@@ -155,7 +170,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
             )
         }
         ProtectCmd::Release(a) => {
-            let version = hash(&a.version)?;
+            let version = hash(&a.held)?;
             svc.clear_quarantine(pb::ClearQuarantineRequest {
                 operation_id: Default::default(),
                 repo: a.repo,
@@ -165,6 +180,27 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
             ctx.emit(j!({ "released": version.to_hex() }), |out| {
                 out.line(format!("released {version}"))
             })
+        }
+        ProtectCmd::RotateKey(a) => {
+            let response = svc
+                .rotate_data_keys(pb::RotateDataKeysRequest {
+                    operation_id: Default::default(),
+                    org: a.org.org,
+                    rewrap: a.rewrap,
+                })
+                .await?
+                .into_inner();
+            ctx.emit(
+                j!({ "key_id": response.key_id, "active_from": response.active_from, "rewrapped": response.rewrapped }),
+                |out| match (a.rewrap, response.key_id) {
+                    (true, _) => out.line(format!("rewrapped {} data keys", response.rewrapped)),
+                    (false, Some(id)) => out.line(format!(
+                        "data key {id} added; it seals from {}",
+                        when(&Timestamp::from_millis(response.active_from))
+                    )),
+                    (false, None) => out.line(out.dim("another server added a key at the same moment")),
+                },
+            )
         }
     }
 }

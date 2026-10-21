@@ -24,7 +24,7 @@ use url::Url;
 use crate::codec;
 use crate::error::{Error, Result};
 use crate::object::{verify, ObjectStore};
-use crate::seal::{Plaintext, Sealer, DEFAULT_NAMESPACE};
+use crate::seal::{ObjectAt, Plaintext, Sealer, DEFAULT_NAMESPACE};
 
 /// How many `has`/`get` requests a batch call keeps in flight.
 const BATCH_CONCURRENCY: usize = 16;
@@ -45,6 +45,7 @@ pub struct ObjectStoreBackend {
     store: Arc<dyn object_store::ObjectStore>,
     /// The prefix holding every namespace.
     base: Path,
+    namespace: Arc<str>,
     prefix: Path,
     sealer: Arc<dyn Sealer>,
     strategy: PutStrategy,
@@ -58,6 +59,7 @@ impl ObjectStoreBackend {
         ObjectStoreBackend {
             store,
             prefix: base.clone().join(DEFAULT_NAMESPACE),
+            namespace: Arc::from(DEFAULT_NAMESPACE),
             base,
             sealer: Arc::new(Plaintext),
             strategy: PutStrategy::Conditional,
@@ -142,6 +144,7 @@ impl ObjectStoreBackend {
         Ok(ObjectStoreBackend {
             store: Arc::from(store),
             prefix: full.clone().join(DEFAULT_NAMESPACE),
+            namespace: Arc::from(DEFAULT_NAMESPACE),
             base: full,
             sealer: Arc::new(Plaintext),
             strategy: PutStrategy::Conditional,
@@ -164,18 +167,30 @@ impl ObjectStoreBackend {
 
     async fn fetch(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<Option<Bytes>> {
         let path = self.path_for(kind, hash);
+        self.sealer.ready(&self.namespace).await?;
         match self.store.get(&path).await {
             Ok(result) => {
                 let stored = result.bytes().await.map_err(Error::backend)?;
-                let frame = Bytes::from(self.sealer.open(stored.to_vec())?);
-                // Decompression is CPU work proportional to the object; keep
-                // it off the reactor for anything larger than a tree node.
-                let decoded = if frame.len() > 64 * 1024 {
-                    tokio::task::spawn_blocking(move || codec::decompress(&frame))
+                let large = stored.len() > 64 * 1024;
+                let (sealer, namespace, hash) =
+                    (self.sealer.clone(), self.namespace.clone(), *hash);
+                let decode = move || {
+                    let at = ObjectAt {
+                        namespace: &namespace,
+                        kind,
+                        hash: &hash,
+                    };
+                    codec::decompress(&sealer.open(at, stored.to_vec())?)
+                };
+                // Opening and decompressing are CPU work proportional to the
+                // object; keep them off the reactor for anything larger than
+                // a tree node.
+                let decoded = if large {
+                    tokio::task::spawn_blocking(decode)
                         .await
                         .map_err(Error::backend)??
                 } else {
-                    codec::decompress(&frame)?
+                    decode()?
                 };
                 Ok(Some(Bytes::from(decoded)))
             }
@@ -206,10 +221,16 @@ impl ObjectStore for ObjectStoreBackend {
 
     async fn put(&self, kind: ObjectKind, hash: &ObjectHash, bytes: Bytes) -> Result<()> {
         let expected = *hash;
-        let sealer = self.sealer.clone();
+        let (sealer, namespace) = (self.sealer.clone(), self.namespace.clone());
+        sealer.ready(&namespace).await?;
         let frame = tokio::task::spawn_blocking(move || {
             verify(kind, &expected, &bytes)?;
-            Ok::<_, Error>(Bytes::from(sealer.seal(codec::compress(&bytes))?))
+            let at = ObjectAt {
+                namespace: &namespace,
+                kind,
+                hash: &expected,
+            };
+            Ok::<_, Error>(Bytes::from(sealer.seal(at, codec::compress(&bytes))?))
         })
         .await
         .map_err(Error::backend)??;
@@ -239,6 +260,7 @@ impl ObjectStore for ObjectStoreBackend {
     fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
         Arc::new(ObjectStoreBackend {
             prefix: self.base.clone().join(namespace),
+            namespace: Arc::from(namespace),
             ..self.clone()
         })
     }
@@ -509,12 +531,13 @@ mod tests {
     #[derive(Debug)]
     struct Reverse;
 
+    #[async_trait::async_trait]
     impl Sealer for Reverse {
-        fn seal(&self, mut frame: Vec<u8>) -> Result<Vec<u8>> {
+        fn seal(&self, _: ObjectAt<'_>, mut frame: Vec<u8>) -> Result<Vec<u8>> {
             frame.reverse();
             Ok(frame)
         }
-        fn open(&self, mut stored: Vec<u8>) -> Result<Vec<u8>> {
+        fn open(&self, _: ObjectAt<'_>, mut stored: Vec<u8>) -> Result<Vec<u8>> {
             stored.reverse();
             Ok(stored)
         }

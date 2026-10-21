@@ -43,7 +43,7 @@ in, without it. It also registers `tonic-reflection` and
 | `AccessService` | `access.proto` | `services/access/` | `AddRelation`, `RemoveRelation`, `ListRelations`, `Check`, `Expand`, `LookupPaths` ([permissions](../05-policy/permissions.md#accessservice)) |
 | `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser`, agents (`RegisterAgent`, `UpdateAgent`, `ListAgents`), workload issuers (`Put`/`List`/`DeleteWorkloadIssuer`), `KillSwitch`, SCIM credentials ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
 | `AuditService` | `audit.proto` | `services/audit.rs` | `ListAuditEntries`, `ListAuditRoots`, `SealAudit`, `ListAuditKeys`, `WatchAudit` ([audit log](../05-policy/audit.md)) |
-| `ProtectionService` | `protection.proto` | `services/protection.rs` | `RequestRedaction`, `ApproveRedaction`, `ListRedactions`, `ClearQuarantine` ([data protection](../05-policy/data-protection.md)) |
+| `ProtectionService` | `protection.proto` | `services/protection.rs` | `RequestRedaction`, `ApproveRedaction`, `ListRedactions`, `ClearQuarantine`, `RotateDataKeys` ([data protection](../05-policy/data-protection.md)) |
 | `SessionService` | `identity.proto` | `services/session.rs` | `ListSignInProviders`, `ExchangeToken`, `RefreshSession`; no auth layer ([sign-in](../05-policy/identity-and-auth.md#sign-in)) |
 
 `types.proto` holds the shared object model and `events.proto` the event

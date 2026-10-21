@@ -2,6 +2,7 @@
 //! identity providers, and the identity change log every server follows.
 
 mod agent;
+mod data_key;
 mod event;
 mod keys;
 mod login;
@@ -15,6 +16,7 @@ mod user;
 mod workload;
 
 pub use agent::{AgentBudgets, AgentRecord, Sponsor, WorkloadBinding};
+pub use data_key::DataKeyRecord;
 pub use event::{IdentityChange, IdentityEvent};
 pub use keys::{TokenKeyRecord, WrappedSecret};
 pub use login::PendingLogin;

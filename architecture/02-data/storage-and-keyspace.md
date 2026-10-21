@@ -210,9 +210,10 @@ writes its org's objects. Objects are deduplicated within an org, never
 across orgs: a hash learned in one org fetches nothing in another, and
 identical content in two orgs is stored twice
 ([ADR 014](../10-decisions/014-objects-per-organization.md)). Both persistent backends
-pass each frame through a `Sealer` (`seal` on write,
-`open` on read); the default `Plaintext` sealer is the identity, and an
-encrypting sealer can be plugged in without touching the layout.
+pass each frame through a `Sealer` (`ready` before, then `seal` on write
+and `open` on read), which sees the namespace, kind and hash of each
+object. `Plaintext` is the identity; `OrgSealer` encrypts under each org's
+data keys ([data protection](../05-policy/data-protection.md#encryption-at-rest)).
 
 ## Codec
 
@@ -235,7 +236,6 @@ version or method.
   (phase 10).
 * The `object_store` backend is tested only against in-process stores,
   never a real S3 endpoint.
-* No encrypting sealer ships yet.
 
 ## Code
 

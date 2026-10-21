@@ -3,26 +3,43 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use rill_store::{LocalObjectStore, LocalStores, MetaStore, RedbMetaStore, Stores};
+use rill_store::{
+    LocalObjectStore, LocalOptions, LocalStores, MetaStore, Plaintext, RedbMetaStore, Sealer,
+    Stores,
+};
 
 use crate::config::{MetadataConfig, StorageConfig};
 use crate::error::{Error, Result};
 
 /// Open the stores the configuration describes and check their format.
-pub async fn open_stores(storage: &StorageConfig, metadata: &MetadataConfig) -> Result<Stores> {
+/// Persistent objects pass through `sealer` (plaintext when `None`).
+pub async fn open_stores(
+    storage: &StorageConfig,
+    metadata: &MetadataConfig,
+    sealer: Option<Arc<dyn Sealer>>,
+) -> Result<Stores> {
     let meta = open_metadata(metadata)?;
+    let sealer = sealer.unwrap_or_else(|| Arc::new(Plaintext));
     let stores = match storage {
         StorageConfig::Memory => Stores::new(
             Arc::new(rill_store::MemoryObjectStore::new()),
             meta.unwrap_or_else(|| Arc::new(rill_store::MemoryMetaStore::new())),
         ),
-        StorageConfig::Local { dir } => match meta {
-            None => LocalStores::open(dir).await?,
-            Some(meta) => Stores::new(
-                Arc::new(LocalObjectStore::open(dir.join(LocalStores::OBJECTS_DIR)).await?),
-                meta,
-            ),
-        },
+        StorageConfig::Local { dir } => {
+            let objects = LocalObjectStore::open_with(
+                dir.join(LocalStores::OBJECTS_DIR),
+                LocalOptions {
+                    sealer,
+                    ..LocalOptions::default()
+                },
+            )
+            .await?;
+            let meta = match meta {
+                Some(meta) => meta,
+                None => open_redb(dir).await?,
+            };
+            Stores::new(Arc::new(objects), meta)
+        }
         StorageConfig::S3 {
             url,
             prefix,
@@ -31,7 +48,8 @@ pub async fn open_stores(storage: &StorageConfig, metadata: &MetadataConfig) -> 
         } => {
             let objects = rill_store::ObjectStoreBackend::from_url(url, prefix)?
                 .probe(*allow_unconditional_put)
-                .await?;
+                .await?
+                .with_sealer(sealer);
             let meta = match (meta, meta_dir) {
                 (Some(meta), _) => meta,
                 (None, Some(dir)) => open_redb(dir).await?,

@@ -5839,7 +5839,9 @@ dependencies = [
 name = "rill-store"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "async-trait",
+ "blake3",
  "bytes",
  "foundationdb",
  "foundationdb-tuple",
@@ -5848,6 +5850,7 @@ dependencies = [
  "object_store",
  "parking_lot",
  "postcard",
+ "rand 0.10.3",
  "redb",
  "rill-types",
  "serde",

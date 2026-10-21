@@ -105,6 +105,12 @@ instance comes from `rill api mint-token`. See
 | --- | --- | --- |
 | `audit.seal_every_secs` | `86400` | how often each org's [audit chain](../05-policy/audit.md) is sealed, when it grew |
 
+## Encryption
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `encryption.enabled` | on, except in dev mode | seal objects at rest under per-org data keys ([data protection](../05-policy/data-protection.md#encryption-at-rest)); in-memory storage is never sealed |
+
 ## Environment variables
 
 | Variable | Effect |
@@ -112,6 +118,7 @@ instance comes from `rill api mint-token`. See
 | `RILL_CONFIG` | config file path (same as `--config`) |
 | `RILL_LISTEN_GRPC`, `RILL_LISTEN_HTTP` | socket addresses |
 | `RILL_DEV_MODE` | boolean (`1/0`, `true/false`, `yes/no`, `on/off`) |
+| `RILL_ENCRYPTION` | boolean; overrides `encryption.enabled` |
 | `RILL_STORAGE` | `memory`, `local:<dir>` or `s3:<url>` |
 | `RILL_S3_PREFIX`, `RILL_S3_META_DIR` | details for `s3:` |
 | `RILL_S3_ALLOW_UNCONDITIONAL_PUT` | boolean; start even when the service ignores conditional puts (see [storage](../02-data/storage-and-keyspace.md#object-backends)) |

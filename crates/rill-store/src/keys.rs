@@ -125,6 +125,8 @@ pub mod table {
     pub const REDACTION: &str = "red";
     /// `(redh, org, hash)` → id of the applied redaction of an object
     pub const REDACTED: &str = "redh";
+    /// `(dk, org, id)` → DataKeyRecord
+    pub const DATA_KEY: &str = "dk";
     /// `(idl, stamp)` → IdentityEvent
     pub const IDENT_LOG: &str = "idl";
     /// `(idln)` → identity log counter followers wait on

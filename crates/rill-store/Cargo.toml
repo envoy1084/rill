@@ -29,6 +29,9 @@ tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 parking_lot = { workspace = true }
+aes-gcm = { workspace = true }
+blake3 = { workspace = true }
+rand = { workspace = true }
 hex = { workspace = true }
 zstd = { workspace = true }
 redb = { workspace = true, optional = true }

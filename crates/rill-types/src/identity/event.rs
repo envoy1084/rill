@@ -81,6 +81,10 @@ pub enum IdentityChange {
         id: String,
         hash: crate::hash::ObjectHash,
     },
+    /// An org's data keys changed (added or rewrapped).
+    DataKeysChanged {
+        org: String,
+    },
     /// A quarantined version was released by an owner.
     QuarantineCleared {
         org: String,

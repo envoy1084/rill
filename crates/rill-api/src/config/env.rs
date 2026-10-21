@@ -13,6 +13,7 @@ impl ServerConfig {
     ///
     /// * `RILL_LISTEN_GRPC`, `RILL_LISTEN_HTTP`: socket addresses;
     /// * `RILL_DEV_MODE`: `true`/`false`;
+    /// * `RILL_ENCRYPTION`: `true`/`false`, sealing objects at rest;
     /// * `RILL_ROLES`: `api`, `workers` or `api,workers`;
     /// * `RILL_LOG_FORMAT`: `text` or `json`;
     /// * `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`: trace export;
@@ -68,6 +69,9 @@ impl ServerConfig {
         }
         if let Some(v) = lookup("RILL_DEV_MODE") {
             self.dev_mode = parse_bool("RILL_DEV_MODE", &v)?;
+        }
+        if let Some(v) = lookup("RILL_ENCRYPTION") {
+            self.encryption.enabled = Some(parse_bool("RILL_ENCRYPTION", &v)?);
         }
         if let Some(v) = lookup("RILL_STORAGE") {
             self.storage = match v.split_once(':') {

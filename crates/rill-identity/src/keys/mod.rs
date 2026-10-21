@@ -9,6 +9,7 @@
 #[cfg(feature = "aws")]
 mod aws;
 mod config;
+mod data;
 #[cfg(feature = "gcp")]
 mod gcp;
 mod local;
@@ -19,6 +20,7 @@ mod wrapper;
 #[cfg(feature = "aws")]
 pub use aws::AwsKms;
 pub use config::{key_service, KeyServiceConfig};
+pub use data::{DataKeyManager, DATA_KEY_ACTIVATION_MS};
 #[cfg(feature = "gcp")]
 pub use gcp::GcpKms;
 pub use local::LocalKeyService;

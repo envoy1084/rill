@@ -187,6 +187,7 @@ fn store_code(e: &rill_store::Error) -> Code {
         E::Codec(_) | E::Corrupt { .. } => Code::DataLoss,
         E::IncompatibleFormat { .. } | E::Redacted { .. } => Code::FailedPrecondition,
         E::TooLarge(_) => Code::ResourceExhausted,
+        E::Sealed(_) => Code::Internal,
         E::Backend(_) | E::Io(_) | E::Retryable(_) | E::CommitUnknown(_) => Code::Unavailable,
     }
 }

@@ -1,8 +1,9 @@
 # Data protection
 
-What keeps credentials out of history and what removes content that must
-not be served: secret scanning on every write, quarantine, and redaction
-approved by two administrators.
+What keeps credentials out of history, what removes content that must not
+be served, and what keeps stored bytes unreadable without the key service:
+secret scanning on every write, quarantine, redaction approved by two
+administrators, and per-org encryption at rest.
 
 ## Secret scanning
 
@@ -73,6 +74,36 @@ deleting them is the backing store's lifecycle job.
 Requests and approvals are audited as `redaction.request` and
 `redaction.apply`.
 
+## Encryption at rest
+
+Objects on local disk and in S3 are sealed with AES-256-GCM under their
+org's data keys ([`rill-store/src/seal/org.rs`](../../crates/rill-store/src/seal/org.rs)).
+Sealing is on by default outside dev mode (`[encryption] enabled`,
+`RILL_ENCRYPTION`); in-memory storage is never sealed.
+
+* **Data keys.** Each org has its own 32-byte random keys, wrapped by the
+  instance's [key service](token-keys.md#key-services) and stored as
+  `DataKeyRecord`s in identity metadata (`(dk, org, id)`). An org gets its
+  first key, active at once, when its first object is sealed. Servers
+  unwrap each key once and keep it in memory.
+* **Frames.** A sealed object is `RXE1 ‖ key id ‖ nonce ‖ ciphertext ‖ tag`
+  around the compressed frame. Every object is encrypted under its own key,
+  derived (keyed BLAKE3) from the data key, kind and hash, with a random
+  nonce, so no nonce budget applies. The associated data binds the org,
+  kind, hash and key id, so a frame copied to another org or hash fails
+  authentication. Plaintext frames are refused when sealing is on.
+* **Rotation.** `rill admin protect rotate-key --org O` adds a key that
+  seals new objects ten minutes later; servers re-read an org's keys every
+  minute, so all of them hold it first. Old keys stay to open what they
+  sealed. `--rewrap` wraps every data key again under the key service's
+  current key. Re-encrypting old objects under new keys comes later.
+* **Metadata.** Secrets in metadata are wrapped (token keys, data keys,
+  identity provider client secrets), hashed (refresh secrets, SCIM
+  credentials) or single-use and short-lived (sign-in PKCE verifiers, ten
+  minutes). The rest of metadata (names, paths, relations, review state)
+  is not encrypted by Rill; FoundationDB and redb files rely on disk
+  encryption.
+
 ## Limitations
 
 * Scanning sees only content that reaches the server. A secret in an
@@ -81,6 +112,10 @@ Requests and approvals are audited as `redaction.request` and
   under. Changing them takes an owner-approved land.
 * A cache tier serves a redacted object until its next poll
   (`--redaction-poll`, 10 s by default).
+* Cache tiers keep plaintext objects on their own disks; encrypt those
+  volumes.
+* Losing the key service (or its key) loses every object. Back it up as
+  carefully as the data.
 * Redaction is by exact hash. Other copies (an edited file, another chunk
   boundary) need their own redactions.
 
@@ -91,7 +126,8 @@ Requests and approvals are audited as `redaction.request` and
 * [`rill-api/src/services/protection.rs`](../../crates/rill-api/src/services/protection.rs): `ProtectionService`.
 * [`rill-store/src/repo/quarantine.rs`](../../crates/rill-store/src/repo/quarantine.rs), [`redact.rs`](../../crates/rill-store/src/redact.rs).
 * [`rill-cache/src/redactions.rs`](../../crates/rill-cache/src/redactions.rs).
-* Tests: `rill-api/tests/grpc/protection.rs`, `rill-cli/tests/cache.rs`.
+* [`rill-store/src/seal/`](../../crates/rill-store/src/seal/): the `Sealer` hook and `OrgSealer`; [`rill-identity/src/keys/data.rs`](../../crates/rill-identity/src/keys/data.rs): `DataKeyManager`.
+* Tests: `rill-api/tests/grpc/protection.rs`, `rill-api/tests/grpc/encryption.rs`, `rill-cli/tests/cache.rs`.
 
 ---
 ← Previous: [Audit log](audit.md) · [Index](../index.md) · Next: [Threat model](threat-model.md) →
