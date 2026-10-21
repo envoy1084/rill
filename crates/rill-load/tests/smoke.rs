@@ -67,4 +67,9 @@ async fn disjoint_landings_all_land() {
         .unwrap_or_default();
     assert!(land["ok"].as_u64().unwrap_or(0) > 0, "{report:#}");
     assert_eq!(land["errors"], 0, "{report:#}");
+    let ops = report["ops"].as_array().unwrap();
+    assert!(
+        ops.iter().all(|r| r["errors"] == 0),
+        "reads use seeded files: {report:#}"
+    );
 }

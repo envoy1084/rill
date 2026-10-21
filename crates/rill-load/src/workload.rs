@@ -53,13 +53,19 @@ impl Workload {
         }
     }
 
-    fn path(&self) -> RepoPathBuf {
-        if self.disjoint {
-            let n = self
-                .fresh
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            return RepoPathBuf::new(format!("fresh/f{n}.rs")).expect("generated paths are valid");
+    /// A file to edit: a new one of its own when disjoint.
+    fn edit_path(&self) -> RepoPathBuf {
+        if !self.disjoint {
+            return self.path();
         }
+        let n = self
+            .fresh
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        RepoPathBuf::new(format!("fresh/f{n}.rs")).expect("generated paths are valid")
+    }
+
+    /// A seeded file, hot with `hot_share`.
+    fn path(&self) -> RepoPathBuf {
         let mut rng = rand::rng();
         let (dir, file) = if rng.random_bool(self.hot_share) {
             (0, rng.random_range(0..HOT_FILES))
@@ -119,7 +125,7 @@ impl Workload {
 
     /// A new change editing one file at trunk.
     pub async fn new_version(&self) {
-        let path = self.path();
+        let path = self.edit_path();
         let body = format!(
             "pub const value_{}: u32 = 1;\n",
             rand::rng().random_range(0..1000)
