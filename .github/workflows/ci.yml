@@ -11,9 +11,9 @@ env:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -25,13 +25,13 @@ jobs:
   # The metadata store conformance suite and the end-to-end server test
   # against a real single-node FoundationDB.
   foundationdb:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     env:
       FDB_VERSION: 7.3.77
       FDB_CLIENTS_SHA256: b6c263723009bddbc30b6ae8cf9854340bd35cef14152abb0da8fb5af2b91254
       FDB_SERVER_SHA256: 789f1ed4cbacc0fd7043da2217c9e57516e4ec94fa7140853ec22a7e715785cc
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
