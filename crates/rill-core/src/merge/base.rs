@@ -13,7 +13,8 @@ use futures::future::BoxFuture;
 use rill_types::objects::change::FileState;
 use rill_types::{ChangeVersionHash, Merge, RepoPath, TreeHash};
 
-use super::state::{change_terms, merge_file_state};
+use super::content::Structural;
+use super::state::{change_terms, merge_file_state_with};
 use crate::derive::{DeriveManager, RootTree};
 use crate::diff::file_state;
 use crate::error::Result;
@@ -108,7 +109,11 @@ impl MergeBase {
                     let right = right.terms(derive, path).await?;
                     let terms = Merge::three_way(base, left, right).flatten();
                     let objects = derive.repo().objects();
-                    let merged = merge_file_state(terms, objects, objects.as_ref()).await?;
+                    let structural = derive.merger().map(|merger| Structural { merger, path });
+                    let merged =
+                        merge_file_state_with(terms, objects, objects.as_ref(), structural)
+                            .await?
+                            .change;
                     Ok(match merged.resolved_state() {
                         Some(state) => Merge::resolved(state),
                         None => change_terms(&merged),

@@ -12,6 +12,7 @@ rill-types = { workspace = true }
 hex = { workspace = true }
 rill-proto = { workspace = true }
 rill-core = { workspace = true }
+rill-merge-syntax = { workspace = true }
 tonic = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }

@@ -68,13 +68,45 @@ keep local edits when a checkout updates.
 | Kinds differ, or the kind is `Symlink` | `Conflict` |
 | Any content `is_binary` | `Conflict` |
 | `merge_terms` is clean | Merged bytes stored with `store_content`; `Set` with the shared kind |
-| `merge_terms` conflicts | `Conflict` |
+| `merge_terms` conflicts, three-way, and a structural merger handles the path and resolves it | Its bytes stored; `Set`, marked structural |
+| Otherwise | `Conflict` |
 
 The `Conflict` always carries the simplified file-state terms, not text
 hunks. Text conflicts are recomputed when needed by `materialize`.
 `merge_states(removes, adds, ..)` is the same with explicit lists.
 `change_terms` lifts a `FileChange` to terms: a `Conflict` gives its terms,
 `Set`/`Delete` give one resolved state.
+
+## Structural merge (`merge/content.rs`, `rill-merge-syntax`)
+
+A `ContentMerger` resolves a text conflict the line merge leaves. It is
+consulted only then, so every result the line merge produces cleanly is
+unchanged, and only for a plain three-way conflict (`[ours, base,
+theirs]`) in a path it `handles`. `merge_file_state_with` runs it on the
+blocking pool, bounded by its `timeout`; a decline, a panic or a timeout
+leaves the `Conflict`. The `DeriveManager` holds the merger
+(`set_merger`), so rebases (and with them landing), `merge_changes` and
+virtual bases all use it. A rebase or merge records the files it resolved
+in the version's `extra["structural_merge"]` (`weave-0.6.1: src/a.rs,
+Cargo.toml`, at most 4 KiB), replacing what an earlier version recorded;
+`rill show` prints it as "merged by".
+
+`rill-merge-syntax` provides `WeaveMerger`: [weave-core](https://crates.io/crates/weave-core)
+(MIT/Apache-2.0, tree-sitter, entity-level three-way merge), pinned to an
+exact version (`WEAVE_VERSION`). It handles every extension weave supports
+(`supported_merge_extensions`: Rust, TypeScript/JavaScript, Python, Go,
+Java, C/C++, C#, Ruby, Swift, Kotlin, TOML, JSON, YAML and more) less the
+configured exclusions, and accepts a result only when weave's entity merge
+is clean, did not fall back to lines, and carries no warning other than
+the advisory ones weave itself never refuses on (`SiblingCoChange`: both
+sides added different members of one container; `CompositionLicensed`:
+disjoint blocks in one slot). Inputs that are not UTF-8 or exceed
+`max_bytes` are skipped. Counts by extension feed
+`rill_structural_merges{extension,outcome}`.
+
+The server enables it from `[merge]` ([configuration](../07-runtime/configuration.md#merge));
+client sync (`rill-sdk` `local/update.rs`) uses it too unless
+`RILL_STRUCTURAL_MERGE=false`.
 
 ## Change-level merge (`merge/change.rs`)
 
@@ -147,12 +179,17 @@ re-materialises to identical bytes.
   through `Resolve` or a new snapshot, so partially resolved files cannot be
   uploaded as conflict terms.
 - Merging reads whole file contents into memory.
+- Structural merge is only as good as weave on a pattern: adjacent `match`
+  arms, for example, are left conflicted by weave 0.6.1. A timed-out merge
+  keeps its blocking thread until weave returns.
 
 ## Code
 
 - [merge/mod.rs](../../crates/rill-core/src/merge/mod.rs)
 - [merge/file.rs](../../crates/rill-core/src/merge/file.rs)
 - [merge/state.rs](../../crates/rill-core/src/merge/state.rs)
+- [merge/content.rs](../../crates/rill-core/src/merge/content.rs)
+- [rill-merge-syntax](../../crates/rill-merge-syntax/src/)
 - [merge/change.rs](../../crates/rill-core/src/merge/change.rs)
 - [merge/materialize.rs](../../crates/rill-core/src/merge/materialize.rs)
 - [merge/parse.rs](../../crates/rill-core/src/merge/parse.rs)

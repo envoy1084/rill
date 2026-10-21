@@ -26,6 +26,7 @@ mod scim;
 mod search;
 mod shutdown;
 mod signin;
+mod structural;
 mod telemetry;
 mod workspaces;
 
@@ -225,6 +226,20 @@ async fn land_with(
     change_id: Bytes,
     extra_votes: &[(&str, i32)],
 ) -> u64 {
+    match try_land_with(clients, repo, change_id, extra_votes).await {
+        Ok(seq) => seq,
+        Err(e) => panic!("landing failed: {e}"),
+    }
+}
+
+/// Submit, approve and land `change_id`; the trunk position, or why it
+/// did not land.
+async fn try_land_with(
+    clients: &mut Clients,
+    repo: &str,
+    change_id: Bytes,
+    extra_votes: &[(&str, i32)],
+) -> Result<u64, String> {
     clients
         .review
         .submit_for_review(pb::SubmitForReviewRequest {
@@ -272,14 +287,14 @@ async fn land_with(
             .unwrap()
             .into_inner();
         match pb::LandStatus::try_from(status.ticket.as_ref().unwrap().status).unwrap() {
-            pb::LandStatus::Landed => return status.seq.unwrap(),
+            pb::LandStatus::Landed => return Ok(status.seq.unwrap()),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
-                panic!("landing failed: {:?}", status.error)
+                return Err(status.error.unwrap_or_default())
             }
             _ => tokio::time::sleep(Duration::from_millis(100)).await,
         }
     }
-    panic!("landing did not complete");
+    Err("landing did not complete".into())
 }
 
 async fn http_get(addr: std::net::SocketAddr, path: &str) -> (u16, Vec<(String, String)>, Vec<u8>) {

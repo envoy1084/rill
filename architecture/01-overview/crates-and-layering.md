@@ -13,6 +13,7 @@ and policy crates stay free of RPC and storage-layout concerns.
 | `rill-events` | Reading the event log: filtered, resumable tails that wait on the event counter; retention | Writing events (each writer does, in its own transaction) |
 | `rill-jobs` | Durable job queues: priorities, shards, leased claims with fencing tokens, backoff, dead-letter queue, counters, a worker runtime | What jobs do (handlers live with their callers) |
 | `rill-core` | Diff, three-way merge, trees, rebase, ancestry graph, derived data, blob chunking, `ChangeBuilder` | Storage layout, RPC |
+| `rill-merge-syntax` | Structural merge: weave-core behind `rill-core`'s `ContentMerger`, configuration, counts | When it is consulted (the merge code decides) |
 | `rill-policy` | Risk classification, Cedar submit rules, ReBAC, Biscuit capability tokens, signing | Enforcement points (the server owns those) |
 | `rill-review` | Labels, votes, threads, interdiff, stacks, submit evaluation, review agents | Landing |
 | `rill-lander` | Queue, rebase onto trunk, CAS land, landing records, the jobs a landing enqueues, post-land verification, bisect, revert | Review state (through `ReviewHooks`), execution (through `Verifier`) |
@@ -45,6 +46,7 @@ flowchart BT
   events[rill-events] --> store
   jobs[rill-jobs] --> store
   core[rill-core] --> store
+  mergesyn[rill-merge-syntax] --> core
   policy[rill-policy] --> store
   review[rill-review] --> core & policy
   lander[rill-lander] --> core & jobs
@@ -53,9 +55,9 @@ flowchart BT
   import[rill-git-import] --> core
   identity[rill-identity] --> policy
   proto[rill-proto] --> types
-  server[rill-api] --> review & lander & search & exec & proto & events & jobs
+  server[rill-api] --> review & lander & search & exec & proto & events & jobs & mergesyn
   cache[rill-cache] --> policy
-  sdk[rill-sdk] --> proto & core
+  sdk[rill-sdk] --> proto & core & mergesyn
   mcp[rill-mcp] --> sdk & core
   cli[rill-cli] --> sdk & mcp & server & cache & store & import
 ```
@@ -80,6 +82,9 @@ that order in a few places:
   (`ReviewHooksAdapter`, `ExecVerifier`).
 - `rill-proto` depends only on `rill-types`. It is the wire layer between
   the domain crates and anything that speaks gRPC.
+- `rill-merge-syntax` sits just above `rill-core`, whose `ContentMerger`
+  trait it implements; `rill-core` never depends on it. The server and the
+  SDK plug it in.
 - `rill-git-import` sits beside the other `rill-core` consumers. It writes
   through `RepoStore` directly and needs no server.
 - `rill-sdk` depends on `rill-proto` and `rill-core`, not on `rill-api`.

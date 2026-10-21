@@ -5,6 +5,7 @@ use rill_store::ObjectStore;
 use rill_types::objects::change::FileState;
 use rill_types::{ContentRef, FileChange, FileKind, Merge};
 
+use super::content::Structural;
 use super::file::{merge_terms, resolved_bytes};
 use crate::blobs::{store_content, BlobReader};
 use crate::diff::is_binary;
@@ -22,12 +23,41 @@ pub async fn merge_file_state(
     reader: &dyn BlobReader,
     objects: &dyn ObjectStore,
 ) -> Result<FileChange> {
+    Ok(merge_file_state_with(terms, reader, objects, None)
+        .await?
+        .change)
+}
+
+/// A merged path, and whether the structural merger resolved it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Merged {
+    pub change: FileChange,
+    pub structural: bool,
+}
+
+impl From<FileChange> for Merged {
+    fn from(change: FileChange) -> Self {
+        Merged {
+            change,
+            structural: false,
+        }
+    }
+}
+
+/// [`merge_file_state`], handing a three-way text conflict to
+/// `structural` before giving up on it.
+pub async fn merge_file_state_with(
+    terms: Merge<FileState>,
+    reader: &dyn BlobReader,
+    objects: &dyn ObjectStore,
+    structural: Option<Structural<'_>>,
+) -> Result<Merged> {
     let terms = terms.simplify();
     if let Some(state) = terms.resolve_trivial() {
-        return Ok(to_change(state.clone()));
+        return Ok(to_change(state.clone()).into());
     }
     if !terms.is_present_everywhere() {
-        return Ok(FileChange::Conflict(terms));
+        return Ok(FileChange::Conflict(terms).into());
     }
     let kinds: Vec<FileKind> = terms
         .iter()
@@ -35,7 +65,7 @@ pub async fn merge_file_state(
         .collect();
     let kind = kinds[0];
     if kind == FileKind::Symlink || kinds.iter().any(|k| *k != kind) {
-        return Ok(FileChange::Conflict(terms));
+        return Ok(FileChange::Conflict(terms).into());
     }
     let mut contents = Vec::with_capacity(terms.as_slice().len());
     for term in terms.iter() {
@@ -47,18 +77,29 @@ pub async fn merge_file_state(
         contents.push(bytes);
     }
     if contents.iter().any(|b| is_binary(b)) {
-        return Ok(FileChange::Conflict(terms));
+        return Ok(FileChange::Conflict(terms).into());
     }
     // Same shape as `terms`, so `from_vec` cannot fail.
     let text_terms = Merge::from_vec(contents).expect("same shape as terms");
     let hunks = merge_terms(&text_terms);
-    match resolved_bytes(&hunks) {
-        Some(bytes) => {
-            let content = store_content(objects, Bytes::from(bytes)).await?;
-            Ok(FileChange::set(content, kind))
-        }
-        None => Ok(FileChange::Conflict(terms)),
+    if let Some(bytes) = resolved_bytes(&hunks) {
+        let content = store_content(objects, Bytes::from(bytes)).await?;
+        return Ok(FileChange::set(content, kind).into());
     }
+    // Only a plain three-way conflict ([ours, base, theirs]) goes further.
+    if let (Some(structural), [ours, base, theirs]) = (structural, text_terms.as_slice()) {
+        if let Some(bytes) = structural
+            .resolve(base.clone(), ours.clone(), theirs.clone())
+            .await
+        {
+            let content = store_content(objects, Bytes::from(bytes)).await?;
+            return Ok(Merged {
+                change: FileChange::set(content, kind),
+                structural: true,
+            });
+        }
+    }
+    Ok(FileChange::Conflict(terms).into())
 }
 
 /// Merge the states of one path given explicit removes and adds.

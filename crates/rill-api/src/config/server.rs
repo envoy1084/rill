@@ -45,6 +45,8 @@ pub struct ServerConfig {
     pub audit: super::AuditConfig,
     /// Encryption of stored objects.
     pub encryption: super::EncryptionConfig,
+    /// Structural merge of text conflicts.
+    pub merge: rill_merge_syntax::MergeConfig,
     /// Landing pipeline policy (verification modes, retries, auto-revert).
     pub lander: LandPolicy,
     /// Risk classification rules applied to every change under review.
@@ -84,6 +86,7 @@ impl Default for ServerConfig {
             identity: IdentityConfig::default(),
             audit: super::AuditConfig::default(),
             encryption: super::EncryptionConfig::default(),
+            merge: rill_merge_syntax::MergeConfig::default(),
             lander: LandPolicy::default(),
             risk: RiskConfig::default(),
             labels: LabelSet::default(),

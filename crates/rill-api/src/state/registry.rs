@@ -196,6 +196,8 @@ pub struct RepoRegistry {
     contexts: DashMap<RepoId, Arc<RepoContext>>,
     build_lock: tokio::sync::Mutex<()>,
     lifecycle: Arc<super::Lifecycle>,
+    /// Structural merge, shared by every repository; `None` when off.
+    merger: Option<Arc<rill_merge_syntax::WeaveMerger>>,
 }
 
 impl RepoRegistry {
@@ -208,6 +210,10 @@ impl RepoRegistry {
         identity: Arc<crate::identity::IdentityView>,
         lifecycle: Arc<super::Lifecycle>,
     ) -> Self {
+        let merger = config
+            .merge
+            .structural
+            .then(|| Arc::new(rill_merge_syntax::WeaveMerger::new(&config.merge)));
         RepoRegistry {
             denials: Arc::new(crate::audit::denials::Denials::new(stores.audit())),
             stores,
@@ -217,7 +223,13 @@ impl RepoRegistry {
             contexts: DashMap::new(),
             build_lock: tokio::sync::Mutex::new(()),
             lifecycle,
+            merger,
         }
+    }
+
+    /// The structural merger, when structural merge is on.
+    pub fn merger(&self) -> Option<&Arc<rill_merge_syntax::WeaveMerger>> {
+        self.merger.as_ref()
     }
 
     /// Every repository context built so far.
@@ -324,6 +336,9 @@ impl RepoRegistry {
         let repo = org.with_objects(redacting).repo(config.id);
         let trees = TreeOps::new(repo.objects().clone(), DEFAULT_TREE_CACHE);
         let derive = DeriveManager::new(repo.clone(), trees.clone(), DERIVE_CACHE);
+        if let Some(merger) = &self.merger {
+            derive.set_merger(merger.clone());
+        }
         let graph = Arc::new(CommitGraph::new(repo.clone(), derive.clone()));
         let labels = Arc::new(self.config.labels.clone());
         let (review_events, _) = broadcast::channel(rill_review::service::DEFAULT_EVENT_CAPACITY);

@@ -135,6 +135,10 @@ pub fn change_version(v: &ChangeVersion) -> Value {
         "summary": v.summary(),
         "created_at": timestamp(&v.created_at),
         "has_conflicts": v.has_conflicts(),
+        "structural_merge": v
+            .extra
+            .get(rill_core::merge::STRUCTURAL_MERGE_EXTRA)
+            .map(|b| String::from_utf8_lossy(b).into_owned()),
         "conflicted_paths": v.conflicted_paths().map(|p| p.as_str()).collect::<Vec<_>>(),
         "file_changes": v.file_changes.iter().map(|(p, c)| {
             let mut entry = file_change(c);

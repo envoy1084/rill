@@ -9,7 +9,7 @@ use rill_jobs::Queue;
 use rill_lander::land::followups::{DERIVE_QUEUE, INDEX_QUEUE};
 use tokio_util::sync::CancellationToken;
 
-use super::metrics::{KeyLabels, QueueLabels, RepoLabels, RoleLabels};
+use super::metrics::{KeyLabels, OutcomeKeyLabels, QueueLabels, RepoLabels, RoleLabels};
 use crate::state::{AppState, RepoContext};
 
 /// How often gauges are refreshed.
@@ -35,6 +35,29 @@ pub async fn sample_forever(state: Arc<AppState>, shutdown: CancellationToken) {
             if let Err(e) = sample(&state, &ctx).await {
                 tracing::debug!(repo = %ctx.config.name, error = %e, "sampling metrics failed");
             }
+        }
+        sample_merges(&state);
+    }
+}
+
+fn sample_merges(state: &AppState) {
+    let Some(merger) = state.repos.merger() else {
+        return;
+    };
+    for (extension, stats) in merger.stats().snapshot() {
+        for (outcome, value) in [
+            ("resolved", stats.resolved),
+            ("declined", stats.declined),
+            ("skipped", stats.skipped),
+        ] {
+            state
+                .metrics
+                .structural_merges
+                .get_or_create(&OutcomeKeyLabels {
+                    extension: extension.clone(),
+                    outcome: outcome.to_string(),
+                })
+                .set(value as i64);
         }
     }
 }

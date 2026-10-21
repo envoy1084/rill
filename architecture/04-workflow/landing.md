@@ -125,8 +125,10 @@ Each window of up to `MAX_BATCH` (64):
    when no surviving earlier request overlaps it, after the latest one when
    that one's chain holds all it overlaps, or else on the lined-up batch.
    A wave's requests are prepared concurrently: a version already on trunk
-   or an ancestor of it fails; one not based on its slot is rebased
-   (`Conflict { paths }` returns it to its owner); it is verified unless its
+   or an ancestor of it fails; one not based on its slot is rebased, with
+   [structural merge](../03-core-algorithms/merge.md#structural-merge-mergecontentrs-rill-merge-syntax)
+   resolving what the line merge cannot (`Conflict { paths }` returns it
+   to its owner); it is verified unless its
    mode is `None`; its land-critical values are stored; and it is approved.
    A failure removes only what was speculated on top of it: later requests
    are placed against the survivors.

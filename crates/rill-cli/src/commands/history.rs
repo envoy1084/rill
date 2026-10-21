@@ -232,6 +232,14 @@ pub async fn show(ctx: &mut Ctx<'_>, args: ShowArgs) -> Result<()> {
                 .collect::<Vec<_>>()
                 .join(" / "),
             ),
+            (
+                "merged by",
+                version
+                    .extra
+                    .get(rill_core::merge::STRUCTURAL_MERGE_EXTRA)
+                    .map(|b| String::from_utf8_lossy(b).into_owned())
+                    .unwrap_or_default(),
+            ),
         ])?;
         out.blank()?;
         for line in version.message.lines() {

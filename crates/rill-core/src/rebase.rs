@@ -62,20 +62,24 @@ pub async fn rebase(
     });
 
     let mut file_changes = BTreeMap::new();
+    let mut structural = BTreeSet::new();
     for path in paths {
         let base = file_state(trees, old_parent_root, &path).await?;
         let left = file_state(trees, Some(new_parent_root), &path).await?;
         let right = tip_terms(&cv, &path, file_state(trees, Some(old_root), &path).await?);
-        let change = merge_path(derive, base, Merge::resolved(left.clone()), right).await?;
-        if is_same_as(&change, &left) {
+        let merged = merge_path(derive, &path, base, Merge::resolved(left.clone()), right).await?;
+        if is_same_as(&merged.change, &left) {
             continue;
         }
-        file_changes.insert(path, change);
+        if merged.structural {
+            structural.insert(path.clone());
+        }
+        file_changes.insert(path, merged.change);
     }
 
     let mut parents = vec![*new_parent];
     parents.extend(cv.parents.iter().skip(1).filter(|p| *p != new_parent));
-    Ok(ChangeVersion {
+    let mut rebased = ChangeVersion {
         change_id: cv.change_id,
         parents,
         predecessor: Some(*version),
@@ -87,7 +91,11 @@ pub async fn rebase(
         message: cv.message,
         created_at,
         extra: cv.extra,
-    })
+    };
+    if let Some(merger) = derive.merger() {
+        crate::merge::record_structural(&mut rebased, merger.name(), &structural);
+    }
+    Ok(rebased)
 }
 
 async fn dir_at(

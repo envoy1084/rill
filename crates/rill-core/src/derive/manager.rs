@@ -28,6 +28,8 @@ pub struct DeriveManager {
     /// One lock per key being derived, so concurrent requests for the same
     /// value compute it once and the rest read it from the store.
     in_flight: DashMap<Key, Arc<Mutex<()>>>,
+    /// Resolves text conflicts the line merge leaves, when configured.
+    merger: std::sync::OnceLock<Arc<dyn crate::merge::ContentMerger>>,
 }
 
 impl DeriveManager {
@@ -38,7 +40,20 @@ impl DeriveManager {
             trees,
             cache: LruCache::new(cache_size),
             in_flight: DashMap::new(),
+            merger: std::sync::OnceLock::new(),
         })
+    }
+
+    /// Use `merger` for text conflicts in rebases and merges; set once.
+    pub fn set_merger(&self, merger: Arc<dyn crate::merge::ContentMerger>) {
+        if self.merger.set(merger).is_err() {
+            tracing::warn!("content merger set twice; keeping the first");
+        }
+    }
+
+    /// The configured content merger, if any.
+    pub fn merger(&self) -> Option<&Arc<dyn crate::merge::ContentMerger>> {
+        self.merger.get()
     }
 
     /// The repository this manager derives for.

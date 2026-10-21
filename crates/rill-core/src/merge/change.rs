@@ -10,7 +10,8 @@ use rill_types::{
 };
 
 use super::base::MergeBase;
-use super::state::{change_terms, merge_file_state};
+use super::content::Structural;
+use super::state::{change_terms, merge_file_state_with, Merged};
 use crate::derive::{DeriveManager, RootTree};
 use crate::diff::{diff_trees, file_state};
 use crate::error::Result;
@@ -76,6 +77,7 @@ pub async fn merge_changes(
     paths.extend(right_cv.conflicted_paths().cloned());
 
     let mut file_changes = std::collections::BTreeMap::new();
+    let mut structural = BTreeSet::new();
     for path in paths {
         let base_terms = match &base {
             Some(base) => base.terms(derive, &path).await?,
@@ -85,14 +87,17 @@ pub async fn merge_changes(
         let left_terms = tip_terms(&left_cv, &path, left_state.clone());
         let right_state = file_state(trees, Some(right_root), &path).await?;
         let right_terms = tip_terms(&right_cv, &path, right_state);
-        let change = merge_terms(derive, base_terms, left_terms, right_terms).await?;
-        if is_same_as(&change, &left_state) {
+        let merged = merge_terms(derive, &path, base_terms, left_terms, right_terms).await?;
+        if is_same_as(&merged.change, &left_state) {
             continue;
         }
-        file_changes.insert(path, change);
+        if merged.structural {
+            structural.insert(path.clone());
+        }
+        file_changes.insert(path, merged.change);
     }
 
-    Ok(ChangeVersion {
+    let mut cv = ChangeVersion {
         change_id: options.change_id.unwrap_or_default(),
         parents: vec![*left, *right],
         predecessor: None,
@@ -104,7 +109,11 @@ pub async fn merge_changes(
         message: options.message,
         created_at: options.created_at,
         extra: Default::default(),
-    })
+    };
+    if let Some(merger) = derive.merger() {
+        super::content::record_structural(&mut cv, merger.name(), &structural);
+    }
+    Ok(cv)
 }
 
 /// Terms of a path on one side: the tip's conflict terms if it records
@@ -124,24 +133,27 @@ pub(crate) fn tip_terms(
 /// then by content.
 pub(crate) async fn merge_path(
     derive: &Arc<DeriveManager>,
+    path: &RepoPath,
     base: FileState,
     left: Merge<FileState>,
     right: Merge<FileState>,
-) -> Result<FileChange> {
-    merge_terms(derive, Merge::resolved(base), left, right).await
+) -> Result<Merged> {
+    merge_terms(derive, path, Merge::resolved(base), left, right).await
 }
 
 /// [`merge_path`] with a base that may itself be conflicted (a virtual
 /// base from a criss-cross history).
 async fn merge_terms(
     derive: &Arc<DeriveManager>,
+    path: &RepoPath,
     base: Merge<FileState>,
     left: Merge<FileState>,
     right: Merge<FileState>,
-) -> Result<FileChange> {
+) -> Result<Merged> {
     let terms = Merge::three_way(base, left, right).flatten();
     let objects = derive.repo().objects();
-    merge_file_state(terms, objects, objects.as_ref()).await
+    let structural = derive.merger().map(|merger| Structural { merger, path });
+    merge_file_state_with(terms, objects, objects.as_ref(), structural).await
 }
 
 /// True when `change` leaves the path exactly as `state`.

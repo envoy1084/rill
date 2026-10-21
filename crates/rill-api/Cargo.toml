@@ -20,6 +20,7 @@ saml = ["rill-identity/saml"]
 rill-types = { workspace = true }
 rill-store = { workspace = true, features = ["s3"] }
 rill-core = { workspace = true }
+rill-merge-syntax = { workspace = true }
 rill-policy = { workspace = true }
 rill-proto = { workspace = true }
 rill-review = { workspace = true }

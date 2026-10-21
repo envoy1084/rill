@@ -5,6 +5,7 @@ members = [
     "crates/rill-types",
     "crates/rill-store",
     "crates/rill-core",
+    "crates/rill-merge-syntax",
     "crates/rill-policy",
     "crates/rill-proto",
     "crates/rill-review",
@@ -34,10 +35,13 @@ repository = "https://github.com/rill-vcs/rill"
 authors = ["Rill contributors"]
 
 [workspace.dependencies]
+# Structural merge engine; pinned exactly, upgraded deliberately.
+weave-core = "=0.6.1"
 # Internal crates
 rill-types = { path = "crates/rill-types" }
 rill-store = { path = "crates/rill-store" }
 rill-core = { path = "crates/rill-core" }
+rill-merge-syntax = { path = "crates/rill-merge-syntax" }
 rill-policy = { path = "crates/rill-policy" }
 rill-proto = { path = "crates/rill-proto" }
 rill-review = { path = "crates/rill-review" }

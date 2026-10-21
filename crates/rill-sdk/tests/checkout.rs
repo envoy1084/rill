@@ -276,3 +276,52 @@ async fn update_without_local_changes_is_a_plain_switch() {
     assert_eq!(co.manifest().len(), 2);
     assert!(!dir.path().join("src").exists());
 }
+
+#[tokio::test]
+async fn update_merges_adjacent_additions_in_source_files() {
+    let mock = mock_with_base();
+    let new = fake_hash("new");
+    mock.set_tree(
+        &new.to_hex(),
+        vec![
+            ("README.md", MockFile::regular("# hi\n")),
+            (
+                "src/lib.rs",
+                MockFile::regular("fn a() {}\n\nfn upstream() {}\n"),
+            ),
+            ("src/util.rs", MockFile::regular("fn u() {}\n")),
+            ("docs/guide.md", MockFile::regular("guide\n")),
+            (
+                "bin/run",
+                MockFile {
+                    bytes: "#!/bin/sh\n".into(),
+                    kind: FileKind::Executable,
+                },
+            ),
+        ],
+    );
+    let h = Harness::with_repo(mock).await;
+    let dir = tempfile::tempdir().unwrap();
+    let mut co = Checkout::create(
+        dir.path(),
+        h.client.repo("main"),
+        Root::trunk(),
+        SparseProfile::full(),
+    )
+    .await
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/lib.rs"),
+        "fn a() {}\n\nfn local() {}\n",
+    )
+    .unwrap();
+
+    let report = co.update(Root::Version(new)).await.unwrap();
+    assert_eq!(report.merged, vec![p("src/lib.rs")], "{report:?}");
+    assert!(report.conflicts.is_empty(), "{report:?}");
+    let text = std::fs::read_to_string(dir.path().join("src/lib.rs")).unwrap();
+    assert!(
+        text.contains("fn local()") && text.contains("fn upstream()"),
+        "{text}"
+    );
+}

@@ -105,6 +105,15 @@ instance comes from `rill api mint-token`. See
 | --- | --- | --- |
 | `audit.seal_every_secs` | `86400` | how often each org's [audit chain](../05-policy/audit.md) is sealed, when it grew |
 
+## Merge
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `merge.structural` | `true` | resolve text conflicts with the structural merger ([merge](../03-core-algorithms/merge.md#structural-merge-mergecontentrs-rill-merge-syntax)) |
+| `merge.exclude` | `[]` | extensions never merged structurally (`["yaml", ".py"]`) |
+| `merge.max_bytes` | 1 MiB | larger files keep the line merge |
+| `merge.timeout_ms` | 2000 | longest one structural merge may take |
+
 ## Encryption
 
 | Setting | Default | Meaning |
@@ -119,6 +128,7 @@ instance comes from `rill api mint-token`. See
 | `RILL_LISTEN_GRPC`, `RILL_LISTEN_HTTP` | socket addresses |
 | `RILL_DEV_MODE` | boolean (`1/0`, `true/false`, `yes/no`, `on/off`) |
 | `RILL_ENCRYPTION` | boolean; overrides `encryption.enabled` |
+| `RILL_STRUCTURAL_MERGE` | boolean; overrides `merge.structural` (also read by client sync) |
 | `RILL_STORAGE` | `memory`, `local:<dir>` or `s3:<url>` |
 | `RILL_S3_PREFIX`, `RILL_S3_META_DIR` | details for `s3:` |
 | `RILL_S3_ALLOW_UNCONDITIONAL_PUT` | boolean; start even when the service ignores conditional puts (see [storage](../02-data/storage-and-keyspace.md#object-backends)) |

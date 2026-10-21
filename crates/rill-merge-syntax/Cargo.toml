@@ -1,0 +1,19 @@
+[package]
+name = "rill-merge-syntax"
+description = "Structural (syntax-aware) merge for Rill, backed by weave-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-core = { workspace = true }
+rill-types = { workspace = true }
+weave-core = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

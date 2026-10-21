@@ -48,6 +48,13 @@ pub struct KeyLabels {
     pub key: String,
 }
 
+/// One file extension and what structural merge did with it.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+pub struct OutcomeKeyLabels {
+    pub extension: String,
+    pub outcome: String,
+}
+
 /// One lease role of one repository.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 pub struct RoleLabels {
@@ -85,6 +92,9 @@ pub struct Metrics {
     pub land_conflict_permille: Family<KeyLabels, Gauge>,
     /// Unfinished land requests per sponsor (or requester).
     pub land_queued_by_share: Family<KeyLabels, Gauge>,
+    /// Text conflicts structural merge resolved, declined or skipped, by
+    /// file extension and outcome.
+    pub structural_merges: Family<OutcomeKeyLabels, Gauge>,
 }
 
 impl Default for Metrics {
@@ -210,6 +220,14 @@ impl Metrics {
             "land_queued_by_share",
             "unfinished land requests per sponsor or requester",
         );
+        let structural_merges = Family::<OutcomeKeyLabels, Gauge>::default();
+        register(
+            &mut registry,
+            &mut names,
+            "structural_merges",
+            "text conflicts structural merge resolved, declined or skipped",
+            structural_merges.clone(),
+        );
         let lease_epoch = Family::<RoleLabels, Gauge>::default();
         register(
             &mut registry,
@@ -237,6 +255,7 @@ impl Metrics {
             land_interval_ms,
             land_conflict_permille,
             land_queued_by_share,
+            structural_merges,
         }
     }
 

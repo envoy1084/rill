@@ -14,7 +14,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use bytes::Bytes;
-use rill_core::merge::{materialize as render_conflict, merge_file, FileMergeResult};
+use std::sync::{Arc, OnceLock};
+
+use rill_core::merge::{
+    materialize as render_conflict, merge_file, ContentMerger, FileMergeResult, Structural,
+};
 use rill_types::{FileKind, Merge, ObjectHash, RepoPath, RepoPathBuf};
 
 use super::checkout::{materialize, resolve_version, Checkout};
@@ -105,7 +109,7 @@ impl Checkout {
                         if bytes == upstream && kind == new.kind {
                             Outcome::Adopt(new.clone())
                         } else {
-                            Outcome::Write(merge_bytes(&[], &bytes, upstream, new))
+                            Outcome::Write(merge_bytes(path, &[], &bytes, upstream, new).await)
                         }
                     }
                     _ => Outcome::Fetch,
@@ -153,7 +157,7 @@ impl Checkout {
         let base = self.repo().read_file(read_root, path).await?;
         let upstream = remote::fetch(self.repo(), new).await?;
         Ok(Outcome::Write(match local {
-            Some(local) => merge_bytes(&base, &local, upstream, new),
+            Some(local) => merge_bytes(path, &base, &local, upstream, new).await,
             None => {
                 let terms = Merge::three_way(Some(base), None, Some(upstream.clone()));
                 Written {
@@ -259,8 +263,44 @@ enum Outcome {
     Write(Written),
 }
 
-fn merge_bytes(base: &[u8], local: &[u8], upstream: Bytes, new: &RemoteFile) -> Written {
-    let (text, conflict) = match merge_file(base, local, &upstream) {
+/// The structural merger sync uses, unless `RILL_STRUCTURAL_MERGE` is
+/// `false`.
+fn structural_merger() -> Option<&'static Arc<dyn ContentMerger>> {
+    static MERGER: OnceLock<Option<Arc<dyn ContentMerger>>> = OnceLock::new();
+    MERGER
+        .get_or_init(|| {
+            let off = std::env::var("RILL_STRUCTURAL_MERGE")
+                .is_ok_and(|v| matches!(v.as_str(), "0" | "false" | "no" | "off"));
+            (!off).then(|| {
+                Arc::new(rill_merge_syntax::WeaveMerger::new(&Default::default()))
+                    as Arc<dyn ContentMerger>
+            })
+        })
+        .as_ref()
+}
+
+async fn merge_bytes(
+    path: &RepoPath,
+    base: &[u8],
+    local: &[u8],
+    upstream: Bytes,
+    new: &RemoteFile,
+) -> Written {
+    let mut merged = merge_file(base, local, &upstream);
+    if let (FileMergeResult::Conflicted { .. }, Some(merger)) = (&merged, structural_merger()) {
+        let structural = Structural { merger, path };
+        if let Some(bytes) = structural
+            .resolve(
+                Bytes::copy_from_slice(base),
+                Bytes::copy_from_slice(local),
+                upstream.clone(),
+            )
+            .await
+        {
+            merged = FileMergeResult::Resolved(bytes);
+        }
+    }
+    let (text, conflict) = match merged {
         FileMergeResult::Resolved(bytes) => (Bytes::from(bytes), false),
         FileMergeResult::Conflicted { .. } => {
             let terms = Merge::three_way(
