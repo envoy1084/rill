@@ -165,12 +165,14 @@ async fn a_request_rate_budget_refuses_the_excess() {
                 .map(|s| s.code()),
         );
     }
-    // A minute boundary may fall between the calls; at most two windows.
     let refused = codes
         .iter()
         .filter(|c| **c == Some(Code::ResourceExhausted))
         .count();
-    assert!(refused >= 1, "{codes:?}");
+    assert_eq!(
+        refused, 2,
+        "a burst of the budget, then refusals: {codes:?}"
+    );
     server.stop().await;
 }
 

@@ -84,7 +84,10 @@ where
                 .get(super::context::RELATIONS_SEEN_HEADER)
                 .and_then(|v| v.to_str().ok())
                 .map(str::to_owned);
-            match authenticate(&state, header.as_deref()).await {
+            let admitted = authenticate(&state, header.as_deref())
+                .await
+                .and_then(|ctx| state.admit(&ctx).map(|()| ctx));
+            match admitted {
                 Ok(mut ctx) => {
                     ctx.relations_seen = super::context::relations_seen(seen.as_deref());
                     tracing::Span::current().record("principal", ctx.principal.name.as_str());

@@ -17,6 +17,7 @@ gcp = ["rill-identity/gcp"]
 saml = ["rill-identity/saml"]
 
 [dependencies]
+governor = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true, features = ["s3"] }
 rill-core = { workspace = true }

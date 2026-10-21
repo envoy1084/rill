@@ -63,3 +63,27 @@ async fn large_inline_edits_become_blobs_and_huge_messages_are_refused() {
     assert_eq!(err.code(), Code::OutOfRange, "{err}");
     server.stop().await;
 }
+
+#[tokio::test]
+async fn a_burst_past_the_rate_limit_is_told_when_to_retry() {
+    let mut config = dev_config();
+    config.rate_limit.per_principal_per_sec = 1;
+    config.rate_limit.burst = 3;
+    let server = TestServer::start(config).await;
+    let mut c = clients(&server, None).await;
+    let mut refused = Vec::new();
+    for _ in 0..6 {
+        if let Err(status) = c.admin.who_am_i(pb::WhoAmIRequest {}).await {
+            refused.push(status);
+        }
+    }
+    assert!(
+        (2..=3).contains(&refused.len()),
+        "a burst of three, then about one a second: {refused:?}"
+    );
+    for status in &refused {
+        assert_eq!(status.code(), Code::ResourceExhausted);
+        assert!(status.metadata().get("retry-after").is_some());
+    }
+    server.stop().await;
+}

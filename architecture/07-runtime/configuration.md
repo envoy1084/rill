@@ -46,6 +46,7 @@ defaults with a comment header that lists every alternative.
 | `[risk]` | `RiskConfig::default()` | risk rules, used when a repository has no stored `risk` policy |
 | `[labels]` | `LabelSet::default()` | vote labels for every repository |
 | `[verify]` | `enabled = false`, `sandbox = "local"` (or `confined`, `gvisor`), `network = false`, `runsc = "runsc"` | pre-land `.rill/verify.toml` runs; when disabled the lander uses `AlwaysGreen` |
+| `[rate_limit]` | `per_principal_per_sec = 1000`, `burst = 2000` | per-principal token bucket on every authenticated request; 0 turns it off ([rate limits](api-surface.md#rate-limits)) |
 | `[postland]` | `enabled = false`, `interval_secs = 30`, `batch_size = 8` | post-land verifier loop |
 
 `LandPolicy` durations use serde's default `Duration` form, a table of
@@ -169,7 +170,7 @@ startup. In dev mode:
 * `network = false` is advisory under `[verify] sandbox = "local"`;
   `confined` (Linux only) and `gvisor` enforce it.
 * Some fields have no environment variable: `lander`, `risk`, `labels`,
-  `verify.sandbox`, `verify.network`, `verify.runsc`, `postland.batch_size`. They are set only in the file.
+  `verify.sandbox`, `verify.network`, `verify.runsc`, `rate_limit`, `postland.batch_size`. They are set only in the file.
 * Configuration is read once at startup. There is no reload.
 * `attestation_key` has no environment variable.
 

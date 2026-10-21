@@ -32,6 +32,8 @@ pub struct AppState {
     pub lifecycle: Arc<super::Lifecycle>,
     /// Each org's data keys, when objects are sealed at rest.
     pub data_keys: Option<Arc<rill_identity::keys::DataKeyManager>>,
+    /// Per-principal request rate limits, when on.
+    pub rate_limits: Option<crate::auth::RateLimits>,
     /// Every metric the server keeps.
     pub metrics: Arc<crate::telemetry::Metrics>,
     /// Process start time, for health reporting.
@@ -101,6 +103,7 @@ impl AppState {
             identity.clone(),
             lifecycle.clone(),
         );
+        let rate_limits = auth::RateLimits::new(&config.rate_limit);
         Ok(Arc::new(AppState {
             stores,
             config,
@@ -111,6 +114,7 @@ impl AppState {
             shutdown,
             lifecycle,
             data_keys,
+            rate_limits,
             metrics,
             started_at: std::time::Instant::now(),
         }))
@@ -119,6 +123,14 @@ impl AppState {
     /// Whether anonymous requests are allowed and everything is permitted.
     pub fn dev_mode(&self) -> bool {
         self.config.dev_mode
+    }
+
+    /// Count a request from `ctx` against its principal's rate limit.
+    pub fn admit(&self, ctx: &rill_policy::AuthContext) -> Result<()> {
+        match &self.rate_limits {
+            Some(limits) => limits.check(&ctx.principal.name),
+            None => Ok(()),
+        }
     }
 }
 

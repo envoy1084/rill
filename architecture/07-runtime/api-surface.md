@@ -193,8 +193,21 @@ Every input is bounded. Exceeding a gRPC limit answers `OUT_OF_RANGE`
 | Other HTTP bodies | 2 MiB | axum's default |
 | Pages and results | log 10,000, grep 5,000, lander lists and workspace operations 1,000, diff 4 MiB and 1,000 files | each handler's `limit` |
 
+### Rate limits
+
+Every authenticated request, gRPC or object HTTP, is counted against its
+principal's token bucket (`auth/rate.rs`, a keyed GCRA limiter from
+`governor`): `[rate_limit] per_principal_per_sec` (1000; 0 turns it off)
+refilling a bucket of `burst` (2000). Past it, gRPC answers
+`RESOURCE_EXHAUSTED` and HTTP 429, both with `retry-after` in seconds.
+Buckets are per server and idle ones are dropped every minute. A
+registered agent's `requests_per_minute` budget is a second bucket of that
+size refilled over a minute ([identity](../05-policy/identity-and-auth.md)).
+
 ## Limitations
 
+* `SessionService` (sign-in) is not rate limited; nothing limits by
+  client address.
 * `next_page_token` exists on list responses, but the server always returns
   `None`. `limit` truncates and there is no continuation.
 * A request without an `operation_id` is not deduplicated. Only the

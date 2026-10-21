@@ -1,9 +1,11 @@
 //! What a verified token's holder may do now: a user's teams, and a
 //! registered agent's standing (registration, model, sponsor) and scope.
 
+use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use dashmap::DashMap;
+use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use rill_identity::agents::agent_may_act;
 use rill_policy::{AgentScope, AuthContext, Verified};
 use rill_types::identity::{AgentRecord, OrgIdentitySettings};
@@ -20,8 +22,9 @@ pub struct CallerCaches {
     settings: DashMap<String, Arc<OrgIdentitySettings>>,
     /// Whether `(org, agent, model)` may act; the refusal when not.
     standing: DashMap<(String, String, Option<String>), Option<String>>,
-    /// Requests per agent in the current minute, on this server.
-    requests: DashMap<(String, String), (i64, u64)>,
+    /// Each agent's request budget on this server, with the limit it was
+    /// built for.
+    requests: DashMap<(String, String), (u64, Arc<DefaultDirectRateLimiter>)>,
 }
 
 impl CallerCaches {
@@ -66,30 +69,40 @@ impl IdentityView {
         Ok(settings)
     }
 
-    /// Count a request by `agent` against its per-minute budget. The
-    /// window is per server: a cluster of n servers admits up to n times
-    /// the budget.
+    /// Count a request by `agent` against its per-minute budget: a token
+    /// bucket of `limit` refilled over a minute. The bucket is per server:
+    /// a cluster of n servers admits up to n times the budget.
     fn count_request(&self, agent: &AgentRecord) -> Result<()> {
         let Some(limit) = agent.budgets.requests_per_minute else {
             return Ok(());
         };
-        let minute = Timestamp::now().millis().div_euclid(60_000);
-        let mut entry = self
-            .callers
-            .requests
-            .entry((agent.org.clone(), agent.principal.name.clone()))
-            .or_insert((minute, 0));
-        if entry.0 != minute {
-            *entry = (minute, 0);
-        }
-        if entry.1 >= limit {
-            return Err(Error::Exhausted(format!(
+        let refuse = || {
+            Error::Exhausted(format!(
                 "agent {} may make {limit} requests a minute",
                 agent.principal.name
-            )));
-        }
-        entry.1 += 1;
-        Ok(())
+            ))
+        };
+        let per_minute = u32::try_from(limit)
+            .ok()
+            .and_then(NonZeroU32::new)
+            .ok_or_else(refuse)?;
+        let key = (agent.org.clone(), agent.principal.name.clone());
+        let limiter = {
+            let mut entry = self.callers.requests.entry(key).or_insert_with(|| {
+                (
+                    limit,
+                    Arc::new(RateLimiter::direct(Quota::per_minute(per_minute))),
+                )
+            });
+            if entry.0 != limit {
+                *entry = (
+                    limit,
+                    Arc::new(RateLimiter::direct(Quota::per_minute(per_minute))),
+                );
+            }
+            entry.1.clone()
+        };
+        limiter.check().map_err(|_| refuse())
     }
 
     /// Refuse unless registered agent `agent` may act as `model` now.

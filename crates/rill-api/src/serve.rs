@@ -108,6 +108,7 @@ pub async fn serve_with_state(
             shutdown.clone(),
         ));
     }
+    tokio::spawn(sweep_rate_limits(state.clone(), shutdown.clone()));
     let grpc = roles
         .api
         .then(|| tokio::spawn(serve_grpc(state.clone(), listeners.grpc, shutdown.clone())));
@@ -127,6 +128,19 @@ pub async fn serve_with_state(
     }
     tracing::info!("rill server stopped");
     Ok(())
+}
+
+async fn sweep_rate_limits(state: Arc<AppState>, shutdown: CancellationToken) {
+    let Some(limits) = &state.rate_limits else {
+        return;
+    };
+    let mut tick = tokio::time::interval(crate::auth::SWEEP_EVERY);
+    loop {
+        tokio::select! {
+            _ = shutdown.cancelled() => return,
+            _ = tick.tick() => limits.sweep(),
+        }
+    }
 }
 
 async fn serve_grpc(

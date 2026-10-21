@@ -78,8 +78,9 @@ flowchart LR
 
 - This page reflects v1 code; rows move to "fixed" as their phase lands and
   the owning page changes in the same commit.
-- Denial-of-service beyond single-request limits (rate limiting, admission
-  control) is tracked under operations, not here.
+- Denial-of-service beyond single-request limits and per-principal rate
+  limits ([rate limits](../07-runtime/api-surface.md#rate-limits)) is
+  tracked under operations, not here.
 
 ## Code
 

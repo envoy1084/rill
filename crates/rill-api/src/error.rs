@@ -62,6 +62,12 @@ pub enum Error {
     #[error("{0}")]
     Exhausted(String),
 
+    #[error("{principal} is sending requests too fast; retry in {retry_after_secs}s")]
+    RateLimited {
+        principal: String,
+        retry_after_secs: u64,
+    },
+
     #[error("{0}")]
     AlreadyExists(String),
 
@@ -173,7 +179,7 @@ impl Error {
             Error::Unauthenticated(_) => Code::Unauthenticated,
             Error::Unimplemented(_) => Code::Unimplemented,
             Error::Unavailable(_) => Code::Unavailable,
-            Error::Exhausted(_) => Code::ResourceExhausted,
+            Error::Exhausted(_) | Error::RateLimited { .. } => Code::ResourceExhausted,
         }
     }
 }
@@ -273,7 +279,10 @@ impl From<Error> for Status {
         let retry_after = match &err {
             Error::Lander(rill_lander::Error::QueueFull {
                 retry_after_secs, ..
-            }) => Some(*retry_after_secs),
+            })
+            | Error::RateLimited {
+                retry_after_secs, ..
+            } => Some(*retry_after_secs),
             _ => None,
         };
         let mut status = Status::new(code, err.to_string());

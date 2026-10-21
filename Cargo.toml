@@ -161,6 +161,7 @@ icu_casemap = "2.3.0"
 backon = "1.6.0"
 moka = { version = "0.12.16", features = ["sync"] }
 roaring = "0.11"
+governor = "0.10.4"
 # Pinned with weave-core, which depends on the same release.
 sem-core = { version = "=0.28.1", features = ["grammar-all"] }
 proptest = "1.12.0"
