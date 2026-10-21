@@ -13,6 +13,7 @@ pub mod faults;
 pub mod jobs;
 pub mod known;
 pub mod oracle;
+pub mod processes;
 pub mod rng;
 pub mod run;
 pub mod scenario;

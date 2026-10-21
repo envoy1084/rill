@@ -14,7 +14,14 @@ use rill_review::{LabelSet, ReviewService};
 use rill_store::{RepoStore, Stores};
 use rill_types::{ChangeVersionHash, EntryKind, RepoPath};
 
-use crate::faults::{FaultPlan, FaultyMetaStore, FaultyObjectStore};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+use crate::faults::{FaultPlan, FaultyMetaStore, FaultyObjectStore, PartitionedMetaStore};
+
+/// Server processes the world runs: the main one (the API agents talk to,
+/// with its lander) and a rival with its own lander, competing for the
+/// lease.
+pub const PROCESSES: usize = 2;
 
 /// One repository and the services over it.
 pub struct World {
@@ -22,7 +29,12 @@ pub struct World {
     pub derive: Arc<DeriveManager>,
     pub review: Arc<ArcSwap<ReviewService>>,
     pub lander: Arc<Lander>,
+    /// The rival process's lander, over its own view of the stores.
+    pub rival: Arc<Lander>,
     pub plan: Arc<FaultPlan>,
+    /// Per process: cut off from the metadata store, and until which step.
+    cut: [Arc<AtomicBool>; PROCESSES],
+    cut_until: [AtomicUsize; PROCESSES],
     /// The lease a lander held when its process was restarted: what a
     /// paused process that wakes up after being replaced still has.
     pub zombie: Option<rill_store::repo::Lease>,
@@ -40,16 +52,49 @@ impl World {
             .create_repo("sim", "")
             .await
             .expect("repository creation runs before faults are enabled");
-        let repo = stores.repo(config.id);
+        let cut: [Arc<AtomicBool>; PROCESSES] = Default::default();
+        let view = |cut: &Arc<AtomicBool>| {
+            stores
+                .with_meta(Arc::new(PartitionedMetaStore::new(
+                    stores.meta.clone(),
+                    cut.clone(),
+                )))
+                .repo(config.id)
+        };
+        let repo = view(&cut[0]);
         let (derive, review, lander) = services(&repo);
+        let (_, _, rival) = services(&view(&cut[1]));
         World {
             repo,
             derive,
             review,
             lander,
+            rival,
             plan,
+            cut,
+            cut_until: Default::default(),
             zombie: None,
         }
+    }
+
+    /// Cut `process` off from the metadata store until `step`.
+    pub fn partition(&self, process: usize, until: usize) {
+        self.cut[process].store(true, Ordering::SeqCst);
+        self.cut_until[process].store(until, Ordering::SeqCst);
+    }
+
+    /// Reconnect processes whose partition is over at `step`; every one
+    /// when `step` is `None`.
+    pub fn heal(&self, step: Option<usize>) {
+        for p in 0..PROCESSES {
+            if step.is_none_or(|s| s >= self.cut_until[p].load(Ordering::SeqCst)) {
+                self.cut[p].store(false, Ordering::SeqCst);
+            }
+        }
+    }
+
+    pub fn is_partitioned(&self, process: usize) -> bool {
+        self.cut[process].load(Ordering::SeqCst)
     }
 
     /// Simulate a process restart: every in-memory structure (caches, the

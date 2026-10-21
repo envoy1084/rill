@@ -64,6 +64,8 @@ pub struct Oracle {
     pub killed_jobs: BTreeSet<rill_types::JobId>,
     /// Writes a deposed lease holder tried, all of which must fail.
     pub fenced_attempts: usize,
+    pub partitions: usize,
+    pub rival_landings: usize,
     pub violations: Vec<Violation>,
 }
 

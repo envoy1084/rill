@@ -40,6 +40,10 @@ pub struct Report {
     pub killed_jobs: usize,
     /// Landings a replaced lander tried with its stale lease.
     pub fenced_attempts: usize,
+    /// Times a process lost the metadata store for longer than a lease.
+    pub partitions: usize,
+    /// Requests the rival process landed during the run.
+    pub rival_landings: usize,
     pub violations: Vec<Violation>,
     /// Hash of every action and outcome; equal seeds give equal digests.
     pub digest: u64,
@@ -81,6 +85,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
 
     plan.set_enabled(true);
     for step in 0..scenario.steps {
+        world.heal(Some(step));
         if rng.chance(scenario.restart_rate) {
             world.restart().await;
             restarts += 1;
@@ -96,6 +101,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
             reviewers: &reviewers,
             hot_file_share: scenario.hot_file_share,
             stale_base_share: scenario.stale_base_share,
+            partitions: scenario.partitions,
             step,
         };
         set_clock(Some(START_MILLIS + step as i64 * 1_000));
@@ -105,6 +111,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
     }
 
     plan.set_enabled(false);
+    world.heal(None);
     // Past any lease a restarted lander left behind, so the current one
     // can take over and serve every stored request.
     set_clock(Some(
@@ -115,6 +122,7 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
             break;
         }
         let _ = world.lander.run_once().await;
+        let _ = world.rival.run_once().await;
     }
     oracle.observe_trunk(&world.repo).await;
     oracle.check_durability(&world.repo).await;
@@ -138,6 +146,8 @@ async fn run_async(seed: u64, scenario: &Scenario) -> Report {
         trunk_length: oracle.trunk_len(),
         killed_jobs: oracle.killed_jobs.len(),
         fenced_attempts: oracle.fenced_attempts,
+        partitions: oracle.partitions,
+        rival_landings: oracle.rival_landings,
         violations: oracle.violations,
         digest: trace.finish(),
     }

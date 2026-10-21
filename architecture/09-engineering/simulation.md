@@ -1,7 +1,8 @@
 # Simulation
 
 `rill-sim` runs simulated agents and reviewers against Rill's real stores,
-review service and lander, with store failures and process restarts, all
+review service and two landers, with store failures, process restarts
+and network partitions, all
 chosen by one seed. After each sweep, and once the run settles, it checks
 invariants that must hold whatever happened. The same seed always replays
 the same run, so a failing seed is a reproducible bug report. Concurrency
@@ -12,11 +13,12 @@ and crash bugs that example tests miss show up here first.
 ```mermaid
 flowchart LR
   S[seed] --> R[SimRng]
-  R --> A[agents: new change · amend · submit · vote · request land · sweep · sync · abandon · derive work · zombie land]
+  R --> A[agents: new change · amend · submit · vote · request land · sweep · sync · abandon · derive work · zombie land · rival sweep · partition]
   R --> X[restarts]
   S --> F[FaultPlan]
   A --> W[World: RepoStore · ReviewService · Lander · ReviewHooksAdapter]
-  W --> FS[FaultyMetaStore / FaultyObjectStore]
+  W --> P[PartitionedMetaStore per process]
+  P --> FS[FaultyMetaStore / FaultyObjectStore]
   FS --> M[(memory stores)]
   W --> O[Oracle: invariants]
 ```
@@ -36,7 +38,14 @@ flowchart LR
    queue and, 30% of the time, dies holding the claim. Once another lander
    holds the lease, the zombie tries to land an acknowledged version with
    its stale lease.
-5. **Settle:** faults stop and the lander sweeps until the queue is empty.
+5. **Processes and partitions:** a second, rival process runs its own
+   lander over its own view of the stores, so the two compete for the
+   lander lease. A partition cuts one process off from the metadata store
+   for 12 to 20 steps (simulated seconds), longer than the 10 s lease: the
+   other process takes the lease while the cut one still holds its own
+   claim, and must be fenced when it reconnects.
+6. **Settle:** faults stop, partitions heal and both landers sweep until
+   the queue is empty.
    The clock then jumps past every lease and backoff, expired claims are
    reaped, dead jobs revived, and the derive queue is run dry. Then the
    final checks run.
@@ -61,6 +70,11 @@ and how often that same operation has run. It is not a draw from a shared
 sequence, because some code iterates hash sets and so issues store calls in
 a different order on each run. Keyed decisions give a seed the same faults
 regardless of order.
+
+`PartitionedMetaStore` sits above the fault layer, one per process: while
+its process is cut off every read, scan, counter and transaction fails
+with an injected error, as a network partition does. Partitions run only in
+`faulty`.
 
 ## Determinism
 
@@ -93,7 +107,7 @@ change ids explicitly. A run's `digest` hashes every action and outcome, and
 | --- | --- | --- |
 | `clean` | none | every invariant |
 | `contended` | none; 16 agents, 70% of edits on the hot file | every invariant |
-| `faulty` | 3% failed writes, 2% lost acknowledgements, 1% corrupt reads, 2% restarts | every invariant |
+| `faulty` | 3% failed writes, 2% lost acknowledgements, 1% corrupt reads, 2% restarts, partitions | every invariant |
 
 `known.rs` lists violations the current code is known to produce under
 faults, with the roadmap phase whose redesign removes each; the list is
@@ -104,9 +118,11 @@ into the store so a restarted lander serves the ones its predecessor left.
 
 A violation of any other invariant fails the tests. When a phase fixes a
 known issue, its entry is removed. The faulty test also requires that some
-worker died holding a job and some zombie tried to land, so the job and
-lease checks are never vacuous; 10,000 faulty seeds rerun about 5,900 jobs
-and refuse about 21,000 zombie landings.
+worker died holding a job, some zombie tried to land, some process was
+partitioned and the rival landed something, so the job and lease checks are
+never vacuous. 50,000 faulty seeds hold every invariant: they rerun 27,601
+jobs, refuse 101,483 zombie landings, partition 64,664 times and land
+18,036 requests through the rival.
 
 ## Running
 
@@ -117,13 +133,13 @@ cargo run --release -p rill-sim -- --scenario faulty --seeds 10000
 cargo run --release -p rill-sim -- --scenario clean --seed 42    # replay one seed
 ```
 
-A release build runs about 500 seeds a second.
+A release build runs about 200 faulty seeds a second.
 
 ## Limitations
 
-- One process, called as a library. There is no network between client and
-  server, and no concurrency between separate server processes. That needs a
-  network simulator once the server is split into separate roles.
+- Called as a library. There is no network between client and server, and
+  the two processes take turns step by step; they never run concurrently
+  inside one sweep.
 - Restarts happen between actions, never in the middle of a sweep. A crash
   inside a landing shows up only through faults injected into its writes.
 - Workspaces, intents, search and post-land verification are not simulated.
@@ -131,7 +147,7 @@ A release build runs about 500 seeds a second.
 
 ## Code
 
-- [rill-sim/src/run.rs](../../crates/rill-sim/src/run.rs), [world.rs](../../crates/rill-sim/src/world.rs), [actors.rs](../../crates/rill-sim/src/actors.rs), [oracle.rs](../../crates/rill-sim/src/oracle.rs), [known.rs](../../crates/rill-sim/src/known.rs)
+- [rill-sim/src/run.rs](../../crates/rill-sim/src/run.rs), [world.rs](../../crates/rill-sim/src/world.rs), [actors.rs](../../crates/rill-sim/src/actors.rs), [oracle.rs](../../crates/rill-sim/src/oracle.rs), [known.rs](../../crates/rill-sim/src/known.rs), [processes.rs](../../crates/rill-sim/src/processes.rs)
 - [rill-sim/src/faults/](../../crates/rill-sim/src/faults/mod.rs), [rill-sim/tests/seeds.rs](../../crates/rill-sim/tests/seeds.rs)
 - [rill-types/src/testing/](../../crates/rill-types/src/testing/mod.rs)
 

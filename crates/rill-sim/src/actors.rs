@@ -29,6 +29,8 @@ pub enum Action {
     Abandon,
     DeriveWork,
     ZombieLand,
+    RivalSweep,
+    Partition,
 }
 
 impl Action {
@@ -43,6 +45,8 @@ impl Action {
         (Action::Abandon, 3),
         (Action::DeriveWork, 8),
         (Action::ZombieLand, 3),
+        (Action::RivalSweep, 6),
+        (Action::Partition, 1),
     ];
 
     /// Draw an action by weight.
@@ -89,6 +93,7 @@ pub struct Ctx<'a> {
     pub reviewers: &'a [Principal],
     pub hot_file_share: f64,
     pub stale_base_share: f64,
+    pub partitions: bool,
     pub step: usize,
 }
 
@@ -110,6 +115,8 @@ impl Ctx<'_> {
             Action::Abandon => self.abandon(agent).await,
             Action::DeriveWork => self.derive_work().await,
             Action::ZombieLand => self.zombie_land().await,
+            Action::RivalSweep => self.rival_sweep().await,
+            Action::Partition => self.partition().await,
         }
     }
 

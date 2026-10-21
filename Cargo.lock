@@ -4581,6 +4581,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "parking_lot",
  "prometheus-client",
  "prost 0.14.4",
  "rill-core",
@@ -4632,6 +4633,7 @@ name = "rill-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bytes",
  "clap",
  "clap_complete",
@@ -4720,6 +4722,7 @@ dependencies = [
 name = "rill-git-import"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bytes",
  "gix",
  "hex",
@@ -4755,6 +4758,7 @@ name = "rill-lander"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "blake3",
  "bytes",
  "dashmap",
  "futures",
@@ -4777,6 +4781,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "clap",
+ "futures",
  "hdrhistogram",
  "parking_lot",
  "rand 0.10.3",
@@ -4818,6 +4823,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "biscuit-auth",
+ "blake3",
  "bytes",
  "cedar-policy",
  "ed25519-dalek 3.0.0",

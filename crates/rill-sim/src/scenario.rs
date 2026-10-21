@@ -15,6 +15,8 @@ pub struct Scenario {
     pub corrupt_rate: f64,
     /// Probability a step is a process restart.
     pub restart_rate: f64,
+    /// Whether processes lose the metadata store for longer than a lease.
+    pub partitions: bool,
     /// Share of edits that touch the one shared hot file.
     pub hot_file_share: f64,
     /// Share of new changes based on an older trunk position.
@@ -32,12 +34,14 @@ impl Scenario {
             lose_ack_rate: 0.0,
             corrupt_rate: 0.0,
             restart_rate: 0.0,
+            partitions: false,
             hot_file_share: 0.3,
             stale_base_share: 0.2,
         }
     }
 
-    /// Store faults and restarts: violations must all be known issues.
+    /// Store faults, restarts and partitions: violations must all be known
+    /// issues.
     pub fn faulty() -> Self {
         Scenario {
             name: "faulty",
@@ -45,6 +49,7 @@ impl Scenario {
             lose_ack_rate: 0.02,
             corrupt_rate: 0.01,
             restart_rate: 0.02,
+            partitions: true,
             ..Scenario::clean()
         }
     }

@@ -2,8 +2,10 @@
 
 mod meta;
 mod objects;
+mod partition;
 mod plan;
 
 pub use meta::FaultyMetaStore;
 pub use objects::FaultyObjectStore;
+pub use partition::PartitionedMetaStore;
 pub use plan::{Fault, FaultPlan};
