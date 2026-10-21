@@ -74,6 +74,9 @@ idempotent!(
     RevokeTokenRequest,
     RevokeSessionRequest,
     RotateTokenKeysRequest,
+    PutIdentityProviderRequest,
+    DeleteIdentityProviderRequest,
+    UpdateUserRequest,
 );
 
 /// The idempotency key of the request being handled, for work that

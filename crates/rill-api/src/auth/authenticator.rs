@@ -57,9 +57,10 @@ pub async fn authenticate(state: &AppState, authorization: Option<&str>) -> Resu
         }
     }
     let verified = state.identity.verify(token).await?;
+    let teams = state.identity.teams_of(&verified).await?;
     Ok(AuthContext {
         principal: verified.principal,
-        teams: Vec::new(),
+        teams,
         capability: verified.capability,
         claims: Some(verified.claims),
     })

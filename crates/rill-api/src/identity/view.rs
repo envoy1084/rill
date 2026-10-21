@@ -5,12 +5,14 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 use rill_identity::keys::{key_service, KeyManager, KeySet};
+use rill_identity::oidc::Issuers;
 use rill_policy::{Issuer, TokenLifetimes, Verified, Verifier};
 use rill_store::identity::IdentityStore;
 use rill_store::Stores;
-use rill_types::identity::IdentityChange;
+use rill_types::identity::{IdentityChange, UserRecord};
 use rill_types::{Principal, SessionId, Timestamp, TokenId};
 
 use crate::config::IdentityConfig;
@@ -35,6 +37,11 @@ pub struct IdentityView {
     revoked_sessions: RwLock<HashMap<SessionId, Timestamp>>,
     last_forced_reload: Mutex<Option<Instant>>,
     admins: Vec<String>,
+    /// Users by `(org, name)`, read on first use and dropped when the
+    /// identity log says they changed. `None` caches "no such user".
+    users: DashMap<(String, String), Option<Arc<UserRecord>>>,
+    issuers: Issuers,
+    config: IdentityConfig,
 }
 
 impl IdentityView {
@@ -60,6 +67,9 @@ impl IdentityView {
             revoked_sessions: RwLock::new(HashMap::new()),
             last_forced_reload: Mutex::new(None),
             admins: config.admins.clone(),
+            users: DashMap::new(),
+            issuers: Issuers::new(reqwest::Client::new()),
+            config: config.clone(),
         });
         view.reload_revocations().await?;
         Ok(view)
@@ -75,6 +85,26 @@ impl IdentityView {
 
     pub fn lifetimes(&self) -> TokenLifetimes {
         self.lifetimes
+    }
+
+    pub fn config(&self) -> &IdentityConfig {
+        &self.config
+    }
+
+    /// OIDC issuers this process has discovered.
+    pub fn issuers(&self) -> &Issuers {
+        &self.issuers
+    }
+
+    /// The user `name` of `org`, from the cache.
+    pub async fn user(&self, org: &str, name: &str) -> Result<Option<Arc<UserRecord>>> {
+        let key = (org.to_string(), name.to_string());
+        if let Some(cached) = self.users.get(&key) {
+            return Ok(cached.clone());
+        }
+        let user = self.store.user(org, name).await?.map(Arc::new);
+        self.users.insert(key, user.clone());
+        Ok(user)
     }
 
     /// When a stored key next activates, if one is pending.
@@ -119,6 +149,7 @@ impl IdentityView {
 
     /// Reread everything.
     pub async fn reload(&self) -> Result<()> {
+        self.users.clear();
         self.reload_keys().await?;
         self.reload_revocations().await
     }
@@ -142,7 +173,11 @@ impl IdentityView {
                     .insert(*session, Timestamp::from_millis(i64::MAX));
                 false
             }
-            IdentityChange::UserChanged { .. } | IdentityChange::ProviderChanged { .. } => false,
+            IdentityChange::UserChanged { org, name } => {
+                self.users.remove(&(org.clone(), name.clone()));
+                false
+            }
+            IdentityChange::ProviderChanged { .. } => false,
         }
     }
 
@@ -174,7 +209,28 @@ impl IdentityView {
                 return Err(Error::Unauthenticated("session revoked".into()));
             }
         }
+        if let Some(user) = self
+            .user(&verified.claims.org, &verified.principal.name)
+            .await?
+        {
+            if user.principal.kind == verified.principal.kind && !user.is_active() {
+                return Err(Error::Unauthenticated(format!(
+                    "{} is suspended",
+                    verified.principal
+                )));
+            }
+        }
         Ok(verified)
+    }
+
+    /// The teams of a verified caller.
+    pub async fn teams_of(&self, verified: &Verified) -> Result<Vec<String>> {
+        Ok(self
+            .user(&verified.claims.org, &verified.principal.name)
+            .await?
+            .filter(|u| u.principal.kind == verified.principal.kind)
+            .map(|u| u.teams.clone())
+            .unwrap_or_default())
     }
 
     fn check_signature(&self, token: &str, now: Timestamp) -> rill_policy::Result<Verified> {

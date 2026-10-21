@@ -105,7 +105,7 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
         .route("/readyz", get(readyz))
         .route("/metrics", get(metrics));
     let router = if serve_objects {
-        health.merge(objects)
+        health.merge(objects).merge(crate::signin::router())
     } else {
         health
     };

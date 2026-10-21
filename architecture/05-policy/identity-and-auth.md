@@ -95,6 +95,72 @@ The `IdentityService` RPCs:
 `WhoAmI` reports the caller's token id, session, org, sponsor and model with
 its principal and capability.
 
+## Sign-in
+
+Each organization registers OpenID Connect providers
+(`PutIdentityProvider`: issuer, a confidential client for browsers whose
+secret the key service wraps, an optional public client for the CLI, the
+username and groups claims, and whether a first sign-in provisions the
+user). An issuer belongs to one provider in the instance. Issuers must use
+https, except on loopback addresses.
+
+```mermaid
+sequenceDiagram
+  participant B as browser
+  participant R as rill (HTTP listener)
+  participant P as provider
+  B->>R: GET /auth/login?org&provider&return_to
+  R->>R: PendingLogin {state, nonce, PKCE verifier}, 10 min
+  R-->>B: 303 to the provider (code_challenge S256)
+  B->>P: authorize
+  P-->>B: 303 /auth/callback?code&state
+  B->>R: callback
+  R->>R: take PendingLogin (once)
+  R->>P: exchange code + verifier (+ client secret)
+  R->>R: verify ID token (issuer, audience, nonce, keys)
+  R->>R: resolve_user, open_session (Browser)
+  R-->>B: Set-Cookie rill_session (HttpOnly, SameSite=Lax, Path=/auth)
+  B->>R: POST /auth/token (x-rill-request)
+  R-->>B: access token, cookie rotated
+```
+
+[`resolve_user`](../../crates/rill-identity/src/signin/users.rs) finds the
+user an `(issuer, subject)` is linked to, or creates one named by the
+provider's username claim (`preferred_username`, falling back to `email`)
+when the provider provisions. Principal names are unique across the
+instance, so a second identity claiming a taken name is refused; groups
+become teams on every sign-in when the provider names a groups claim.
+Suspended users and identities of another organization are refused.
+
+[`open_session`](../../crates/rill-identity/src/signin/sessions.rs) stores a
+`SessionRecord` (`identity.session_hours`, 12 by default) with a hash of a
+random refresh secret; the refresh token is `ss_<id>.<secret>`. Each refresh
+replaces the secret with a compare-and-set, so a refresh token works once
+and a stolen one dies the first time either party uses it. Access tokens
+carry the session and live as long as the principal's kind allows, never
+past the session.
+
+The HTTP routes ([signin/](../../crates/rill-api/src/signin/mod.rs)), on the
+object-protocol listener and open:
+
+| Route | Does |
+| --- | --- |
+| `GET /auth/login?org&provider&return_to` | starts the browser flow; `return_to` must be a path on this server |
+| `GET /auth/callback` | finishes it; sets the session cookie and redirects or shows a page |
+| `POST /auth/token` | cookie to access token, rotating the cookie; needs the `x-rill-request` header |
+| `POST /auth/logout` | ends the cookie's session; needs `x-rill-request` |
+| `GET /auth/providers?org` | the org's providers, CLI clients and device endpoints |
+| `POST /oauth/token` | `refresh_token` grants, and RFC 8693 exchange of a provider ID token (`subject_token_type` `…:id_token`, any of the provider's clients) for a device session |
+
+Refreshing refuses and ends the session of a user suspended since signing
+in; every request by a suspended user is refused through the identity view
+(`UserChanged` in the log drops the cached user).
+
+Org administration (`require_org_admin`): instance administrators, or an
+active member of the org with the `admin` role presenting an unnarrowed
+token for that org. `ListIdentityProviders`, `DeleteIdentityProvider`,
+`ListUsers` and `UpdateUser` (suspend, reactivate, set roles) need it.
+
 ## Bootstrap
 
 A server outside dev mode accepts only tokens the instance signed. The first
@@ -158,7 +224,7 @@ path and repository. `resolved_by()` maps the caller's kind to the
   is accepted for any workspace.
 * No `TeamResolver` is wired in the server. Token-authenticated principals
   always have empty teams; only static tokens carry teams.
-* There is no sign-in yet: tokens come from `mint-token` and `IssueToken`.
+* SAML providers are not supported.
 * `PrincipalKind` has no serde rename, so a TOML `auth.tokens[].kind` must be
   written `Human`, `Agent` or `Service`. The env var form uses lowercase.
 * `CreateChangeVersion` stores the client-supplied `author` and `provenance`
@@ -170,7 +236,8 @@ path and repository. `resolved_by()` maps the caller's kind to the
 ## Code
 
 * [`rill-policy/src/identity.rs`](../../crates/rill-policy/src/identity.rs): `AuthHeaders`, `AuthContext`, `Authenticator`, `StaticTokenAuthenticator`, `TeamResolver`.
-* Tests: `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-cli/tests/bootstrap.rs`.
+* [`signin/`](../../crates/rill-api/src/signin/mod.rs): the sign-in HTTP routes; [`rill-identity/src/signin/`](../../crates/rill-identity/src/signin/mod.rs), [`rill-identity/src/oidc/`](../../crates/rill-identity/src/oidc/mod.rs).
+* Tests: `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-cli/tests/bootstrap.rs`.
 * [`rill-types/src/principal.rs`](../../crates/rill-types/src/principal.rs): `Principal`, `PrincipalKind`.
 * [`auth/authenticator.rs`](../../crates/rill-api/src/auth/authenticator.rs): `static_tokens`, `authenticate`.
 * [`auth/instance.rs`](../../crates/rill-api/src/auth/instance.rs): `require_instance_admin`.

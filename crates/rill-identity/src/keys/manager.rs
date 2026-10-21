@@ -79,6 +79,12 @@ impl KeyManager {
         &self.policy
     }
 
+    /// The key service, which also wraps other secrets the instance keeps
+    /// (identity provider client secrets).
+    pub fn key_service(&self) -> &Arc<dyn KeyWrapper> {
+        &self.wrapper
+    }
+
     /// The longest any token lives: how long a key must outlive its last
     /// signature.
     fn longest_token_ms(&self) -> i64 {

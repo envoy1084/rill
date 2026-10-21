@@ -13,6 +13,7 @@ mod replicas;
 mod retries;
 mod search;
 mod shutdown;
+mod signin;
 mod telemetry;
 mod workspaces;
 

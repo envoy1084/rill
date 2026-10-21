@@ -24,6 +24,7 @@ pub mod objects;
 mod serve;
 pub mod services;
 mod shutdown;
+pub mod signin;
 pub mod state;
 pub mod telemetry;
 mod tls;

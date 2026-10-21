@@ -42,6 +42,7 @@ async fn maintain(view: &IdentityView) -> crate::error::Result<()> {
     let store = view.store();
     store.sweep_revocations(expired, SWEEP_LIMIT).await?;
     store.sweep_sessions(expired, SWEEP_LIMIT).await?;
+    store.sweep_pending_logins(now, SWEEP_LIMIT).await?;
     store
         .sweep_log(
             Timestamp::from_millis(now.millis() - LOG_RETENTION_MS),

@@ -9,6 +9,7 @@
 pub mod error;
 pub mod keys;
 pub mod oidc;
+pub mod signin;
 #[cfg(feature = "testing")]
 pub mod testing;
 

@@ -1,7 +1,9 @@
 //! The identity service: token keys, revocation and sessions.
 
 mod keys;
+mod providers;
 mod revoke;
+mod users;
 
 use std::sync::Arc;
 
@@ -69,5 +71,58 @@ impl IdentityService for IdentitySvc {
             .await
             .map(Response::new)
             .map_err(Status::from)
+    }
+
+    async fn put_identity_provider(
+        &self,
+        request: Request<pb::PutIdentityProviderRequest>,
+    ) -> GrpcResult<pb::PutIdentityProviderResponse> {
+        idem::once(&self.state, request, |r| async move {
+            providers::put(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn list_identity_providers(
+        &self,
+        request: Request<pb::ListIdentityProvidersRequest>,
+    ) -> GrpcResult<pb::ListIdentityProvidersResponse> {
+        providers::list(&self.state, request)
+            .await
+            .map(Response::new)
+            .map_err(Status::from)
+    }
+
+    async fn delete_identity_provider(
+        &self,
+        request: Request<pb::DeleteIdentityProviderRequest>,
+    ) -> GrpcResult<pb::DeleteIdentityProviderResponse> {
+        idem::once(&self.state, request, |r| async move {
+            providers::delete(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn list_users(
+        &self,
+        request: Request<pb::ListUsersRequest>,
+    ) -> GrpcResult<pb::ListUsersResponse> {
+        users::list(&self.state, request)
+            .await
+            .map(Response::new)
+            .map_err(Status::from)
+    }
+
+    async fn update_user(
+        &self,
+        request: Request<pb::UpdateUserRequest>,
+    ) -> GrpcResult<pb::UpdateUserResponse> {
+        idem::once(&self.state, request, |r| async move {
+            users::update(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
     }
 }

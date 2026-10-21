@@ -17,6 +17,10 @@ pub enum Error {
     #[error("OIDC: {0}")]
     Oidc(String),
 
+    /// Sign-in or a token request was refused.
+    #[error("refused: {0}")]
+    Denied(String),
+
     /// Identity configuration is unusable.
     #[error("identity configuration: {0}")]
     Config(String),

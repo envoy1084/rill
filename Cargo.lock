@@ -5214,6 +5214,7 @@ dependencies = [
  "async-trait",
  "axum",
  "axum-server",
+ "base64 0.23.1",
  "blake3",
  "bytes",
  "dashmap",
@@ -5227,6 +5228,8 @@ dependencies = [
  "parking_lot",
  "prometheus-client",
  "prost 0.14.4",
+ "rand 0.10.3",
+ "reqwest",
  "rill-core",
  "rill-events",
  "rill-exec",
@@ -5258,6 +5261,7 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]

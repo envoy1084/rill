@@ -5,9 +5,15 @@ use rill_policy::TokenLifetimes;
 use serde::{Deserialize, Serialize};
 
 /// The `[identity]` section.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct IdentityConfig {
+    /// The URL browsers reach this service at (`https://rill.example.com`);
+    /// sign-in redirects come back to `<public_url>/auth/callback`. Defaults
+    /// to the HTTP listen address.
+    pub public_url: Option<String>,
+    /// How long a sign-in session lasts before signing in again.
+    pub session_hours: u64,
     /// The key service that wraps token signing keys.
     pub keys: KeyServiceConfig,
     pub lifetimes: LifetimesConfig,
@@ -15,6 +21,19 @@ pub struct IdentityConfig {
     /// Principal names that administer the instance (keys, revocation,
     /// organizations) before any role is stored.
     pub admins: Vec<String>,
+}
+
+impl Default for IdentityConfig {
+    fn default() -> Self {
+        IdentityConfig {
+            public_url: None,
+            session_hours: 12,
+            keys: KeyServiceConfig::default(),
+            lifetimes: LifetimesConfig::default(),
+            rotation: RotationConfig::default(),
+            admins: Vec::new(),
+        }
+    }
 }
 
 /// The longest a token may live, per principal kind, in seconds.

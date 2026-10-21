@@ -11,5 +11,5 @@ mod registry;
 pub use code_flow::{authorize_url, exchange_code, AuthorizationRequest, CodeExchange};
 pub use discovery::{discover, ProviderMetadata};
 pub use jwks::{JwksCache, JwksSource};
-pub use jwt::{Claims, JwtVerifier};
+pub use jwt::{unverified_issuer, Claims, JwtVerifier};
 pub use registry::Issuers;

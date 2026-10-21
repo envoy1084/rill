@@ -39,7 +39,7 @@ The server registers all seven services behind `AuthLayer`
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
 | `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
-| `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys` ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
+| `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser` ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
 
 `types.proto` holds the shared object model and `events.proto` the event
 log's messages. The streaming RPCs are `GetBlob` (server stream of
@@ -130,7 +130,9 @@ values survive a trip through the wire and back.
 
 ## HTTP object protocol
 
-`objects/mod.rs` builds an axum router on the HTTP listener. An object URL
+`objects/mod.rs` builds an axum router on the HTTP listener. The same
+listener serves the sign-in routes (`/auth/*`, `/oauth/token`; see
+[identity and auth](../05-policy/identity-and-auth.md#sign-in)). An object URL
 names exactly one byte string forever, so responses carry
 `ETag: "<hash>"` and `Cache-Control: public, immutable, max-age=31536000`.
 

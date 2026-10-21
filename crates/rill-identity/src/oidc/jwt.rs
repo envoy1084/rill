@@ -55,6 +55,26 @@ impl Claims {
     }
 }
 
+/// The issuer a JWT names, read without verifying anything: only to pick
+/// the verifier that will.
+pub fn unverified_issuer(token: &str) -> Result<String> {
+    use base64::Engine as _;
+    let payload = token
+        .split('.')
+        .nth(1)
+        .ok_or_else(|| Error::Oidc("not a JWT".into()))?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .map_err(|_| Error::Oidc("not a JWT".into()))?;
+    let claims: Map<String, Value> =
+        serde_json::from_slice(&bytes).map_err(|_| Error::Oidc("not a JWT".into()))?;
+    claims
+        .get("iss")
+        .and_then(Value::as_str)
+        .map(String::from)
+        .ok_or_else(|| Error::Oidc("token has no issuer".into()))
+}
+
 /// Verifies tokens from one issuer for a set of audiences.
 pub struct JwtVerifier {
     issuer: String,
