@@ -1,6 +1,6 @@
 //! Background tasks that run per repository: the landing loop, post-land
-//! verification, background derivation, search indexing and the event
-//! forwarders that feed the repository's event bus.
+//! verification, background derivation, search indexing, event retention
+//! and the forwarders that feed the repository's event bus.
 
 mod deriver;
 mod hooks;
@@ -13,6 +13,9 @@ pub use hooks::ReviewHooksAdapter;
 pub use verifier::ExecVerifier;
 
 use crate::state::{land_to_bus, RepoContext, RepoEvent};
+
+/// How often expired events are swept.
+const EVENT_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3600);
 
 /// Spawn every worker for `ctx`. They run until the context's shutdown
 /// token is cancelled; the forwarders also stop when their source channel
@@ -32,6 +35,11 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>) {
         );
     }
     tokio::spawn(deriver::run(ctx.clone(), shutdown.clone()));
+    tokio::spawn(rill_events::run_retention(
+        ctx.repo.clone(),
+        EVENT_SWEEP_INTERVAL,
+        shutdown.clone(),
+    ));
     tokio::spawn(indexer::run(ctx.clone(), shutdown));
     tracing::info!(repo = %ctx.config.name, "repository workers started");
 }

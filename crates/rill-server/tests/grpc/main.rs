@@ -4,6 +4,7 @@
 mod auth;
 mod commits;
 mod end_to_end;
+mod events;
 mod orgs;
 mod retries;
 mod workspaces;

@@ -9,6 +9,7 @@ members = [
     "crates/rill-proto",
     "crates/rill-review",
     "crates/rill-lander",
+    "crates/rill-events",
     "crates/rill-search",
     "crates/rill-exec",
     "crates/rill-server",
@@ -38,6 +39,7 @@ rill-policy = { path = "crates/rill-policy" }
 rill-proto = { path = "crates/rill-proto" }
 rill-review = { path = "crates/rill-review" }
 rill-lander = { path = "crates/rill-lander" }
+rill-events = { path = "crates/rill-events" }
 rill-search = { path = "crates/rill-search" }
 rill-exec = { path = "crates/rill-exec" }
 rill-server = { path = "crates/rill-server" }

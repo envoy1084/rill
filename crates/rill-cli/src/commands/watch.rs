@@ -1,11 +1,11 @@
-//! `rill watch`: stream trunk landings, ref moves or new versions as
-//! lines (one JSON object per line with `--json`).
+//! `rill watch`: stream trunk landings, ref moves, new versions or every
+//! event as lines (one JSON object per line with `--json`).
 
 use clap::{Args, Subcommand};
 use futures::StreamExt;
 use rill_mcp::json;
-use rill_sdk::{LogEntry, WatchStart};
-use rill_types::Versionstamp;
+use rill_sdk::{EventQuery, LogEntry, LoggedEvent, WatchStart};
+use rill_types::{ChangeId, Versionstamp};
 use serde_json::Value;
 
 use crate::commands::seq_arg;
@@ -22,6 +22,28 @@ pub enum WatchCmd {
     Refs(RefsArgs),
     /// New change versions as they are created.
     Log(LogArgs),
+    /// Every committed state change, from the event log.
+    Events(EventsArgs),
+}
+
+/// `rill watch events`.
+#[derive(Args, Debug)]
+pub struct EventsArgs {
+    /// Resume after this cursor, printed with every event (default: now).
+    #[arg(long, conflicts_with = "from_start")]
+    pub after: Option<Versionstamp>,
+    /// Replay the retained log first.
+    #[arg(long)]
+    pub from_start: bool,
+    /// Only these event kinds (`ref_moved`, `landed`, ...); repeatable.
+    #[arg(long = "kind")]
+    pub kinds: Vec<String>,
+    /// Only events about this change.
+    #[arg(long)]
+    pub change: Option<ChangeId>,
+    /// Only moves of refs starting with this prefix.
+    #[arg(long)]
+    pub ref_prefix: Option<String>,
 }
 
 /// `rill watch trunk`.
@@ -90,11 +112,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: WatchCmd) -> Result<()> {
             }
         }
         WatchCmd::Log(args) => {
-            let start = match (args.after, args.from_start) {
-                (Some(cursor), _) => WatchStart::After(cursor),
-                (None, true) => WatchStart::Beginning,
-                (None, false) => WatchStart::Now,
-            };
+            let start = watch_start(args.after, args.from_start);
             let mut stream = repo.watch_log(start).await?;
             while let Some(event) = stream.next().await {
                 let LogEntry { cursor, info: e } = event?;
@@ -105,8 +123,49 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: WatchCmd) -> Result<()> {
                 })?;
             }
         }
+        WatchCmd::Events(args) => {
+            let query = EventQuery {
+                kinds: args.kinds,
+                change: args.change,
+                ref_prefix: args.ref_prefix,
+            };
+            let start = watch_start(args.after, args.from_start);
+            let mut stream = repo.watch_events(start, query).await?;
+            while let Some(entry) = stream.next().await {
+                let LoggedEvent { cursor, event } = entry?;
+                let value = serde_json::json!({
+                    "cursor": cursor.to_string(),
+                    "kind": event.kind.name(),
+                    "actor": event.actor.to_string(),
+                    "at": event.at.millis(),
+                    "change_id": event.kind.change().map(|c| c.to_string()),
+                    "detail": serde_json::to_value(&event.kind)?,
+                });
+                emit(ctx, value, || {
+                    let change = event
+                        .kind
+                        .change()
+                        .map(|c| format!(" {c}"))
+                        .unwrap_or_default();
+                    format!(
+                        "{cursor} {}{change} by {} at {}",
+                        event.kind.name(),
+                        event.actor,
+                        when(&event.at)
+                    )
+                })?;
+            }
+        }
     }
     Ok(())
+}
+
+fn watch_start(after: Option<Versionstamp>, from_start: bool) -> WatchStart {
+    match (after, from_start) {
+        (Some(cursor), _) => WatchStart::After(cursor),
+        (None, true) => WatchStart::Beginning,
+        (None, false) => WatchStart::Now,
+    }
 }
 
 fn emit(ctx: &mut Ctx<'_>, value: Value, human: impl FnOnce() -> String) -> Result<()> {

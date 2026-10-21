@@ -250,6 +250,15 @@ impl RepoService for RepoSvc {
         Ok(Response::new(self.watch_log_impl(request).await?))
     }
 
+    type WatchEventsStream = EventStream<pb::EventEnvelope>;
+
+    async fn watch_events(
+        &self,
+        request: Request<pb::WatchEventsRequest>,
+    ) -> GrpcResult<Self::WatchEventsStream> {
+        Ok(Response::new(self.watch_events_impl(request).await?))
+    }
+
     async fn get_derived(
         &self,
         request: Request<pb::GetDerivedRequest>,

@@ -29,6 +29,9 @@ pub enum Error {
     Lander(#[from] rill_lander::Error),
 
     #[error(transparent)]
+    Events(#[from] rill_events::Error),
+
+    #[error(transparent)]
     Exec(#[from] rill_exec::Error),
 
     #[error(transparent)]
@@ -111,6 +114,7 @@ impl Error {
             Error::Policy(e) => policy_code(e),
             Error::Review(e) => review_code(e),
             Error::Lander(e) => lander_code(e),
+            Error::Events(rill_events::Error::Store(e)) => store_code(e),
             Error::Exec(_) => Code::Internal,
             Error::Search(e) => match e {
                 rill_search::Error::InvalidPattern(_) | rill_search::Error::InvalidGlob(_) => {

@@ -130,6 +130,7 @@ impl RepoService for MockRepo {
     type WatchRefsStream = BoxStream<'static, Result<pb::RefEvent, Status>>;
     type WatchTrunkStream = BoxStream<'static, Result<pb::LandEvent, Status>>;
     type WatchLogStream = BoxStream<'static, Result<pb::LogEntry, Status>>;
+    type WatchEventsStream = BoxStream<'static, Result<pb::EventEnvelope, Status>>;
 
     async fn get_repo(&self, req: Request<pb::GetRepoRequest>) -> RpcResult<pb::GetRepoResponse> {
         let name = req.into_inner().repo;
@@ -264,6 +265,7 @@ impl RepoService for MockRepo {
         watch_trunk(pb::WatchTrunkRequest) -> Self::WatchTrunkStream;
         watch_refs(pb::WatchRefsRequest) -> Self::WatchRefsStream;
         watch_log(pb::WatchLogRequest) -> Self::WatchLogStream;
+        watch_events(pb::WatchEventsRequest) -> Self::WatchEventsStream;
         get_derived(pb::GetDerivedRequest) -> pb::GetDerivedResponse;
         wait_derived(pb::WaitDerivedRequest) -> pb::WaitDerivedResponse;
     }

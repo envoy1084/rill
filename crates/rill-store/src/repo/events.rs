@@ -74,6 +74,20 @@ impl RepoStore {
         Ok(removed)
     }
 
+    /// The cursor of the newest event, if any.
+    pub async fn latest_event(&self) -> Result<Option<Versionstamp>> {
+        let prefix = self.keys().table(table::EVENT);
+        let rows = self
+            .meta()
+            .scan(KeyRange::prefix(prefix.clone()).reverse().limit(1))
+            .await?;
+        rows.first()
+            .map(|(k, _)| {
+                stamp_from_key(prefix.len(), k).ok_or_else(|| Error::Codec("bad event key".into()))
+            })
+            .transpose()
+    }
+
     /// Events after `after` (from the start when `None`), oldest first.
     pub async fn events_after(
         &self,

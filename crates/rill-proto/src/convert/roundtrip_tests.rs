@@ -452,3 +452,84 @@ fn descriptor_set_is_embedded_and_parses() {
         .collect();
     assert_eq!(services.len(), 6);
 }
+
+#[test]
+fn every_event_kind_roundtrips() {
+    let change = ChangeId::new();
+    let kinds = vec![
+        EventKind::RepoCreated { name: "r".into() },
+        EventKind::RefMoved {
+            name: "feature".into(),
+            old: None,
+            new: Some(h("a")),
+        },
+        EventKind::ReviewSubmitted {
+            change,
+            version: h("a"),
+        },
+        EventKind::Voted {
+            change,
+            label: "Code-Review".into(),
+            value: -2,
+            version: h("a"),
+        },
+        EventKind::Commented {
+            change,
+            thread: "t1".into(),
+            new_thread: true,
+        },
+        EventKind::ThreadResolved {
+            change,
+            thread: "t1".into(),
+            resolved: false,
+        },
+        EventKind::StackSet {
+            change,
+            stack: vec![change, ChangeId::new()],
+        },
+        EventKind::WorkspaceChanged {
+            workspace: WorkspaceId::new(),
+            operation: OperationId::new(),
+        },
+        EventKind::WorkspaceDeleted {
+            workspace: WorkspaceId::new(),
+        },
+        EventKind::IntentChanged {
+            intent: IntentId::new(),
+        },
+        EventKind::RelationChanged {
+            object: "repo".into(),
+            relation: "reader".into(),
+            subject: "*".into(),
+            added: true,
+        },
+        EventKind::PolicyChanged {
+            name: "submit".into(),
+        },
+        EventKind::VersionStored {
+            version: h("b"),
+            change,
+        },
+        EventKind::StatusChanged {
+            change,
+            from: ReviewStatus::Open,
+            to: ReviewStatus::Landable,
+        },
+        EventKind::Landed {
+            seq: TrunkSeq(7),
+            version: h("b"),
+            change,
+        },
+    ];
+    for kind in kinds {
+        let event = Event {
+            kind,
+            actor: Principal::agent("bot"),
+            at: Timestamp::from_millis(42),
+        };
+        assert_eq!(
+            Event::try_from(wire(pb::Event::from(&event))).unwrap(),
+            event
+        );
+    }
+}

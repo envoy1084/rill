@@ -7,6 +7,7 @@ syntax = "proto3";
 package rill.v1;
 
 import "rill/v1/types.proto";
+import "rill/v1/events.proto";
 
 service RepoService {
   // Repositories.
@@ -55,6 +56,8 @@ service RepoService {
   rpc WatchRefs(WatchRefsRequest) returns (stream RefEvent);
   rpc WatchTrunk(WatchTrunkRequest) returns (stream LandEvent);
   rpc WatchLog(WatchLogRequest) returns (stream LogEntry);
+  // Every committed state change, filtered and resumable.
+  rpc WatchEvents(WatchEventsRequest) returns (stream EventEnvelope);
 
   // Derived data.
   rpc GetDerived(GetDerivedRequest) returns (GetDerivedResponse);

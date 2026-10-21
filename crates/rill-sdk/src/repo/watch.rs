@@ -1,7 +1,9 @@
-//! Server-streamed watches over trunk, refs and the log.
+//! Server-streamed watches over trunk, refs, the version log and the
+//! event log.
 
 use bytes::Bytes;
 use futures::StreamExt;
+use rill_proto::convert::id_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{TrunkSeq, Versionstamp};
 use tonic::Streaming;
@@ -9,7 +11,7 @@ use tonic::Streaming;
 use super::RepoClient;
 use crate::error::{Error, Result};
 use crate::stream::EventStream;
-use crate::types::{LandEvent, LogEntry, RefEvent};
+use crate::types::{EventQuery, LandEvent, LogEntry, LoggedEvent, RefEvent};
 
 impl RepoClient {
     /// Landings as they happen, optionally resuming after a sequence.
@@ -40,16 +42,31 @@ impl RepoClient {
 
     /// Every version stored from `after` on.
     pub async fn watch_log(&self, after: WatchStart) -> Result<EventStream<LogEntry>> {
-        let after = match after {
-            WatchStart::Now => None,
-            WatchStart::Beginning => Some(Bytes::new()),
-            WatchStart::After(cursor) => Some(Bytes::copy_from_slice(cursor.as_bytes())),
-        };
         let stream = self
             .svc()
             .watch_log(pb::WatchLogRequest {
                 repo: self.repo.clone(),
-                after,
+                after: after.to_proto(),
+            })
+            .await?
+            .into_inner();
+        Ok(convert_stream(stream))
+    }
+
+    /// Every committed state change matching `query`, from `after` on.
+    pub async fn watch_events(
+        &self,
+        after: WatchStart,
+        query: EventQuery,
+    ) -> Result<EventStream<LoggedEvent>> {
+        let stream = self
+            .svc()
+            .watch_events(pb::WatchEventsRequest {
+                repo: self.repo.clone(),
+                after: after.to_proto(),
+                kinds: query.kinds,
+                change_id: query.change.map(|c| id_to_proto(&c)),
+                ref_prefix: query.ref_prefix,
             })
             .await?
             .into_inner();
@@ -72,7 +89,7 @@ where
         .boxed()
 }
 
-/// Where a version-log watch starts.
+/// Where a log watch starts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WatchStart {
     /// Only versions stored from now on.
@@ -81,4 +98,14 @@ pub enum WatchStart {
     Beginning,
     /// After the entry with this cursor.
     After(Versionstamp),
+}
+
+impl WatchStart {
+    fn to_proto(self) -> Option<Bytes> {
+        match self {
+            WatchStart::Now => None,
+            WatchStart::Beginning => Some(Bytes::new()),
+            WatchStart::After(cursor) => Some(Bytes::copy_from_slice(cursor.as_bytes())),
+        }
+    }
 }

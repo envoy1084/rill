@@ -16,7 +16,7 @@ use crate::error::{ConvertError, Result};
 use crate::rill::v1 as pb;
 
 /// Clamp an `i32` vote value into the `i8` label range.
-fn i8_from_proto(field: &'static str, value: i32) -> Result<i8> {
+pub(crate) fn i8_from_proto(field: &'static str, value: i32) -> Result<i8> {
     i8::try_from(value).map_err(|_| ConvertError::OutOfRange {
         field,
         value: value as i64,

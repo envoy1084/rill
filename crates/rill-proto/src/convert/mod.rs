@@ -8,6 +8,7 @@
 
 mod change;
 mod content;
+mod event;
 mod intent;
 mod primitives;
 mod principal;

@@ -4327,6 +4327,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rill-events"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "rill-store",
+ "rill-types",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "rill-exec"
 version = "0.1.0"
 dependencies = [
@@ -4542,6 +4555,7 @@ dependencies = [
  "http-body-util",
  "prost 0.14.4",
  "rill-core",
+ "rill-events",
  "rill-exec",
  "rill-lander",
  "rill-policy",

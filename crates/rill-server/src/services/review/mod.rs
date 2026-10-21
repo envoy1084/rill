@@ -1,33 +1,28 @@
 //! `rill.v1.ReviewService`: a thin mapping onto `rill_review::ReviewService`
 //! plus the hand-off to the lander.
 
-use std::pin::Pin;
+mod watch;
+
 use std::sync::Arc;
 
-use futures::Stream;
-use rill_lander::{LandEvent, LandRequest};
+use rill_lander::LandRequest;
 use rill_proto::convert::{
-    comment_category_from_proto, confidence_from_proto, hash_to_proto, id_from_proto, id_to_proto,
-    ids_from_proto, opt_id_from_proto, review_status_from_proto, timestamp_to_proto,
+    comment_category_from_proto, confidence_from_proto, hash_to_proto, id_from_proto,
+    ids_from_proto, opt_id_from_proto, review_status_from_proto,
 };
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::review_service_server::ReviewService;
-use rill_review::service::ReviewEvent;
 use rill_review::threads::CommentMeta;
-use rill_types::{ChangeId, Principal, RepoPathBuf, ReviewStatus, ThreadAnchor, Timestamp};
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
+use rill_types::{ChangeId, Principal, RepoPathBuf, ReviewStatus, ThreadAnchor};
 use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult, Opened};
 use super::idem;
 use crate::error::{Error, Result};
-use crate::state::{AppState, RepoEvent};
+use crate::state::AppState;
 
 /// Server stream of review events.
-pub type ReviewEventStream =
-    Pin<Box<dyn Stream<Item = std::result::Result<pb::ReviewEvent, Status>> + Send>>;
+pub type ReviewEventStream = super::repo::EventStream<pb::ReviewEvent>;
 
 /// The review service.
 #[derive(Clone)]
@@ -460,103 +455,6 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::WatchReviewRequest>,
     ) -> GrpcResult<Self::WatchReviewStream> {
-        let result: crate::error::Result<Response<Self::WatchReviewStream>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().read(&RepoPathBuf::root()).await?;
-            let id = change_id(&request.get_ref().change_id)?;
-            let ctx = opened.repo.clone();
-            let mut rx = ctx.events.subscribe();
-            let (tx, out) = mpsc::channel(256);
-            tokio::spawn(async move {
-                loop {
-                    let received = tokio::select! {
-                        _ = ctx.shutdown.cancelled() => break,
-                        r = rx.recv() => r,
-                    };
-                    let event = match received {
-                        Ok(event) => event,
-                        Err(RecvError::Lagged(_)) => continue,
-                        Err(RecvError::Closed) => break,
-                    };
-                    let Some(mapped) = review_event_proto(&ctx, &id, event).await else {
-                        continue;
-                    };
-                    if tx.send(Ok(mapped)).await.is_err() {
-                        break;
-                    }
-                }
-            });
-            let stream: ReviewEventStream = Box::pin(ReceiverStream::new(out));
-            Ok(Response::new(stream))
-        }
-        .await;
-        result.map_err(Status::from)
-    }
-}
-
-/// Map a bus event to a wire review event for `change_id`, or `None`
-/// when it concerns another change.
-async fn review_event_proto(
-    ctx: &crate::state::RepoContext,
-    change_id: &ChangeId,
-    event: RepoEvent,
-) -> Option<pb::ReviewEvent> {
-    use pb::review_event::Event;
-    let at = timestamp_to_proto(Timestamp::now());
-    let wrap = |event: Event| pb::ReviewEvent {
-        change_id: id_to_proto(change_id),
-        at,
-        event: Some(event),
-    };
-    match event {
-        RepoEvent::Review(review) if review.change_id() == *change_id => match review {
-            ReviewEvent::StatusChanged { to, .. } => Some(wrap(Event::StatusChanged(
-                pb::ReviewStatus::from(to) as i32,
-            ))),
-            ReviewEvent::Submitted { .. } => {
-                Some(wrap(Event::StatusChanged(pb::ReviewStatus::Open as i32)))
-            }
-            ReviewEvent::Abandoned { .. } => Some(wrap(Event::StatusChanged(
-                pb::ReviewStatus::Abandoned as i32,
-            ))),
-            ReviewEvent::Voted { vote, .. } => Some(wrap(Event::Voted(pb::LabelVote::from(&vote)))),
-            ReviewEvent::Commented { thread_id, .. }
-            | ReviewEvent::ThreadResolved { thread_id, .. } => {
-                let state = ctx.review().get(change_id).await.ok()?;
-                let thread = state.threads.iter().find(|t| t.id == thread_id)?;
-                Some(wrap(Event::ThreadUpdated(pb::Thread::from(thread))))
-            }
-            ReviewEvent::VersionAdded { version, .. } => {
-                Some(wrap(Event::NewVersion(hash_to_proto(&version))))
-            }
-            ReviewEvent::StackChanged { .. } | ReviewEvent::Landed { .. } => None,
-        },
-        RepoEvent::Land(land) => {
-            let (ticket_change, status) = match &land {
-                LandEvent::Queued { change_id, .. } => (*change_id, pb::LandStatus::Queued),
-                LandEvent::Landed { change_id, .. } => (*change_id, pb::LandStatus::Landed),
-                LandEvent::Conflict { change_id, .. } | LandEvent::Failed { change_id, .. } => {
-                    (*change_id, pb::LandStatus::Failed)
-                }
-                _ => return None,
-            };
-            if ticket_change != *change_id {
-                return None;
-            }
-            let ticket = ctx
-                .tickets
-                .iter()
-                .filter(|t| t.value().change_id == *change_id)
-                .max_by_key(|t| *t.key())
-                .map(|t| (*t.key(), t.value().requested_at));
-            let (id, requested_at) = ticket.unwrap_or((0, Timestamp::now()));
-            Some(wrap(Event::LandUpdate(pb::LandTicket {
-                id: id.to_string(),
-                change_id: id_to_proto(change_id),
-                status: status as i32,
-                requested_at: timestamp_to_proto(requested_at),
-            })))
-        }
-        _ => None,
+        Ok(Response::new(self.watch_review_impl(request).await?))
     }
 }

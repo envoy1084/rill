@@ -10,6 +10,7 @@ use std::path::PathBuf;
 
 const PROTOS: &[&str] = &[
     "rill/v1/types.proto",
+    "rill/v1/events.proto",
     "rill/v1/repo.proto",
     "rill/v1/workspace.proto",
     "rill/v1/review.proto",

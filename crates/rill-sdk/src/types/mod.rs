@@ -4,6 +4,7 @@
 mod admin;
 mod diff;
 mod edit;
+mod event;
 mod intent;
 mod lander;
 mod page;
@@ -19,6 +20,7 @@ pub use admin::{
 pub use diff::{DiffFormat, DiffLine, DiffOp, DiffOptions, DiffResult, FileDiff, Hunk};
 pub(crate) use edit::set_content_proto;
 pub use edit::{ApplyOptions, Edit, EditBase, MergeOptions, Resolution, VersionResult};
+pub use event::{EventQuery, LoggedEvent};
 pub use intent::{FieldUpdate, IntentFilter, IntentUpdate, NewIntent, ScoredIntent};
 pub use lander::{
     BisectResult, DerivedBytes, InFlightLanding, Landing, NewVerification, RevertResult,
