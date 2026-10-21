@@ -66,6 +66,7 @@ pub async fn resolve_user(
                 roles: Vec::new(),
                 teams: groups.clone().unwrap_or_default(),
                 scim_id: None,
+                external_id: None,
                 created_at: now,
                 updated_at: now,
             };

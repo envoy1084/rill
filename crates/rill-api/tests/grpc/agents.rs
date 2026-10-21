@@ -40,6 +40,7 @@ fn user(name: &str) -> UserRecord {
         roles: vec![],
         teams: vec![],
         scim_id: None,
+        external_id: None,
         created_at: Timestamp::now(),
         updated_at: Timestamp::now(),
     }

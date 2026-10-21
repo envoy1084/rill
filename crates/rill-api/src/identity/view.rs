@@ -200,7 +200,8 @@ impl IdentityView {
                 false
             }
             IdentityChange::ProviderChanged { .. }
-            | IdentityChange::WorkloadIssuerChanged { .. } => false,
+            | IdentityChange::WorkloadIssuerChanged { .. }
+            | IdentityChange::TeamChanged { .. } => false,
         }
     }
 

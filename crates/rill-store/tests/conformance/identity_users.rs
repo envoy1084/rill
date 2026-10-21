@@ -22,6 +22,7 @@ fn user(org: &str, name: &str, subject: &str) -> UserRecord {
         roles: vec![],
         teams: vec![],
         scim_id: None,
+        external_id: None,
         created_at: Timestamp::from_millis(1),
         updated_at: Timestamp::from_millis(1),
     }

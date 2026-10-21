@@ -39,6 +39,7 @@ async fn setup(stores: &rill_store::Stores, budgets: AgentBudgets) {
                 roles: vec![],
                 teams: vec![],
                 scim_id: None,
+                external_id: None,
                 created_at: now,
                 updated_at: now,
             },

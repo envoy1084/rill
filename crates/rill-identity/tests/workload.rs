@@ -61,6 +61,7 @@ async fn setup(keys: IssuerKeys) -> (MockIdp, Stores, WorkloadKeys) {
                 roles: vec![],
                 teams: vec![],
                 scim_id: None,
+                external_id: None,
                 created_at: Timestamp::now(),
                 updated_at: Timestamp::now(),
             },

@@ -50,6 +50,9 @@ pub enum AdminCmd {
     Trust(super::identity::TrustCmd),
     /// Stop an agent, a session, a sponsor's agents or a model at once.
     Kill(super::identity::KillArgs),
+    /// Credentials for the org's provisioning system (SCIM).
+    #[command(subcommand)]
+    Scim(super::identity::ScimCmd),
 }
 
 /// `rill admin token <subcommand>`.
@@ -171,6 +174,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: AdminCmd) -> Result<()> {
         AdminCmd::Agent(cmd) => super::identity::agents::agent(ctx, cmd).await,
         AdminCmd::Trust(cmd) => super::identity::agents::trust(ctx, cmd).await,
         AdminCmd::Kill(args) => super::identity::agents::kill(ctx, args).await,
+        AdminCmd::Scim(cmd) => super::identity::scim::run(ctx, cmd).await,
         AdminCmd::Token(TokenCmd::Issue(args)) => issue(ctx, args).await,
         AdminCmd::Relation(RelationCmd::Add(args)) => relation_add(ctx, args, true).await,
         AdminCmd::Relation(RelationCmd::Remove(args)) => relation_add(ctx, args, false).await,

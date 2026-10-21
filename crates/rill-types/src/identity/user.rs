@@ -42,8 +42,11 @@ pub struct UserRecord {
     pub roles: Vec<OrgRole>,
     /// Team names, for `team:` relation subjects.
     pub teams: Vec<String>,
-    /// The provisioning system's id for the user, when one manages it.
+    /// The id Rill gives the user in SCIM, when a provisioning system
+    /// manages it.
     pub scim_id: Option<String>,
+    /// The provisioning system's own id for the user (SCIM `externalId`).
+    pub external_id: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }

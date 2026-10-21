@@ -4,6 +4,7 @@
 pub mod agents;
 pub mod keys;
 pub mod providers;
+pub mod scim;
 pub mod users;
 
 use clap::{Args, Subcommand};
@@ -11,6 +12,7 @@ use clap::{Args, Subcommand};
 pub use agents::{AgentCmd, KillArgs, TrustCmd};
 pub use keys::KeyCmd;
 pub use providers::IdpCmd;
+pub use scim::ScimCmd;
 pub use users::UserCmd;
 
 use crate::context::Ctx;

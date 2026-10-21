@@ -14,6 +14,7 @@ mod kubernetes;
 mod orgs;
 mod replicas;
 mod retries;
+mod scim;
 mod search;
 mod shutdown;
 mod signin;

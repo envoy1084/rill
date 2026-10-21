@@ -21,6 +21,7 @@ pub mod config;
 pub mod error;
 pub mod identity;
 pub mod objects;
+pub mod scim;
 mod serve;
 pub mod services;
 mod shutdown;

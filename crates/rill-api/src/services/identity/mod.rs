@@ -5,6 +5,7 @@ mod keys;
 mod kill;
 mod providers;
 mod revoke;
+pub mod scim_credentials;
 mod users;
 mod workloads;
 
@@ -199,6 +200,42 @@ impl IdentityService for IdentitySvc {
     ) -> GrpcResult<pb::KillSwitchResponse> {
         idem::once(&self.state, request, |r| async move {
             kill::kill(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn create_scim_credential(
+        &self,
+        request: Request<pb::CreateScimCredentialRequest>,
+    ) -> GrpcResult<pb::CreateScimCredentialResponse> {
+        idem::once(&self.state, request, |r| async move {
+            scim_credentials::create(&self.state, r)
+                .await
+                .map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn list_scim_credentials(
+        &self,
+        request: Request<pb::ListScimCredentialsRequest>,
+    ) -> GrpcResult<pb::ListScimCredentialsResponse> {
+        scim_credentials::list(&self.state, request)
+            .await
+            .map(Response::new)
+            .map_err(Status::from)
+    }
+
+    async fn revoke_scim_credential(
+        &self,
+        request: Request<pb::RevokeScimCredentialRequest>,
+    ) -> GrpcResult<pb::RevokeScimCredentialResponse> {
+        idem::once(&self.state, request, |r| async move {
+            scim_credentials::revoke(&self.state, r)
+                .await
+                .map(Response::new)
         })
         .await
         .map_err(Status::from)

@@ -31,6 +31,10 @@ fn external_key(id: &ExternalIdentity) -> Bytes {
     )
 }
 
+fn scim_key(org: &str, scim_id: &str) -> Bytes {
+    keys::identity_pair(table::IDENT_SCIM_USER, org, scim_id)
+}
+
 fn encode_pair(org: &str, name: &str) -> Bytes {
     Bytes::from(foundationdb_tuple::pack(&(org, name)))
 }
@@ -70,6 +74,18 @@ impl IdentityStore {
         }
     }
 
+    /// The user a provisioning system knows as `scim_id`.
+    pub async fn user_by_scim_id(&self, org: &str, scim_id: &str) -> Result<Option<UserRecord>> {
+        match self.meta.get(&scim_key(org, scim_id)).await? {
+            Some(name) => {
+                let name = String::from_utf8(name.to_vec())
+                    .map_err(|_| Error::Codec("bad user name in SCIM index".into()))?;
+                self.user(org, &name).await
+            }
+            None => Ok(None),
+        }
+    }
+
     pub async fn users(&self, org: &str) -> Result<Vec<UserRecord>> {
         let rows = self
             .meta
@@ -95,6 +111,12 @@ impl IdentityStore {
             tx = tx.expect_absent(external_key(id)).set(
                 external_key(id),
                 encode_pair(&user.org, &user.principal.name),
+            );
+        }
+        if let Some(scim) = &user.scim_id {
+            tx = tx.expect_absent(scim_key(&user.org, scim)).set(
+                scim_key(&user.org, scim),
+                Bytes::from(user.principal.name.clone()),
             );
         }
         let tx = self.logged(tx, user_changed(user), actor)?;
@@ -140,6 +162,17 @@ impl IdentityStore {
                 external_key(id),
                 encode_pair(&after.org, &after.principal.name),
             );
+        }
+        if before.scim_id != after.scim_id {
+            if let Some(old) = &before.scim_id {
+                tx = tx.delete(scim_key(&before.org, old));
+            }
+            if let Some(new) = &after.scim_id {
+                tx = tx.expect_absent(scim_key(&after.org, new)).set(
+                    scim_key(&after.org, new),
+                    Bytes::from(after.principal.name.clone()),
+                );
+            }
         }
         let tx = self.logged(tx, user_changed(after), actor)?;
         self.meta.transact(tx).await?;

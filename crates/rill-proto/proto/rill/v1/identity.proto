@@ -41,7 +41,43 @@ service IdentityService {
   // agent running as a model; org administrators. Tokens are refused at
   // once, and the lander ejects their queued work.
   rpc KillSwitch(KillSwitchRequest) returns (KillSwitchResponse);
+
+  // Bearer credentials a provisioning system calls the org's SCIM endpoint
+  // (`/scim/v2/<org>`) with; org administrators. The secret is returned
+  // once.
+  rpc CreateScimCredential(CreateScimCredentialRequest) returns (CreateScimCredentialResponse);
+  rpc ListScimCredentials(ListScimCredentialsRequest) returns (ListScimCredentialsResponse);
+  rpc RevokeScimCredential(RevokeScimCredentialRequest) returns (RevokeScimCredentialResponse);
 }
+
+message ScimCredentialInfo {
+  string org = 1;
+  string id = 2;
+  Principal created_by = 3;
+  int64 created_at = 4;
+  optional int64 revoked_at = 5;
+}
+message CreateScimCredentialRequest {
+  bytes operation_id = 1;
+  string org = 2;
+}
+message CreateScimCredentialResponse {
+  ScimCredentialInfo credential = 1;
+  // The bearer token to give the provisioning system; not stored.
+  string token = 2;
+}
+message ListScimCredentialsRequest {
+  string org = 1;
+}
+message ListScimCredentialsResponse {
+  repeated ScimCredentialInfo credentials = 1;
+}
+message RevokeScimCredentialRequest {
+  bytes operation_id = 1;
+  string org = 2;
+  string id = 3;
+}
+message RevokeScimCredentialResponse {}
 
 message KillSwitchRequest {
   bytes operation_id = 1;

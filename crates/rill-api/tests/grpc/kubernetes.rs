@@ -48,6 +48,7 @@ async fn a_kubernetes_service_account_acts_as_its_agent() {
                 roles: vec![],
                 teams: vec![],
                 scim_id: None,
+                external_id: None,
                 created_at: now,
                 updated_at: now,
             },

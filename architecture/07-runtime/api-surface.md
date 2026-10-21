@@ -40,7 +40,7 @@ in, without it. It also registers `tonic-reflection` and
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
 | `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
-| `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser`, agents (`RegisterAgent`, `UpdateAgent`, `ListAgents`), workload issuers (`Put`/`List`/`DeleteWorkloadIssuer`), `KillSwitch` ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
+| `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser`, agents (`RegisterAgent`, `UpdateAgent`, `ListAgents`), workload issuers (`Put`/`List`/`DeleteWorkloadIssuer`), `KillSwitch`, SCIM credentials ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
 | `SessionService` | `identity.proto` | `services/session.rs` | `ListSignInProviders`, `ExchangeToken`, `RefreshSession`; no auth layer ([sign-in](../05-policy/identity-and-auth.md#sign-in)) |
 
 `types.proto` holds the shared object model and `events.proto` the event
@@ -134,7 +134,9 @@ values survive a trip through the wire and back.
 
 `objects/mod.rs` builds an axum router on the HTTP listener. The same
 listener serves the sign-in routes (`/auth/*`, `/oauth/token`; see
-[identity and auth](../05-policy/identity-and-auth.md#sign-in)). An object URL
+[identity and auth](../05-policy/identity-and-auth.md#sign-in)) and SCIM
+(`/scim/v2/<org>/…`; see
+[provisioning](../05-policy/identity-and-auth.md#provisioning-scim-20)). An object URL
 names exactly one byte string forever, so responses carry
 `ETag: "<hash>"` and `Cache-Control: public, immutable, max-age=31536000`.
 

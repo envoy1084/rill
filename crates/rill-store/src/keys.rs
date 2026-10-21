@@ -132,6 +132,13 @@ pub mod table {
     pub const IDENT_ORG_SETTINGS: &str = "idos";
     /// `(idb, principal, metric, day)` → what the principal spent that day
     pub const IDENT_BUDGET: &str = "idb";
+    /// `(idt, org, name)` → TeamRecord
+    pub const IDENT_TEAM: &str = "idt";
+    /// `(idsu, org, scim id)` → user name; `(idsg, org, scim id)` → team name
+    pub const IDENT_SCIM_USER: &str = "idsu";
+    pub const IDENT_SCIM_GROUP: &str = "idsg";
+    /// `(idsc, id)` → ScimCredential
+    pub const IDENT_SCIM_CREDENTIAL: &str = "idsc";
 }
 
 fn key<T: TuplePack>(t: &T) -> Bytes {

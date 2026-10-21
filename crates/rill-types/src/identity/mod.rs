@@ -7,7 +7,9 @@ mod keys;
 mod login;
 mod provider;
 mod revocation;
+mod scim;
 mod session;
+mod team;
 mod user;
 mod workload;
 
@@ -17,6 +19,8 @@ pub use keys::{TokenKeyRecord, WrappedSecret};
 pub use login::PendingLogin;
 pub use provider::IdentityProvider;
 pub use revocation::Revocation;
+pub use scim::ScimCredential;
 pub use session::{SessionKind, SessionRecord};
+pub use team::TeamRecord;
 pub use user::{AccountStatus, ExternalIdentity, OrgRole, UserRecord};
 pub use workload::{IssuerKeys, OrgIdentitySettings, WorkloadIssuer};

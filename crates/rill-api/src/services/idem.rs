@@ -82,6 +82,8 @@ idempotent!(
     PutWorkloadIssuerRequest,
     DeleteWorkloadIssuerRequest,
     KillSwitchRequest,
+    CreateScimCredentialRequest,
+    RevokeScimCredentialRequest,
 );
 
 /// The idempotency key of the request being handled, for work that

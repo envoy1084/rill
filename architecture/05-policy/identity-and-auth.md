@@ -91,6 +91,7 @@ The `IdentityService` RPCs:
 | identity providers, users, workload issuers | org administrators |
 | `RegisterAgent`, `UpdateAgent`, `ListAgents` | org administrators, or the sponsoring user |
 | `KillSwitch` | org administrators |
+| `Create`/`List`/`RevokeScimCredential` | org administrators |
 
 `require_instance_admin` passes in dev mode, or for a principal named in
 `identity.admins` presenting an unnarrowed token.
@@ -168,6 +169,29 @@ Org administration (`require_org_admin`): instance administrators, or an
 active member of the org with the `admin` role presenting an unnarrowed
 token for that org. `ListIdentityProviders`, `DeleteIdentityProvider`,
 `ListUsers` and `UpdateUser` (suspend, reactivate, set roles) need it.
+
+## Provisioning (SCIM 2.0)
+
+Each organization's provisioning system (Okta, Entra ID) calls
+`/scim/v2/<org>` ([scim/](../../crates/rill-api/src/scim/mod.rs)) with a
+credential an org administrator creates (`CreateScimCredential`: a bearer
+`scim_<id>.<secret>` shown once, its secret stored as a keyed BLAKE3 hash,
+revocable, never expiring because provisioning systems cannot refresh). A
+credential works only for its org.
+
+| Resource | Maps to | Notes |
+| --- | --- | --- |
+| `/Users` | `UserRecord` | `userName` is the principal name and cannot change; `externalId`, `displayName`/`name`, the primary email and `active` are kept; a user who signed in before provisioning started is adopted, not duplicated |
+| `/Groups` | `TeamRecord` | `displayName` is the team name; members' `teams` follow membership, renames and deletion, so `team:` relations apply at once |
+| `ServiceProviderConfig`, `ResourceTypes`, `Schemas` | — | patch and `eq` filters (joined by `and`) supported; no bulk, sort or etags |
+
+[`rill_identity::scim`](../../crates/rill-identity/src/scim/mod.rs) holds the
+mapping, filters and PatchOp handling (both Okta's path form and Entra ID's
+whole-object form, `active` as a string or boolean). `DELETE /Users` and
+`active: false` deprovision: the user is suspended (kept for attribution),
+their live sessions are revoked and the agents they sponsor are suspended
+until an administrator reassigns them; reactivating the user does not
+resume the agents.
 
 ## Agents and workload identity
 
@@ -304,7 +328,7 @@ path and repository. `resolved_by()` maps the caller's kind to the
 * [`rill-policy/src/identity.rs`](../../crates/rill-policy/src/identity.rs): `AuthHeaders`, `AuthContext`, `Authenticator`, `StaticTokenAuthenticator`, `TeamResolver`.
 * [`signin/`](../../crates/rill-api/src/signin/mod.rs): the sign-in HTTP routes; [`rill-identity/src/signin/`](../../crates/rill-identity/src/signin/mod.rs), [`rill-identity/src/oidc/`](../../crates/rill-identity/src/oidc/mod.rs).
 * [`identity/callers.rs`](../../crates/rill-api/src/identity/callers.rs): teams, agent standing and scope; [`rill-identity/src/agents/`](../../crates/rill-identity/src/agents/mod.rs): the workload exchange.
-* Tests: `rill-api/tests/grpc/killswitch.rs` (exact budgets, rate, kill switch ejection), `rill-api/tests/grpc/agents.rs` (exchange, scope, sponsor and model suspension), `rill-identity/tests/workload.rs`, `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-cli/tests/bootstrap.rs`.
+* Tests: `rill-api/tests/grpc/scim.rs` (credentials, groups as teams, deactivation), `rill-identity/tests/scim.rs`, `rill-api/tests/grpc/killswitch.rs` (exact budgets, rate, kill switch ejection), `rill-api/tests/grpc/agents.rs` (exchange, scope, sponsor and model suspension), `rill-identity/tests/workload.rs`, `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-cli/tests/bootstrap.rs`.
 * [`rill-types/src/principal.rs`](../../crates/rill-types/src/principal.rs): `Principal`, `PrincipalKind`.
 * [`auth/authenticator.rs`](../../crates/rill-api/src/auth/authenticator.rs): `static_tokens`, `authenticate`.
 * [`auth/instance.rs`](../../crates/rill-api/src/auth/instance.rs): `require_instance_admin`.

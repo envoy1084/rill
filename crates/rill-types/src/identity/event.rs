@@ -36,6 +36,10 @@ pub enum IdentityChange {
         org: String,
         name: String,
     },
+    TeamChanged {
+        org: String,
+        name: String,
+    },
     /// An org's identity settings (blocked models) changed.
     OrgSettingsChanged {
         org: String,
