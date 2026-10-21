@@ -9,6 +9,7 @@ mod end_to_end;
 mod events;
 mod history;
 mod identity;
+mod keycloak;
 mod killswitch;
 mod kubernetes;
 mod orgs;
