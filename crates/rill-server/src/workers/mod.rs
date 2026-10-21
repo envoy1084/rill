@@ -1,9 +1,12 @@
 //! Background tasks that run per repository: the landing loop, post-land
-//! verification, the derive and index job workers and event retention.
+//! verification, the derive and index job workers, event retention and
+//! the follower that keeps cached policy and relations current.
 
 mod deriver;
+mod follower;
 mod hooks;
 mod indexer;
+mod leader;
 mod verifier;
 
 use std::sync::Arc;
@@ -35,8 +38,31 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>) {
         EVENT_SWEEP_INTERVAL,
         shutdown.clone(),
     ));
+    tokio::spawn(follower::run(ctx.clone(), shutdown.clone()));
     tokio::spawn(indexer::run(ctx.clone(), shutdown));
     tracing::info!(repo = %ctx.config.name, "repository workers started");
+}
+
+/// How often a server looks for repositories other servers created.
+const DISCOVER_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Build the context (and so start the workers) of every repository,
+/// including ones other servers create later, until `shutdown`: any server
+/// may be the one left to land or index for them.
+pub async fn discover_repos(
+    state: Arc<crate::state::AppState>,
+    shutdown: tokio_util::sync::CancellationToken,
+) {
+    let mut tick = tokio::time::interval(DISCOVER_INTERVAL);
+    loop {
+        tokio::select! {
+            _ = shutdown.cancelled() => return,
+            _ = tick.tick() => {}
+        }
+        if let Err(e) = state.repos.warm().await {
+            tracing::warn!(error = %e, "discovering repositories failed");
+        }
+    }
 }
 
 /// Delete expired idempotency records every ten minutes until `shutdown`.

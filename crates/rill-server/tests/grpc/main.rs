@@ -6,6 +6,7 @@ mod commits;
 mod end_to_end;
 mod events;
 mod orgs;
+mod replicas;
 mod retries;
 mod workspaces;
 
@@ -42,6 +43,19 @@ struct TestServer {
 impl TestServer {
     async fn start(config: ServerConfig) -> Self {
         let shutdown = CancellationToken::new();
+        let state = build_state(config, shutdown.clone()).await.unwrap();
+        Self::serve(state, shutdown).await
+    }
+
+    /// A server over `stores`, which other test servers may share.
+    async fn start_on(config: ServerConfig, stores: rill_store::Stores) -> Self {
+        let shutdown = CancellationToken::new();
+        let state = AppState::with_stores(config, stores, shutdown.clone()).unwrap();
+        state.repos.warm().await.unwrap();
+        Self::serve(state, shutdown).await
+    }
+
+    async fn serve(state: Arc<AppState>, shutdown: CancellationToken) -> Self {
         let listeners = Listeners::bind(
             "127.0.0.1:0".parse().unwrap(),
             "127.0.0.1:0".parse().unwrap(),
@@ -49,7 +63,6 @@ impl TestServer {
         .await
         .unwrap();
         let (grpc_addr, http) = listeners.addrs().unwrap();
-        let state = build_state(config, shutdown.clone()).await.unwrap();
         let task = tokio::spawn(serve_with_state(state.clone(), listeners, shutdown.clone()));
         TestServer {
             grpc: format!("http://{grpc_addr}"),

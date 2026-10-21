@@ -1,7 +1,7 @@
 //! The [`SearchIndex`]: in-memory postings over a repository, persisted as
 //! derived data.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -10,13 +10,14 @@ use dashmap::DashMap;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use parking_lot::{Mutex, RwLock};
 use rill_core::{is_binary, read_content, DeriveManager, RootTree, TreeOps};
+use rill_store::repo::Lease;
 use rill_store::RepoStore;
 use rill_types::{ChangeVersionHash, ObjectHash, RepoPathBuf, SparseProfile, TreeHash};
 
 use super::config::IndexConfig;
 use super::docs::DocTable;
 use super::manifest::{ManifestEntry, RootManifest};
-use super::persist::{self, shard_of, BlobMarker, KIND_ROOT, SHARD_COUNT};
+use super::persist::{self, shard_of, BlobMarker, IndexState, KIND_ROOT};
 use crate::error::{Error, Result};
 use crate::trigram::{trigrams, DocId, PostingList};
 
@@ -51,21 +52,25 @@ pub struct FlushStats {
 /// then filters exactly. The cost is slightly weaker pruning for
 /// case-sensitive searches.
 pub struct SearchIndex {
-    repo: RepoStore,
-    derive: Arc<DeriveManager>,
-    config: IndexConfig,
-    docs: RwLock<DocTable>,
-    postings: DashMap<u32, PostingList>,
+    pub(super) repo: RepoStore,
+    pub(super) derive: Arc<DeriveManager>,
+    pub(super) config: IndexConfig,
+    pub(super) docs: RwLock<DocTable>,
+    pub(super) postings: DashMap<u32, PostingList>,
     /// Blobs whose state is known in this process: indexed under a document
     /// id, or skipped.
-    seen: DashMap<ObjectHash, Option<DocId>>,
+    pub(super) seen: DashMap<ObjectHash, Option<DocId>>,
     /// Markers to persist at the next flush. Markers are written only after
     /// the postings they refer to, so a crash between the two never leaves a
     /// blob marked indexed without postings.
-    pending_markers: Mutex<Vec<(ObjectHash, Option<DocId>)>>,
-    dirty_shards: Mutex<BTreeSet<u8>>,
-    manifests: DashMap<TreeHash, Arc<RootManifest>>,
-    blob_index_calls: AtomicU64,
+    pub(super) pending_markers: Mutex<Vec<(ObjectHash, Option<DocId>)>>,
+    pub(super) dirty_shards: Mutex<BTreeSet<u8>>,
+    pub(super) manifests: DashMap<TreeHash, Arc<RootManifest>>,
+    pub(super) blob_index_calls: AtomicU64,
+    /// The generations this process last loaded or wrote.
+    pub(super) state: Mutex<IndexState>,
+    /// Serialises refreshes and flushes.
+    pub(super) syncing: tokio::sync::Mutex<()>,
 }
 
 impl SearchIndex {
@@ -82,6 +87,8 @@ impl SearchIndex {
             dirty_shards: Mutex::new(BTreeSet::new()),
             manifests: DashMap::new(),
             blob_index_calls: AtomicU64::new(0),
+            state: Mutex::new(IndexState::default()),
+            syncing: tokio::sync::Mutex::new(()),
         })
     }
 
@@ -94,34 +101,6 @@ impl SearchIndex {
         let index = Self::new(repo, derive, config);
         index.load().await?;
         Ok(index)
-    }
-
-    /// Replace in-memory postings and the document table with the persisted
-    /// ones. Unflushed state is discarded.
-    pub async fn load(&self) -> Result<()> {
-        let docs = match persist::get_docs(&self.repo).await? {
-            Some(record) => DocTable::from_record(record),
-            None => DocTable::new(),
-        };
-        self.postings.clear();
-        self.seen.clear();
-        for shard in 0..SHARD_COUNT {
-            if let Some(lists) = persist::get_shard(&self.repo, shard as u8).await? {
-                for (trigram, list) in lists {
-                    self.postings.insert(trigram, list);
-                }
-            }
-        }
-        for id in 0..docs.len() as DocId {
-            if let Some(hash) = docs.hash_of(id) {
-                self.seen.insert(hash, Some(id));
-            }
-        }
-        *self.docs.write() = docs;
-        self.pending_markers.lock().clear();
-        self.dirty_shards.lock().clear();
-        tracing::info!(docs = self.docs.read().len(), "search index loaded");
-        Ok(())
     }
 
     /// The repository this index covers.
@@ -210,9 +189,10 @@ impl SearchIndex {
     }
 
     /// Index every file under `root`, tokenizing only blobs not yet seen,
-    /// and store the root's manifest. A root that already has a manifest is
-    /// left alone.
-    pub async fn index_root(&self, root: TreeHash) -> Result<IndexStats> {
+    /// flush, and then store the root's manifest, so a manifest is only
+    /// ever visible with the postings behind it. A root that already has a
+    /// manifest is left alone. Writes are fenced on `fence` when given.
+    pub async fn index_root(&self, root: TreeHash, fence: Option<&Lease>) -> Result<IndexStats> {
         if let Some(manifest) = self.load_manifest(root).await? {
             return Ok(IndexStats {
                 files: manifest.len(),
@@ -263,9 +243,15 @@ impl SearchIndex {
             blobs_skipped: results.iter().filter(|r| r.is_none()).count(),
             already_indexed: false,
         };
-        self.repo
-            .put_derived(KIND_ROOT, &root, persist::encode(KIND_ROOT, &manifest)?)
-            .await?;
+        self.flush(fence).await?;
+        persist::put(
+            &self.repo,
+            KIND_ROOT,
+            &root,
+            persist::encode(KIND_ROOT, &manifest)?,
+            fence,
+        )
+        .await?;
         self.manifests.insert(root, Arc::new(manifest));
         tracing::info!(root = %root, ?stats, "indexed root");
         Ok(stats)
@@ -275,9 +261,10 @@ impl SearchIndex {
     pub async fn index_version(
         &self,
         version: &ChangeVersionHash,
+        fence: Option<&Lease>,
     ) -> Result<(TreeHash, IndexStats)> {
         let root = self.derive.get::<RootTree>(version).await?;
-        let stats = self.index_root(root).await?;
+        let stats = self.index_root(root, fence).await?;
         Ok((root, stats))
     }
 
@@ -301,47 +288,5 @@ impl SearchIndex {
             }
             None => Ok(None),
         }
-    }
-
-    /// Persist dirty shards, the document table and pending blob markers,
-    /// in that order (see the module docs of `persist` for why).
-    pub async fn flush(&self) -> Result<FlushStats> {
-        let dirty: Vec<u8> = std::mem::take(&mut *self.dirty_shards.lock())
-            .into_iter()
-            .collect();
-        let markers = std::mem::take(&mut *self.pending_markers.lock());
-        let mut stats = FlushStats::default();
-        // A blob too short to have trigrams still gets a document id, so
-        // the table can change without any shard becoming dirty.
-        let docs_dirty = !dirty.is_empty() || markers.iter().any(|(_, d)| d.is_some());
-        if !dirty.is_empty() {
-            let wanted: HashSet<u8> = dirty.iter().copied().collect();
-            let mut by_shard: BTreeMap<u8, Vec<(u32, PostingList)>> = BTreeMap::new();
-            for entry in self.postings.iter() {
-                let shard = shard_of(*entry.key());
-                if wanted.contains(&shard) {
-                    by_shard
-                        .entry(shard)
-                        .or_default()
-                        .push((*entry.key(), entry.value().clone()));
-                }
-            }
-            for (shard, mut lists) in by_shard {
-                lists.sort_by_key(|(t, _)| *t);
-                let refs = lists.iter().map(|(t, l)| (*t, l)).collect();
-                persist::put_shard(&self.repo, shard, refs).await?;
-                stats.shards += 1;
-            }
-        }
-        if docs_dirty {
-            let record = self.docs.read().to_record();
-            persist::put_docs(&self.repo, &record).await?;
-        }
-        for (hash, doc) in markers {
-            persist::put_marker(&self.repo, &hash, BlobMarker { doc }).await?;
-            stats.markers += 1;
-        }
-        tracing::debug!(?stats, "search index flushed");
-        Ok(stats)
     }
 }

@@ -28,6 +28,11 @@ use crate::config::ServerConfig;
 use crate::error::{Error, Result};
 use crate::workers;
 
+/// How long a search waits for a root it asked to have indexed.
+const INDEX_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+/// How often a waiting search looks for the root's manifest.
+const INDEX_POLL: std::time::Duration = std::time::Duration::from_millis(50);
+
 /// Size of the derived-data cache per repository.
 const DERIVE_CACHE: usize = 8192;
 
@@ -86,7 +91,7 @@ impl RepoContext {
         allowed: rill_policy::PathFilter,
     ) -> Result<Vec<rill_search::SearchHit>> {
         if self.search.manifest(root).await.is_err() {
-            self.search.index_root(root).await?;
+            self.wait_for_index(root).await?;
         }
         // Boxed so the borrow-heavy search future has a concrete `Send`
         // bound; otherwise the compiler cannot prove it for the tonic
@@ -101,6 +106,24 @@ impl RepoContext {
             rill_search::search(&search, root, &query, move |p| allowed.allows(p)).await
         });
         Ok(fut.await?)
+    }
+
+    /// Ask the search writer to index `root` and wait for its manifest:
+    /// only the server holding the search lease writes the index.
+    async fn wait_for_index(&self, root: rill_types::TreeHash) -> Result<()> {
+        let queue =
+            rill_jobs::Queue::new(self.repo.clone(), rill_lander::land::followups::INDEX_QUEUE);
+        queue
+            .push(rill_lander::land::followups::index_root_job(&root))
+            .await?;
+        let deadline = tokio::time::Instant::now() + INDEX_WAIT;
+        while tokio::time::Instant::now() < deadline {
+            if self.search.manifest(root).await.is_ok() {
+                return Ok(());
+            }
+            tokio::time::sleep(INDEX_POLL).await;
+        }
+        Err(rill_search::Error::RootNotIndexed(root).into())
     }
 
     /// The current review service. Hot-swapped when policy changes, so

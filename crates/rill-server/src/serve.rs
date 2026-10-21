@@ -64,6 +64,10 @@ pub async fn serve_with_state(
         state.stores.clone(),
         shutdown.clone(),
     ));
+    tokio::spawn(crate::workers::discover_repos(
+        state.clone(),
+        shutdown.clone(),
+    ));
     let grpc = tokio::spawn(serve_grpc(state.clone(), listeners.grpc, shutdown.clone()));
     let http = tokio::spawn(serve_http(state, listeners.http, shutdown.clone()));
 

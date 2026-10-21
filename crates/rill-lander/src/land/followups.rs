@@ -14,8 +14,10 @@ pub const DERIVE_QUEUE: &str = "derive";
 pub const INDEX_QUEUE: &str = "index";
 /// Job kind on [`DERIVE_QUEUE`].
 pub const DERIVE_JOB: &str = "derive_background";
-/// Job kind on [`INDEX_QUEUE`].
+/// Job kind on [`INDEX_QUEUE`]: index a version's root tree.
 pub const INDEX_JOB: &str = "index_version";
+/// Job kind on [`INDEX_QUEUE`]: index a root tree a search asked for.
+pub const INDEX_ROOT_JOB: &str = "index_root";
 
 /// The job deriving `version`'s background kinds.
 pub fn derive_job(version: &ChangeVersionHash) -> JobSpec {
@@ -25,6 +27,11 @@ pub fn derive_job(version: &ChangeVersionHash) -> JobSpec {
 /// The job indexing `version` for search.
 pub fn index_job(version: &ChangeVersionHash) -> JobSpec {
     JobSpec::new(INDEX_JOB, version.to_hex(), version.as_bytes().to_vec()).priority(Priority::Low)
+}
+
+/// The job indexing `root`, ahead of landings because a search waits on it.
+pub fn index_root_job(root: &rill_types::TreeHash) -> JobSpec {
+    JobSpec::new(INDEX_ROOT_JOB, root.to_hex(), root.as_bytes().to_vec()).priority(Priority::High)
 }
 
 /// The jobs for landing `versions`, in order: each is derived, and the

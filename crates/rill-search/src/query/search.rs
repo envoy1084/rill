@@ -35,6 +35,9 @@ pub async fn search<F: PathFilter>(
 ) -> Result<Vec<SearchHit>> {
     let regex = Arc::new(query.compile()?);
     let manifest = index.manifest(root).await?;
+    // The manifest is written after the postings behind it, so catching
+    // up now covers every file it lists.
+    index.refresh().await?;
     let candidates = query.trigram_query()?.evaluate(&|t| index.postings_of(t));
 
     // Owned entries: a stream over borrowed entries makes the future's

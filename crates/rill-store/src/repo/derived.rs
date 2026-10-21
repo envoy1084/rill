@@ -29,6 +29,21 @@ impl RepoStore {
         self.meta().set(self.keys().derived(kind, hash), row).await
     }
 
+    /// [`RepoStore::put_derived`] that fails once `fence` is lost.
+    pub async fn put_derived_fenced(
+        &self,
+        kind: &str,
+        hash: &ObjectHash,
+        value: Bytes,
+        fence: &super::leases::Lease,
+    ) -> Result<()> {
+        let row = self.seal_row(value).await?;
+        let mut tx = crate::meta::Transaction::new().set(self.keys().derived(kind, hash), row);
+        tx.conditions.push(fence.fence(self));
+        self.meta().transact(tx).await?;
+        Ok(())
+    }
+
     pub async fn get_misc(&self, name: &str) -> Result<Option<Bytes>> {
         let row = self.meta().get(&self.keys().misc(name)).await?;
         self.open_row(row).await

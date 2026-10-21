@@ -699,9 +699,15 @@ async fn a_request_outlives_the_lander_that_accepted_it() {
 
     let crashed = fx.lander(Arc::new(NoopHooks), Arc::new(AlwaysGreen), fast_policy());
     assert!(crashed.lease().await.unwrap().is_some());
-    let ticket = crashed.enqueue(request(&a, RiskClass::Trivial)).await.unwrap();
+    let ticket = crashed
+        .enqueue(request(&a, RiskClass::Trivial))
+        .await
+        .unwrap();
     assert_eq!(
-        crashed.enqueue(request(&a, RiskClass::Trivial)).await.unwrap(),
+        crashed
+            .enqueue(request(&a, RiskClass::Trivial))
+            .await
+            .unwrap(),
         ticket,
         "asking again returns the same request"
     );

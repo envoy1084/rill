@@ -39,7 +39,7 @@ async fn fixture() -> Fixture {
         .await
         .unwrap();
     let index = SearchIndex::new(repo.clone(), derive.clone(), IndexConfig::default());
-    let (root, stats) = index.index_version(&version).await.unwrap();
+    let (root, stats) = index.index_version(&version, None).await.unwrap();
     assert_eq!(stats.files, 4);
     assert_eq!(stats.blobs_indexed, 3);
     assert_eq!(stats.blobs_skipped, 1);
@@ -169,7 +169,7 @@ async fn regex_without_literals_and_path_filter() {
 async fn reindexing_is_a_noop_and_shares_blobs() {
     let f = fixture().await;
     assert_eq!(f.index.blob_index_calls(), 4);
-    let stats = f.index.index_root(f.root).await.unwrap();
+    let stats = f.index.index_root(f.root, None).await.unwrap();
     assert!(stats.already_indexed);
     assert_eq!(f.index.blob_index_calls(), 4);
 
@@ -182,7 +182,7 @@ async fn reindexing_is_a_noop_and_shares_blobs() {
         .commit(&f.repo)
         .await
         .unwrap();
-    let (root2, stats) = f.index.index_version(&v2).await.unwrap();
+    let (root2, stats) = f.index.index_version(&v2, None).await.unwrap();
     assert_ne!(root2, f.root);
     assert_eq!(stats.blobs_indexed, 1);
     assert_eq!(f.index.blob_index_calls(), 5);
@@ -197,18 +197,16 @@ async fn reindexing_is_a_noop_and_shares_blobs() {
 }
 
 #[tokio::test]
-async fn flush_and_reopen_preserve_postings() {
+async fn indexing_persists_postings_before_the_manifest() {
     let f = fixture().await;
-    let flushed = f.index.flush().await.unwrap();
-    assert!(flushed.shards > 0);
-    assert_eq!(flushed.markers, 4);
-    assert_eq!(f.index.flush().await.unwrap(), Default::default());
+    // Indexing flushed already: nothing is left for an explicit flush.
+    assert_eq!(f.index.flush(None).await.unwrap(), Default::default());
 
     let reopened = SearchIndex::open(f.repo.clone(), f.derive.clone(), IndexConfig::default())
         .await
         .unwrap();
     assert_eq!(reopened.doc_count(), 3);
-    let stats = reopened.index_root(f.root).await.unwrap();
+    let stats = reopened.index_root(f.root, None).await.unwrap();
     assert!(stats.already_indexed);
     assert_eq!(reopened.blob_index_calls(), 0);
     let hits = search(
@@ -231,7 +229,7 @@ async fn flush_and_reopen_preserve_postings() {
         .commit(&f.repo)
         .await
         .unwrap();
-    let (_, stats) = reopened.index_version(&v2).await.unwrap();
+    let (_, stats) = reopened.index_version(&v2, None).await.unwrap();
     assert_eq!(stats.blobs_indexed, 1);
     assert_eq!(reopened.blob_index_calls(), 1);
 }
@@ -261,4 +259,53 @@ async fn symbol_lookup() {
     // Persisted table is reused by a fresh instance.
     let again = SymbolIndex::new(f.repo.clone(), f.derive.trees().clone());
     assert_eq!(again.for_root(f.root).await.unwrap().file_count(), 2);
+}
+
+#[tokio::test]
+async fn a_reader_finds_what_another_process_indexed() {
+    let f = fixture().await;
+    let reader = SearchIndex::open(f.repo.clone(), f.derive.clone(), IndexConfig::default())
+        .await
+        .unwrap();
+    let (v2, _) = ChangeBuilder::new(Principal::human("alice"))
+        .parent(f.version)
+        .message("add")
+        .file("src/new.rs", "fn freshly_indexed() {}\n")
+        .unwrap()
+        .commit(&f.repo)
+        .await
+        .unwrap();
+    let (root2, _) = f.index.index_version(&v2, None).await.unwrap();
+
+    let hits = search(&reader, root2, &SearchQuery::new("freshly_indexed"), |_| {
+        true
+    })
+    .await
+    .unwrap();
+    assert_eq!(paths(&hits), vec![("src/new.rs", 1)]);
+    assert!(!reader.refresh().await.unwrap(), "already current");
+}
+
+#[tokio::test]
+async fn a_replaced_writer_cannot_change_the_index() {
+    let f = fixture().await;
+    let stale = f.repo.try_acquire("search", "a").await.unwrap().unwrap();
+    f.repo.release(&stale).await.unwrap();
+    f.repo.try_acquire("search", "b").await.unwrap().unwrap();
+    let (v2, _) = ChangeBuilder::new(Principal::human("alice"))
+        .parent(f.version)
+        .message("add")
+        .file("src/late.rs", "fn too_late() {}\n")
+        .unwrap()
+        .commit(&f.repo)
+        .await
+        .unwrap();
+    assert!(f.index.index_version(&v2, Some(&stale)).await.is_err());
+    let reader = SearchIndex::open(f.repo.clone(), f.derive.clone(), IndexConfig::default())
+        .await
+        .unwrap();
+    assert!(reader
+        .manifest(f.derive.get::<rill_core::RootTree>(&v2).await.unwrap())
+        .await
+        .is_err());
 }

@@ -32,6 +32,9 @@ pub enum Error {
     Events(#[from] rill_events::Error),
 
     #[error(transparent)]
+    Jobs(#[from] rill_jobs::Error),
+
+    #[error(transparent)]
     Exec(#[from] rill_exec::Error),
 
     #[error(transparent)]
@@ -115,6 +118,8 @@ impl Error {
             Error::Review(e) => review_code(e),
             Error::Lander(e) => lander_code(e),
             Error::Events(rill_events::Error::Store(e)) => store_code(e),
+            Error::Jobs(rill_jobs::Error::Store(e)) => store_code(e),
+            Error::Jobs(rill_jobs::Error::Lost(_)) => Code::Aborted,
             Error::Exec(_) => Code::Internal,
             Error::Search(e) => match e {
                 rill_search::Error::InvalidPattern(_) | rill_search::Error::InvalidGlob(_) => {
