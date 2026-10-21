@@ -46,10 +46,11 @@ pub async fn commit_version(
 /// [`commit_version`] with writes that must commit with the version.
 pub async fn commit_version_with(
     opened: &Opened,
-    cv: ChangeVersion,
+    mut cv: ChangeVersion,
     extras: CommitExtras,
 ) -> Result<(ChangeVersionHash, ChangeVersion)> {
     let ctx = &opened.repo;
+    super::stamp::stamp_provenance(&mut cv, &opened.ctx);
     let scope = idem::current();
     if let Some(prior) = scope.as_ref().and_then(|s| s.prior.as_ref()) {
         if let Ok(hash) = ObjectHash::from_slice(prior) {

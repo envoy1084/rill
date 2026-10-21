@@ -143,6 +143,7 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
         grant.refresh_token.is_none(),
         "agents exchange again instead"
     );
+    let session = grant.session.clone();
     let token = grant.access_token;
     let me = clients(&b, Some(&token))
         .await
@@ -195,11 +196,17 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
         provenance: None,
         change_id: None,
     };
-    agent
+    let written = agent
         .repo
         .apply_edits(write("allowed", "src/a.rs"))
         .await
-        .unwrap();
+        .unwrap()
+        .into_inner();
+    // The server, not the client, says which session, sponsor and model wrote it.
+    let provenance = written.version.unwrap().provenance.unwrap();
+    assert_eq!(provenance.session.as_deref(), Some(session.as_str()));
+    assert_eq!(provenance.model.as_deref(), Some("model-a"));
+    assert_eq!(provenance.sponsor.unwrap().name, "ann");
     let outside = agent
         .repo
         .apply_edits(write("allowed", "docs/a.md"))

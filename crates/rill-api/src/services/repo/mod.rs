@@ -6,6 +6,7 @@ mod commit;
 mod grep;
 mod history;
 mod refs;
+mod stamp;
 mod trees;
 mod watch;
 mod write;

@@ -121,7 +121,16 @@ async fn server_stamps_authorship_and_attests_commits() {
     let stored = rill_types::ChangeVersion::try_from(got.version.unwrap()).unwrap();
     assert_eq!(stored.author.name, "dev");
     assert!(stored.created_at.millis() > 1);
-    assert_eq!(stored.provenance.model.as_deref(), Some("model-x"));
+    // Without a token naming a model, the client's model is a claim.
+    assert_eq!(stored.provenance.model, None);
+    assert_eq!(
+        stored
+            .provenance
+            .extra
+            .get("claimed_model")
+            .map(String::as_str),
+        Some("model-x")
+    );
     assert!(stored.provenance.sponsor.is_none() && stored.provenance.resolved_by.is_none());
 
     let hash = ObjectHash::from_slice(&created.hash).unwrap();

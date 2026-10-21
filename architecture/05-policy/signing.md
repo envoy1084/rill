@@ -59,8 +59,14 @@ file I/O.
 `Provenance` is part of the hashed version, so a version signature also fixes
 `tool`, `model`, `session`, `prompt_ref`, `sponsor` (the human who delegated an
 agent's work), `resolved_by` and the free-form `extra` map. The server sets
-`resolved_by` from `Permit::resolved_by()` in `ApplyEdits`, and copies
-`sponsor` forward on amends when the new version omits it. The risk classifier
+`resolved_by` from `Permit::resolved_by()` in `ApplyEdits`. Every commit
+path stamps the rest from the caller's signed token before hashing
+([stamp.rs](../../crates/rill-api/src/services/repo/stamp.rs)): `session`
+and `model` are the token's claims, `sponsor` is the token's user sponsor
+(a team sponsor goes to `extra["sponsor_team"]`), and a client value that
+differs is kept as `extra["claimed_session"]` / `extra["claimed_model"]`.
+Without a token claim the field is empty and the client value is only a
+claim. The risk classifier
 bumps a change whose `resolved_by` is `agent`; see
 [risk classification](risk-classification.md).
 
