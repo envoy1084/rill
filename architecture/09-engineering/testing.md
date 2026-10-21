@@ -93,7 +93,22 @@ round trips in `src/convert/roundtrip_tests.rs`.
   org (`grpc/orgs.rs`); the land transaction lands batches at gap-free
   positions with records and `Landed` reviews, refuses a replayed batch,
   fences a replaced lander and stops at an abandoned change, on every
-  backend (`conformance/repo.rs`).
+  backend (`conformance/repo.rs`); stored land requests keep one per
+  change, are served by lane and age, finish for good and refuse a
+  replaced lander's status writes (`conformance/land_queue.rs`).
+- **Several servers**: two servers over one store land through either,
+  enforce each other's policy and search what the other indexed
+  (`grpc/replicas.rs`); three servers behind a test load balancer pass the
+  end-to-end scenario, and a server killed (its runtime dropped) after
+  doing a write and before answering costs one retry that returns the
+  first outcome, with landing carried on by the survivors (`grpc/cluster/`,
+  also on FoundationDB). Shutdown turns unready, then stops and frees its
+  leases (`grpc/shutdown.rs`); TLS checks server certificates and mutual
+  TLS refuses clients without one (`rill-cli/tests/tls.rs`); a reader finds
+  what another process indexed and a replaced search writer cannot write
+  (`rill-search/tests/end_to_end.rs`); the SDK retries a write through
+  `UNAVAILABLE` with one operation id (`rill-sdk/tests/repo_rpc.rs`);
+  dashboards query only exported metrics (`grpc/telemetry.rs`).
 - **Trees and derived data**: a directory built by random batches of
   adds, rewrites and deletes across the split threshold hashes the same
   as one built at once; a rewrite in a 200k-entry directory writes at most

@@ -71,14 +71,20 @@ impl RepoClient {
             })),
         };
         let total = bytes.len();
-        let chunks = (0..total).step_by(PUT_BLOB_CHUNK_SIZE).map(move |start| {
-            let end = (start + PUT_BLOB_CHUNK_SIZE).min(total);
-            pb::PutBlobRequest {
-                msg: Some(pb::put_blob_request::Msg::Data(bytes.slice(start..end))),
-            }
-        });
-        let stream = tokio_stream::iter(std::iter::once(header).chain(chunks));
-        let resp = self.svc().put_blob(stream).await?.into_inner();
+        let resp = crate::client::retry_idempotent(|| {
+            let bytes = bytes.clone();
+            let chunks = (0..total).step_by(PUT_BLOB_CHUNK_SIZE).map(move |start| {
+                let end = (start + PUT_BLOB_CHUNK_SIZE).min(total);
+                pb::PutBlobRequest {
+                    msg: Some(pb::put_blob_request::Msg::Data(bytes.slice(start..end))),
+                }
+            });
+            let stream = tokio_stream::iter(std::iter::once(header.clone()).chain(chunks));
+            let mut svc = self.svc();
+            async move { svc.put_blob(stream).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("put_blob.content", resp.content)?.try_into()?)
     }
 

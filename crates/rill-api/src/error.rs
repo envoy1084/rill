@@ -73,6 +73,10 @@ pub enum Error {
     #[error("{0}")]
     Unimplemented(String),
 
+    /// Retry later, possibly against another server.
+    #[error("{0}")]
+    Unavailable(String),
+
     #[error("{0}")]
     Internal(String),
 
@@ -142,6 +146,7 @@ impl Error {
             Error::PermissionDenied(_) => Code::PermissionDenied,
             Error::Unauthenticated(_) => Code::Unauthenticated,
             Error::Unimplemented(_) => Code::Unimplemented,
+            Error::Unavailable(_) => Code::Unavailable,
         }
     }
 }
@@ -251,6 +256,7 @@ impl From<Status> for Error {
             Code::FailedPrecondition => Error::FailedPrecondition(msg),
             Code::AlreadyExists => Error::AlreadyExists(msg),
             Code::Unimplemented => Error::Unimplemented(msg),
+            Code::Unavailable => Error::Unavailable(msg),
             _ => Error::Internal(msg),
         }
     }

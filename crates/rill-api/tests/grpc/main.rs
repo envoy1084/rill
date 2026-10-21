@@ -2,6 +2,7 @@
 //! through the generated tonic clients and a raw HTTP client.
 
 mod auth;
+mod cluster;
 mod commits;
 mod end_to_end;
 mod events;
@@ -75,24 +76,6 @@ impl TestServer {
         }
     }
 
-    async fn channel(&self) -> Channel {
-        let mut last = None;
-        for _ in 0..50 {
-            match Channel::from_shared(self.grpc.clone())
-                .unwrap()
-                .connect()
-                .await
-            {
-                Ok(c) => return c,
-                Err(e) => {
-                    last = Some(e);
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                }
-            }
-        }
-        panic!("could not connect: {last:?}");
-    }
-
     async fn stop(self) {
         self.shutdown.cancel();
         self.task.await.unwrap().unwrap();
@@ -122,7 +105,30 @@ struct Clients {
 }
 
 async fn clients(server: &TestServer, token: Option<&str>) -> Clients {
-    let channel = server.channel().await;
+    clients_at(&server.grpc, token).await
+}
+
+/// A channel to `endpoint`, retried while the server starts.
+async fn connect(endpoint: &str) -> Channel {
+    let mut last = None;
+    for _ in 0..50 {
+        match Channel::from_shared(endpoint.to_string())
+            .unwrap()
+            .connect()
+            .await
+        {
+            Ok(c) => return c,
+            Err(e) => {
+                last = Some(e);
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        }
+    }
+    panic!("could not connect to {endpoint}: {last:?}");
+}
+
+async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
+    let channel = connect(endpoint).await;
     let bearer = Bearer(token.map(str::to_owned));
     Clients {
         repo: RepoServiceClient::with_interceptor(channel.clone(), bearer.clone()),

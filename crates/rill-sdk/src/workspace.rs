@@ -49,17 +49,19 @@ impl WorkspaceClient {
         base: Option<Root>,
         sparse: SparseProfile,
     ) -> Result<WorkspaceOp> {
-        let resp = self
-            .svc()
-            .create_workspace(pb::CreateWorkspaceRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                name: name.to_string(),
-                base: base.map(|b| b.to_proto()),
-                sparse: Some(pb::SparseProfile::from(sparse)),
-            })
-            .await?
-            .into_inner();
+        let request = pb::CreateWorkspaceRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            name: name.to_string(),
+            base: base.map(|b| b.to_proto()),
+            sparse: Some(pb::SparseProfile::from(sparse)),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.create_workspace(request).await }
+        })
+        .await?
+        .into_inner();
         WorkspaceOp::from_parts(resp.workspace, resp.operation)
     }
 
@@ -113,16 +115,18 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         sparse: SparseProfile,
     ) -> Result<WorkspaceOp> {
-        let resp = self
-            .svc()
-            .set_sparse_profile(pb::SetSparseProfileRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
-                sparse: Some(pb::SparseProfile::from(sparse)),
-            })
-            .await?
-            .into_inner();
+        let request = pb::SetSparseProfileRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            workspace: id_to_proto(&workspace),
+            sparse: Some(pb::SparseProfile::from(sparse)),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.set_sparse_profile(request).await }
+        })
+        .await?
+        .into_inner();
         WorkspaceOp::from_parts(resp.workspace, resp.operation)
     }
 
@@ -139,16 +143,18 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         tree: TreeHash,
     ) -> Result<Operation> {
-        let resp = self
-            .svc()
-            .snapshot(pb::SnapshotRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
-                tree_hash: hash_to_proto(&tree),
-            })
-            .await?
-            .into_inner();
+        let request = pb::SnapshotRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            workspace: id_to_proto(&workspace),
+            tree_hash: hash_to_proto(&tree),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.snapshot(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("snapshot.operation", resp.operation)?.try_into()?)
     }
 
@@ -169,18 +175,21 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         change: NewChange,
     ) -> Result<NewChangeResult> {
-        self.svc()
-            .new_change(pb::NewChangeRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
-                message: change.message,
-                intent: change.intent.as_ref().map(id_to_proto),
-                provenance: Some(pb::Provenance::from(&change.provenance)),
-            })
-            .await?
-            .into_inner()
-            .try_into()
+        let request = pb::NewChangeRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            workspace: id_to_proto(&workspace),
+            message: change.message,
+            intent: change.intent.as_ref().map(id_to_proto),
+            provenance: Some(pb::Provenance::from(&change.provenance)),
+        };
+        crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.new_change(request).await }
+        })
+        .await?
+        .into_inner()
+        .try_into()
     }
 
     /// Move the workspace onto a new base (trunk head when `None`),
@@ -201,16 +210,19 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         new_base: Option<Root>,
     ) -> Result<UpdateBaseResult> {
-        self.svc()
-            .update_base(pb::UpdateBaseRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
-                new_base: new_base.map(|b| b.to_proto()),
-            })
-            .await?
-            .into_inner()
-            .try_into()
+        let request = pb::UpdateBaseRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            workspace: id_to_proto(&workspace),
+            new_base: new_base.map(|b| b.to_proto()),
+        };
+        crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.update_base(request).await }
+        })
+        .await?
+        .into_inner()
+        .try_into()
     }
 
     /// Transfer the workspace to another principal.
@@ -226,16 +238,18 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         to: Principal,
     ) -> Result<WorkspaceOp> {
-        let resp = self
-            .svc()
-            .handoff(pb::HandoffRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
-                to: Some(pb::Principal::from(to)),
-            })
-            .await?
-            .into_inner();
+        let request = pb::HandoffRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            workspace: id_to_proto(&workspace),
+            to: Some(pb::Principal::from(to)),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.handoff(request).await }
+        })
+        .await?
+        .into_inner();
         WorkspaceOp::from_parts(resp.workspace, resp.operation)
     }
 
@@ -256,16 +270,18 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         target: Option<OperationId>,
     ) -> Result<WorkspaceOp> {
-        let resp = self
-            .svc()
-            .undo(pb::UndoRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
-                target: target.as_ref().map(id_to_proto),
-            })
-            .await?
-            .into_inner();
+        let request = pb::UndoRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            workspace: id_to_proto(&workspace),
+            target: target.as_ref().map(id_to_proto),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.undo(request).await }
+        })
+        .await?
+        .into_inner();
         WorkspaceOp::from_parts(resp.workspace, resp.operation)
     }
 
@@ -299,13 +315,16 @@ impl WorkspaceClient {
 
     /// [`WorkspaceClient::delete`] with a caller-chosen idempotency key.
     pub async fn delete_with_op(&self, op: OperationId, workspace: WorkspaceId) -> Result<()> {
-        self.svc()
-            .delete_workspace(pb::DeleteWorkspaceRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
-            })
-            .await?;
+        let request = pb::DeleteWorkspaceRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            workspace: id_to_proto(&workspace),
+        };
+        crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.delete_workspace(request).await }
+        })
+        .await?;
         Ok(())
     }
 

@@ -82,15 +82,17 @@ impl ReviewClient {
         op: OperationId,
         change_id: ChangeId,
     ) -> Result<ReviewState> {
-        let resp = self
-            .svc()
-            .submit_for_review(pb::SubmitForReviewRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                change_id: id_to_proto(&change_id),
-            })
-            .await?
-            .into_inner();
+        let request = pb::SubmitForReviewRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            change_id: id_to_proto(&change_id),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.submit_for_review(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("submit_for_review.review", resp.review)?.try_into()?)
     }
 
@@ -118,19 +120,21 @@ impl ReviewClient {
         reason: Option<String>,
         version: Option<ChangeVersionHash>,
     ) -> Result<ReviewState> {
-        let resp = self
-            .svc()
-            .vote(pb::VoteRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                change_id: id_to_proto(&change_id),
-                label: label.to_string(),
-                value: value as i32,
-                reason,
-                version: version.as_ref().map(hash_to_proto),
-            })
-            .await?
-            .into_inner();
+        let request = pb::VoteRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            change_id: id_to_proto(&change_id),
+            label: label.to_string(),
+            value: value as i32,
+            reason,
+            version: version.as_ref().map(hash_to_proto),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.vote(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("vote.review", resp.review)?.try_into()?)
     }
 
@@ -147,22 +151,24 @@ impl ReviewClient {
         change_id: ChangeId,
         comment: NewComment,
     ) -> Result<NewThread> {
-        let resp = self
-            .svc()
-            .comment(pb::CommentRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                change_id: id_to_proto(&change_id),
-                anchor: Some(pb::ThreadAnchor::from(&comment.anchor)),
-                body: comment.body,
-                category: comment
-                    .category
-                    .map(|c| pb::CommentCategory::from(c) as i32),
-                confidence: comment.confidence.map(u32::from),
-                to: comment.to.map(pb::Principal::from),
-            })
-            .await?
-            .into_inner();
+        let request = pb::CommentRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            change_id: id_to_proto(&change_id),
+            anchor: Some(pb::ThreadAnchor::from(&comment.anchor)),
+            body: comment.body,
+            category: comment
+                .category
+                .map(|c| pb::CommentCategory::from(c) as i32),
+            confidence: comment.confidence.map(u32::from),
+            to: comment.to.map(pb::Principal::from),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.comment(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(NewThread {
             thread_id: resp.thread_id,
             thread: required("comment.thread", resp.thread)?.try_into()?,
@@ -188,19 +194,21 @@ impl ReviewClient {
         thread_id: &str,
         reply: Reply,
     ) -> Result<Thread> {
-        let resp = self
-            .svc()
-            .reply_thread(pb::ReplyThreadRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                change_id: id_to_proto(&change_id),
-                thread_id: thread_id.to_string(),
-                body: reply.body,
-                category: reply.category.map(|c| pb::CommentCategory::from(c) as i32),
-                confidence: reply.confidence.map(u32::from),
-            })
-            .await?
-            .into_inner();
+        let request = pb::ReplyThreadRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            change_id: id_to_proto(&change_id),
+            thread_id: thread_id.to_string(),
+            body: reply.body,
+            category: reply.category.map(|c| pb::CommentCategory::from(c) as i32),
+            confidence: reply.confidence.map(u32::from),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.reply_thread(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("reply_thread.thread", resp.thread)?.try_into()?)
     }
 
@@ -223,17 +231,19 @@ impl ReviewClient {
         thread_id: &str,
         resolved: bool,
     ) -> Result<Thread> {
-        let resp = self
-            .svc()
-            .resolve_thread(pb::ResolveThreadRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                change_id: id_to_proto(&change_id),
-                thread_id: thread_id.to_string(),
-                resolved,
-            })
-            .await?
-            .into_inner();
+        let request = pb::ResolveThreadRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            change_id: id_to_proto(&change_id),
+            thread_id: thread_id.to_string(),
+            resolved,
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.resolve_thread(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("resolve_thread.thread", resp.thread)?.try_into()?)
     }
 
@@ -248,15 +258,17 @@ impl ReviewClient {
         op: OperationId,
         change_ids: &[ChangeId],
     ) -> Result<Vec<ReviewState>> {
-        let resp = self
-            .svc()
-            .set_stack(pb::SetStackRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                change_ids: change_ids.iter().map(id_to_proto).collect(),
-            })
-            .await?
-            .into_inner();
+        let request = pb::SetStackRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            change_ids: change_ids.iter().map(id_to_proto).collect(),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.set_stack(request).await }
+        })
+        .await?
+        .into_inner();
         convert_states(resp.reviews)
     }
 
@@ -290,16 +302,18 @@ impl ReviewClient {
         change_id: ChangeId,
         reason: Option<String>,
     ) -> Result<ReviewState> {
-        let resp = self
-            .svc()
-            .abandon(pb::AbandonRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                change_id: id_to_proto(&change_id),
-                reason,
-            })
-            .await?
-            .into_inner();
+        let request = pb::AbandonRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            change_id: id_to_proto(&change_id),
+            reason,
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.abandon(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(required("abandon.review", resp.review)?.try_into()?)
     }
 
@@ -315,15 +329,17 @@ impl ReviewClient {
         op: OperationId,
         change_id: ChangeId,
     ) -> Result<LandTicket> {
-        let resp = self
-            .svc()
-            .request_land(pb::RequestLandRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                change_id: id_to_proto(&change_id),
-            })
-            .await?
-            .into_inner();
+        let request = pb::RequestLandRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            change_id: id_to_proto(&change_id),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.request_land(request).await }
+        })
+        .await?
+        .into_inner();
         required("request_land.ticket", resp.ticket)?.try_into()
     }
 

@@ -43,16 +43,18 @@ impl AdminClient {
         op: OperationId,
         request: TokenRequest,
     ) -> Result<IssuedToken> {
-        let resp = self
-            .svc()
-            .issue_token(pb::IssueTokenRequest {
-                operation_id: id_to_proto(&op),
-                capabilities: request.capabilities.iter().map(|c| c.to_proto()).collect(),
-                expires_at: request.expires_at.map(|t| t.millis()),
-                for_principal: request.for_principal.map(pb::Principal::from),
-            })
-            .await?
-            .into_inner();
+        let request = pb::IssueTokenRequest {
+            operation_id: id_to_proto(&op),
+            capabilities: request.capabilities.iter().map(|c| c.to_proto()).collect(),
+            expires_at: request.expires_at.map(|t| t.millis()),
+            for_principal: request.for_principal.map(pb::Principal::from),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.issue_token(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(IssuedToken {
             token: resp.token,
             expires_at: timestamp_from_proto(resp.expires_at),
@@ -67,12 +69,15 @@ impl AdminClient {
 
     /// [`AdminClient::add_relation`] with a caller-chosen idempotency key.
     pub async fn add_relation_with_op(&self, op: OperationId, relation: &Relation) -> Result<()> {
-        self.svc()
-            .add_relation(pb::AddRelationRequest {
-                operation_id: id_to_proto(&op),
-                relation: Some(relation.to_proto()),
-            })
-            .await?;
+        let request = pb::AddRelationRequest {
+            operation_id: id_to_proto(&op),
+            relation: Some(relation.to_proto()),
+        };
+        crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.add_relation(request).await }
+        })
+        .await?;
         Ok(())
     }
 
@@ -88,12 +93,15 @@ impl AdminClient {
         op: OperationId,
         relation: &Relation,
     ) -> Result<()> {
-        self.svc()
-            .remove_relation(pb::RemoveRelationRequest {
-                operation_id: id_to_proto(&op),
-                relation: Some(relation.to_proto()),
-            })
-            .await?;
+        let request = pb::RemoveRelationRequest {
+            operation_id: id_to_proto(&op),
+            relation: Some(relation.to_proto()),
+        };
+        crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.remove_relation(request).await }
+        })
+        .await?;
         Ok(())
     }
 
@@ -138,29 +146,33 @@ impl AdminClient {
         name: &str,
         text: &str,
     ) -> Result<Timestamp> {
-        let resp = self
-            .svc()
-            .set_policy(pb::SetPolicyRequest {
-                operation_id: id_to_proto(&op),
-                name: name.to_string(),
-                text: text.to_string(),
-            })
-            .await?
-            .into_inner();
+        let request = pb::SetPolicyRequest {
+            operation_id: id_to_proto(&op),
+            name: name.to_string(),
+            text: text.to_string(),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.set_policy(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(timestamp_from_proto(resp.updated_at))
     }
 
     /// Create an org.
     pub async fn create_org(&self, name: &str, description: Option<&str>) -> Result<OrgInfo> {
-        let resp = self
-            .svc()
-            .create_org(pb::CreateOrgRequest {
-                operation_id: id_to_proto(&OperationId::new()),
-                name: name.to_string(),
-                description: description.map(str::to_string),
-            })
-            .await?
-            .into_inner();
+        let request = pb::CreateOrgRequest {
+            operation_id: id_to_proto(&OperationId::new()),
+            name: name.to_string(),
+            description: description.map(str::to_string),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.create_org(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(rill_proto::convert::required("create_org.org", resp.org)?.into())
     }
 

@@ -4,9 +4,10 @@
 //! A request first claims its operation id. A retry of a finished request
 //! gets the stored response; a duplicate of one still running is told so;
 //! reusing an id for a different request is refused. A failed request
-//! releases its claim so the client can retry. Claims and responses expire
-//! after [`IDEM_TTL_MS`]; a claim held past [`CLAIM_TTL_MS`] by a server
-//! that died can be taken over.
+//! releases its claim so the client can retry. Responses expire after
+//! [`IDEM_TTL_MS`]. A running request renews its claim
+//! ([`Stores::idem_renew`]); a claim not renewed for [`CLAIM_TTL_MS`],
+//! because its server died, can be taken over.
 
 use bytes::Bytes;
 use rill_types::{Record, Timestamp};
@@ -20,8 +21,8 @@ use crate::meta::{KeyRange, Mutation, Transaction};
 
 /// How long a finished request's response is kept.
 pub const IDEM_TTL_MS: i64 = 24 * 60 * 60 * 1000;
-/// How long an unfinished claim blocks duplicates.
-pub const CLAIM_TTL_MS: i64 = 5 * 60 * 1000;
+/// How long an unfinished claim blocks duplicates without being renewed.
+pub const CLAIM_TTL_MS: i64 = 15 * 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 enum Outcome {
@@ -169,6 +170,34 @@ impl Stores {
         Ok(())
     }
 
+    /// Extend a running claim while its request works; `false` once the
+    /// claim is no longer this request's running claim.
+    pub async fn idem_renew(
+        &self,
+        principal: &str,
+        operation: &[u8],
+        request: [u8; 32],
+    ) -> Result<bool> {
+        let key = keys::idem(principal, operation);
+        let Some(bytes) = self.meta.get(&key).await? else {
+            return Ok(false);
+        };
+        let mut record: IdemRecord = decode_record(&bytes)?;
+        if record.request != request || !matches!(record.outcome, Outcome::Running { .. }) {
+            return Ok(false);
+        }
+        record.expires_at = Timestamp::from_millis(Timestamp::now().millis() + CLAIM_TTL_MS);
+        let tx = Transaction::new()
+            .expect(key.clone(), Some(bytes))
+            .set(key, encode_record(&record)?);
+        match self.meta.transact(tx).await {
+            Ok(_) => Ok(true),
+            // Finished, or its effect recorded, since the read.
+            Err(Error::Conflict(_)) => Ok(true),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Release a claim after the request failed. A claim whose request
     /// already committed its effect is not dropped: it expires at once, so
     /// a retry takes it over and learns the effect instead of redoing it.
@@ -312,6 +341,27 @@ mod tests {
             stores.idem_sweep(100).await.unwrap(),
             0,
             "the new claim is live"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_running_claim_is_renewed_until_it_finishes() {
+        let stores = Stores::memory();
+        let (who, op, req) = ("pr_alice", b"op-3".as_slice(), [4u8; 32]);
+        stores.idem_claim(who, op, req).await.unwrap();
+        assert!(stores.idem_renew(who, op, req).await.unwrap());
+        assert!(
+            !stores.idem_renew(who, op, [5u8; 32]).await.unwrap(),
+            "another request's claim"
+        );
+        stores.idem_finish(who, op, req, b"done").await.unwrap();
+        assert!(
+            !stores.idem_renew(who, op, req).await.unwrap(),
+            "finished claims stay finished"
+        );
+        assert_eq!(
+            stores.idem_claim(who, op, req).await.unwrap(),
+            Claim::Replay(Bytes::from_static(b"done"))
         );
     }
 }

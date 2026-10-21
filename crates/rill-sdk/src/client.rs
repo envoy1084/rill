@@ -57,6 +57,38 @@ impl Interceptor for AuthInterceptor {
     }
 }
 
+/// How long an idempotent call keeps retrying: past a dead server's
+/// idempotency claim (15 s on the server).
+const RETRY_BUDGET: Duration = Duration::from_secs(20);
+
+/// Run a call that carries an operation id, retrying while the cluster is
+/// unavailable (a dead or draining server, a cut connection, the claim of a
+/// server that died mid-request). The server runs the operation at most
+/// once, so retrying cannot repeat its effect.
+pub(crate) async fn retry_idempotent<T, F, Fut>(
+    mut call: F,
+) -> std::result::Result<tonic::Response<T>, Status>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = std::result::Result<tonic::Response<T>, Status>>,
+{
+    let started = tokio::time::Instant::now();
+    let mut delay = Duration::from_millis(100);
+    loop {
+        match call().await {
+            Err(status)
+                if status.code() == tonic::Code::Unavailable
+                    && started.elapsed() < RETRY_BUDGET =>
+            {
+                tracing::debug!(error = %status, "retrying an idempotent call");
+                tokio::time::sleep(delay).await;
+                delay = (delay * 2).min(Duration::from_secs(2));
+            }
+            outcome => return outcome,
+        }
+    }
+}
+
 /// The transport every generated client runs over.
 pub type Svc = InterceptedService<Channel, AuthInterceptor>;
 

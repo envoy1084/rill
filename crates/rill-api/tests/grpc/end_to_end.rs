@@ -30,7 +30,14 @@ async fn end_to_end_on_foundationdb() {
 
 async fn end_to_end(config: ServerConfig) {
     let server = TestServer::start(config).await;
-    let mut c = clients(&server, None).await;
+    scenario(&server.grpc, server.http).await;
+    server.stop().await;
+}
+
+/// One pass through every service against the server (or servers) at
+/// `endpoint` and `http`.
+pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
+    let mut c = clients_at(endpoint, None).await;
     let repo = "main";
 
     let created = c
@@ -329,11 +336,8 @@ async fn end_to_end(config: ServerConfig) {
     assert_eq!(ops.len(), 3);
 
     // Object protocol.
-    let (status, headers, body) = http_get(
-        server.http,
-        &format!("/o/{repo}/blob/{}", blob_hash.to_hex()),
-    )
-    .await;
+    let (status, headers, body) =
+        http_get(http, &format!("/o/{repo}/blob/{}", blob_hash.to_hex())).await;
     assert_eq!(status, 200);
     assert_eq!(body, big);
     let etag = headers
@@ -347,9 +351,9 @@ async fn end_to_end(config: ServerConfig) {
     assert!(headers
         .iter()
         .any(|(k, v)| k == "cache-control" && v.contains("immutable")));
-    let (status, _, _) = http_get(server.http, "/livez").await;
+    let (status, _, _) = http_get(http, "/livez").await;
     assert_eq!(status, 200);
-    let (status, _, _) = http_get(server.http, "/o/main/blob/zz").await;
+    let (status, _, _) = http_get(http, "/o/main/blob/zz").await;
     assert_eq!(status, 400);
 
     let me = c
@@ -366,6 +370,4 @@ async fn end_to_end(config: ServerConfig) {
         .unwrap()
         .into_inner();
     assert!(health.ok);
-
-    server.stop().await;
 }

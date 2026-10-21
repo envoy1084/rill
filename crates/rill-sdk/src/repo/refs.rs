@@ -90,15 +90,17 @@ impl RepoClient {
             expected,
             target,
         };
-        let resp = self
-            .svc()
-            .move_ref(pb::MoveRefRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                update: Some(pb::RefUpdate::from(update)),
-            })
-            .await?
-            .into_inner();
+        let request = pb::MoveRefRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            update: Some(pb::RefUpdate::from(update)),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.move_ref(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(opt_hash_from_proto("move_ref.hash", resp.hash.as_ref())?)
     }
 

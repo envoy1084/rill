@@ -15,6 +15,11 @@ use crate::auth::caller;
 use crate::error::{Error, Result};
 use crate::state::AppState;
 
+/// How often a running request renews its claim, well inside
+/// [`rill_store::repo::CLAIM_TTL_MS`].
+const RENEW_EVERY: std::time::Duration =
+    std::time::Duration::from_millis(rill_store::repo::CLAIM_TTL_MS as u64 / 3);
+
 /// A request message carrying an idempotency key.
 pub trait Idempotent: Message {
     fn operation_id(&self) -> &[u8];
@@ -115,7 +120,7 @@ where
             return Ok(Response::new(response));
         }
         Claim::Running => {
-            return Err(Error::FailedPrecondition(
+            return Err(Error::Unavailable(
                 "this operation is already running; retry later".into(),
             ))
         }
@@ -131,7 +136,23 @@ where
         digest,
         prior,
     };
-    match SCOPE.scope(scope, handler(request)).await {
+    let renew = async {
+        loop {
+            tokio::time::sleep(RENEW_EVERY).await;
+            match stores.idem_renew(&principal, &operation, digest).await {
+                Ok(true) => {}
+                Ok(false) => return,
+                Err(e) => tracing::warn!(error = %e, "renewing an idempotency claim failed"),
+            }
+        }
+    };
+    let outcome = tokio::select! {
+        outcome = SCOPE.scope(scope, handler(request)) => outcome,
+        _ = renew => Err(Error::Unavailable(
+            "this operation's claim was taken over; retry".into(),
+        )),
+    };
+    match outcome {
         Ok(response) => {
             stores
                 .idem_finish(

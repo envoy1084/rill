@@ -28,16 +28,18 @@ impl RepoClient {
         version: &ChangeVersion,
         signatures: Vec<Signature>,
     ) -> Result<ChangeVersionHash> {
-        let resp = self
-            .svc()
-            .create_change_version(pb::CreateChangeVersionRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                version: Some(pb::ChangeVersion::from(version)),
-                signatures: signatures.into_iter().map(pb::Signature::from).collect(),
-            })
-            .await?
-            .into_inner();
+        let request = pb::CreateChangeVersionRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            version: Some(pb::ChangeVersion::from(version)),
+            signatures: signatures.into_iter().map(pb::Signature::from).collect(),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.create_change_version(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(hash_from_proto("create_change_version.hash", &resp.hash)?)
     }
 
@@ -65,20 +67,22 @@ impl RepoClient {
         for edit in edits {
             wire.push(self.edit_to_proto(edit).await?);
         }
-        let resp = self
-            .svc()
-            .apply_edits(pb::ApplyEditsRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                base: Some(base.to_proto()),
-                edits: wire,
-                message: opts.message,
-                intent: opts.intent.as_ref().map(id_to_proto),
-                provenance: Some(pb::Provenance::from(&opts.provenance)),
-                change_id: opts.change_id.as_ref().map(id_to_proto),
-            })
-            .await?
-            .into_inner();
+        let request = pb::ApplyEditsRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            base: Some(base.to_proto()),
+            edits: wire,
+            message: opts.message,
+            intent: opts.intent.as_ref().map(id_to_proto),
+            provenance: Some(pb::Provenance::from(&opts.provenance)),
+            change_id: opts.change_id.as_ref().map(id_to_proto),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.apply_edits(request).await }
+        })
+        .await?
+        .into_inner();
         VersionResult::from_parts(&resp.hash, resp.version)
     }
 
@@ -115,16 +119,18 @@ impl RepoClient {
         hash: ChangeVersionHash,
         new_parent: ChangeVersionHash,
     ) -> Result<VersionResult> {
-        let resp = self
-            .svc()
-            .rebase(pb::RebaseRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                hash: hash_to_proto(&hash),
-                new_parent: hash_to_proto(&new_parent),
-            })
-            .await?
-            .into_inner();
+        let request = pb::RebaseRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            hash: hash_to_proto(&hash),
+            new_parent: hash_to_proto(&new_parent),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.rebase(request).await }
+        })
+        .await?
+        .into_inner();
         VersionResult::from_parts(&resp.hash, resp.version)
     }
 
@@ -147,19 +153,21 @@ impl RepoClient {
         right: ChangeVersionHash,
         opts: MergeOptions,
     ) -> Result<VersionResult> {
-        let resp = self
-            .svc()
-            .merge(pb::MergeRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                left: hash_to_proto(&left),
-                right: hash_to_proto(&right),
-                message: opts.message,
-                intent: opts.intent.as_ref().map(id_to_proto),
-                provenance: Some(pb::Provenance::from(&opts.provenance)),
-            })
-            .await?
-            .into_inner();
+        let request = pb::MergeRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            left: hash_to_proto(&left),
+            right: hash_to_proto(&right),
+            message: opts.message,
+            intent: opts.intent.as_ref().map(id_to_proto),
+            provenance: Some(pb::Provenance::from(&opts.provenance)),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.merge(request).await }
+        })
+        .await?
+        .into_inner();
         VersionResult::from_parts(&resp.hash, resp.version)
     }
 
@@ -196,17 +204,19 @@ impl RepoClient {
                 resolution: Some(resolution),
             });
         }
-        let resp = self
-            .svc()
-            .resolve(pb::ResolveRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                hash: hash_to_proto(&hash),
-                resolutions: wire,
-                provenance: Some(pb::Provenance::from(&provenance)),
-            })
-            .await?
-            .into_inner();
+        let request = pb::ResolveRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            hash: hash_to_proto(&hash),
+            resolutions: wire,
+            provenance: Some(pb::Provenance::from(&provenance)),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.resolve(request).await }
+        })
+        .await?
+        .into_inner();
         VersionResult::from_parts(&resp.hash, resp.version)
     }
 }

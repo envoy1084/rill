@@ -94,17 +94,26 @@ before it runs:
 | --- | --- |
 | nothing, or an expired claim | run; store the response when it succeeds, release the claim when it fails |
 | the same request, finished | the stored response, without running again |
-| the same request, still running | `FAILED_PRECONDITION` ("already running") |
+| the same request, still running | `UNAVAILABLE` ("already running"): retry |
 | a different request (by BLAKE3 of its encoding) | `INVALID_ARGUMENT` |
 
-Responses are kept 24 hours and claims block duplicates for 5 minutes; a
-server task sweeps expired rows every 10 minutes. The claim is visible to
+Responses are kept 24 hours. A claim lasts 15 s (`CLAIM_TTL_MS`) and the
+request renews it every 5 s while it runs, so the claim of a server that
+died mid-request frees up within 15 s; a server task sweeps expired rows
+every 10 minutes. The claim is visible to
 the handler as a task-local `Scope`. The commit transaction records which
 version the request created in the claim, so if the server dies after
 committing and before storing the response, the retry takes over the
 expired claim, finds that version and returns it instead of storing a
 second one. A failed request whose claim recorded such an effect keeps the
 claim (expired at once) for that retry.
+
+The SDK retries every call that carries an operation id while the answer
+is `UNAVAILABLE` (a dead or draining server, a cut connection, a claim a
+dead server left), with backoff from 100 ms to 2 s for up to 20 s. With
+three servers behind a load balancer, a server killed between committing a
+write and answering it costs the client a retry that returns the first
+outcome (`rill-api/tests/grpc/cluster/`).
 
 ## Conversion rules
 

@@ -55,6 +55,8 @@ pub struct MockRepo {
     pub put_requests: Mutex<Vec<usize>>,
     pub rebases: Mutex<Vec<(ObjectHash, ObjectHash)>>,
     pub chunk_size: usize,
+    /// `ApplyEdits` calls still to fail with `Unavailable`.
+    pub unavailable: std::sync::atomic::AtomicUsize,
 }
 
 impl Default for MockRepo {
@@ -75,6 +77,7 @@ impl MockRepo {
             put_requests: Mutex::default(),
             rebases: Mutex::default(),
             chunk_size: 1000,
+            unavailable: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -363,6 +366,12 @@ impl RepoService for MockRepo {
     ) -> RpcResult<pb::ApplyEditsResponse> {
         let req = req.into_inner();
         self.applied.lock().unwrap().push(req.clone());
+        let failing = self.unavailable.load(std::sync::atomic::Ordering::SeqCst);
+        if failing > 0 {
+            self.unavailable
+                .store(failing - 1, std::sync::atomic::Ordering::SeqCst);
+            return Err(Status::unavailable("server going away"));
+        }
         let mut file_changes = BTreeMap::new();
         for edit in &req.edits {
             let change = match &edit.op {

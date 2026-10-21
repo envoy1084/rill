@@ -205,3 +205,28 @@ async fn watch_trunk_yields_converted_events() {
     }
     assert_eq!(seqs, vec![TrunkSeq(1), TrunkSeq(2), TrunkSeq(3)]);
 }
+
+#[tokio::test]
+async fn writes_retry_through_unavailable_servers_with_one_operation_id() {
+    let mock = MockRepo::new();
+    mock.set_trunk(1, fake_hash("head"));
+    mock.unavailable
+        .store(2, std::sync::atomic::Ordering::SeqCst);
+    let h = Harness::with_repo(mock).await;
+    let repo = h.client.repo("main");
+    repo.apply_edits(
+        EditBase::Root(Root::trunk()),
+        vec![Edit::set(path("a.txt"), "hi")],
+        ApplyOptions::message("retried"),
+    )
+    .await
+    .unwrap();
+    let applied = h.repo.applied.lock().unwrap();
+    assert_eq!(applied.len(), 3, "two failures, then success");
+    assert!(
+        applied
+            .iter()
+            .all(|r| r.operation_id == applied[0].operation_id && !r.operation_id.is_empty()),
+        "every attempt is the same operation"
+    );
+}

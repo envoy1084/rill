@@ -103,19 +103,21 @@ impl LanderClient {
         seq: TrunkSeq,
         report: NewVerification,
     ) -> Result<VerificationRecord> {
-        let resp = self
-            .svc()
-            .report_verification(pb::ReportVerificationRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                seq: seq.get(),
-                target: report.target,
-                status: report.status.to_proto(),
-                details: report.details,
-                artifact: report.artifact.as_ref().map(hash_to_proto),
-            })
-            .await?
-            .into_inner();
+        let request = pb::ReportVerificationRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            seq: seq.get(),
+            target: report.target,
+            status: report.status.to_proto(),
+            details: report.details,
+            artifact: report.artifact.as_ref().map(hash_to_proto),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.report_verification(request).await }
+        })
+        .await?
+        .into_inner();
         required("report_verification.result", resp.result)?.try_into()
     }
 
@@ -131,16 +133,18 @@ impl LanderClient {
         seq: TrunkSeq,
         reason: &str,
     ) -> Result<RevertResult> {
-        let resp = self
-            .svc()
-            .revert_seq(pb::RevertSeqRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                seq: seq.get(),
-                reason: reason.to_string(),
-            })
-            .await?
-            .into_inner();
+        let request = pb::RevertSeqRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            seq: seq.get(),
+            reason: reason.to_string(),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.revert_seq(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(RevertResult {
             landing: required("revert_seq.landing", resp.landing)?.try_into()?,
             version: required("revert_seq.version", resp.version)?.try_into()?,
@@ -162,17 +166,19 @@ impl LanderClient {
         to: TrunkSeq,
         target: &str,
     ) -> Result<BisectResult> {
-        let resp = self
-            .svc()
-            .bisect(pb::BisectRequest {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
-                from: from.get(),
-                to: to.get(),
-                target: target.to_string(),
-            })
-            .await?
-            .into_inner();
+        let request = pb::BisectRequest {
+            operation_id: id_to_proto(&op),
+            repo: self.repo.clone(),
+            from: from.get(),
+            to: to.get(),
+            target: target.to_string(),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.bisect(request).await }
+        })
+        .await?
+        .into_inner();
         Ok(BisectResult {
             culprit: resp.culprit.map(TrunkSeq),
             tested: resp

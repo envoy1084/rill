@@ -128,16 +128,18 @@ impl Client {
         description: Option<String>,
         windows_safe: bool,
     ) -> Result<RepoInfo> {
-        let resp = self
-            .repo_svc()
-            .create_repo(pb::CreateRepoRequest {
-                operation_id: id_to_proto(&op),
-                repo: name.to_string(),
-                description,
-                windows_safe,
-            })
-            .await?
-            .into_inner();
+        let request = pb::CreateRepoRequest {
+            operation_id: id_to_proto(&op),
+            repo: name.to_string(),
+            description,
+            windows_safe,
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.repo_svc(), request.clone());
+            async move { svc.create_repo(request).await }
+        })
+        .await?
+        .into_inner();
         rill_proto::convert::required("create_repo.repo", resp.repo)?.try_into()
     }
 }
