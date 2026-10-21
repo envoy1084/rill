@@ -57,7 +57,7 @@ pub async fn create(
     state
         .identity
         .store()
-        .create_scim_credential(&credential)
+        .create_scim_credential(&credential, &ctx.principal)
         .await?;
     tracing::info!(by = %ctx.principal, org = %credential.org, credential = %id, "SCIM credential created");
     Ok(pb::CreateScimCredentialResponse {
@@ -88,7 +88,11 @@ pub async fn revoke(
     require_org_admin(state, &ctx, &req.org).await?;
     let store = state.identity.store();
     match store.scim_credential(&req.id).await? {
-        Some(c) if c.org == req.org => store.revoke_scim_credential(&req.id).await?,
+        Some(c) if c.org == req.org => {
+            store
+                .revoke_scim_credential(&req.id, &ctx.principal)
+                .await?
+        }
         _ => return Err(Error::NotFound(format!("SCIM credential {}", req.id))),
     }
     tracing::info!(by = %ctx.principal, org = %req.org, credential = %req.id, "SCIM credential revoked");

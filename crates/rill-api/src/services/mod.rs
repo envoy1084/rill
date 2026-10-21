@@ -3,6 +3,7 @@
 
 pub mod access;
 pub mod admin;
+pub mod audit;
 pub mod budget;
 pub mod common;
 pub mod diff;
@@ -18,6 +19,7 @@ pub mod workspace;
 
 pub use access::AccessSvc;
 pub use admin::AdminSvc;
+pub use audit::AuditSvc;
 pub use identity::IdentitySvc;
 pub use intent::IntentSvc;
 pub use lander::LanderSvc;

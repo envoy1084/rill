@@ -28,7 +28,11 @@ pub async fn create(
     let req = request.into_inner();
     let org = state
         .stores
-        .create_org(&req.name, req.description.as_deref().unwrap_or(""))
+        .create_org_by(
+            &req.name,
+            req.description.as_deref().unwrap_or(""),
+            &ctx.principal,
+        )
         .await
         .map_err(|e| match e {
             rill_store::Error::Conflict(m) => Error::AlreadyExists(m),

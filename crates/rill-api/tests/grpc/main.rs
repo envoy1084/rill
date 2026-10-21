@@ -3,6 +3,7 @@
 
 mod access;
 mod agents;
+mod audit;
 mod auth;
 mod cluster;
 mod commits;
@@ -34,6 +35,7 @@ use rill_api::{build_state, serve_with_state, AppState, Listeners, ServerConfig}
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::access_service_client::AccessServiceClient;
 use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
+use rill_proto::rill::v1::audit_service_client::AuditServiceClient;
 use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
 use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
 use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
@@ -134,6 +136,7 @@ type Svc = InterceptedService<Channel, Bearer>;
 
 struct Clients {
     repo: RepoServiceClient<Svc>,
+    audit: AuditServiceClient<Svc>,
     access: AccessServiceClient<Svc>,
     workspace: WorkspaceServiceClient<Svc>,
     review: ReviewServiceClient<Svc>,
@@ -169,6 +172,7 @@ async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
     Clients {
         repo: RepoServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         access: AccessServiceClient::with_interceptor(channel.clone(), bearer.clone()),
+        audit: AuditServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         workspace: WorkspaceServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         review: ReviewServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         admin: AdminServiceClient::with_interceptor(channel, bearer),

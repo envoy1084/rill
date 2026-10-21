@@ -20,6 +20,7 @@
 //!   `object_store`.
 //! * [`fdb`] (feature `fdb`): metadata in FoundationDB.
 
+pub mod audit;
 pub mod codec;
 pub mod error;
 pub mod identity;

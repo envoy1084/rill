@@ -154,7 +154,7 @@ sends it when fetching them (`Client::read_grants`).
 Grants are signed with ECDSA P-256 by a key derived from the active token
 key (`GrantSigner::derive`), so grant keys are wrapped by the same key
 service and rotate and retire with token keys. `TokenKeyRecord` stores the
-grant public key. `GET /grant-keys` publishes the public keys so a cache tier
+grant public key. `GET /public-keys` publishes the public keys so a cache tier
 can verify grants without the metadata store.
 
 Content identical in a readable and a hidden path is readable through the

@@ -60,6 +60,8 @@ pub struct RepoContext {
     pub authorizer: Arc<Authorizer>,
     /// Users, agents and org roles, for org administrators' access.
     pub identity: Arc<crate::identity::IdentityView>,
+    /// Where refused requests are noted.
+    pub denials: Arc<crate::audit::denials::Denials>,
     /// Vote labels.
     pub labels: Arc<LabelSet>,
     /// Cancelled when the server shuts down; long-lived streams and
@@ -188,6 +190,7 @@ pub struct RepoRegistry {
     config: Arc<ServerConfig>,
     attestor: Arc<rill_policy::Signer>,
     identity: Arc<crate::identity::IdentityView>,
+    denials: Arc<crate::audit::denials::Denials>,
     contexts: DashMap<RepoId, Arc<RepoContext>>,
     build_lock: tokio::sync::Mutex<()>,
     lifecycle: Arc<super::Lifecycle>,
@@ -204,6 +207,7 @@ impl RepoRegistry {
         lifecycle: Arc<super::Lifecycle>,
     ) -> Self {
         RepoRegistry {
+            denials: Arc::new(crate::audit::denials::Denials::new(stores.audit())),
             stores,
             config,
             attestor,
@@ -376,6 +380,7 @@ impl RepoRegistry {
             search,
             authorizer,
             identity: self.identity.clone(),
+            denials: self.denials.clone(),
             labels,
             shutdown: self.lifecycle.stop.child_token(),
             lifecycle: self.lifecycle.clone(),

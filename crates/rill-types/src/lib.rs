@@ -9,6 +9,7 @@
 //! The crate has no I/O and no async; it is shared by the server, the client
 //! and every tool that speaks the Rill API.
 
+pub mod audit;
 pub mod encoding;
 pub mod error;
 pub mod hash;

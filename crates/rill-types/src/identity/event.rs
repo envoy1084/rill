@@ -44,6 +44,32 @@ pub enum IdentityChange {
     OrgSettingsChanged {
         org: String,
     },
+    /// A sign-in or workload exchange opened a session.
+    SessionOpened {
+        org: String,
+        principal: Principal,
+        session: SessionId,
+        kind: String,
+    },
+    /// A token was issued by request (`IssueToken`) or minted by an
+    /// operator; access tokens a session refreshes are covered by its
+    /// `SessionOpened`.
+    TokenIssued {
+        org: String,
+        principal: Principal,
+        token_id: TokenId,
+        expires_at: Timestamp,
+        /// The capability's repository and paths, when narrowed.
+        scope: Option<String>,
+    },
+    OrgCreated {
+        org: String,
+    },
+    ScimCredentialChanged {
+        org: String,
+        id: String,
+        active: bool,
+    },
 }
 
 /// One entry of the identity change log.

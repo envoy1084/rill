@@ -41,6 +41,8 @@ pub struct ServerConfig {
     pub auth: AuthConfig,
     /// Token keys, lifetimes and instance administrators.
     pub identity: IdentityConfig,
+    /// The audit log.
+    pub audit: super::AuditConfig,
     /// Landing pipeline policy (verification modes, retries, auto-revert).
     pub lander: LandPolicy,
     /// Risk classification rules applied to every change under review.
@@ -78,6 +80,7 @@ impl Default for ServerConfig {
             metadata: MetadataConfig::Storage,
             auth: AuthConfig::default(),
             identity: IdentityConfig::default(),
+            audit: super::AuditConfig::default(),
             lander: LandPolicy::default(),
             risk: RiskConfig::default(),
             labels: LabelSet::default(),

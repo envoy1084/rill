@@ -31,19 +31,10 @@ impl std::fmt::Debug for GrantSigner {
 impl GrantSigner {
     /// The grant key of the token key `key_id` with secret `token_secret`.
     pub fn derive(key_id: u32, token_secret: &[u8]) -> Result<Self> {
-        let mut input = token_secret.to_vec();
-        // A derived string is a valid scalar except with negligible
-        // probability; extend the input and derive again then.
-        for _ in 0..8 {
-            let candidate = blake3::derive_key(DERIVATION, &input);
-            if let Ok(key) = SigningKey::from_slice(&candidate) {
-                return Ok(GrantSigner { key_id, key });
-            }
-            input.push(0);
-        }
-        Err(Error::InvalidKey(
-            "no grant key derives from this secret".into(),
-        ))
+        Ok(GrantSigner {
+            key_id,
+            key: crate::signing::derive_key(DERIVATION, token_secret)?,
+        })
     }
 
     pub fn key_id(&self) -> u32 {

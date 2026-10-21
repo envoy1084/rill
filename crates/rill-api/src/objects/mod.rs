@@ -105,7 +105,7 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
         .route("/livez", get(livez))
         .route("/readyz", get(readyz))
         .route("/metrics", get(metrics))
-        .route("/grant-keys", get(grant_keys));
+        .route("/public-keys", get(public_keys));
     let router = if serve_objects {
         health
             .merge(objects)
@@ -120,9 +120,16 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
 /// Largest object accepted by `PUT`.
 pub const MAX_PUT_BYTES: usize = 256 * 1024 * 1024;
 
-/// The public keys read grants verify with, for cache tiers. Retired keys
-/// are listed with the time they stopped verifying.
-async fn grant_keys(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
+/// The public keys derived from each token key: read grants verify with
+/// the grant key (cache tiers), audit roots with the audit key (auditors).
+/// Retired keys are listed with the time they stopped verifying grants.
+async fn public_keys(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
+    let audit: std::collections::HashMap<u32, Vec<u8>> = state
+        .identity
+        .audit_keys()
+        .into_iter()
+        .map(|(id, key, _)| (id, key))
+        .collect();
     let keys: Vec<_> = state
         .identity
         .grant_keys()
@@ -131,7 +138,8 @@ async fn grant_keys(axum::extract::State(state): axum::extract::State<Arc<AppSta
         .map(|(id, key, not_after)| {
             serde_json::json!({
                 "id": id,
-                "public_key": hex::encode(key),
+                "grant_public_key": hex::encode(key),
+                "audit_public_key": audit.get(&id).map(hex::encode),
                 "not_after": not_after.map(|t| t.millis()),
             })
         })

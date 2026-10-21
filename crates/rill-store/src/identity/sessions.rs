@@ -20,6 +20,16 @@ impl IdentityStore {
         let tx = Transaction::new()
             .expect_absent(key.clone())
             .set(key, encode_record(session)?);
+        let tx = self.logged(
+            tx,
+            IdentityChange::SessionOpened {
+                org: session.org.clone(),
+                principal: session.principal.clone(),
+                session: session.id,
+                kind: format!("{:?}", session.kind).to_lowercase(),
+            },
+            &session.principal,
+        )?;
         self.meta.transact(tx).await?;
         Ok(())
     }

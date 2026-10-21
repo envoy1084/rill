@@ -36,6 +36,7 @@ rill-store = { workspace = true }
 rill-git-import = { workspace = true }
 rill-identity = { workspace = true }
 rill-proto = { workspace = true }
+rill-policy = { workspace = true }
 dirs = { workspace = true }
 hex = { workspace = true }
 rand = { workspace = true }

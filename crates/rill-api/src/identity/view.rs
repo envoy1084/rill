@@ -141,6 +141,20 @@ impl IdentityView {
             .ok_or_else(|| Error::Unavailable("no token signing key is active".into()))
     }
 
+    /// What signs audit roots on this server.
+    pub fn audit_signer(&self) -> Result<rill_policy::audit::AuditSigner> {
+        self.set
+            .load()
+            .audit_signer
+            .clone()
+            .ok_or_else(|| Error::Unavailable("no token signing key is active".into()))
+    }
+
+    /// Every stored key's public audit key: `(id, key, not_after)`.
+    pub fn audit_keys(&self) -> Vec<(u32, Vec<u8>, Option<Timestamp>)> {
+        self.set.load().audit_keys.clone()
+    }
+
     /// The public keys read grants verify with.
     pub fn grant_keys(&self) -> rill_policy::grants::GrantKeys {
         self.set.load().grant_keys.clone()
@@ -215,7 +229,11 @@ impl IdentityView {
             }
             IdentityChange::ProviderChanged { .. }
             | IdentityChange::WorkloadIssuerChanged { .. }
-            | IdentityChange::TeamChanged { .. } => false,
+            | IdentityChange::TeamChanged { .. }
+            | IdentityChange::SessionOpened { .. }
+            | IdentityChange::TokenIssued { .. }
+            | IdentityChange::OrgCreated { .. }
+            | IdentityChange::ScimCredentialChanged { .. } => false,
         }
     }
 

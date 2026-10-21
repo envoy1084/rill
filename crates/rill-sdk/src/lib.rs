@@ -26,6 +26,7 @@
 
 pub mod access;
 pub mod admin;
+pub mod audit;
 pub mod auth;
 pub mod client;
 pub mod config;
@@ -43,6 +44,7 @@ pub mod workspace;
 
 pub use access::AccessClient;
 pub use admin::AdminClient;
+pub use audit::AuditClient;
 pub use client::Client;
 pub use config::{ClientConfig, SessionConfig, TlsOptions};
 pub use error::{Error, Result};

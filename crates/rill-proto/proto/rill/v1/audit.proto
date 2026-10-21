@@ -1,0 +1,90 @@
+// Audit service: each org's hash-chained audit log and its signed seals,
+// for org administrators (instance administrators for `_instance`).
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+service AuditService {
+  rpc ListAuditEntries(ListAuditEntriesRequest) returns (ListAuditEntriesResponse);
+  rpc ListAuditRoots(ListAuditRootsRequest) returns (ListAuditRootsResponse);
+  // Seal what the chain gained since its last seal, now.
+  rpc SealAudit(SealAuditRequest) returns (SealAuditResponse);
+  // The public keys seals verify with, by token key id.
+  rpc ListAuditKeys(ListAuditKeysRequest) returns (ListAuditKeysResponse);
+  // Entries as they are chained, for SIEM export.
+  rpc WatchAudit(WatchAuditRequest) returns (stream AuditEntryRecord);
+}
+
+message AuditEntryRecord {
+  uint64 seq = 1;
+  string org = 2;
+  int64 at = 3;
+  Principal actor = 4;
+  // Dotted, e.g. `relation.add`, `token.issue`, `land`.
+  string action = 5;
+  string target = 6;
+  bool allowed = 7;
+  optional string denied_reason = 8;
+  map<string, string> detail = 9;
+  bytes hash = 10;
+  bytes prev = 11;
+  // The entry as hashed (postcard), so a verifier recomputes the chain
+  // from exactly what was stored.
+  bytes encoded = 12;
+}
+
+message AuditRootRecord {
+  uint64 first_seq = 1;
+  uint64 last_seq = 2;
+  bytes head = 3;
+  // The blob, in the org's object store, holding the sealed entries as
+  // JSON lines.
+  bytes export = 4;
+  int64 sealed_at = 5;
+  uint32 key_id = 6;
+  // The root as signed (postcard).
+  bytes encoded = 7;
+}
+
+message ListAuditEntriesRequest {
+  // Defaults to the default org; `_instance` for instance-wide actions.
+  string org = 1;
+  uint64 after_seq = 2;
+  uint32 limit = 3;
+}
+message ListAuditEntriesResponse {
+  repeated AuditEntryRecord entries = 1;
+  uint64 head_seq = 2;
+}
+
+message ListAuditRootsRequest {
+  string org = 1;
+}
+message ListAuditRootsResponse {
+  repeated AuditRootRecord roots = 1;
+}
+
+message SealAuditRequest {
+  string org = 1;
+}
+message SealAuditResponse {
+  // Absent when nothing was added since the last seal.
+  optional AuditRootRecord root = 1;
+}
+
+message WatchAuditRequest {
+  string org = 1;
+  // Entries after this one; 0 for the whole chain.
+  uint64 after_seq = 2;
+}
+
+message ListAuditKeysRequest {}
+message ListAuditKeysResponse {
+  repeated AuditKey keys = 1;
+}
+message AuditKey {
+  uint32 id = 1;
+  bytes public_key = 2;
+}

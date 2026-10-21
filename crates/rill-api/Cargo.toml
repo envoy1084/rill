@@ -54,6 +54,7 @@ arc-swap = { workspace = true }
 
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
+postcard = { workspace = true }
 tonic-reflection = { workspace = true }
 tonic-health = { workspace = true }
 prost = { workspace = true }

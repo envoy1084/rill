@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use rill_policy::audit::AuditSigner;
 use rill_policy::grants::{GrantKeys, GrantSigner};
 use rill_policy::{Issuer, KeyRing, SigningKey, TokenLifetimes};
 use rill_store::identity::IdentityStore;
@@ -51,6 +52,10 @@ pub struct KeySet {
     pub grant_keys: GrantKeys,
     /// Signs grants with the key derived from the issuer's.
     pub grant_signer: Option<GrantSigner>,
+    /// Signs audit roots with another key derived from the issuer's.
+    pub audit_signer: Option<AuditSigner>,
+    /// Every stored key's public audit key, by id.
+    pub audit_keys: Vec<(u32, Vec<u8>, Option<Timestamp>)>,
     /// When a stored key next becomes active; reload then.
     pub next_activation: Option<Timestamp>,
 }
@@ -134,6 +139,7 @@ impl KeyManager {
             id,
             public_key: key.public_key_bytes(),
             grant_public_key: GrantSigner::derive(id, &key.secret_bytes())?.public_key(),
+            audit_public_key: AuditSigner::derive(id, &key.secret_bytes())?.public_key(),
             secret,
             created_at: now,
             active_from,
@@ -194,13 +200,15 @@ impl KeyManager {
             .filter(|k| k.active_from <= now && k.not_after.is_none_or(|t| now < t))
             .filter(|k| self.wrapper.can_unwrap(&k.secret))
             .max_by_key(|k| (k.active_from, k.id));
-        let (issuer, grant_signer) = match signer {
+        let (issuer, grant_signer, audit_signer) = match signer {
             Some(key) => {
                 let secret = self.secret(key).await?;
                 let signing = SigningKey::from_secret_bytes(key.id, &secret)?;
                 let grants = GrantSigner::derive(key.id, &secret)?;
+                let audit = AuditSigner::derive(key.id, &secret)?;
                 if signing.public_key_bytes() != key.public_key
                     || grants.public_key() != key.grant_public_key
+                    || audit.public_key() != key.audit_public_key
                 {
                     return Err(Error::Config(format!(
                         "token key {} does not match its public keys",
@@ -210,9 +218,10 @@ impl KeyManager {
                 (
                     Some(Arc::new(Issuer::new(signing, self.lifetimes))),
                     Some(grants),
+                    Some(audit),
                 )
             }
-            None => (None, None),
+            None => (None, None, None),
         };
         let next_activation = keys
             .iter()
@@ -224,6 +233,11 @@ impl KeyManager {
             issuer,
             grant_keys,
             grant_signer,
+            audit_signer,
+            audit_keys: keys
+                .iter()
+                .map(|k| (k.id, k.audit_public_key.clone(), k.not_after))
+                .collect(),
             next_activation,
         })
     }

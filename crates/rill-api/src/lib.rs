@@ -16,6 +16,7 @@
 //! * [`workers`]: background tasks;
 //! * [`error`]: the error type and its gRPC status mapping.
 
+pub mod audit;
 pub mod auth;
 pub mod config;
 pub mod error;

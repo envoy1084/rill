@@ -107,4 +107,4 @@ versions.
 * [`rill-sdk/src/repo/write.rs`](../../crates/rill-sdk/src/repo/write.rs), [`rill-sdk/src/repo/history.rs`](../../crates/rill-sdk/src/repo/history.rs): client surface.
 
 ---
-← Previous: [Submit policy](submit-policy.md) · [Index](../index.md) · Next: [Threat model](threat-model.md) →
+← Previous: [Submit policy](submit-policy.md) · [Index](../index.md) · Next: [Audit log](audit.md) →

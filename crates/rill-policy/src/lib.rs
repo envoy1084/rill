@@ -10,6 +10,7 @@
 //! Nothing here performs I/O except the ReBAC authorizer, which reads
 //! relationship tuples from a [`rill_store::RepoStore`].
 
+pub mod audit;
 pub mod error;
 pub mod grants;
 pub mod identity;

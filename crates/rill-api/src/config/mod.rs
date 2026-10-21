@@ -6,12 +6,14 @@
 //! container can be configured without a file; see [`ServerConfig::apply_env`]
 //! for the recognised names.
 
+mod audit;
 mod auth;
 mod env;
 mod identity;
 mod server;
 mod storage;
 
+pub use audit::AuditConfig;
 pub use auth::{AuthConfig, StaticToken};
 pub use identity::{IdentityConfig, LifetimesConfig, RotationConfig};
 pub use server::{

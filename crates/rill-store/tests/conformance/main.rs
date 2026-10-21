@@ -5,6 +5,7 @@
 //! file in `RILL_FDB_CLUSTER_FILE` (or the platform default) and a fresh
 //! root prefix per fixture.
 
+mod audit;
 mod events;
 mod identity;
 mod identity_users;
@@ -148,6 +149,7 @@ async fn repo_stores_conform() {
         land_queue::scenario(f.name, &f.stores).await;
         identity::scenario(f.name, &f.stores).await;
         identity_users::scenario(f.name, &f.stores).await;
+        audit::scenario(f.name, &f.stores).await;
         f.finish().await;
     }
 }

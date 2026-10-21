@@ -107,6 +107,18 @@ pub mod table {
     pub const QUOTA: &str = "quota";
     /// `(idem, principal, operation)` → the request's claim or response
     pub const IDEM: &str = "idem";
+    /// `(audq, org, stamp)` → AuditRecord waiting to be chained
+    pub const AUDIT_PENDING: &str = "audq";
+    /// `(audqn)` → counter of records queued, for the chainer to wait on
+    pub const AUDIT_PENDING_COUNT: &str = "audqn";
+    /// `(aud, org, seq)` → AuditEntry
+    pub const AUDIT: &str = "aud";
+    /// `(audh, org)` → AuditHead
+    pub const AUDIT_HEAD: &str = "audh";
+    /// `(audc, source)` → the last versionstamp projected from a log
+    pub const AUDIT_CURSOR: &str = "audc";
+    /// `(audr, org, last_seq)` → AuditRoot
+    pub const AUDIT_ROOT: &str = "audr";
     /// `(idl, stamp)` → IdentityEvent
     pub const IDENT_LOG: &str = "idl";
     /// `(idln)` → identity log counter followers wait on

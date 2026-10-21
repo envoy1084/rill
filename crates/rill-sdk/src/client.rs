@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use rill_proto::rill::v1::access_service_client::AccessServiceClient;
 use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
+use rill_proto::rill::v1::audit_service_client::AuditServiceClient;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
 use rill_proto::rill::v1::intent_service_client::IntentServiceClient;
 use rill_proto::rill::v1::lander_service_client::LanderServiceClient;
@@ -138,6 +139,8 @@ pub type IntentSvc = IntentServiceClient<Svc>;
 pub type LanderSvc = LanderServiceClient<Svc>;
 /// Generated admin client over the SDK transport.
 pub type AdminSvc = AdminServiceClient<Svc>;
+/// Generated audit client over the SDK transport.
+pub type AuditSvc = AuditServiceClient<Svc>;
 /// Generated access client over the SDK transport.
 pub type AccessSvc = AccessServiceClient<Svc>;
 /// Generated identity client over the SDK transport.
@@ -269,6 +272,11 @@ impl Client {
         AdminClient::new(self.clone())
     }
 
+    /// Org audit logs.
+    pub fn audit(&self) -> crate::audit::AuditClient {
+        crate::audit::AuditClient::new(self.clone())
+    }
+
     /// Relationship tuples and questions about them.
     pub fn access(&self) -> AccessClient {
         AccessClient::new(self.clone())
@@ -321,6 +329,11 @@ impl Client {
     /// A fresh generated admin client.
     pub fn admin_svc(&self) -> AdminSvc {
         AdminServiceClient::new(self.svc())
+    }
+
+    /// A fresh generated audit client.
+    pub fn audit_svc(&self) -> AuditSvc {
+        AuditServiceClient::new(self.svc())
     }
 
     /// A fresh generated access client.

@@ -124,12 +124,28 @@ impl<'a> Permit<'a> {
         {
             return Ok(());
         }
-        Err(Error::denied(format!(
-            "{} is not {relation} of {} in repository {}",
-            self.ctx.principal,
-            describe(path),
-            self.repo.config.name
-        )))
+        Err(self.refuse(
+            &verb.to_string(),
+            format!(
+                "{} is not {relation} of {} in repository {}",
+                self.ctx.principal,
+                describe(path),
+                self.repo.config.name
+            ),
+        ))
+    }
+
+    /// Refuse `verb`, noting it in the audit log.
+    fn refuse(&self, verb: &str, reason: String) -> Error {
+        self.repo.denials.note(
+            &self.repo.config.org,
+            self.repo.id(),
+            &self.ctx.principal,
+            &format!("repo.{verb}"),
+            format!("repo:{}", self.repo.config.name),
+            reason.clone(),
+        );
+        Error::denied(reason)
     }
 
     /// Read access to something in the repository: the filter of what.
@@ -137,10 +153,13 @@ impl<'a> Permit<'a> {
     pub async fn read_any(&self) -> Result<PathFilter> {
         let filter = self.read_filter().await?;
         if filter.is_empty() {
-            return Err(Error::denied(format!(
-                "{} may read nothing in repository {}",
-                self.ctx.principal, self.repo.config.name
-            )));
+            return Err(self.refuse(
+                "read",
+                format!(
+                    "{} may read nothing in repository {}",
+                    self.ctx.principal, self.repo.config.name
+                ),
+            ));
         }
         Ok(filter)
     }
@@ -167,10 +186,13 @@ impl<'a> Permit<'a> {
         if cap_ok && scope_ok && relations_ok {
             Ok(())
         } else {
-            Err(Error::denied(format!(
-                "{} may write nothing in repository {}",
-                self.ctx.principal, config.name
-            )))
+            Err(self.refuse(
+                "write",
+                format!(
+                    "{} may write nothing in repository {}",
+                    self.ctx.principal, config.name
+                ),
+            ))
         }
     }
 

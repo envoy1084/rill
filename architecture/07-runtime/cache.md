@@ -13,7 +13,7 @@ flowchart LR
     K -- hit --> C
     K -- "miss: same request" --> O[origin /o]
     O -- bytes --> K
-    K -. "GET /grant-keys" .-> O
+    K -. "GET /public-keys" .-> O
 ```
 
 ## Requests

@@ -206,6 +206,29 @@ impl AdminService for AdminSvc {
                 .map_or(rill_store::repo::DEFAULT_ORG, |c| c.org.as_str());
             let claims = rill_policy::TokenClaims::new(org, now, expires_at.millis() - now.millis());
             let token = issuer.issue(&principal, &claims, Some(&capability))?;
+            self.state
+                .identity
+                .store()
+                .record(
+                    rill_types::identity::IdentityChange::TokenIssued {
+                        org: org.to_string(),
+                        principal: principal.clone(),
+                        token_id: claims.token_id,
+                        expires_at,
+                        scope: Some(format!(
+                            "{} {}",
+                            repo.config.name,
+                            capability
+                                .paths
+                                .iter()
+                                .map(|p| p.to_string())
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        )),
+                    },
+                    &ctx.principal,
+                )
+                .await?;
             tracing::info!(by = %ctx.principal, for_principal = %principal, repo = %repo.config.name, "token issued");
             Ok(Response::new(pb::IssueTokenResponse {
                 token,

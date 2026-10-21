@@ -4,6 +4,7 @@
 
 pub mod access;
 pub mod admin;
+pub mod audit;
 pub mod change;
 pub mod checkout;
 pub mod export;

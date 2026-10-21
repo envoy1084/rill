@@ -47,6 +47,9 @@ pub enum AdminCmd {
     Trust(super::identity::TrustCmd),
     /// Stop an agent, a session, a sponsor's agents or a model at once.
     Kill(super::identity::KillArgs),
+    /// The org's audit log: list, watch, seal, verify, export.
+    #[command(subcommand)]
+    Audit(super::audit::AuditCmd),
     /// Credentials for the org's provisioning system (SCIM).
     #[command(subcommand)]
     Scim(super::identity::ScimCmd),
@@ -140,6 +143,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: AdminCmd) -> Result<()> {
         AdminCmd::Trust(cmd) => super::identity::agents::trust(ctx, cmd).await,
         AdminCmd::Kill(args) => super::identity::agents::kill(ctx, args).await,
         AdminCmd::Scim(cmd) => super::identity::scim::run(ctx, cmd).await,
+        AdminCmd::Audit(cmd) => super::audit::run(ctx, cmd).await,
         AdminCmd::Token(TokenCmd::Issue(args)) => issue(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Get(args)) => policy_get(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Set(args)) => policy_set(ctx, args).await,

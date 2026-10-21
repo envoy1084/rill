@@ -4,7 +4,7 @@
 //! of an org's metadata is one key range. Names cannot change.
 
 use bytes::Bytes;
-use rill_types::{Record, RepoId, Timestamp};
+use rill_types::{Principal, Record, RepoId, Timestamp};
 use serde::{Deserialize, Serialize};
 
 use super::codec::{decode_record, encode_record};
@@ -65,6 +65,17 @@ pub fn validate_repo_name(name: &str) -> Result<()> {
 impl Stores {
     /// Create an org. Fails with a conflict if it exists.
     pub async fn create_org(&self, name: &str, description: &str) -> Result<OrgConfig> {
+        self.create_org_by(name, description, &Principal::service("rill"))
+            .await
+    }
+
+    /// Create an org on `actor`'s authority.
+    pub async fn create_org_by(
+        &self,
+        name: &str,
+        description: &str,
+        actor: &Principal,
+    ) -> Result<OrgConfig> {
         validate_org_name(name)?;
         let org = OrgConfig {
             name: name.to_string(),
@@ -72,9 +83,15 @@ impl Stores {
             created_at: Timestamp::now(),
         };
         let key = keys::org(name);
-        let tx = Transaction::new()
+        let mut tx = Transaction::new()
             .expect_absent(key.clone())
             .set(key, encode_record(&org)?);
+        tx.mutations.extend(self.identity().log(
+            rill_types::identity::IdentityChange::OrgCreated {
+                org: name.to_string(),
+            },
+            actor,
+        )?);
         self.meta.transact(tx).await.map_err(|e| match e {
             Error::Conflict(_) => Error::Conflict(format!("org {name:?} already exists")),
             other => other,

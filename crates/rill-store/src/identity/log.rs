@@ -43,6 +43,14 @@ impl IdentityStore {
         Ok(tx)
     }
 
+    /// Record `change` by `actor` on its own: for actions that change no
+    /// stored record, such as issuing a token.
+    pub async fn record(&self, change: IdentityChange, actor: &Principal) -> Result<()> {
+        let tx = self.logged(Transaction::new(), change, actor)?;
+        self.meta.transact(tx).await?;
+        Ok(())
+    }
+
     /// Entries written so far.
     pub async fn log_count(&self) -> Result<i64> {
         self.meta

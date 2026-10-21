@@ -12,6 +12,7 @@ fn key(id: u32) -> TokenKeyRecord {
         id,
         public_key: vec![id as u8; 33],
         grant_public_key: vec![id as u8; 33],
+        audit_public_key: vec![id as u8; 33],
         secret: WrappedSecret {
             backend: "local".into(),
             key_ref: "test".into(),
@@ -119,6 +120,12 @@ pub async fn scenario(name: &str, stores: &Stores) {
             IdentityChange::KeysChanged,
             IdentityChange::KeysChanged,
             IdentityChange::KeysChanged,
+            IdentityChange::SessionOpened {
+                org: "default".into(),
+                principal: Principal::human("alice"),
+                session: session.id,
+                kind: "device".into(),
+            },
             IdentityChange::SessionRevoked {
                 session: session.id
             },
@@ -129,5 +136,5 @@ pub async fn scenario(name: &str, stores: &Stores) {
         ],
         "{name}"
     );
-    assert_eq!(identity.log_count().await.unwrap(), start + 6, "{name}");
+    assert_eq!(identity.log_count().await.unwrap(), start + 7, "{name}");
 }

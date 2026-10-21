@@ -2,6 +2,7 @@
 //! reach the metadata store and the key service can sign as the instance.
 
 use rill_policy::TokenClaims;
+use rill_types::identity::IdentityChange;
 use rill_types::{Principal, Timestamp};
 
 use super::view::IdentityView;
@@ -34,6 +35,18 @@ pub async fn mint_token(
     }
     let claims = TokenClaims::new(org, Timestamp::now(), ttl);
     let token = issuer.issue(principal, &claims, None)?;
+    view.store()
+        .record(
+            IdentityChange::TokenIssued {
+                org: org.to_string(),
+                principal: principal.clone(),
+                token_id: claims.token_id,
+                expires_at: claims.expires_at,
+                scope: None,
+            },
+            &Principal::service("operator"),
+        )
+        .await?;
     tracing::info!(principal = %principal, token = %claims.token_id, "token minted");
     Ok(token)
 }

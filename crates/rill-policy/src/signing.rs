@@ -14,6 +14,23 @@ use crate::error::{Error, Result};
 
 const DOMAIN: &[u8] = b"rill:sig:";
 
+/// A P-256 signing key derived from a token key's secret for `context`, so
+/// it is wrapped by the same key service and rotates with that key.
+pub(crate) fn derive_key(context: &str, secret: &[u8]) -> Result<SigningKey> {
+    let mut input = secret.to_vec();
+    // A derived string is a valid scalar except with negligible
+    // probability; extend the input and derive again then.
+    for _ in 0..8 {
+        if let Ok(key) = SigningKey::from_slice(&blake3::derive_key(context, &input)) {
+            return Ok(key);
+        }
+        input.push(0);
+    }
+    Err(Error::InvalidKey(format!(
+        "no {context} derives from this secret"
+    )))
+}
+
 /// Length of a compressed public key.
 pub const PUBLIC_KEY_LEN: usize = 33;
 

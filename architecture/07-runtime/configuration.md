@@ -99,6 +99,12 @@ refuses to start with them otherwise. The first token for a production
 instance comes from `rill api mint-token`. See
 [identity and auth](../05-policy/identity-and-auth.md).
 
+## Audit
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `audit.seal_every_secs` | `86400` | how often each org's [audit chain](../05-policy/audit.md) is sealed, when it grew |
+
 ## Environment variables
 
 | Variable | Effect |

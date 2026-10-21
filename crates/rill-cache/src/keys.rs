@@ -21,7 +21,7 @@ struct Published {
 #[derive(Deserialize)]
 struct PublishedKey {
     id: u32,
-    public_key: String,
+    grant_public_key: String,
     not_after: Option<i64>,
 }
 
@@ -37,7 +37,7 @@ impl OriginKeys {
     /// Fetch the keys `origin` publishes.
     pub async fn fetch(origin: &str, client: reqwest::Client) -> Result<Arc<Self>> {
         let keys = Arc::new(OriginKeys {
-            url: format!("{}/grant-keys", origin.trim_end_matches('/')),
+            url: format!("{}/public-keys", origin.trim_end_matches('/')),
             client,
             keys: RwLock::new(GrantKeys::new()),
             last_fetch: Mutex::new(None),
@@ -61,7 +61,7 @@ impl OriginKeys {
             .map_err(|e| Error::Origin(format!("grant keys: {e}")))?;
         let mut keys = GrantKeys::new();
         for k in published.keys {
-            let public = hex::decode(&k.public_key)
+            let public = hex::decode(&k.grant_public_key)
                 .map_err(|e| Error::Origin(format!("grant key {}: {e}", k.id)))?;
             keys.insert(k.id, &public, k.not_after.map(Timestamp::from_millis))
                 .map_err(|e| Error::Origin(e.to_string()))?;

@@ -1,7 +1,7 @@
 //! SCIM credentials.
 
-use rill_types::identity::ScimCredential;
-use rill_types::Timestamp;
+use rill_types::identity::{IdentityChange, ScimCredential};
+use rill_types::{Principal, Timestamp};
 
 use super::store::IdentityStore;
 use crate::error::{Error, Result};
@@ -10,11 +10,24 @@ use crate::meta::{KeyRange, Transaction};
 use crate::repo::{decode_record, encode_record};
 
 impl IdentityStore {
-    pub async fn create_scim_credential(&self, credential: &ScimCredential) -> Result<()> {
+    pub async fn create_scim_credential(
+        &self,
+        credential: &ScimCredential,
+        actor: &Principal,
+    ) -> Result<()> {
         let key = keys::identity_row(table::IDENT_SCIM_CREDENTIAL, credential.id.as_str());
         let tx = Transaction::new()
             .expect_absent(key.clone())
             .set(key, encode_record(credential)?);
+        let tx = self.logged(
+            tx,
+            IdentityChange::ScimCredentialChanged {
+                org: credential.org.clone(),
+                id: credential.id.clone(),
+                active: true,
+            },
+            actor,
+        )?;
         self.meta.transact(tx).await?;
         Ok(())
     }
@@ -45,7 +58,7 @@ impl IdentityStore {
     }
 
     /// Revoke a SCIM credential.
-    pub async fn revoke_scim_credential(&self, id: &str) -> Result<()> {
+    pub async fn revoke_scim_credential(&self, id: &str, actor: &Principal) -> Result<()> {
         let key = keys::identity_row(table::IDENT_SCIM_CREDENTIAL, id);
         let current = self
             .meta
@@ -57,6 +70,15 @@ impl IdentityStore {
         let tx = Transaction::new()
             .expect(key.clone(), Some(current))
             .set(key, encode_record(&credential)?);
+        let tx = self.logged(
+            tx,
+            IdentityChange::ScimCredentialChanged {
+                org: credential.org.clone(),
+                id: credential.id.clone(),
+                active: false,
+            },
+            actor,
+        )?;
         self.meta.transact(tx).await?;
         Ok(())
     }
