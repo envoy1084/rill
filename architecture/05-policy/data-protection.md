@@ -11,14 +11,18 @@ Every version is scanned as it is committed
 ([`services/repo/secrets.rs`](../../crates/rill-api/src/services/repo/secrets.rs)),
 whatever the entry point: `ApplyEdits`, `CreateChangeVersion`, rebases and
 merges, workspace changes (`NewChange`) and imports all store versions
-through the same commit path. What a version adds is read: its message,
-the files it sets (inline bytes, and blobs and manifests streamed part by
-part with a 4 KiB overlap so a secret split across two chunks is still
-found), and every file of a directory it copies, at its destination path.
-Binary-looking content is scanned too: UTF-16 is narrowed to its low
-bytes, and other content to its printable runs. Scanning runs on the
-blocking pool, stops at 20 findings per file and 100 per version, and an
-audit record names at most 20. Content found clean is remembered per rules
+through the same commit path, which checks the author's rights (including
+read on every copy source) before scanning. What a version adds is read:
+its message, paths and extension fields, the files it sets (inline bytes,
+and blobs and manifests streamed part by part with a 4 KiB overlap so a
+secret split across two chunks is still found), and every file of a
+directory it copies, at its destination path; copied files count toward
+the 100,000-file limit before any is read. Binary-looking content is
+scanned as its printable runs and as its even and odd bytes, which covers
+UTF-16 of either byte order. Scanning runs on the blocking pool and stops
+at 20 findings per file and 100 per version; a version that reaches a
+limit is refused whatever the mode, since nobody could review what was not
+listed. An audit record names at most 20 findings. Content found clean is remembered per rules
 digest, so a file is scanned once however many versions name it; content
 at an allowed path is never remembered as clean.
 

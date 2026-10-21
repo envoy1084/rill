@@ -6,6 +6,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use futures::StreamExt;
 use rill_policy::secrets::{scan, Finding, SecretRules, MAX_FINDINGS, RULES_PATH};
+use rill_types::limits::MAX_FILES_PER_CHANGE;
 use rill_types::{
     ChangeVersion, ChangeVersionHash, ContentRef, EntryKind, FileChange, RepoPathBuf,
     SparseProfile, SubtreeChange,
@@ -16,8 +17,9 @@ use crate::state::RepoContext;
 
 /// Findings reported for one version; scanning stops there.
 pub const MAX_VERSION_FINDINGS: usize = 100;
-/// The path findings in a change message are reported at.
-const MESSAGE_PATH: &str = "(message)";
+/// The path findings in a version's message, paths or extension fields
+/// are reported at.
+const METADATA_PATH: &str = "(message)";
 /// Content found clean is not scanned again under the same rules.
 const CLEAN_CAPACITY: usize = 200_000;
 /// Bytes carried from one part of a large file into the next, so a
@@ -72,20 +74,21 @@ impl Scanner {
     }
 
     /// The rules in force and the findings in what `cv` adds: its message,
-    /// the files it sets, and the files of every directory it copies, each
-    /// at its destination path. At most [`MAX_VERSION_FINDINGS`].
-    pub async fn version(
-        &self,
-        ctx: &RepoContext,
-        cv: &ChangeVersion,
-    ) -> Result<(Arc<SecretRules>, Vec<Finding>)> {
+    /// paths and extension fields, the files it sets, and the files of every
+    /// directory it copies, each at its destination path. The caller has
+    /// checked that `cv`'s author may read what it copies.
+    pub async fn version(&self, ctx: &RepoContext, cv: &ChangeVersion) -> Result<VersionScan> {
         let (rules, digest) = self.rules(ctx).await?;
-        let mut findings = scan_off_thread(
-            MESSAGE_PATH.to_string(),
-            cv.message.clone().into_bytes(),
-            rules.clone(),
-        )
-        .await?;
+        let copies = copied_trees(ctx, cv).await?;
+        let mut scan = VersionScan {
+            findings: Vec::new(),
+            truncated: false,
+            rules: rules.clone(),
+        };
+        let found = scan_off_thread(METADATA_PATH.to_string(), metadata(cv), rules.clone()).await?;
+        if scan.add(found) {
+            return Ok(scan);
+        }
         for (path, change) in &cv.file_changes {
             let contents: Vec<&ContentRef> = match change {
                 FileChange::Set { content, .. } => vec![content],
@@ -95,32 +98,20 @@ impl Scanner {
                 FileChange::Delete => Vec::new(),
             };
             for content in contents {
-                if findings.len() >= MAX_VERSION_FINDINGS {
-                    break;
+                if scan.add(self.content(ctx, path, content, &rules, digest).await?) {
+                    return Ok(scan);
                 }
-                findings.extend(self.content(ctx, path, content, &rules, digest).await?);
             }
         }
-        for (dest, change) in &cv.subtree_changes {
-            let SubtreeChange::Copy {
-                from_path,
-                from_version,
-            } = change
-            else {
-                continue;
-            };
-            let root = ctx.derive.get::<rill_core::RootTree>(from_version).await?;
+        for (dest, from_path, root) in copies {
             let files = ctx
                 .trees
-                .walk(root, from_path, &SparseProfile::default())
+                .walk(root, &from_path, &SparseProfile::default())
                 .await?;
             for file in files {
-                if findings.len() >= MAX_VERSION_FINDINGS {
-                    break;
-                }
                 let rel = file
                     .path
-                    .strip_prefix(from_path)
+                    .strip_prefix(&from_path)
                     .map(|r| r.as_str().to_string())
                     .unwrap_or_default();
                 let path = if rel.is_empty() {
@@ -130,14 +121,15 @@ impl Scanner {
                 } else {
                     RepoPathBuf::new(format!("{dest}/{rel}"))?
                 };
-                findings.extend(
+                if scan.add(
                     self.content(ctx, &path, &file.content, &rules, digest)
                         .await?,
-                );
+                ) {
+                    return Ok(scan);
+                }
             }
         }
-        findings.truncate(MAX_VERSION_FINDINGS);
-        Ok((rules, findings))
+        Ok(scan)
     }
 
     async fn content(
@@ -207,6 +199,80 @@ impl Scanner {
         }
         Ok(findings)
     }
+}
+
+/// What scanning a version found.
+pub struct VersionScan {
+    pub rules: Arc<SecretRules>,
+    pub findings: Vec<Finding>,
+    /// Scanning stopped at a limit, so there may be more than were found.
+    pub truncated: bool,
+}
+
+impl VersionScan {
+    /// Add one file's findings; true once the version's limit is reached.
+    fn add(&mut self, found: Vec<Finding>) -> bool {
+        self.truncated |= found.len() >= MAX_FINDINGS;
+        self.findings.extend(found);
+        if self.findings.len() >= MAX_VERSION_FINDINGS {
+            self.findings.truncate(MAX_VERSION_FINDINGS);
+            self.truncated = true;
+        }
+        self.truncated && self.findings.len() >= MAX_VERSION_FINDINGS
+    }
+}
+
+/// The free text `cv` carries besides file content: its message, the
+/// paths it touches and its extension fields.
+fn metadata(cv: &ChangeVersion) -> Vec<u8> {
+    let mut text = cv.message.clone().into_bytes();
+    for path in cv.file_changes.keys().chain(cv.subtree_changes.keys()) {
+        text.push(b'\n');
+        text.extend_from_slice(path.as_str().as_bytes());
+    }
+    for (key, value) in &cv.extra {
+        text.push(b'\n');
+        text.extend_from_slice(key.as_bytes());
+        text.extend_from_slice(b" = ");
+        text.extend_from_slice(value);
+    }
+    text
+}
+
+/// The directories `cv` copies, as `(destination, source path, source
+/// root)`, once their files are known to fit the per-change file limit.
+async fn copied_trees(
+    ctx: &RepoContext,
+    cv: &ChangeVersion,
+) -> Result<Vec<(RepoPathBuf, RepoPathBuf, rill_types::TreeHash)>> {
+    let mut out = Vec::new();
+    let mut files = cv.file_changes.len() as u64;
+    for (dest, change) in &cv.subtree_changes {
+        let SubtreeChange::Copy {
+            from_path,
+            from_version,
+        } = change
+        else {
+            continue;
+        };
+        let root = ctx.derive.get::<rill_core::RootTree>(from_version).await?;
+        files += if from_path.is_root() {
+            ctx.trees.get_tree(&root).await?.summary().file_count
+        } else {
+            match ctx.trees.lookup(root, from_path).await? {
+                Some(EntryKind::Dir { summary, .. }) => summary.file_count,
+                Some(EntryKind::File { .. }) => 1,
+                None => 0,
+            }
+        };
+        if files > MAX_FILES_PER_CHANGE as u64 {
+            return Err(crate::error::Error::invalid(format!(
+                "the version changes or copies more than {MAX_FILES_PER_CHANGE} files"
+            )));
+        }
+        out.push((dest.clone(), from_path.clone(), root));
+    }
+    Ok(out)
 }
 
 /// Scan `bytes` on the blocking pool: content can be large.

@@ -5,11 +5,9 @@ use bytes::Bytes;
 use rill_types::ChangeVersionHash;
 
 use super::store::RepoStore;
-use crate::error::Result;
-use crate::meta::{Mutation, Transaction};
-
-/// Ancestors off trunk walked before giving up.
-const MAX_ANCESTRY: usize = 10_000;
+use crate::error::{Error, Result};
+use crate::keys::{self, table};
+use crate::meta::{KeyRange, Mutation, Transaction};
 
 impl RepoStore {
     /// The mutation quarantining `version`, with why, for its commit.
@@ -29,36 +27,22 @@ impl RepoStore {
             .map(|b| String::from_utf8_lossy(&b).into_owned()))
     }
 
-    /// Why `version` may not reach trunk: it, or an ancestor not yet on
-    /// trunk, is quarantined. Moving trunk to a version brings in all of
-    /// its history, so every such ancestor counts.
-    pub async fn quarantined_ancestry(
-        &self,
-        version: &ChangeVersionHash,
-    ) -> Result<Option<String>> {
-        let mut queue = std::collections::VecDeque::from([*version]);
-        let mut seen = std::collections::HashSet::new();
-        while let Some(at) = queue.pop_front() {
-            if !seen.insert(at) || self.trunk_seq_of(&at).await?.is_some() {
-                continue;
-            }
-            if seen.len() > MAX_ANCESTRY {
-                return Ok(Some(format!(
-                    "more than {MAX_ANCESTRY} of its ancestors are not on trunk; land them first"
-                )));
-            }
-            if let Some(why) = self.quarantined(&at).await? {
-                return Ok(Some(if at == *version {
-                    why
-                } else {
-                    format!("its ancestor {at} is quarantined: {why}")
-                }));
-            }
-            if let Some(cv) = self.get_change_version(&at).await? {
-                queue.extend(cv.parents);
-            }
-        }
-        Ok(None)
+    /// Every quarantined version, with why.
+    pub async fn quarantined_versions(&self) -> Result<Vec<(ChangeVersionHash, String)>> {
+        let prefix = self.keys().table(table::QUARANTINE);
+        self.meta()
+            .scan(KeyRange::prefix(prefix.clone()))
+            .await?
+            .into_iter()
+            .map(|(key, value)| {
+                let (hash,): (Vec<u8>,) = keys::tail(&prefix, &key)?;
+                Ok((
+                    ChangeVersionHash::from_slice(&hash)
+                        .map_err(|e| Error::Codec(e.to_string()))?,
+                    String::from_utf8_lossy(&value).into_owned(),
+                ))
+            })
+            .collect()
     }
 
     /// Release `version`, with `extra` mutations (its audit record) in the

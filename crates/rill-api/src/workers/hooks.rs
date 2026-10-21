@@ -19,6 +19,9 @@ pub struct ReviewHooksAdapter {
     standing: Option<(String, Arc<dyn AuthorStanding>)>,
     /// Whether authors may still write what their versions change.
     rights: Option<super::rights::WriteRights>,
+    /// For quarantined ancestors; without it only the version itself is
+    /// checked.
+    graph: Option<Arc<rill_core::CommitGraph>>,
 }
 
 impl ReviewHooksAdapter {
@@ -28,6 +31,7 @@ impl ReviewHooksAdapter {
             review,
             standing: None,
             rights: None,
+            graph: None,
         }
     }
 
@@ -44,6 +48,12 @@ impl ReviewHooksAdapter {
 
     /// Also refuse landings whose author may no longer write what the
     /// version changes.
+    /// Refuse versions with a quarantined ancestor off trunk.
+    pub fn with_graph(mut self, graph: Arc<rill_core::CommitGraph>) -> Self {
+        self.graph = Some(graph);
+        self
+    }
+
     pub fn with_write_rights(mut self, rights: super::rights::WriteRights) -> Self {
         self.rights = Some(rights);
         self
@@ -169,13 +179,15 @@ impl ReviewHooks for ReviewHooksAdapter {
             (refusal, _) => refusal,
         };
         let refusal = match refusal {
-            None => service
-                .repo()
-                .quarantined_ancestry(&version)
-                .await?
-                .map(|why| {
-                    format!("it is quarantined by secret scanning ({why}); an owner must clear it")
-                }),
+            None => match &self.graph {
+                Some(graph) => crate::services::repo::held_back(service.repo(), graph, &version)
+                    .await
+                    .map_err(|e| rill_lander::Error::Hook(e.to_string()))?,
+                None => service.repo().quarantined(&version).await?,
+            }
+            .map(|why| {
+                format!("it is quarantined by secret scanning ({why}); an owner must clear it")
+            }),
             refusal => refusal,
         };
         let refusal = match (refusal, &self.rights) {

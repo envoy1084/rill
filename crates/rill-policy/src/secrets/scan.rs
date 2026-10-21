@@ -1,5 +1,8 @@
 //! Finding credentials in a file's content.
 
+use std::borrow::Cow;
+use std::collections::HashSet;
+
 use super::detectors::{entropy, BUILT_IN};
 use super::rules::SecretRules;
 
@@ -23,29 +26,29 @@ pub fn fingerprint(secret: &str) -> String {
 /// Findings reported for one file; more are not looked for.
 pub const MAX_FINDINGS: usize = 20;
 
-/// The text to scan in `content`. Binary-looking content (a NUL in the
-/// first 8 KiB) is scanned too: UTF-16LE is narrowed to its low bytes, and
-/// other bytes outside printable ASCII become line breaks, leaving the
-/// printable runs.
-fn text_of(content: &[u8]) -> std::borrow::Cow<'_, str> {
+/// The texts to scan in `content`. Text is scanned as it is. Binary-looking
+/// content (a NUL in the first 8 KiB) gives three: its printable runs, and
+/// its even and odd bytes, which hold UTF-16 text of either byte order at
+/// either alignment.
+fn texts_of(content: &[u8]) -> Vec<Cow<'_, str>> {
     let head = &content[..content.len().min(8192)];
     if !head.contains(&0) {
-        return String::from_utf8_lossy(content);
+        return vec![String::from_utf8_lossy(content)];
     }
-    let odd_zeros = head.iter().skip(1).step_by(2).filter(|b| **b == 0).count();
-    let bytes: Vec<u8> = if odd_zeros * 5 >= head.len() / 2 * 4 {
-        content.iter().step_by(2).copied().collect()
-    } else {
-        content.to_vec()
+    let printable = |bytes: &mut dyn Iterator<Item = u8>| -> Cow<'_, str> {
+        let runs = bytes
+            .map(|b| match b {
+                b'\t' | b'\n' | b'\r' | 0x20..=0x7e => b,
+                _ => b'\n',
+            })
+            .collect();
+        Cow::Owned(String::from_utf8(runs).expect("printable ASCII"))
     };
-    let printable = bytes
-        .into_iter()
-        .map(|b| match b {
-            b'\t' | b'\n' | b'\r' | 0x20..=0x7e => b,
-            _ => b'\n',
-        })
-        .collect();
-    std::borrow::Cow::Owned(String::from_utf8(printable).expect("printable ASCII"))
+    vec![
+        printable(&mut content.iter().copied()),
+        printable(&mut content.iter().step_by(2).copied()),
+        printable(&mut content.iter().skip(1).step_by(2).copied()),
+    ]
 }
 
 /// The credentials in `content` at `path` under `rules`, at most
@@ -54,22 +57,40 @@ pub fn scan(path: &str, content: &[u8], rules: &SecretRules) -> Vec<Finding> {
     if rules.path_allowed(path) {
         return Vec::new();
     }
-    let text = text_of(content);
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
+    let mut findings = Vec::new();
+    for text in texts_of(content) {
+        let room = MAX_FINDINGS - findings.len();
+        findings.extend(scan_text(path, &text, rules, &mut seen, room));
+        if findings.len() >= MAX_FINDINGS {
+            break;
+        }
+    }
+    findings
+}
+
+/// Up to `room` findings in `text` not already `seen`, in text order.
+fn scan_text(
+    path: &str,
+    text: &str,
+    rules: &SecretRules,
+    seen: &mut HashSet<String>,
+    room: usize,
+) -> Vec<Finding> {
     let mut hits: Vec<(usize, String, String)> = Vec::new();
     let mut add = |name: &str, start: usize, secret: &str| -> bool {
         let fp = fingerprint(secret);
         if !rules.allow_fingerprints.contains(&fp) && seen.insert(fp.clone()) {
             hits.push((start, name.to_string(), fp));
         }
-        hits.len() < MAX_FINDINGS
+        hits.len() < room
     };
     let detectors = BUILT_IN
         .iter()
         .map(|d| (d.name, &d.regex, d.min_entropy))
         .chain(rules.patterns.iter().map(|(n, r)| (n.as_str(), r, 0.0)));
     'scan: for (name, regex, min_entropy) in detectors {
-        for caps in regex.captures_iter(&text) {
+        for caps in regex.captures_iter(text) {
             let m = caps
                 .get(1)
                 .or_else(|| caps.get(0))
@@ -82,7 +103,7 @@ pub fn scan(path: &str, content: &[u8], rules: &SecretRules) -> Vec<Finding> {
     hits.sort_by_key(|(start, _, _)| *start);
     let (mut line, mut at) = (1, 0);
     hits.into_iter()
-        .map(|(start, name, fingerprint)| {
+        .map(|(start, detector, fingerprint)| {
             line += text.as_bytes()[at..start]
                 .iter()
                 .filter(|b| **b == b'\n')
@@ -91,7 +112,7 @@ pub fn scan(path: &str, content: &[u8], rules: &SecretRules) -> Vec<Finding> {
             Finding {
                 path: path.to_string(),
                 line,
-                detector: name,
+                detector,
                 fingerprint,
             }
         })
@@ -225,5 +246,18 @@ mod tests {
         let found = scan("keys.txt", text.as_bytes(), &SecretRules::default());
         assert_eq!(found.len(), MAX_FINDINGS);
         assert_eq!(found[1].line, 2, "lines stay right when counted once");
+    }
+
+    #[test]
+    fn utf16_is_found_at_either_alignment_and_byte_order() {
+        let rules = SecretRules::default();
+        let text = "key=AKIAZ7T3KQ2MVXC4L9PW\r\n";
+        let le: Vec<u8> = text.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let be: Vec<u8> = text.encode_utf16().flat_map(|u| u.to_be_bytes()).collect();
+        let mut shifted = vec![b'x'];
+        shifted.extend_from_slice(&le);
+        for (name, bytes) in [("BE", &be), ("LE at an odd offset", &shifted)] {
+            assert!(!scan("a.cfg", bytes, &rules).is_empty(), "{name}");
+        }
     }
 }

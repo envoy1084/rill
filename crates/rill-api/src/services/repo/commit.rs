@@ -61,6 +61,9 @@ pub async fn commit_version_with(
     }
     validate(opened, &cv).await?;
     let hash = cv.hash();
+    // Scanning reads what the version copies and names what it finds, so
+    // the author's rights are checked first.
+    super::authorize::version(opened, &cv).await?;
     let found = secret_findings(opened, &cv, &hash).await?;
     let staged = ctx.repo.stage_version(&cv).await?;
     // Derive what landing needs now, so a bad change fails the request and
@@ -163,11 +166,20 @@ async fn secret_findings(
     use rill_types::audit::{AuditOutcome, AuditRecord};
 
     let ctx = &opened.repo;
-    let (rules, findings) = ctx.secrets.version(ctx, cv).await?;
+    let scan = ctx.secrets.version(ctx, cv).await?;
+    let (rules, findings) = (scan.rules, scan.findings);
     if findings.is_empty() {
         return Ok(Vec::new());
     }
-    let described = super::secrets::describe(&findings);
+    let mut described = super::secrets::describe(&findings);
+    // Too many to review: an owner releasing a quarantine would see only
+    // the first few, so the version is refused whatever the mode.
+    let mode = if scan.truncated {
+        described.push_str(", and more not listed");
+        ScanMode::Block
+    } else {
+        rules.mode
+    };
     let audit = ctx.repo.stores().audit();
     let record = |action: &str, outcome: AuditOutcome| AuditRecord {
         org: ctx.config.org.clone(),
@@ -188,7 +200,7 @@ async fn secret_findings(
             })
             .collect(),
     };
-    match rules.mode {
+    match mode {
         ScanMode::Block => {
             if let Err(e) = audit
                 .record(&record(

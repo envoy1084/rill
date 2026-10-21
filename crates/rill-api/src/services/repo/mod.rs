@@ -6,6 +6,7 @@ pub(crate) mod authorize;
 mod commit;
 mod grep;
 mod history;
+mod quarantine;
 mod refs;
 pub(crate) mod secrets;
 mod stamp;
@@ -23,6 +24,7 @@ use tonic::{Request, Response, Streaming};
 use super::common::GrpcResult;
 
 pub use commit::{commit_version, commit_version_with, CommitExtras};
+pub use quarantine::held_back;
 pub use trees::BlobStream;
 pub(crate) use watch::forward;
 pub use watch::EventStream;

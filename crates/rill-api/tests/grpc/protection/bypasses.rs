@@ -8,6 +8,47 @@ use super::fixtures::*;
 
 const RULES: &str = "allow_paths = [\"tests/fixtures/**\"]\n";
 
+/// A version of `repo` whose only change copies `from_path` of `source`
+/// to each of `to`.
+fn copies(source: &Bytes, from_path: &str, to: &[String]) -> pb::ChangeVersion {
+    let source = ObjectHash::from_slice(source).unwrap();
+    let mut cv = ChangeVersion {
+        change_id: rill_types::ChangeId::new(),
+        parents: vec![source],
+        predecessor: None,
+        subtree_changes: Default::default(),
+        file_changes: Default::default(),
+        author: Principal::human("root"),
+        provenance: Default::default(),
+        intent: None,
+        message: "copy".into(),
+        created_at: rill_types::Timestamp::now(),
+        extra: Default::default(),
+    };
+    for dest in to {
+        cv.subtree_changes.insert(
+            RepoPathBuf::new(dest).unwrap(),
+            SubtreeChange::Copy {
+                from_path: RepoPathBuf::new(from_path).unwrap(),
+                from_version: source,
+            },
+        );
+    }
+    pb::ChangeVersion::from(cv)
+}
+
+async fn create(c: &mut Clients, version: pb::ChangeVersion) -> Result<(), Status> {
+    c.repo
+        .create_change_version(pb::CreateChangeVersionRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            version: Some(version),
+            signatures: Vec::new(),
+        })
+        .await
+        .map(|_| ())
+}
+
 fn secret_file() -> Vec<u8> {
     let mut bytes = "# fixture\n".repeat(40).into_bytes();
     bytes.extend_from_slice(format!("aws = {AWS_KEY}\n").as_bytes());
@@ -133,5 +174,97 @@ async fn a_child_of_a_quarantined_version_cannot_reach_trunk() {
         .await
         .unwrap_err();
     assert_eq!(appended.code(), Code::FailedPrecondition, "{appended:?}");
+    server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_copy_from_an_unreadable_path_is_refused_before_it_is_scanned() {
+    let server = TestServer::start(admins_config()).await;
+    let mut root = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
+    repo(&mut root, "app").await;
+    land_rules(&mut root, "app", "allow_paths = [\"infra/**\"]\n").await;
+    let (infra, _) = blob(&server, "infra/deploy.env", &secret_file()).await;
+    let source = apply(&mut root, "app", vec![infra]).await.unwrap().hash;
+    let bob = Principal::human("bob");
+    root.access
+        .add_relation(pb::AddRelationRequest {
+            operation_id: Bytes::new(),
+            relation: Some(pb::Relation {
+                repo: "app".into(),
+                path: "scratch".into(),
+                relation: "writer".into(),
+                subject: format!("principal:{}", bob.id),
+            }),
+        })
+        .await
+        .unwrap();
+    let mut bob = clients(&server, Some(&server.token_for(&bob))).await;
+    let refused = create(&mut bob, copies(&source, "infra", &["scratch/x".into()]))
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), Code::PermissionDenied, "{refused:?}");
+    assert!(!refused.message().contains("deploy.env"), "{refused:?}");
+    server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn copied_files_count_toward_the_file_limit() {
+    let server = TestServer::start(admins_config()).await;
+    let mut c = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
+    repo(&mut c, "app").await;
+    let files: Vec<pb::Edit> = (0..1000)
+        .map(|i| set_edit(&format!("lib/f{i}.txt"), format!("{i}\n").as_bytes()))
+        .collect();
+    let source = apply(&mut c, "app", files).await.unwrap().hash;
+    let to: Vec<String> = (0..=rill_types::limits::MAX_FILES_PER_CHANGE / 1000)
+        .map(|i| format!("copy{i}"))
+        .collect();
+    let started = std::time::Instant::now();
+    let refused = create(&mut c, copies(&source, "lib", &to))
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), Code::InvalidArgument, "{refused:?}");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(2),
+        "refused before walking"
+    );
+    server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_credential_in_extension_fields_is_refused() {
+    let server = TestServer::start(admins_config()).await;
+    let mut c = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
+    repo(&mut c, "app").await;
+    let source = apply(&mut c, "app", vec![set_edit("README", b"hi\n")])
+        .await
+        .unwrap()
+        .hash;
+    let mut cv = copies(&source, "", &[]);
+    cv.extra
+        .insert("note".into(), format!("key {AWS_KEY}").into());
+    let refused = create(&mut c, cv).await.unwrap_err();
+    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
+    server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn too_many_findings_to_review_are_refused_not_quarantined() {
+    let server = TestServer::start(admins_config()).await;
+    let mut c = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
+    repo(&mut c, "app").await;
+    land_rules(&mut c, "app", "mode = \"quarantine\"\n").await;
+    let fakes: String = (0..30u64)
+        .map(|i| {
+            format!(
+                "k{i} = AKIA{:016X}\n",
+                0x9E37_79B9_7F4A_7C15u64.wrapping_mul(i + 1)
+            )
+        })
+        .collect();
+    let (edit, _) = blob(&server, "aaa/fixtures.txt", fakes.as_bytes()).await;
+    let refused = apply(&mut c, "app", vec![edit]).await.unwrap_err();
+    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
+    assert!(refused.message().contains("more"), "{refused:?}");
     server.stop().await;
 }

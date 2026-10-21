@@ -281,7 +281,10 @@ impl AdminService for AdminSvc {
                 let expected =
                     rill_proto::convert::opt_hash_from_proto("expected", req.expected.as_ref())?;
                 let version = rill_proto::convert::hash_from_proto("version", &req.version)?;
-                if let Some(why) = opened.repo.repo.quarantined_ancestry(&version).await? {
+                if let Some(why) =
+                    super::repo::held_back(&opened.repo.repo, &opened.repo.graph, &version)
+                        .await?
+                {
                     return Err(Error::FailedPrecondition(format!(
                         "{version} is quarantined by secret scanning ({why}); an owner must clear it"
                     )));

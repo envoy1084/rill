@@ -349,7 +349,8 @@ impl RepoRegistry {
         };
         let authorizer = Arc::new(Authorizer::new(repo.clone()));
         let mut hooks = workers::ReviewHooksAdapter::new(review.clone())
-            .with_standing(config.org.clone(), self.identity.clone());
+            .with_standing(config.org.clone(), self.identity.clone())
+            .with_graph(graph.clone());
         if !self.config.dev_mode {
             hooks = hooks.with_write_rights(workers::rights::WriteRights {
                 org: config.org.clone(),

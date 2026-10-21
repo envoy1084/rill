@@ -53,9 +53,10 @@ execution of verification steps (phase 15), and the release pipeline
 
 ## Review findings
 
-The review of the Phase 12 design and code (audit, secret scanning,
-redaction, encryption at rest, input limits) found no criticals. Every
-finding below was reproduced by a test that failed before its fix.
+Two review rounds of the Phase 12 design and code (audit, secret
+scanning, redaction, encryption at rest, input limits) found no
+criticals; the second round checked the first round's fixes. Every fixed
+finding was reproduced by a test that failed before its fix.
 
 | Finding | Severity | State |
 | --- | --- | --- |
@@ -70,6 +71,11 @@ finding below was reproduced by a test that failed before its fix.
 | Change messages were not scanned | low | fixed (`86fbfa5`) |
 | `GET /redactions` was public; a cache that could not reread it kept serving | low | fixed (`4885996`) |
 | Inline files (≤ 256 bytes) cannot be redacted by their own hash | medium | by design: redact the trees holding them; block mode keeps credentials out |
+| Copy scanning ran before authorization, so a refusal named files under paths the author could not read | high | fixed (`bb14163`) |
+| Copies were walked in full before any limit, so one version could copy a large tree many times | high | fixed (`bb14163`) |
+| Findings past the caps were dropped silently, so a quarantine could be released after reviewing only fakes | medium | fixed (`bb14163`): reaching a cap refuses the version |
+| The quarantine ancestry walk could be made slow by a long off-trunk chain | medium | fixed (`bb14163`): each quarantine is tested against the commit graph |
+| UTF-16 big-endian or at an odd offset was still missed; extension fields and paths were not scanned | low | fixed (`bb14163`) |
 | An org administrator who controls a second admin account can satisfy two-person redaction alone | low | by design: both accounts are audited; separate identity control is the operator's |
 
 ## Code
