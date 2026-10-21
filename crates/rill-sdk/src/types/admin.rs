@@ -58,6 +58,16 @@ pub struct WhoAmI {
     pub capabilities: Vec<Capability>,
     /// Token expiry.
     pub token_expires_at: Option<Timestamp>,
+    /// The token's id (`tk_…`), when the caller holds an issued token.
+    pub token_id: Option<String>,
+    /// The session (`ss_…`) the token belongs to.
+    pub session: Option<String>,
+    /// The caller's organization.
+    pub org: Option<String>,
+    /// Who the caller acts for, when it is an agent.
+    pub sponsor: Option<String>,
+    /// The model the caller runs as, when it is an agent.
+    pub model: Option<String>,
 }
 
 impl TryFrom<pb::WhoAmIResponse> for WhoAmI {
@@ -69,6 +79,11 @@ impl TryFrom<pb::WhoAmIResponse> for WhoAmI {
             teams: r.teams,
             capabilities: r.capabilities.into_iter().map(Capability::from).collect(),
             token_expires_at: r.token_expires_at.map(timestamp_from_proto),
+            token_id: r.token_id,
+            session: r.session,
+            org: r.org,
+            sponsor: r.sponsor,
+            model: r.model,
         })
     }
 }

@@ -21,6 +21,11 @@ pub fn whoami(w: &WhoAmI) -> Value {
         "teams": w.teams,
         "capabilities": w.capabilities.iter().map(capability).collect::<Vec<_>>(),
         "token_expires_at": opt(w.token_expires_at.as_ref(), timestamp),
+        "token_id": w.token_id,
+        "session": w.session,
+        "org": w.org,
+        "sponsor": w.sponsor,
+        "model": w.model,
     })
 }
 

@@ -199,6 +199,10 @@ async fn whoami(ctx: &mut Ctx<'_>) -> Result<()> {
                 "expires",
                 me.token_expires_at.map(|t| when(&t)).unwrap_or_default(),
             ),
+            ("org", me.org.clone().unwrap_or_default()),
+            ("session", me.session.clone().unwrap_or_default()),
+            ("sponsor", me.sponsor.clone().unwrap_or_default()),
+            ("model", me.model.clone().unwrap_or_default()),
         ])?;
         if !me.capabilities.is_empty() {
             let mut table = Table::new(&["ACTION", "SCOPE", "EXPIRES"]);
