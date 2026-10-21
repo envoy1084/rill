@@ -113,10 +113,11 @@ impl RepoSvc {
                 .collect()
         };
         let next_start = if hashes.len() > limit {
+            let overflow = hashes[limit];
             hashes.truncate(limit);
             // Continue from the first parent of the last returned entry in
             // first-parent walks; the ancestor walk is re-entered at the
-            // next entry it would have produced.
+            // next entry it produced.
             match path_filter.is_some() || req.first_parent {
                 true => ctx
                     .derive
@@ -124,20 +125,14 @@ impl RepoSvc {
                     .await?
                     .first_parent()
                     .map(|h| hash_to_proto(&h)),
-                false => ctx
-                    .graph
-                    .ancestors(&start, limit + 1)
-                    .await?
-                    .get(limit)
-                    .map(|e| hash_to_proto(&e.info.hash)),
+                false => Some(hash_to_proto(&overflow)),
             }
         } else {
             None
         };
-        let mut entries = Vec::with_capacity(hashes.len());
-        for hash in &hashes {
-            entries.push(common::change_info(ctx, hash).await?);
-        }
+        let entries =
+            futures::future::try_join_all(hashes.iter().map(|hash| common::change_info(ctx, hash)))
+                .await?;
         Ok(pb::LogResponse {
             entries,
             next_start,

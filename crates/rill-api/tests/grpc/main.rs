@@ -6,6 +6,7 @@ mod cluster;
 mod commits;
 mod end_to_end;
 mod events;
+mod history;
 mod orgs;
 mod replicas;
 mod retries;
