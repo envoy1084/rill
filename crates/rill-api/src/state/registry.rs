@@ -70,6 +70,7 @@ pub struct RepoContext {
     server_config: Arc<ServerConfig>,
     /// Signs an attestation for every committed version.
     pub attestor: Arc<rill_policy::Signer>,
+    index_requests: super::index_requests::IndexRequests,
 }
 
 impl RepoContext {
@@ -113,11 +114,15 @@ impl RepoContext {
     /// Ask the search writer to index `root` and wait for its manifest:
     /// only the server holding the search lease writes the index.
     async fn wait_for_index(&self, root: rill_types::TreeHash) -> Result<()> {
-        let queue =
-            rill_jobs::Queue::new(self.repo.clone(), rill_lander::land::followups::INDEX_QUEUE);
-        queue
-            .push(rill_lander::land::followups::index_root_job(&root))
-            .await?;
+        let _request = match self.index_requests.claim(root) {
+            Some(request) => {
+                rill_jobs::Queue::new(self.repo.clone(), rill_lander::land::followups::INDEX_QUEUE)
+                    .push(rill_lander::land::followups::index_root_job(&root))
+                    .await?;
+                Some(request)
+            }
+            None => None,
+        };
         let deadline = tokio::time::Instant::now() + INDEX_WAIT;
         while tokio::time::Instant::now() < deadline {
             if self.search.manifest(root).await.is_ok() {
@@ -361,6 +366,7 @@ impl RepoRegistry {
             review_events,
             server_config: self.config.clone(),
             attestor: self.attestor.clone(),
+            index_requests: Default::default(),
         })
     }
 }

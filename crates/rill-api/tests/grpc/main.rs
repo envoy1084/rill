@@ -9,6 +9,7 @@ mod events;
 mod orgs;
 mod replicas;
 mod retries;
+mod search;
 mod shutdown;
 mod telemetry;
 mod workspaces;

@@ -2,6 +2,7 @@
 //! per-repository service graphs.
 
 mod app;
+mod index_requests;
 mod lifecycle;
 pub mod policy;
 mod registry;

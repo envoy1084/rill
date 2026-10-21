@@ -91,7 +91,9 @@ exact. `max_results` of 0 means 200 and is capped at 5000; `context_lines`
 is capped at 20. A root without a manifest is not indexed by the server
 that was asked: `RepoContext::grep` queues a high-priority `index_root`
 job and waits up to 30 s for the manifest (then `RootNotIndexed`), so any
-tree is searchable at the cost of a full walk by the index writer.
+tree is searchable at the cost of a full walk by the index writer. Concurrent searches of one root on a server share one job
+(`state::index_requests`): under load every search of a new trunk head
+would otherwise queue its own, and the queue grows without bound.
 
 Error mapping: `InvalidPattern` and `InvalidGlob` are `InvalidArgument`,
 `RootNotIndexed` is `Unavailable`, `Codec` and `Join` are `Internal`.
