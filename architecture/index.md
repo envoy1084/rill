@@ -58,42 +58,43 @@ Read in this order the first time; each page ends with Previous / Next links.
 
 25. [Identity and authentication](05-policy/identity-and-auth.md)
 26. [Capability tokens](05-policy/capability-tokens.md)
-27. [Permissions](05-policy/permissions.md)
-28. [Risk classification](05-policy/risk-classification.md)
-29. [Submit policy](05-policy/submit-policy.md)
-30. [Signing](05-policy/signing.md)
-31. [Threat model](05-policy/threat-model.md)
+27. [Token keys](05-policy/token-keys.md)
+28. [Permissions](05-policy/permissions.md)
+29. [Risk classification](05-policy/risk-classification.md)
+30. [Submit policy](05-policy/submit-policy.md)
+31. [Signing](05-policy/signing.md)
+32. [Threat model](05-policy/threat-model.md)
 
 **06 Services**
 
-32. [Search](06-services/search.md)
-33. [Exec](06-services/exec.md)
-34. [Git import and export](06-services/git-import.md)
+33. [Search](06-services/search.md)
+34. [Exec](06-services/exec.md)
+35. [Git import and export](06-services/git-import.md)
 
 **07 Runtime**
 
-35. [Server](07-runtime/server.md)
-36. [API surface](07-runtime/api-surface.md)
-37. [Events and workers](07-runtime/events-and-workers.md)
-38. [Configuration](07-runtime/configuration.md)
-39. [Observability](07-runtime/observability.md)
+36. [Server](07-runtime/server.md)
+37. [API surface](07-runtime/api-surface.md)
+38. [Events and workers](07-runtime/events-and-workers.md)
+39. [Configuration](07-runtime/configuration.md)
+40. [Observability](07-runtime/observability.md)
 
 **08 Clients**
 
-40. [SDK](08-clients/sdk.md)
-41. [CLI](08-clients/cli.md)
-42. [MCP server](08-clients/mcp.md)
+41. [SDK](08-clients/sdk.md)
+42. [CLI](08-clients/cli.md)
+43. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-43. [Development](09-engineering/development.md)
-44. [Testing](09-engineering/testing.md)
-45. [Simulation](09-engineering/simulation.md)
-46. [Performance](09-engineering/performance.md)
+44. [Development](09-engineering/development.md)
+45. [Testing](09-engineering/testing.md)
+46. [Simulation](09-engineering/simulation.md)
+47. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-47. [Architecture decisions](10-decisions/README.md): the twelve ADRs that
+48. [Architecture decisions](10-decisions/README.md): the thirteen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -117,7 +118,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Labels, votes, threads | [Review](04-workflow/review.md) |
 | How trunk moves and sequence numbers are assigned | [Landing](04-workflow/landing.md) |
 | Bisect and automatic revert | [Post-land verification](04-workflow/post-land-verification.md) |
-| Who a caller is and what they may do | [Identity and authentication](05-policy/identity-and-auth.md), [Capability tokens](05-policy/capability-tokens.md), [Permissions](05-policy/permissions.md) |
+| Who a caller is and what they may do | [Identity and authentication](05-policy/identity-and-auth.md), [Capability tokens](05-policy/capability-tokens.md), [Token keys](05-policy/token-keys.md), [Permissions](05-policy/permissions.md) |
 | What a change needs before it may land | [Risk classification](05-policy/risk-classification.md), [Submit policy](05-policy/submit-policy.md) |
 | Known threats and which phase closes each | [Threat model](05-policy/threat-model.md) |
 | Code search and symbols | [Search](06-services/search.md) |

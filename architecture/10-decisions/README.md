@@ -26,6 +26,7 @@ accepted one beyond fixing errors. Status is one of `accepted`,
 | [010](010-multi-tenancy.md) | Multi-tenancy is built into the keyspace | accepted |
 | [011](011-idempotent-api.md) | Every mutation is idempotent; every list is paginated | accepted |
 | [012](012-rust-server-generated-clients.md) | Rust on the server; generated clients elsewhere | accepted |
+| [013](013-p256-envelope-token-keys.md) | P-256 everywhere, with token keys wrapped by a key service | accepted |
 
 ## Template
 

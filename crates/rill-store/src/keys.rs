@@ -102,6 +102,16 @@ pub mod table {
     pub const QUOTA: &str = "quota";
     /// `(idem, principal, operation)` → the request's claim or response
     pub const IDEM: &str = "idem";
+    /// `(idl, stamp)` → IdentityEvent
+    pub const IDENT_LOG: &str = "idl";
+    /// `(idln)` → identity log counter followers wait on
+    pub const IDENT_LOG_COUNT: &str = "idln";
+    /// `(idk, key id)` → TokenKeyRecord
+    pub const IDENT_KEY: &str = "idk";
+    /// `(idss, session)` → SessionRecord
+    pub const IDENT_SESSION: &str = "idss";
+    /// `(idrv, token)` → Revocation
+    pub const IDENT_REVOKED: &str = "idrv";
 }
 
 fn key<T: TuplePack>(t: &T) -> Bytes {
@@ -143,6 +153,16 @@ pub fn idem(principal: &str, operation: &[u8]) -> Bytes {
 
 pub fn idem_table() -> Bytes {
     key(&(table::IDEM,))
+}
+
+/// A whole instance-wide identity table.
+pub fn identity_table(table: &str) -> Bytes {
+    key(&(table,))
+}
+
+/// One row of an instance-wide identity table keyed by `id`.
+pub fn identity_row<T: TuplePack>(table: &str, id: T) -> Bytes {
+    key(&(table, id))
 }
 
 pub fn repo(ns: &str, id: &RepoId) -> Bytes {

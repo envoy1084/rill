@@ -142,4 +142,4 @@ repository inside the object string. The object is `repo:<name>` or
 * [`services/admin.rs`](../../crates/rill-api/src/services/admin.rs): relation RPCs.
 
 ---
-← Previous: [Capability tokens](capability-tokens.md) · [Index](../index.md) · Next: [Risk classification](risk-classification.md) →
+← Previous: [Token keys](token-keys.md) · [Index](../index.md) · Next: [Risk classification](risk-classification.md) →

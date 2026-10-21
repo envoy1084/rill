@@ -1,0 +1,38 @@
+[package]
+name = "rill-identity"
+description = "Identity for Rill: token signing keys and the key services that wrap them, sign-in, sessions, agents and workload identity"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+# AWS KMS as a key service.
+aws = ["dep:aws-config", "dep:aws-sdk-kms"]
+# Google Cloud KMS as a key service.
+gcp = ["dep:gcp_auth"]
+
+[dependencies]
+rill-types = { workspace = true }
+rill-store = { workspace = true }
+rill-policy = { workspace = true }
+aes-gcm = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+blake3 = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+aws-config = { workspace = true, optional = true }
+aws-sdk-kms = { workspace = true, optional = true }
+gcp_auth = { workspace = true, optional = true }
+
+[dev-dependencies]
+axum = { workspace = true }

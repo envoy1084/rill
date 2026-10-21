@@ -22,6 +22,7 @@
 
 pub mod codec;
 pub mod error;
+pub mod identity;
 pub mod keys;
 pub mod keyspace;
 pub mod memory;

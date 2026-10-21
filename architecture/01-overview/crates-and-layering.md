@@ -18,6 +18,7 @@ and policy crates stay free of RPC and storage-layout concerns.
 | `rill-lander` | Queue, rebase onto trunk, CAS land, landing records, the jobs a landing enqueues, post-land verification, bisect, revert | Review state (through `ReviewHooks`), execution (through `Verifier`) |
 | `rill-search` | Trigram index, symbol extraction, query execution | Permission filtering (the server passes a `PathFilter`) |
 | `rill-exec` | Action cache, sandbox materialization, verify plans | Scheduling policy |
+| `rill-identity` | Token signing keys and the key services that wrap them (local, Vault, AWS KMS, Google Cloud KMS), key rotation | Request authentication (the server owns it) |
 | `rill-git-import` | One-way git history import onto trunk | Export, mirroring |
 | `rill-proto` | `rill.v1` protobufs, generated tonic services, domain/wire conversion | Handlers |
 | `rill-api` | Authentication, `RepoContext`, gRPC handlers and watch streams, object HTTP protocol, job handlers and workers, config | Client-side state |
@@ -49,6 +50,7 @@ flowchart BT
   search[rill-search] --> core
   exec[rill-exec] --> core
   import[rill-git-import] --> core
+  identity[rill-identity] --> policy
   proto[rill-proto] --> types
   server[rill-api] --> review & lander & search & exec & proto & events & jobs
   sdk[rill-sdk] --> proto & core
@@ -60,8 +62,8 @@ flowchart BT
 
 The declared order is `rill-types` <- `rill-store` <- `rill-events` /
 `rill-jobs` / `rill-core` <- `rill-policy` / `rill-review` / `rill-lander` /
-`rill-search` / `rill-exec` <- `rill-api` <- `rill-sdk` <- `rill-cli` /
-`rill-mcp`. Lower crates never depend on higher ones. The manifests refine
+`rill-search` / `rill-exec` <- `rill-identity` <- `rill-api` <- `rill-sdk` <-
+`rill-cli` / `rill-mcp`. Lower crates never depend on higher ones. The manifests refine
 that order in a few places:
 
 - `rill-events` and `rill-jobs` depend only on `rill-types` and

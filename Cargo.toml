@@ -17,6 +17,7 @@ members = [
     "crates/rill-sdk",
     "crates/rill-cli",
     "crates/rill-mcp",
+    "crates/rill-identity",
     "crates/rill-git-import",
     "crates/rill-sim",
     "crates/rill-bench",
@@ -48,6 +49,7 @@ rill-api = { path = "crates/rill-api" }
 rill-sdk = { path = "crates/rill-sdk" }
 rill-git-import = { path = "crates/rill-git-import" }
 rill-mcp = { path = "crates/rill-mcp" }
+rill-identity = { path = "crates/rill-identity" }
 
 # Serialization and hashing
 serde = { version = "1.0.229", features = ["derive"] }
@@ -102,6 +104,11 @@ imara-diff = "0.2.0"
 cedar-policy = "4.14.0"
 biscuit-auth = "6.0.0"
 p256 = { version = "0.13.2", features = ["ecdsa"] }
+aes-gcm = "0.11.1"
+base64 = "0.23.1"
+aws-config = { version = "1.13.0", features = ["behavior-version-latest"] }
+aws-sdk-kms = { version = "1.124.0", features = ["behavior-version-latest"] }
+gcp_auth = "0.12.7"
 rand = "0.10.3"
 
 # Errors, logging, misc

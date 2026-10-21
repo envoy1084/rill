@@ -175,4 +175,4 @@ verb and path, with action `repo.<verb>` and scope `repo:<name>/<path>/*`.
 * [`services/admin.rs`](../../crates/rill-api/src/services/admin.rs): `IssueToken`, `WhoAmI`, `parse_scope`, `parse_action`.
 
 ---
-← Previous: [Identity and authentication](identity-and-auth.md) · [Index](../index.md) · Next: [Permissions](permissions.md) →
+← Previous: [Identity and authentication](identity-and-auth.md) · [Index](../index.md) · Next: [Token keys](token-keys.md) →
