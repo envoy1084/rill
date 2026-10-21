@@ -1,18 +1,20 @@
 //! Storing content as it arrives.
 
+use std::sync::Arc;
+
 use bytes::{Bytes, BytesMut};
+use fastcdc::v2020::AsyncStreamCDC;
 use futures::{Stream, StreamExt};
+use parking_lot::Mutex;
 use rill_store::ObjectStore;
 use rill_types::limits::MAX_FILE_BYTES;
 use rill_types::objects::blob::CHUNK_THRESHOLD;
 use rill_types::{ContentRef, ObjectHash, ObjectKind};
+use tokio_util::io::StreamReader;
 
-use super::store::{chunk_boundaries, put_chunk, put_manifest, store_content};
-use super::CHUNK_MAX;
+use super::store::{put_chunk, put_manifest, store_content};
+use super::{CHUNK_AVG, CHUNK_MAX, CHUNK_MIN};
 use crate::error::{Error, Result};
-
-/// Buffered bytes that trigger chunking a stream's prefix.
-const FLUSH_AT: usize = 8 * CHUNK_MAX;
 
 /// What [`store_content_stream`] stored.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,14 +25,11 @@ pub struct StoredContent {
     pub size: u64,
 }
 
-/// Store content arriving as `parts`, holding at most a few megabytes at a
+/// Store content arriving as `parts`, holding at most a chunk or so at a
 /// time. The result is the same [`ContentRef`] [`store_content`] gives for
-/// the same bytes.
-///
-/// A FastCDC cut depends only on the bytes from the chunk's start to at most
-/// [`CHUNK_MAX`] past it, so a chunk whose start is at least `CHUNK_MAX` from
-/// the end of the buffer is final and can be written before the rest of the
-/// stream arrives.
+/// the same bytes: content below the chunking threshold is stored whole,
+/// and larger content is cut by fastcdc's streaming chunker with the same
+/// parameters as the one-shot one.
 pub async fn store_content_stream<S>(
     objects: &dyn ObjectStore,
     mut parts: S,
@@ -38,63 +37,82 @@ pub async fn store_content_stream<S>(
 where
     S: Stream<Item = Result<Bytes>> + Unpin + Send,
 {
-    let mut hasher = ObjectHash::hasher(ObjectKind::Blob);
-    let mut size: u64 = 0;
-    let mut buf = BytesMut::new();
-    let mut add = |part: &Bytes, buf: &mut BytesMut| -> Result<()> {
-        size += part.len() as u64;
-        if size > MAX_FILE_BYTES {
-            return Err(Error::InvalidChange("content is larger than 5 GiB".into()));
+    let hasher = Arc::new(Mutex::new(ObjectHash::hasher(ObjectKind::Blob)));
+    let size = Arc::new(Mutex::new(0u64));
+    let failure: Arc<Mutex<Option<Error>>> = Arc::default();
+    let count = {
+        let (hasher, size) = (hasher.clone(), size.clone());
+        move |part: &Bytes| -> Result<()> {
+            let mut size = size.lock();
+            *size += part.len() as u64;
+            if *size > MAX_FILE_BYTES {
+                return Err(Error::InvalidChange("content is larger than 5 GiB".into()));
+            }
+            hasher.lock().update(part);
+            Ok(())
         }
-        hasher.update(part);
-        buf.extend_from_slice(part);
-        Ok(())
     };
 
-    while (buf.len() as u64) < CHUNK_THRESHOLD {
+    let mut prefix = BytesMut::new();
+    while (prefix.len() as u64) < CHUNK_THRESHOLD {
         match parts.next().await {
-            Some(part) => add(&part?, &mut buf)?,
+            Some(part) => {
+                let part = part?;
+                count(&part)?;
+                prefix.extend_from_slice(&part);
+            }
             None => {
-                let content = store_content(objects, buf.freeze()).await?;
+                let content = store_content(objects, prefix.freeze()).await?;
+                let blob_hash =
+                    std::mem::replace(&mut *hasher.lock(), ObjectHash::hasher(ObjectKind::Blob))
+                        .finalize();
+                let size = *size.lock();
                 return Ok(StoredContent {
                     content,
-                    blob_hash: hasher.finalize(),
+                    blob_hash,
                     size,
                 });
             }
         }
     }
 
+    // The chunker reads bytes, so errors cross it as I/O errors; the typed
+    // error is kept aside and returned instead.
+    let rest = {
+        let failure = failure.clone();
+        parts.map(move |part| {
+            let part = part.and_then(|p| count(&p).map(|()| p));
+            part.map_err(|e| {
+                let message = e.to_string();
+                *failure.lock() = Some(e);
+                std::io::Error::other(message)
+            })
+        })
+    };
+    let input = futures::stream::iter([Ok(prefix.freeze())]).chain(rest);
+    let mut chunker =
+        AsyncStreamCDC::new(StreamReader::new(input), CHUNK_MIN, CHUNK_AVG, CHUNK_MAX);
+    let mut cut = Box::pin(chunker.as_stream());
     let mut chunks = Vec::new();
-    loop {
-        let next = parts.next().await;
-        let done = next.is_none();
-        if let Some(part) = next {
-            add(&part?, &mut buf)?;
-        }
-        if !done && buf.len() < FLUSH_AT {
-            continue;
-        }
-        let data = buf.split().freeze();
-        let scan = data.clone();
-        let cuts = tokio::task::spawn_blocking(move || chunk_boundaries(&scan)).await?;
-        let mut consumed = 0;
-        for (offset, len) in cuts {
-            if !done && offset + CHUNK_MAX > data.len() {
-                break;
+    while let Some(chunk) = cut.next().await {
+        let chunk = match chunk {
+            Ok(chunk) => chunk,
+            Err(e) => {
+                return Err(failure
+                    .lock()
+                    .take()
+                    .unwrap_or_else(|| Error::InvalidChange(format!("reading content: {e}"))))
             }
-            chunks.push(put_chunk(objects, data.slice(offset..offset + len)).await?);
-            consumed = offset + len;
-        }
-        buf.extend_from_slice(&data[consumed..]);
-        if done {
-            break;
-        }
+        };
+        chunks.push(put_chunk(objects, Bytes::from(chunk.data)).await?);
     }
     let content = put_manifest(objects, chunks).await?;
+    let blob_hash =
+        std::mem::replace(&mut *hasher.lock(), ObjectHash::hasher(ObjectKind::Blob)).finalize();
+    let size = *size.lock();
     Ok(StoredContent {
         content,
-        blob_hash: hasher.finalize(),
+        blob_hash,
         size,
     })
 }
