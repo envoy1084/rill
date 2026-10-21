@@ -102,27 +102,24 @@ const RETRY_BUDGET: Duration = Duration::from_secs(20);
 /// server runs an identified operation at most once, so retrying cannot
 /// repeat an effect.
 pub(crate) async fn retry_idempotent<T, F, Fut>(
-    mut call: F,
+    call: F,
 ) -> std::result::Result<tonic::Response<T>, Status>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = std::result::Result<tonic::Response<T>, Status>>,
 {
-    let started = tokio::time::Instant::now();
-    let mut delay = Duration::from_millis(100);
-    loop {
-        match call().await {
-            Err(status)
-                if status.code() == tonic::Code::Unavailable
-                    && started.elapsed() < RETRY_BUDGET =>
-            {
-                tracing::debug!(error = %status, "retrying an idempotent call");
-                tokio::time::sleep(delay).await;
-                delay = (delay * 2).min(Duration::from_secs(2));
-            }
-            outcome => return outcome,
-        }
-    }
+    use backon::Retryable;
+    let schedule = backon::ExponentialBuilder::default()
+        .with_min_delay(Duration::from_millis(100))
+        .with_max_delay(Duration::from_secs(2))
+        .with_jitter()
+        .with_total_delay(Some(RETRY_BUDGET))
+        .without_max_times();
+    call.retry(schedule)
+        .sleep(tokio::time::sleep)
+        .when(|status: &Status| status.code() == tonic::Code::Unavailable)
+        .notify(|status, _| tracing::debug!(error = %status, "retrying an idempotent call"))
+        .await
 }
 
 /// The transport every generated client runs over.

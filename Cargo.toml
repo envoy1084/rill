@@ -152,6 +152,7 @@ toml = "1.1.8"
 dirs = "7.0.0"
 tempfile = "3.27.0"
 icu_casemap = "2.3.0"
+backon = "1.6.0"
 proptest = "1.12.0"
 similar-asserts = "2.0.0"
 

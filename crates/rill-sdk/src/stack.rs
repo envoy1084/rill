@@ -10,31 +10,17 @@ use crate::repo::RepoClient;
 use crate::review::ReviewClient;
 use crate::types::{LandProgress, LandStatus, Root};
 
-/// Polling schedule for [`StackClient::await_land`].
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Backoff {
-    /// First wait between polls.
-    pub initial: Duration,
-    /// Growth factor applied after each poll.
-    pub factor: f64,
-    /// Longest wait between polls.
-    pub max: Duration,
-}
+/// The polling schedule for awaiting landings: exponential, jittered,
+/// without a limit on attempts.
+pub type Backoff = backon::ExponentialBuilder;
 
-impl Default for Backoff {
-    fn default() -> Self {
-        Backoff {
-            initial: Duration::from_millis(250),
-            factor: 1.6,
-            max: Duration::from_secs(5),
-        }
-    }
-}
-
-impl Backoff {
-    fn next(&self, current: Duration) -> Duration {
-        current.mul_f64(self.factor).min(self.max)
-    }
+fn default_backoff() -> Backoff {
+    backon::ExponentialBuilder::default()
+        .with_min_delay(Duration::from_millis(250))
+        .with_factor(1.6)
+        .with_max_delay(Duration::from_secs(5))
+        .with_jitter()
+        .without_max_times()
 }
 
 /// One change's new version after a sync, with any conflicted paths.
@@ -94,7 +80,7 @@ impl StackClient {
         StackClient {
             repo,
             reviews,
-            backoff: Backoff::default(),
+            backoff: default_backoff(),
         }
     }
 
@@ -175,7 +161,7 @@ impl StackClient {
     /// [`Error::Timeout`] when `timeout` elapses first.
     pub async fn await_land(&self, ticket: &str, timeout: Duration) -> Result<LandProgress> {
         let started = Instant::now();
-        let mut wait = self.backoff.initial;
+        let mut waits = backon::BackoffBuilder::build(self.backoff);
         loop {
             let progress = self.reviews.land_status(ticket).await?;
             match progress.status() {
@@ -193,26 +179,8 @@ impl StackClient {
             if elapsed >= timeout {
                 return Err(Error::Timeout(timeout));
             }
+            let wait = waits.next().unwrap_or(Duration::from_secs(5));
             tokio::time::sleep(wait.min(timeout - elapsed)).await;
-            wait = self.backoff.next(wait);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn backoff_grows_and_caps() {
-        let b = Backoff {
-            initial: Duration::from_millis(100),
-            factor: 2.0,
-            max: Duration::from_millis(350),
-        };
-        let w1 = b.next(b.initial);
-        let w2 = b.next(w1);
-        assert_eq!(w1, Duration::from_millis(200));
-        assert_eq!(w2, Duration::from_millis(350));
     }
 }

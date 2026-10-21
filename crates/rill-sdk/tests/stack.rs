@@ -10,11 +10,10 @@ use rill_sdk::{Backoff, Error, LandStatus, Root};
 use rill_types::{ChangeId, TrunkSeq};
 
 fn fast() -> Backoff {
-    Backoff {
-        initial: Duration::from_millis(5),
-        factor: 2.0,
-        max: Duration::from_millis(20),
-    }
+    Backoff::default()
+        .with_min_delay(Duration::from_millis(5))
+        .with_max_delay(Duration::from_millis(20))
+        .without_max_times()
 }
 
 #[tokio::test]

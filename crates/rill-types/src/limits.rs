@@ -173,7 +173,9 @@ pub fn is_windows_reserved(component: &str) -> bool {
 /// The key two names collide under on a case-insensitive filesystem:
 /// full Unicode case folding (`ß` and `ss` collide).
 pub fn case_key(name: &str) -> String {
-    icu_casemap::CaseMapper::new().fold_string(name).into_owned()
+    icu_casemap::CaseMapper::new()
+        .fold_string(name)
+        .into_owned()
 }
 
 fn is_reserved(path: &RepoPath) -> bool {
