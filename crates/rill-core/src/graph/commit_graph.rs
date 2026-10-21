@@ -4,20 +4,23 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::sync::Arc;
 
-use dashmap::DashMap;
 use rill_store::RepoStore;
 use rill_types::{ChangeInfo, ChangeVersionHash};
 
 use crate::derive::{Ancestry, AncestryInfo, DeriveManager};
 use crate::error::{Error, Result};
+use crate::util::LruCache;
+
+/// Versions whose parents and ancestry are kept in memory.
+const GRAPH_CACHE: usize = 200_000;
 
 /// In-process view of the change graph with cached parents and
 /// generation numbers.
 pub struct CommitGraph {
     repo: RepoStore,
     derive: Arc<DeriveManager>,
-    parents: DashMap<ChangeVersionHash, Arc<[ChangeVersionHash]>>,
-    ancestry: DashMap<ChangeVersionHash, AncestryInfo>,
+    parents: LruCache<ChangeVersionHash, Arc<[ChangeVersionHash]>>,
+    ancestry: LruCache<ChangeVersionHash, AncestryInfo>,
 }
 
 /// Walk colors for the merge-base search.
@@ -31,8 +34,8 @@ impl CommitGraph {
         CommitGraph {
             repo,
             derive,
-            parents: DashMap::new(),
-            ancestry: DashMap::new(),
+            parents: LruCache::new(GRAPH_CACHE),
+            ancestry: LruCache::new(GRAPH_CACHE),
         }
     }
 
@@ -43,14 +46,14 @@ impl CommitGraph {
             .get_change_info(hash)
             .await?
             .ok_or(Error::ChangeNotFound(*hash))?;
-        self.parents.insert(*hash, info.parents.clone().into());
+        self.parents.put(*hash, info.parents.clone().into());
         Ok(info)
     }
 
     /// Parents of a version, cached.
     pub async fn parents(&self, hash: &ChangeVersionHash) -> Result<Arc<[ChangeVersionHash]>> {
         if let Some(p) = self.parents.get(hash) {
-            return Ok(p.clone());
+            return Ok(p);
         }
         let info = self.info(hash).await?;
         Ok(info.parents.into())
@@ -59,10 +62,10 @@ impl CommitGraph {
     /// Ancestry record of a version, cached.
     pub async fn ancestry(&self, hash: &ChangeVersionHash) -> Result<AncestryInfo> {
         if let Some(a) = self.ancestry.get(hash) {
-            return Ok(*a);
+            return Ok(a);
         }
         let a = self.derive.get::<Ancestry>(hash).await?;
-        self.ancestry.insert(*hash, a);
+        self.ancestry.put(*hash, a);
         Ok(a)
     }
 

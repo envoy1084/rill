@@ -10,7 +10,7 @@ use std::pin::Pin;
 
 use rill_types::{ContentRef, EntryKind, FileKind, RepoPath, Tree, TreeEntry, TreeHash};
 
-use super::ops::TreeOps;
+use super::ops::{NodeRef, TreeOps};
 use super::shard::DirEdits;
 use crate::error::Result;
 
@@ -82,10 +82,15 @@ type BuildFuture<'a> = Pin<Box<dyn Future<Output = Result<(TreeHash, bool)>> + S
 fn build_dir(ops: &TreeOps, base: Option<TreeHash>, node: Node) -> BuildFuture<'_> {
     Box::pin(async move {
         let mut edits = DirEdits::default();
+        let base_node = match base {
+            Some(h) => Some(ops.get_node(&h).await?),
+            None => None,
+        };
         for (name, mut child) in node.children {
-            let before = match base {
-                Some(h) => ops.entry(&h, &name).await?,
-                None => None,
+            let before = match (&base_node, base) {
+                (Some(NodeRef::Leaf(tree)), _) => tree.get(&name).cloned(),
+                (Some(_), Some(h)) => ops.entry(&h, &name).await?,
+                _ => None,
             };
             let mut current = before.clone();
             if let Some(edit) = child.edit.take() {

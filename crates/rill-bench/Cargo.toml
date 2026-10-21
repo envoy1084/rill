@@ -25,3 +25,7 @@ harness = false
 [[bench]]
 name = "meta"
 harness = false
+
+[[bench]]
+name = "trees"
+harness = false

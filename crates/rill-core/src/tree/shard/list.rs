@@ -66,11 +66,7 @@ pub(crate) async fn find<L: Layout>(
                 }
                 hash = children[i - 1].hash;
             }
-            _ => {
-                return Ok(L::items(&node)?
-                    .into_iter()
-                    .find(|item| L::key(item) == key));
-            }
+            _ => return L::find(&node, key),
         }
     }
 }

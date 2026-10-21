@@ -1,7 +1,8 @@
 //! Background tasks that run per repository: the landing loop, post-land
-//! verification, search indexing and the event forwarders that feed the
-//! repository's event bus.
+//! verification, background derivation, search indexing and the event
+//! forwarders that feed the repository's event bus.
 
+mod deriver;
 mod hooks;
 mod indexer;
 mod verifier;
@@ -30,6 +31,7 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>) {
                 .run_forever(ctx.postland_interval(), shutdown.clone()),
         );
     }
+    tokio::spawn(deriver::run(ctx.clone(), shutdown.clone()));
     tokio::spawn(indexer::run(ctx.clone(), shutdown));
     tracing::info!(repo = %ctx.config.name, "repository workers started");
 }

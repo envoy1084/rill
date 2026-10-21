@@ -68,7 +68,10 @@ impl Shape {
     }
 }
 
-/// A generated repository with one root version holding every file.
+/// Files per commit while building a corpus.
+const INITIAL_BATCH: usize = 5_000;
+
+/// A generated repository whose `root` version holds every file.
 pub struct Corpus {
     pub shape: Shape,
     pub repo: RepoStore,
@@ -86,15 +89,24 @@ impl Corpus {
         let trees = TreeOps::new(repo.objects().clone(), 1 << 16);
         let derive = DeriveManager::new(repo.clone(), trees, 1 << 14);
         let graph = Arc::new(CommitGraph::new(repo.clone(), derive.clone()));
-        let mut builder = ChangeBuilder::new(author())
-            .change_id(ChangeId::derived("bench", "root"))
-            .created_at(Timestamp::from_millis(0));
-        for i in 0..shape.files {
-            builder = builder
-                .file(&shape.path(i), shape.content(i, 0))
-                .expect("generated paths are valid");
+        // Changes are capped in size, so the files arrive in a chain of
+        // commits; `root` is its tip.
+        let mut root = None;
+        for (n, start) in (0..shape.files).step_by(INITIAL_BATCH).enumerate() {
+            let mut builder = ChangeBuilder::new(author())
+                .change_id(ChangeId::derived("bench", &format!("root-{n}")))
+                .created_at(Timestamp::from_millis(0));
+            if let Some(parent) = root {
+                builder = builder.parent(parent);
+            }
+            for i in start..(start + INITIAL_BATCH).min(shape.files) {
+                builder = builder
+                    .file(&shape.path(i), shape.content(i, 0))
+                    .expect("generated paths are valid");
+            }
+            root = Some(builder.commit(&repo).await.expect("memory store").0);
         }
-        let (root, _) = builder.commit(&repo).await.expect("memory store");
+        let root = root.expect("a corpus has files");
         Corpus {
             shape,
             repo,

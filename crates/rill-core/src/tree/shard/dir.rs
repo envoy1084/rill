@@ -163,6 +163,9 @@ impl TreeOps {
         added: &[String],
         removed: &[String],
     ) -> Result<()> {
+        if added.is_empty() {
+            return Ok(());
+        }
         let removed: BTreeSet<&str> = removed.iter().map(String::as_str).collect();
         let mut seen: BTreeMap<String, &str> = BTreeMap::new();
         for name in added {
@@ -229,10 +232,10 @@ impl TreeOps {
             };
             return Ok((a, b));
         };
-        let both_split = matches!(self.get_node(&a).await?, NodeRef::Inner { .. })
-            && matches!(self.get_node(&b).await?, NodeRef::Inner { .. });
-        if !both_split {
-            return Ok((self.get_tree(&a).await?, self.get_tree(&b).await?));
+        match (self.get_node(&a).await?, self.get_node(&b).await?) {
+            (NodeRef::Leaf(ta), NodeRef::Leaf(tb)) => return Ok((ta, tb)),
+            (NodeRef::Inner { .. }, NodeRef::Inner { .. }) => {}
+            _ => return Ok((self.get_tree(&a).await?, self.get_tree(&b).await?)),
         }
         let la = list::leaves(self, &a).await?;
         let lb = list::leaves(self, &b).await?;
