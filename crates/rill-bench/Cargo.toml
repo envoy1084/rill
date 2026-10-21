@@ -9,6 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+rill-policy = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true }
 rill-core = { workspace = true }
@@ -17,6 +18,10 @@ bytes = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+
+[[bench]]
+name = "authz"
+harness = false
 
 [[bench]]
 name = "core"

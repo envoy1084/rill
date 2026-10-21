@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 rill-types = { workspace = true }
+rill-proto = { workspace = true }
 futures = { workspace = true }
 rill-sdk = { workspace = true }
 rill-api = { workspace = true }
@@ -22,3 +23,4 @@ serde_json = { workspace = true }
 parking_lot = { workspace = true }
 hdrhistogram = { workspace = true }
 rand = { workspace = true }
+reqwest = { workspace = true }

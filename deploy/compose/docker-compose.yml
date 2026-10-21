@@ -79,9 +79,17 @@ services:
         done
         exit 1
 
-  rill1: *rill
-  rill2: *rill
-  rill3: *rill
+  # Each server's gRPC port is also published, for probes that must reach
+  # one server rather than the balancer.
+  rill1:
+    <<: *rill
+    ports: ["7480:7420"]
+  rill2:
+    <<: *rill
+    ports: ["7481:7420"]
+  rill3:
+    <<: *rill
+    ports: ["7482:7420"]
 
   lb:
     image: nginx:1.27

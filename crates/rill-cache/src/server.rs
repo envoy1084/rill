@@ -173,6 +173,7 @@ fn error_response(cache: &Cache, e: Error) -> Response {
     match e {
         Error::Denied(m) => {
             cache.stats.denied.fetch_add(1, Ordering::Relaxed);
+            tracing::debug!(reason = %m, "request refused");
             refusal(StatusCode::FORBIDDEN, m)
         }
         Error::NotFound(m) => refusal(StatusCode::NOT_FOUND, m),
