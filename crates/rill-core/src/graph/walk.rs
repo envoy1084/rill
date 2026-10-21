@@ -1,6 +1,6 @@
 //! History walks for `log`.
 
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use rill_types::{ChangeInfo, ChangeVersionHash, Timestamp};
 
@@ -29,19 +29,26 @@ impl CommitGraph {
     ) -> Result<Vec<LogEntry>> {
         let mut out = Vec::new();
         let mut seen = HashSet::new();
+        // Infos read to queue a version, kept for when it is popped.
+        let mut infos = HashMap::new();
         let mut heap = BinaryHeap::new();
         let first = self.info(start).await?;
         seen.insert(*start);
         heap.push(Key(self.generation(start).await?, first.created_at, *start));
+        infos.insert(*start, first);
         while out.len() < limit {
             let Some(Key(generation, _, hash)) = heap.pop() else {
                 break;
             };
-            let info = self.info(&hash).await?;
+            let info = match infos.remove(&hash) {
+                Some(info) => info,
+                None => self.info(&hash).await?,
+            };
             for parent in &info.parents {
                 if seen.insert(*parent) {
                     let p = self.info(parent).await?;
                     heap.push(Key(self.generation(parent).await?, p.created_at, *parent));
+                    infos.insert(*parent, p);
                 }
             }
             out.push(LogEntry { info, generation });

@@ -13,6 +13,8 @@ use crate::util::LruCache;
 
 /// Versions whose parents and ancestry are kept in memory.
 const GRAPH_CACHE: usize = 200_000;
+/// Landed versions whose metadata is kept in memory for log walks.
+const INFO_CACHE: usize = 20_000;
 
 /// In-process view of the change graph with cached parents and
 /// generation numbers.
@@ -21,6 +23,7 @@ pub struct CommitGraph {
     derive: Arc<DeriveManager>,
     parents: LruCache<ChangeVersionHash, Arc<[ChangeVersionHash]>>,
     ancestry: LruCache<ChangeVersionHash, AncestryInfo>,
+    infos: LruCache<ChangeVersionHash, ChangeInfo>,
 }
 
 /// Walk colors for the merge-base search.
@@ -36,17 +39,26 @@ impl CommitGraph {
             derive,
             parents: LruCache::new(GRAPH_CACHE),
             ancestry: LruCache::new(GRAPH_CACHE),
+            infos: LruCache::new(INFO_CACHE),
         }
     }
 
     /// Metadata of a version.
     pub async fn info(&self, hash: &ChangeVersionHash) -> Result<ChangeInfo> {
+        if let Some(info) = self.infos.get(hash) {
+            return Ok(info);
+        }
         let info = self
             .repo
             .get_change_info(hash)
             .await?
             .ok_or(Error::ChangeNotFound(*hash))?;
         self.parents.put(*hash, info.parents.clone().into());
+        // A version's metadata never changes once it is on trunk; before
+        // that its trunk position is still to come.
+        if info.trunk_seq.is_some() {
+            self.infos.put(*hash, info.clone());
+        }
         Ok(info)
     }
 

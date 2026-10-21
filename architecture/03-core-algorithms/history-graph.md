@@ -13,6 +13,7 @@ take O(log depth) steps through skip pointers instead of a walk.
 flowchart LR
     CG[CommitGraph] --> P[(parents cache)]
     CG --> G[(ancestry cache)]
+    CG --> I[(info cache)]
     CG --> RS[RepoStore::get_change_info]
     CG --> DM["DeriveManager::get::&lt;Ancestry&gt;"]
     CG --> IA[is_ancestor]
@@ -26,7 +27,7 @@ flowchart LR
 
 | Method | Source | Cache |
 | --- | --- | --- |
-| `info(hash)` | `RepoStore::get_change_info`; absent is `Error::ChangeNotFound` | Fills `parents` as a side effect; `info` itself always reads the store |
+| `info(hash)` | `RepoStore::get_change_info`; absent is `Error::ChangeNotFound` | `LruCache` of 20,000 versions on trunk; fills `parents` as a side effect |
 | `parents(hash)` | `info` | `LruCache` of 200,000 versions |
 | `ancestry(hash)`, `generation(hash)` | `DeriveManager::get::<Ancestry>` | `LruCache` of 200,000 versions |
 | `ancestor_at_depth(from, depth)` | jump pointers | |
@@ -48,8 +49,14 @@ parents, predecessor, author, provenance, intent, message, `created_at`,
 `files_changed`, `has_conflicts` and `trunk_seq`. The store writes it on
 `put_change_version`.
 
-Both caches are process-local and bounded. Versions are immutable, so
-entries never go stale.
+The caches are process-local and bounded. Versions are immutable, so
+entries never go stale. The one mutable part of `ChangeInfo` is
+`trunk_seq`, set once when the version lands, so only infos already on
+trunk are cached; the rest are read again.
+
+`ancestors` keeps the info it read to queue each parent and uses it when
+the parent is popped, and the `Log` RPC returns those infos as they are,
+so a page costs one info read per version.
 
 ## is_ancestor
 

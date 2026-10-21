@@ -99,29 +99,32 @@ impl RepoSvc {
         // The path walk and the first-parent walk both follow first
         // parents, which is what a path history means; the full walk uses
         // the generation-ordered ancestor traversal.
-        let mut hashes: Vec<ChangeVersionHash> = if let Some(p) = &path_filter {
-            opened.permit().read(p).await?;
-            ctx.derive.history(p, &start, limit + 1).await?
-        } else if req.first_parent {
-            first_parents(ctx, start, limit + 1).await?
-        } else {
-            ctx.graph
-                .ancestors(&start, limit + 1)
-                .await?
-                .into_iter()
-                .map(|e| e.info.hash)
-                .collect()
-        };
-        let next_start = if hashes.len() > limit {
-            let overflow = hashes[limit];
-            hashes.truncate(limit);
+        // The ancestor walk reads each version's info on the way; the
+        // first-parent walks leave them to be read below.
+        let mut walked: Vec<(ChangeVersionHash, Option<rill_types::ChangeInfo>)> =
+            if let Some(p) = &path_filter {
+                opened.permit().read(p).await?;
+                without_infos(ctx.derive.history(p, &start, limit + 1).await?)
+            } else if req.first_parent {
+                without_infos(first_parents(ctx, start, limit + 1).await?)
+            } else {
+                ctx.graph
+                    .ancestors(&start, limit + 1)
+                    .await?
+                    .into_iter()
+                    .map(|e| (e.info.hash, Some(e.info)))
+                    .collect()
+            };
+        let next_start = if walked.len() > limit {
+            let overflow = walked[limit].0;
+            walked.truncate(limit);
             // Continue from the first parent of the last returned entry in
             // first-parent walks; the ancestor walk is re-entered at the
             // next entry it produced.
             match path_filter.is_some() || req.first_parent {
                 true => ctx
                     .derive
-                    .change(&hashes[limit - 1])
+                    .change(&walked[limit - 1].0)
                     .await?
                     .first_parent()
                     .map(|h| hash_to_proto(&h)),
@@ -131,8 +134,13 @@ impl RepoSvc {
             None
         };
         let entries =
-            futures::future::try_join_all(hashes.iter().map(|hash| common::change_info(ctx, hash)))
-                .await?;
+            futures::future::try_join_all(walked.into_iter().map(|(hash, info)| async move {
+                match info {
+                    Some(info) => Ok(pb::ChangeInfo::from(info)),
+                    None => common::change_info(ctx, &hash).await,
+                }
+            }))
+            .await?;
         Ok(pb::LogResponse {
             entries,
             next_start,
@@ -253,4 +261,10 @@ async fn first_parents(
         cursor = ctx.graph.parents(&hash).await?.first().copied();
     }
     Ok(out)
+}
+
+fn without_infos(
+    hashes: Vec<ChangeVersionHash>,
+) -> Vec<(ChangeVersionHash, Option<rill_types::ChangeInfo>)> {
+    hashes.into_iter().map(|hash| (hash, None)).collect()
 }
