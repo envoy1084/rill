@@ -54,12 +54,23 @@ execution of verification steps (phase 15), and the release pipeline
 ## Review findings
 
 The review of the Phase 12 design and code (audit, secret scanning,
-redaction, encryption at rest, input limits) found the following. None is
-open at critical or high severity.
+redaction, encryption at rest, input limits) found no criticals. Every
+finding below was reproduced by a test that failed before its fix.
 
 | Finding | Severity | State |
 | --- | --- | --- |
+| A subtree copy brought content onto trunk unscanned (and around quarantine) | high | fixed (`86fbfa5`) |
+| Content at an allowed path was cached as clean, so the same bytes passed elsewhere | high | fixed (`86fbfa5`) |
+| One commit with many findings could tie up a server (quadratic work on an async thread, unbounded audit detail) | high | fixed (`86fbfa5`) |
 | `AppendTrunk` moved trunk to a quarantined version | high | fixed (`3e16153`) |
+| Cached tree nodes were served after their redaction | medium | fixed (`7ff78e7`) |
+| Two concurrent seals stored overlapping roots, so verification failed | medium | fixed (`82b7e5d`) |
+| A child of a quarantined version could reach trunk | low | fixed (`86fbfa5`) |
+| One NUL byte (or UTF-16) turned scanning off for a file | low | fixed (`86fbfa5`) |
+| Change messages were not scanned | low | fixed (`86fbfa5`) |
+| `GET /redactions` was public; a cache that could not reread it kept serving | low | fixed (`4885996`) |
+| Inline files (≤ 256 bytes) cannot be redacted by their own hash | medium | by design: redact the trees holding them; block mode keeps credentials out |
+| An org administrator who controls a second admin account can satisfy two-person redaction alone | low | by design: both accounts are audited; separate identity control is the operator's |
 
 ## Code
 
