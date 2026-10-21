@@ -18,7 +18,7 @@ When two principles conflict, the lower number wins.
 5. **Conflicts are data (`Merge<T>` terms), never errors.**
 6. **Intent and provenance are first-class and signed into every change.**
    `Provenance` and the intent id are fields of the `ChangeVersion`, so they
-   are covered by its hash; Ed25519 signatures over that hash are detached
+   are covered by its hash; P-256 signatures over that hash are detached
    records, stored when the client supplies them.
 7. **Landing is optimistic; verification is continuous** (post-land,
    bisect, revert).

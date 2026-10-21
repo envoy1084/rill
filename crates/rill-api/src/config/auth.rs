@@ -38,7 +38,7 @@ pub enum AuthConfig {
     },
     /// Biscuit tokens signed by a root key.
     Biscuit {
-        /// Hex-encoded Ed25519 public key that verifies tokens.
+        /// Hex-encoded compressed P-256 public key that verifies tokens.
         root_public_key_hex: String,
         /// Hex-encoded private key, when this server also issues tokens.
         /// Without it, `IssueToken` uses a key generated at startup.

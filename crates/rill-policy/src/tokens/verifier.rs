@@ -46,9 +46,9 @@ impl Verifier {
         Verifier { root }
     }
 
-    /// Verifier from a 32-byte Ed25519 public key.
+    /// Verifier from a compressed P-256 public key.
     pub fn from_public_key_bytes(bytes: &[u8]) -> Result<Self> {
-        PublicKey::from_bytes(bytes, biscuit_auth::builder::Algorithm::Ed25519)
+        PublicKey::from_bytes(bytes, biscuit_auth::builder::Algorithm::Secp256r1)
             .map(Self::new)
             .map_err(|e| Error::InvalidKey(e.to_string()))
     }

@@ -49,7 +49,7 @@ pub struct ServerConfig {
     pub verify: VerifyConfig,
     /// Post-land verification worker.
     pub postland: PostLandConfig,
-    /// File holding the hex Ed25519 seed the server signs commit
+    /// File holding the hex P-256 secret key the server signs commit
     /// attestations with. Without it a key is generated per process, so
     /// attestations do not verify across restarts.
     pub attestation_key: Option<std::path::PathBuf>,

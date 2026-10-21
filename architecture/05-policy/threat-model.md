@@ -71,7 +71,7 @@ flowchart LR
   trusted. Rill does not defend against a root user on the server.
 * Clients are trusted to protect their own tokens; the server limits what a
   stolen token can do (scope, expiry, revocation).
-* Cryptographic primitives (BLAKE3, Ed25519, the Biscuit format) are sound.
+* Cryptographic primitives (BLAKE3, ECDSA P-256, the Biscuit format) are sound.
 
 ## Limitations
 

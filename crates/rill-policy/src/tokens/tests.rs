@@ -270,3 +270,21 @@ fn empty_capability_is_rejected() {
     };
     assert!(issuer.issue(&Principal::human("a"), &no_verbs).is_err());
 }
+
+#[test]
+fn every_key_in_a_token_is_p256() {
+    use biscuit_auth::format::schema::public_key::Algorithm;
+    let issuer = Issuer::generate();
+    let token = issuer.issue(&Principal::agent("bot"), &cap()).unwrap();
+    let narrower = Capability::repo_wide(repo(), [Verb::Read], LATER);
+    let child = attenuate(&token, &issuer.public_key(), &narrower).unwrap();
+    let parsed = biscuit_auth::Biscuit::from_base64(&child, issuer.public_key()).unwrap();
+    let proto = parsed.container().to_proto();
+    let p256 = Algorithm::Secp256r1 as i32;
+    assert_eq!(issuer.public_key().to_proto().algorithm, p256);
+    assert_eq!(proto.authority.next_key.algorithm, p256);
+    assert_eq!(proto.blocks.len(), 1);
+    for block in &proto.blocks {
+        assert_eq!(block.next_key.algorithm, p256);
+    }
+}

@@ -143,7 +143,7 @@ the first parent's tree plus the changes. For a conflicted path the first
 add of the merge supplies the tree entry, so trees never contain conflicts.
 
 `ChangeInfo` is the projection without `file_changes`, so history listings
-never load a large change map. `Signature` (`signer`, Ed25519 `public_key`
+never load a large change map. `Signature` (`signer`, P-256 `public_key`
 and `signature`, `signed_at`) is stored beside a version, not in its hash.
 
 The server owns authorship. `CreateChangeVersion` replaces `author` with

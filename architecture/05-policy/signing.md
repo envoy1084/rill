@@ -1,6 +1,7 @@
 # Signing
 
-`signing.rs` produces and checks Ed25519 signatures over object hashes. A
+`signing.rs` produces and checks ECDSA P-256 signatures over object hashes.
+Every key Rill uses is P-256, so one key service can hold them all. A
 `Signer` holds a keypair. `sign` returns a detached `Signature` that names the
 signing principal, and `verify` checks it against the public key the signature
 carries. The invariant: the signed message is `"rill:sig:" || hash`, so a
@@ -19,7 +20,7 @@ it attests to the whole version, including
 flowchart LR
     CV[ChangeVersion] -->|encode + digest| H[ChangeVersionHash]
     H -->|"prefix rill:sig:"| M[message]
-    K[Signer] -->|Ed25519 sign| S[64-byte signature]
+    K[Signer] -->|ECDSA P-256 sign| S[64-byte signature]
     S --> R["Signature {signer, public_key, signature, signed_at}"]
     R -->|put_signatures| ST["sig/<repo>/<hash>"]
 ```
@@ -27,27 +28,28 @@ flowchart LR
 | `Signature` field | Content |
 | --- | --- |
 | `signer` | The `Principal` the key signed for. |
-| `public_key` | 32-byte Ed25519 verifying key. |
-| `signature` | 64-byte signature over `rill:sig:` + hash bytes. |
+| `public_key` | 33-byte compressed SEC1 P-256 point. |
+| `signature` | 64-byte `r || s` over `rill:sig:` + hash bytes, always low-S. |
 | `signed_at` | Informational. Not covered by the signature. |
 
 ## Keys and API
 
 [`Signer`](../../crates/rill-policy/src/signing.rs):
 
-* `generate()` uses `OsRng`. `from_seed(&[u8; 32])` is deterministic.
-  `from_bytes` rejects any length other than 32 with `Error::InvalidKey`.
-* `seed()` returns the secret, and `public_key()` returns 32 bytes. `Debug`
-  prints only the public key.
+* `generate()` draws a random 32-byte scalar. `from_bytes` rejects anything
+  that is not a valid P-256 secret scalar with `Error::InvalidKey`.
+* `secret_bytes()` returns the secret, and `public_key()` the 33-byte
+  compressed point. `Debug` prints only the public key.
+* Signing is deterministic (RFC 6979) and normalized to low-S.
 * `sign(hash, principal)` is `sign_at(hash, principal, Timestamp::now())`.
 
-`verify(sig, hash)` rebuilds the message and runs
-`VerifyingKey::verify_strict`. A key or signature of the wrong length returns
-`false` and never panics. A `true` result proves only that the embedded key
+`verify(sig, hash)` rebuilds the message and checks the ECDSA signature. A
+malformed key or signature, or a high-S signature (so each signature has one
+encoding), returns `false` and never panics. A `true` result proves only that the embedded key
 signed this hash. It does not prove that the key belongs to `sig.signer`; that
 binding is the caller's job.
 
-`KeyFile::encode` writes the seed as 64 hex characters plus a newline.
+`KeyFile::encode` writes the secret as 64 hex characters plus a newline.
 `decode` trims whitespace and hex-decodes. `encode_public` and `decode_public`
 do the same for verifying keys. The crate defines this format but performs no
 file I/O.

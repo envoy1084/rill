@@ -1,16 +1,21 @@
-//! Ed25519 signatures over object hashes.
+//! ECDSA P-256 signatures over object hashes.
 //!
 //! A signature covers `"rill:sig:" || hash bytes`, so a signature over an
 //! object hash can never be replayed as a signature over arbitrary data
-//! signed with the same key in another protocol.
+//! signed with the same key in another protocol. Public keys are 33-byte
+//! compressed SEC1 points and signatures 64 bytes (`r || s`, low-S).
 
 use bytes::Bytes;
-use ed25519_dalek::{Signature as DalekSignature, Signer as _, SigningKey, VerifyingKey};
+use p256::ecdsa::signature::{Signer as _, Verifier as _};
+use p256::ecdsa::{Signature as EcdsaSignature, SigningKey, VerifyingKey};
 use rill_types::{ObjectHash, Principal, Signature, Timestamp};
 
 use crate::error::{Error, Result};
 
 const DOMAIN: &[u8] = b"rill:sig:";
+
+/// Length of a compressed public key.
+pub const PUBLIC_KEY_LEN: usize = 33;
 
 fn message(hash: &ObjectHash) -> Vec<u8> {
     let mut m = Vec::with_capacity(DOMAIN.len() + ObjectHash::LEN);
@@ -19,7 +24,7 @@ fn message(hash: &ObjectHash) -> Vec<u8> {
     m
 }
 
-/// A signing identity: an Ed25519 keypair.
+/// A signing identity: a P-256 keypair.
 #[derive(Clone)]
 pub struct Signer {
     key: SigningKey,
@@ -36,34 +41,33 @@ impl std::fmt::Debug for Signer {
 impl Signer {
     /// Generate a fresh random keypair.
     pub fn generate() -> Self {
-        // rand's thread RNG is a CSPRNG seeded from the OS, and a seed is all
-        // an Ed25519 key needs; this avoids coupling to ed25519's rand_core.
-        Signer::from_seed(&rand::random())
-    }
-
-    /// Build from a 32-byte seed.
-    pub fn from_seed(seed: &[u8; 32]) -> Self {
-        Signer {
-            key: SigningKey::from_bytes(seed),
+        // A random 32-byte string is a valid scalar except with negligible
+        // probability (zero or at least the group order); draw again then.
+        loop {
+            if let Ok(signer) = Signer::from_bytes(&rand::random::<[u8; 32]>()) {
+                return signer;
+            }
         }
     }
 
-    /// Build from seed bytes of any length; must be exactly 32.
+    /// Build from a 32-byte secret scalar.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let seed: [u8; 32] = bytes.try_into().map_err(|_| {
-            Error::InvalidKey(format!("expected 32-byte seed, got {}", bytes.len()))
-        })?;
-        Ok(Self::from_seed(&seed))
+        SigningKey::from_slice(bytes)
+            .map(|key| Signer { key })
+            .map_err(|e| Error::InvalidKey(format!("P-256 secret key: {e}")))
     }
 
-    /// The 32-byte seed. Treat as secret.
-    pub fn seed(&self) -> [u8; 32] {
-        self.key.to_bytes()
+    /// The 32-byte secret scalar. Treat as secret.
+    pub fn secret_bytes(&self) -> [u8; 32] {
+        self.key.to_bytes().into()
     }
 
-    /// The 32-byte public key.
-    pub fn public_key(&self) -> [u8; 32] {
-        self.key.verifying_key().to_bytes()
+    /// The compressed public key.
+    pub fn public_key(&self) -> [u8; PUBLIC_KEY_LEN] {
+        let point = self.key.verifying_key().to_encoded_point(true);
+        let mut out = [0u8; PUBLIC_KEY_LEN];
+        out.copy_from_slice(point.as_bytes());
+        out
     }
 
     /// Sign an object hash on behalf of `principal`.
@@ -74,7 +78,8 @@ impl Signer {
     /// Sign with an explicit timestamp; the timestamp is informational and
     /// not covered by the signature.
     pub fn sign_at(&self, hash: &ObjectHash, principal: &Principal, at: Timestamp) -> Signature {
-        let sig = self.key.sign(&message(hash));
+        let sig: EcdsaSignature = self.key.sign(&message(hash));
+        let sig = sig.normalize_s().unwrap_or(sig);
         Signature {
             signer: principal.clone(),
             public_key: Bytes::copy_from_slice(&self.public_key()),
@@ -86,28 +91,28 @@ impl Signer {
 
 /// Verify that `sig` is a valid signature over `hash` by the public key it
 /// carries. Does not check that the key belongs to `sig.signer`; that
-/// binding is the caller's (or a key directory's) job.
+/// binding is the caller's (or a key directory's) job. High-S signatures
+/// are refused so each signature has one encoding.
 pub fn verify(sig: &Signature, hash: &ObjectHash) -> bool {
-    let Ok(key_bytes) = <[u8; 32]>::try_from(sig.public_key.as_ref()) else {
+    let Ok(key) = VerifyingKey::from_sec1_bytes(&sig.public_key) else {
         return false;
     };
-    let Ok(key) = VerifyingKey::from_bytes(&key_bytes) else {
+    let Ok(signature) = EcdsaSignature::from_slice(&sig.signature) else {
         return false;
     };
-    let Ok(sig_bytes) = <[u8; 64]>::try_from(sig.signature.as_ref()) else {
+    if signature.normalize_s().is_some() {
         return false;
-    };
-    let signature = DalekSignature::from_bytes(&sig_bytes);
-    key.verify_strict(&message(hash), &signature).is_ok()
+    }
+    key.verify(&message(hash), &signature).is_ok()
 }
 
-/// Hex encoding of a keypair seed for key files.
+/// Hex encoding of a secret key for key files.
 pub struct KeyFile;
 
 impl KeyFile {
-    /// Encode a signer's seed as 64 hex characters plus a trailing newline.
+    /// Encode a signer's secret as 64 hex characters plus a trailing newline.
     pub fn encode(signer: &Signer) -> String {
-        let mut s = hex::encode(signer.seed());
+        let mut s = hex::encode(signer.secret_bytes());
         s.push('\n');
         s
     }
@@ -120,16 +125,18 @@ impl KeyFile {
     }
 
     /// Encode a public key as hex.
-    pub fn encode_public(public_key: &[u8; 32]) -> String {
+    pub fn encode_public(public_key: &[u8]) -> String {
         hex::encode(public_key)
     }
 
-    /// Decode a hex public key.
-    pub fn decode_public(hex_str: &str) -> Result<[u8; 32]> {
+    /// Decode a hex compressed public key.
+    pub fn decode_public(hex_str: &str) -> Result<[u8; PUBLIC_KEY_LEN]> {
         let bytes = hex::decode(hex_str.trim()).map_err(|e| Error::InvalidKey(e.to_string()))?;
+        VerifyingKey::from_sec1_bytes(&bytes)
+            .map_err(|e| Error::InvalidKey(format!("P-256 public key: {e}")))?;
         bytes
             .try_into()
-            .map_err(|_| Error::InvalidKey("expected 32-byte public key".into()))
+            .map_err(|_| Error::InvalidKey("expected a 33-byte compressed public key".into()))
     }
 }
 
@@ -148,7 +155,7 @@ mod tests {
         let alice = Principal::human("alice");
         let sig = signer.sign(&h(b"a"), &alice);
         assert_eq!(sig.signer, alice);
-        assert_eq!(sig.public_key.len(), 32);
+        assert_eq!(sig.public_key.len(), PUBLIC_KEY_LEN);
         assert_eq!(sig.signature.len(), 64);
         assert!(verify(&sig, &h(b"a")));
         assert!(!verify(&sig, &h(b"b")));
@@ -181,11 +188,23 @@ mod tests {
         let text = KeyFile::encode(&signer);
         assert_eq!(text.len(), 65);
         let back = KeyFile::decode(&text).unwrap();
-        assert_eq!(back.seed(), signer.seed());
+        assert_eq!(back.secret_bytes(), signer.secret_bytes());
         assert_eq!(back.public_key(), signer.public_key());
         assert!(KeyFile::decode("zz").is_err());
         assert!(Signer::from_bytes(&[0; 31]).is_err());
+        assert!(Signer::from_bytes(&[0; 32]).is_err());
         let pk = KeyFile::decode_public(&KeyFile::encode_public(&signer.public_key())).unwrap();
         assert_eq!(pk, signer.public_key());
+    }
+
+    #[test]
+    fn high_s_signatures_are_refused() {
+        let signer = Signer::generate();
+        let mut sig = signer.sign(&h(b"a"), &Principal::human("alice"));
+        let low = EcdsaSignature::from_slice(&sig.signature).unwrap();
+        let (r, s) = low.split_scalars();
+        let high = EcdsaSignature::from_scalars(r, -*s).unwrap();
+        sig.signature = Bytes::copy_from_slice(&high.to_bytes());
+        assert!(!verify(&sig, &h(b"a")));
     }
 }

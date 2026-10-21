@@ -4,7 +4,7 @@
 //! * [`submit`]: Cedar submit rules deciding whether a change may land.
 //! * [`rebac`]: relationship-based access control over repository paths.
 //! * [`tokens`]: Biscuit capability tokens that agents carry and attenuate.
-//! * [`signing`]: Ed25519 signatures over object hashes.
+//! * [`signing`]: P-256 signatures over object hashes.
 //! * [`identity`]: turning request credentials into an [`AuthContext`].
 //!
 //! Nothing here performs I/O except the ReBAC authorizer, which reads

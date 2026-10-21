@@ -13,7 +13,7 @@ blake3 = { workspace = true }
 rill-store = { workspace = true }
 cedar-policy = { workspace = true }
 biscuit-auth = { workspace = true }
-ed25519-dalek = { workspace = true }
+p256 = { workspace = true }
 rand = { workspace = true }
 globset = { workspace = true }
 hex = { workspace = true }

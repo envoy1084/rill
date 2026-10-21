@@ -38,7 +38,7 @@ defaults with a comment header that lists every alternative.
 | `tls.cert`, `tls.key`, `tls.client_ca` | none (plain text) | PEM files for TLS on both listeners; `client_ca` makes it mutual: every connection must present a certificate that CA signed. `RILL_TLS_CERT`, `RILL_TLS_KEY`, `RILL_TLS_CLIENT_CA` |
 | `telemetry.log_format`, `telemetry.otlp_endpoint`, `telemetry.service_name` | `text`, none, `rill` | log lines as text or JSON; OTLP/HTTP trace export ([observability](observability.md)). `RILL_LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` |
 | `dev_mode` | `false` | anonymous requests act as `dev`; ReBAC checks pass |
-| `attestation_key` | none | path to an Ed25519 key file the server signs every stored version with; without it a per-process key is generated (warned outside dev mode). Its public half is in `Health` |
+| `attestation_key` | none | path to a P-256 key file (hex secret scalar) the server signs every stored version with; without it a per-process key is generated (warned outside dev mode). Its public half is in `Health` |
 | `[storage] kind` | `memory` | backend, see below |
 | `[auth] kind` | `static` with no tokens | token scheme, see below |
 | `[lander]` | `LandPolicy::default()` | verify mode per risk class, `max_wait`, `batch_window`, `auto_revert`, `revert_grace`, `max_retries` |

@@ -1,7 +1,8 @@
 # Capability tokens
 
 A capability token is a [Biscuit](https://www.biscuitsec.org) signed by the
-instance's root Ed25519 key. Its authority block names the principal and holds
+instance's root P-256 key; every block's ephemeral key is P-256 too
+(`ephemeral_key`, since Biscuit defaults those to Ed25519). Its authority block names the principal and holds
 Datalog checks for one `Capability`. A holder can append blocks offline to
 narrow it. The invariant: checks accumulate across blocks, so no block can
 grant more than the one before it, and the principal is read only from the

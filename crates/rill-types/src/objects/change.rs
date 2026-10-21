@@ -131,9 +131,9 @@ pub struct Provenance {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Signature {
     pub signer: Principal,
-    /// Ed25519 public key, 32 bytes.
+    /// Compressed P-256 public key, 33 bytes.
     pub public_key: Bytes,
-    /// Ed25519 signature over the object hash, 64 bytes.
+    /// ECDSA P-256 signature over the object hash, 64 bytes (`r || s`).
     pub signature: Bytes,
     pub signed_at: Timestamp,
 }
