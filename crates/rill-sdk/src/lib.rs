@@ -31,6 +31,7 @@ pub mod auth;
 pub mod client;
 pub mod config;
 pub mod error;
+mod files;
 pub mod grants;
 pub mod intent;
 pub mod lander;

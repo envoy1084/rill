@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+tempfile = { workspace = true }
 rill-types = { workspace = true }
 hex = { workspace = true }
 rill-proto = { workspace = true }

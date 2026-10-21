@@ -221,10 +221,7 @@ pub fn load(root: &Path) -> Result<(CheckoutMeta, Manifest)> {
 }
 
 fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, bytes)?;
-    std::fs::rename(&tmp, path)?;
-    Ok(())
+    Ok(crate::files::write_atomic(path, bytes, None)?)
 }
 
 #[cfg(test)]

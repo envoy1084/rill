@@ -139,17 +139,7 @@ impl FileStore {
         }
         let text = serde_json::to_string_pretty(all)
             .map_err(|e| Error::config(format!("credentials: {e}")))?;
-        let tmp = self.path.with_extension("tmp");
-        {
-            use std::io::Write;
-            let mut options = std::fs::OpenOptions::new();
-            options.write(true).create(true).truncate(true);
-            #[cfg(unix)]
-            std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-            let mut file = options.open(&tmp).map_err(io)?;
-            file.write_all(text.as_bytes()).map_err(io)?;
-        }
-        std::fs::rename(&tmp, &self.path).map_err(io)
+        crate::files::write_atomic(&self.path, text.as_bytes(), Some(0o600)).map_err(io)
     }
 }
 
