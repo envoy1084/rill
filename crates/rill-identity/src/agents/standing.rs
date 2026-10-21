@@ -62,3 +62,27 @@ pub async fn agent_may_act(
     }
     Ok(())
 }
+
+/// Refuse unless `agent`'s registration lets it act at `now`, whatever
+/// model it runs as: active and unexpired, with an active sponsor. For
+/// judging an agent that requested something earlier.
+pub async fn registration_holds(
+    store: &IdentityStore,
+    agent: &AgentRecord,
+    now: Timestamp,
+) -> Result<()> {
+    if !agent.is_live_at(now) {
+        return Err(Error::Denied(format!(
+            "agent {} is suspended or expired",
+            agent.principal.name
+        )));
+    }
+    if !sponsor_is_active(store, &agent.org, &agent.sponsor).await? {
+        return Err(Error::Denied(format!(
+            "agent {}'s sponsor {} is not active",
+            agent.principal.name,
+            agent.sponsor.label()
+        )));
+    }
+    Ok(())
+}

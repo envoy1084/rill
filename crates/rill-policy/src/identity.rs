@@ -56,6 +56,8 @@ pub struct AgentScope {
     pub repos: Vec<String>,
     /// Path prefixes; empty for every path.
     pub paths: Vec<RepoPathBuf>,
+    /// What it may spend.
+    pub budgets: rill_types::identity::AgentBudgets,
 }
 
 impl AgentScope {

@@ -54,10 +54,10 @@ flowchart LR
 | T6 | Path-scoped token searches everything | `Grep` performs no path permit | Permit on every read RPC, generated permission matrix | 11 |
 | T7 | Writer edits paths they cannot write | `CreateChangeVersion` checks `file_changes` only; a version made only of `subtree_changes` gets no path check | All write checks inside the commit transaction | 11 |
 | T8 | Spoofed authorship | Fixed: the server stamps `author` and `created_at`, drops client `sponsor` and `resolved_by`, and signs an attestation for every version it stores | — | — |
-| T9 | Impersonation through token issuance | A repository owner can issue a token for any principal name | Issuance bound to the caller; agent registry with sponsors | 10 |
+| T9 | Impersonation through token issuance | Partly fixed: agents are registered with sponsors and get tokens only through the workload exchange; but `IssueToken` still lets a repository owner name any principal | Restrict `IssueToken` to the caller and registered agents it sponsors | 10 |
 | T10 | Leaked token stays valid | Fixed: tokens and sessions are revoked through the identity log and refused by every server within seconds; lifetimes are capped per principal kind (1 h human, 15 min agent, 12 h service); signing keys are wrapped by a key service and rotate | — | 10 (done) |
 | T11 | Agent approves its own swarm's work | Votes from any agent count toward agent quorums | Independence rules (session, sponsor, model) in policy facts | 23 |
-| T12 | Compromised model or session lands bad code at scale | No way to find or revert by provenance | Kill switch and blast-radius revert by provenance | 10, 18 |
+| T12 | Compromised model or session lands bad code at scale | Partly fixed: the kill switch stops an agent, session, sponsor or model at once and the lander ejects its queued work; provenance (session, sponsor, model) is stamped from the token. No blast-radius revert yet | Blast-radius revert by provenance | 10 (done), 18 |
 | T13 | Memory exhaustion by one request | Partly fixed: `PutBlob` streams in bounded memory with a 5 GiB cap, chunked reads check manifest sizes, change versions are capped at 8 MiB and 100k paths. Other RPCs have no message-size limits | Input limits on every RPC | 12 |
 | T14 | Repository open to everyone | A repository with no relation tuples is readable and writable by every authenticated principal | Explicit open flag; refuse removing the last owner | 11 |
 | T15 | Secret committed to history | Nothing detects it; nothing can remove it | Secret scanning on ingest; audited redaction | 12 |

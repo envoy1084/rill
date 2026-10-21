@@ -2,6 +2,7 @@
 //! one lower crate, encode.
 
 pub mod admin;
+pub mod budget;
 pub mod common;
 pub mod diff;
 pub mod idem;

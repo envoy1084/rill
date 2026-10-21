@@ -90,6 +90,7 @@ The `IdentityService` RPCs:
 | `RotateTokenKeys`, `ListTokenKeys` | administrators |
 | identity providers, users, workload issuers | org administrators |
 | `RegisterAgent`, `UpdateAgent`, `ListAgents` | org administrators, or the sponsoring user |
+| `KillSwitch` | org administrators |
 
 `require_instance_admin` passes in dev mode, or for a principal named in
 `identity.admins` presenting an unnarrowed token.
@@ -205,6 +206,27 @@ before the relation check, and read filters are narrowed to them. An agent
 principal with no registration (named by an administrator through
 `IssueToken` or `mint-token`) has no scope beyond its token.
 
+## Budgets and the kill switch
+
+A registered agent's budgets travel in its `AgentScope`:
+
+| Budget | Enforced |
+| --- | --- |
+| `versions_per_day` | in the commit transaction: a counter per agent and UTC day (`idb` table) is read and set with compare-and-set alongside the version, so concurrent writes never exceed it and failed commits never spend it |
+| `lands_per_day` | at `RequestLand`, before the request is queued |
+| `requests_per_minute` | per server, in the identity view; a cluster of n servers admits up to n times the budget |
+
+Exhausted budgets are `RESOURCE_EXHAUSTED`.
+
+`KillSwitch` (org administrators) stops an agent (suspended, its live
+sessions revoked), a session, every agent of a sponsor, or a model (added
+to the org's `blocked_models`, live sessions running as it revoked). Tokens
+are refused at once on the server that ran it and through the log on the
+others. Work already queued is caught at landing: the lander's approval
+hook asks `AuthorStanding` whether the version's author and the requester
+may still act, so a killed agent's queued requests are ejected and its open
+changes cannot land ([landing](../04-workflow/landing.md#sequencing)).
+
 ## Bootstrap
 
 A server outside dev mode accepts only tokens the instance signed. The first
@@ -282,7 +304,7 @@ path and repository. `resolved_by()` maps the caller's kind to the
 * [`rill-policy/src/identity.rs`](../../crates/rill-policy/src/identity.rs): `AuthHeaders`, `AuthContext`, `Authenticator`, `StaticTokenAuthenticator`, `TeamResolver`.
 * [`signin/`](../../crates/rill-api/src/signin/mod.rs): the sign-in HTTP routes; [`rill-identity/src/signin/`](../../crates/rill-identity/src/signin/mod.rs), [`rill-identity/src/oidc/`](../../crates/rill-identity/src/oidc/mod.rs).
 * [`identity/callers.rs`](../../crates/rill-api/src/identity/callers.rs): teams, agent standing and scope; [`rill-identity/src/agents/`](../../crates/rill-identity/src/agents/mod.rs): the workload exchange.
-* Tests: `rill-api/tests/grpc/agents.rs` (exchange, scope, sponsor and model suspension), `rill-identity/tests/workload.rs`, `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-cli/tests/bootstrap.rs`.
+* Tests: `rill-api/tests/grpc/killswitch.rs` (exact budgets, rate, kill switch ejection), `rill-api/tests/grpc/agents.rs` (exchange, scope, sponsor and model suspension), `rill-identity/tests/workload.rs`, `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-cli/tests/bootstrap.rs`.
 * [`rill-types/src/principal.rs`](../../crates/rill-types/src/principal.rs): `Principal`, `PrincipalKind`.
 * [`auth/authenticator.rs`](../../crates/rill-api/src/auth/authenticator.rs): `static_tokens`, `authenticate`.
 * [`auth/instance.rs`](../../crates/rill-api/src/auth/instance.rs): `require_instance_admin`.

@@ -88,6 +88,11 @@ pub async fn commit_version_with(
             at: now,
         };
         let mut tx = staged.clone().merge(extras.tx.clone());
+        if let Some(spend) =
+            crate::services::budget::spend(opened, crate::services::budget::VERSIONS).await?
+        {
+            tx = tx.merge(spend);
+        }
         tx.mutations
             .push(ctx.repo.signatures_mutation(&hash, &signatures)?);
         tx.mutations

@@ -5,4 +5,4 @@ mod exchange;
 mod standing;
 
 pub use exchange::{exchange_workload, WorkloadKeys};
-pub use standing::{agent_may_act, sponsor_is_active};
+pub use standing::{agent_may_act, registration_holds, sponsor_is_active};

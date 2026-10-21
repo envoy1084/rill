@@ -130,6 +130,8 @@ pub mod table {
     pub const IDENT_WORKLOAD: &str = "idw";
     /// `(idos, org)` → OrgIdentitySettings
     pub const IDENT_ORG_SETTINGS: &str = "idos";
+    /// `(idb, principal, metric, day)` → what the principal spent that day
+    pub const IDENT_BUDGET: &str = "idb";
 }
 
 fn key<T: TuplePack>(t: &T) -> Bytes {

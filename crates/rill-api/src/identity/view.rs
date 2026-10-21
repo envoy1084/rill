@@ -246,6 +246,11 @@ impl IdentityView {
         Ok(verified)
     }
 
+    /// Whether `session` is revoked, as this server last heard.
+    pub fn session_revoked(&self, session: &SessionId) -> bool {
+        self.revoked_sessions.read().contains_key(session)
+    }
+
     fn check_signature(&self, token: &str, now: Timestamp) -> rill_policy::Result<Verified> {
         Verifier::new(self.set.load().ring.clone()).authenticate(token, now)
     }

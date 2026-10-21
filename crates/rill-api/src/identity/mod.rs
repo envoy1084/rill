@@ -7,9 +7,11 @@ mod callers;
 mod follower;
 mod maintenance;
 mod mint;
+mod standing;
 mod view;
 
 pub use follower::follow;
 pub use maintenance::maintain_forever;
 pub use mint::mint_token;
+pub use standing::AuthorStanding;
 pub use view::IdentityView;

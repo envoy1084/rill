@@ -9,16 +9,34 @@ use rill_review::error::Error as ReviewError;
 use rill_review::service::ReviewService;
 use rill_types::{ChangeId, ChangeVersionHash, Principal, ReviewStatus, ThreadAnchor, TrunkSeq};
 
+use crate::identity::AuthorStanding;
+
 /// Adapts [`ReviewService`] to [`ReviewHooks`]. Holds the swappable
 /// service handle so a policy reload is seen by in-flight landings.
 pub struct ReviewHooksAdapter {
     review: Arc<ArcSwap<ReviewService>>,
+    /// The repository's org and who judges its authors' standing.
+    standing: Option<(String, Arc<dyn AuthorStanding>)>,
 }
 
 impl ReviewHooksAdapter {
     /// Hooks over the given review service handle.
     pub fn new(review: Arc<ArcSwap<ReviewService>>) -> Self {
-        ReviewHooksAdapter { review }
+        ReviewHooksAdapter {
+            review,
+            standing: None,
+        }
+    }
+
+    /// Also refuse landings whose author or requester may no longer act
+    /// in `org`.
+    pub fn with_standing(
+        mut self,
+        org: impl Into<String>,
+        standing: Arc<dyn AuthorStanding>,
+    ) -> Self {
+        self.standing = Some((org.into(), standing));
+        self
     }
 
     fn service(&self) -> Arc<ReviewService> {
@@ -126,6 +144,19 @@ impl ReviewHooks for ReviewHooksAdapter {
                     decision.reasons.join("; ")
                 )
             })
+        };
+        let refusal = match (refusal, &self.standing) {
+            (None, Some((org, standing))) => {
+                match service.repo().get_change_version(&version).await? {
+                    Some(cv) => {
+                        standing
+                            .refusal(org, &cv.author, &cv.provenance, requester)
+                            .await
+                    }
+                    None => Some(format!("version {version} is missing")),
+                }
+            }
+            (refusal, _) => refusal,
         };
         let votes = state
             .votes

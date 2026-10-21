@@ -185,6 +185,7 @@ pub struct RepoRegistry {
     stores: Stores,
     config: Arc<ServerConfig>,
     attestor: Arc<rill_policy::Signer>,
+    identity: Arc<crate::identity::IdentityView>,
     contexts: DashMap<RepoId, Arc<RepoContext>>,
     build_lock: tokio::sync::Mutex<()>,
     lifecycle: Arc<super::Lifecycle>,
@@ -197,12 +198,14 @@ impl RepoRegistry {
         stores: Stores,
         config: Arc<ServerConfig>,
         attestor: Arc<rill_policy::Signer>,
+        identity: Arc<crate::identity::IdentityView>,
         lifecycle: Arc<super::Lifecycle>,
     ) -> Self {
         RepoRegistry {
             stores,
             config,
             attestor,
+            identity,
             contexts: DashMap::new(),
             build_lock: tokio::sync::Mutex::new(()),
             lifecycle,
@@ -330,7 +333,10 @@ impl RepoRegistry {
             Some(runner) => Arc::new(workers::ExecVerifier::new(runner.clone())),
             None => Arc::new(AlwaysGreen),
         };
-        let hooks = Arc::new(workers::ReviewHooksAdapter::new(review.clone()));
+        let hooks = Arc::new(
+            workers::ReviewHooksAdapter::new(review.clone())
+                .with_standing(config.org.clone(), self.identity.clone()),
+        );
         let lander = Lander::new(
             repo.clone(),
             derive.clone(),

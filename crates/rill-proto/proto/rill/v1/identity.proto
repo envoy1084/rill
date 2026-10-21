@@ -36,6 +36,30 @@ service IdentityService {
   rpc PutWorkloadIssuer(PutWorkloadIssuerRequest) returns (PutWorkloadIssuerResponse);
   rpc ListWorkloadIssuers(ListWorkloadIssuersRequest) returns (ListWorkloadIssuersResponse);
   rpc DeleteWorkloadIssuer(DeleteWorkloadIssuerRequest) returns (DeleteWorkloadIssuerResponse);
+
+  // Stop an agent, a session, everything a sponsor's agents do, or every
+  // agent running as a model; org administrators. Tokens are refused at
+  // once, and the lander ejects their queued work.
+  rpc KillSwitch(KillSwitchRequest) returns (KillSwitchResponse);
+}
+
+message KillSwitchRequest {
+  bytes operation_id = 1;
+  string org = 2;
+  oneof target {
+    string agent = 3;
+    // `ss_…`
+    string session = 4;
+    // `user:<name>` or `team:<name>`.
+    string sponsor = 5;
+    string model = 6;
+  }
+  string reason = 7;
+}
+message KillSwitchResponse {
+  repeated string agents_suspended = 1;
+  repeated string sessions_revoked = 2;
+  repeated string models_blocked = 3;
 }
 
 message AgentBudgets {

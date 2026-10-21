@@ -388,6 +388,7 @@ impl ReviewService for ReviewSvc {
                 let version = state
                     .current_version()
                     .ok_or_else(|| Error::precondition(format!("change {id} has no versions")))?;
+                crate::services::budget::spend_now(&opened, crate::services::budget::LANDS).await?;
                 let ticket = opened
                     .repo
                     .lander

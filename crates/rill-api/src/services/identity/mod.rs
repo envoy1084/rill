@@ -2,6 +2,7 @@
 
 pub mod agents;
 mod keys;
+mod kill;
 mod providers;
 mod revoke;
 mod users;
@@ -187,6 +188,17 @@ impl IdentityService for IdentitySvc {
     ) -> GrpcResult<pb::DeleteWorkloadIssuerResponse> {
         idem::once(&self.state, request, |r| async move {
             workloads::delete(&self.state, r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn kill_switch(
+        &self,
+        request: Request<pb::KillSwitchRequest>,
+    ) -> GrpcResult<pb::KillSwitchResponse> {
+        idem::once(&self.state, request, |r| async move {
+            kill::kill(&self.state, r).await.map(Response::new)
         })
         .await
         .map_err(Status::from)

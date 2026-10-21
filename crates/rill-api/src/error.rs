@@ -58,6 +58,10 @@ pub enum Error {
     #[error("{0}")]
     NotFound(String),
 
+    /// A budget or rate limit was reached.
+    #[error("{0}")]
+    Exhausted(String),
+
     #[error("{0}")]
     AlreadyExists(String),
 
@@ -158,6 +162,7 @@ impl Error {
             Error::Unauthenticated(_) => Code::Unauthenticated,
             Error::Unimplemented(_) => Code::Unimplemented,
             Error::Unavailable(_) => Code::Unavailable,
+            Error::Exhausted(_) => Code::ResourceExhausted,
         }
     }
 }

@@ -3,6 +3,7 @@
 //! identity view current.
 
 mod agents;
+mod budgets;
 mod log;
 mod logins;
 mod providers;

@@ -91,8 +91,11 @@ The server evaluates the submit policy for the requester before queueing
    its land-critical values are stored.
 3. **Approve.** `hooks.approve(change, requested version, requester)`
    reads the review and judges it: it must still be `Landing` or
-   `Landable`, its current version must still be the requested one, and the
-   submit policy must still allow the requester. A refusal sets `Ejected
+   `Landable`, its current version must still be the requested one, the
+   submit policy must still allow the requester, and the version's author
+   and the requester must still be allowed to act (`AuthorStanding`: a
+   suspended user, a killed or lapsed agent, a blocked model or a revoked
+   session that wrote it refuses). A refusal sets `Ejected
    { reason }` and returns the change to its owner. An approval carries the
    review snapshot, the policy's digest (BLAKE3 of its text) and the votes
    it saw. Status `Landing`.

@@ -20,6 +20,8 @@ pub struct CallerCaches {
     settings: DashMap<String, Arc<OrgIdentitySettings>>,
     /// Whether `(org, agent, model)` may act; the refusal when not.
     standing: DashMap<(String, String, Option<String>), Option<String>>,
+    /// Requests per agent in the current minute, on this server.
+    requests: DashMap<(String, String), (i64, u64)>,
 }
 
 impl CallerCaches {
@@ -62,6 +64,32 @@ impl IdentityView {
             .settings
             .insert(org.to_string(), settings.clone());
         Ok(settings)
+    }
+
+    /// Count a request by `agent` against its per-minute budget. The
+    /// window is per server: a cluster of n servers admits up to n times
+    /// the budget.
+    fn count_request(&self, agent: &AgentRecord) -> Result<()> {
+        let Some(limit) = agent.budgets.requests_per_minute else {
+            return Ok(());
+        };
+        let minute = Timestamp::now().millis().div_euclid(60_000);
+        let mut entry = self
+            .callers
+            .requests
+            .entry((agent.org.clone(), agent.principal.name.clone()))
+            .or_insert((minute, 0));
+        if entry.0 != minute {
+            *entry = (minute, 0);
+        }
+        if entry.1 >= limit {
+            return Err(Error::Exhausted(format!(
+                "agent {} may make {limit} requests a minute",
+                agent.principal.name
+            )));
+        }
+        entry.1 += 1;
+        Ok(())
     }
 
     /// Refuse unless registered agent `agent` may act as `model` now.
@@ -128,10 +156,12 @@ impl IdentityView {
                         .iter()
                         .map(|p| RepoPathBuf::new(p.as_str()))
                         .collect::<std::result::Result<Vec<_>, _>>()?;
+                    self.count_request(&agent)?;
                     scope = Some(AgentScope {
                         org: org.clone(),
                         repos: agent.repos.clone(),
                         paths,
+                        budgets: agent.budgets.clone(),
                     });
                 }
             }

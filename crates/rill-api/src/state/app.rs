@@ -64,6 +64,7 @@ impl AppState {
             stores.clone(),
             config.clone(),
             attestor.clone(),
+            identity.clone(),
             lifecycle.clone(),
         );
         Ok(Arc::new(AppState {
