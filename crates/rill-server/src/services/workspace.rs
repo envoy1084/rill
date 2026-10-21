@@ -574,7 +574,11 @@ impl WorkspaceService for WorkspaceSvc {
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let ws = self.load_mut(&opened, &request.get_ref().workspace).await?;
-                opened.repo.repo.delete_workspace(&ws.id).await?;
+                opened
+                    .repo
+                    .repo
+                    .delete_workspace(&ws.id, opened.principal())
+                    .await?;
                 Ok(Response::new(pb::DeleteWorkspaceResponse {}))
             })
             .await;

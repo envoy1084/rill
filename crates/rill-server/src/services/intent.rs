@@ -67,7 +67,11 @@ impl IntentService for IntentSvc {
                         return Err(Error::not_found(format!("parent intent {parent}")));
                     }
                 }
-                opened.repo.repo.put_intent(&intent).await?;
+                opened
+                    .repo
+                    .repo
+                    .put_intent(&intent, opened.principal())
+                    .await?;
                 Ok(Response::new(pb::CreateIntentResponse {
                     intent: Some(pb::Intent::from(intent)),
                 }))
@@ -128,7 +132,11 @@ impl IntentService for IntentSvc {
                     intent.risk_override = Some(risk_from_proto("risk_override", risk)?);
                 }
                 intent.updated_at = Timestamp::now();
-                opened.repo.repo.put_intent(&intent).await?;
+                opened
+                    .repo
+                    .repo
+                    .put_intent(&intent, opened.principal())
+                    .await?;
                 Ok(Response::new(pb::UpdateIntentResponse {
                     intent: Some(pb::Intent::from(intent)),
                 }))
@@ -205,14 +213,22 @@ impl IntentService for IntentSvc {
                     if intent.status == IntentStatus::Open {
                         intent.status = IntentStatus::InProgress;
                     }
-                    opened.repo.repo.put_intent(&intent).await?;
+                    opened
+                        .repo
+                        .repo
+                        .put_intent(&intent, opened.principal())
+                        .await?;
                 }
                 if let Some(prev) = opened.repo.repo.read_review(&change_id).await? {
                     if prev.state.intent != Some(intent.id) {
                         let mut next = prev.state.clone();
                         next.intent = Some(intent.id);
                         next.updated_at = Timestamp::now();
-                        opened.repo.repo.write_review(&prev, &next).await?;
+                        opened
+                            .repo
+                            .repo
+                            .write_review(&prev, &next, opened.principal())
+                            .await?;
                     }
                 }
                 Ok(Response::new(pb::LinkChangeResponse {

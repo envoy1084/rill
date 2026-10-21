@@ -91,22 +91,17 @@ pub async fn commit_version_with(
         tx.mutations
             .push(ctx.repo.signatures_mutation(&hash, &signatures)?);
         tx.mutations
-            .push(ctx.repo.event(&event(EventKind::VersionStored {
+            .extend(ctx.repo.event(&event(EventKind::VersionStored {
                 version: hash,
                 change: cv.change_id,
             }))?);
         tx.mutations
             .push(stores.charge(opened.principal(), metric::VERSIONS, 1));
         if let Some(p) = &prepared {
-            tx = tx.merge(ctx.repo.review_writes(&p.prev, &p.next)?);
-            if let Some((from, to)) = p.transition {
-                tx.mutations
-                    .push(ctx.repo.event(&event(EventKind::StatusChanged {
-                        change: cv.change_id,
-                        from,
-                        to,
-                    }))?);
-            }
+            tx = tx.merge(
+                ctx.repo
+                    .review_writes(&p.prev, &p.next, opened.principal())?,
+            );
         }
         if let Some(s) = &scope {
             tx.mutations.push(stores.idem_effect(

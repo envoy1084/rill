@@ -39,6 +39,20 @@ impl RepoStore {
         self.meta().set(self.keys().misc(name), row).await
     }
 
+    /// [`RepoStore::set_misc`] together with the event it causes.
+    pub async fn set_misc_with_event(
+        &self,
+        name: &str,
+        value: Bytes,
+        event: &rill_types::Event,
+    ) -> Result<()> {
+        let row = self.seal_row(value).await?;
+        let mut tx = crate::meta::Transaction::new().set(self.keys().misc(name), row);
+        tx.mutations.extend(self.event(event)?);
+        self.meta().transact(tx).await?;
+        Ok(())
+    }
+
     /// [`RepoStore::set_misc`] that fails once `lease` is lost.
     pub async fn set_misc_fenced(
         &self,

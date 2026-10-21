@@ -264,6 +264,7 @@ impl AdminService for AdminSvc {
                         &object,
                         parse_relation(&rel.relation)?,
                         &parse_subject(&rel.subject)?,
+                        opened.principal(),
                     )
                     .await?;
                 Ok(Response::new(pb::AddRelationResponse {}))
@@ -293,6 +294,7 @@ impl AdminService for AdminSvc {
                         &object,
                         parse_relation(&rel.relation)?,
                         &parse_subject(&rel.subject)?,
+                        opened.principal(),
                     )
                     .await?;
                 Ok(Response::new(pb::RemoveRelationResponse {}))

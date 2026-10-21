@@ -99,23 +99,31 @@ pub async fn scenario(name: &str, stores: &Stores) {
 
     // Ref CAS: create, wrong expectation, update, delete.
     let feature = rill_types::RefName::new("feature").unwrap();
-    repo.update_ref(&feature, None, Some(a)).await.unwrap();
+    repo.update_ref(&feature, None, Some(a), &Principal::human("alice"))
+        .await
+        .unwrap();
     assert!(repo
-        .update_ref(&feature, None, Some(b_hash))
+        .update_ref(&feature, None, Some(b_hash), &Principal::human("alice"))
         .await
         .unwrap_err()
         .is_conflict());
-    repo.update_ref(&feature, Some(a), Some(b_hash))
+    repo.update_ref(&feature, Some(a), Some(b_hash), &Principal::human("alice"))
         .await
         .unwrap();
     assert_eq!(repo.get_ref(&feature).await.unwrap(), Some(b_hash));
     let refs = repo.list_refs().await.unwrap();
     assert_eq!(refs.len(), 2, "{name}: trunk + feature");
-    repo.update_ref(&feature, Some(b_hash), None).await.unwrap();
+    repo.update_ref(&feature, Some(b_hash), None, &Principal::human("alice"))
+        .await
+        .unwrap();
     assert_eq!(repo.get_ref(&feature).await.unwrap(), None);
 
-    repo.add_relation("doc", "owner", "alice").await.unwrap();
-    repo.add_relation("doc", "viewer", "bob").await.unwrap();
+    repo.add_relation("doc", "owner", "alice", &Principal::human("alice"))
+        .await
+        .unwrap();
+    repo.add_relation("doc", "viewer", "bob", &Principal::human("alice"))
+        .await
+        .unwrap();
     assert_eq!(
         repo.relations_of("doc").await.unwrap(),
         vec![
@@ -123,8 +131,12 @@ pub async fn scenario(name: &str, stores: &Stores) {
             ("viewer".to_string(), "bob".to_string())
         ]
     );
-    repo.add_relation("doc/x", "owner", "carol").await.unwrap();
-    repo.remove_relation("doc", "owner", "alice").await.unwrap();
+    repo.add_relation("doc/x", "owner", "carol", &Principal::human("alice"))
+        .await
+        .unwrap();
+    repo.remove_relation("doc", "owner", "alice", &Principal::human("alice"))
+        .await
+        .unwrap();
     assert_eq!(repo.relations_of("doc").await.unwrap().len(), 1, "{name}");
     assert_eq!(repo.list_relations().await.unwrap().len(), 2, "{name}");
 }
@@ -159,9 +171,12 @@ pub async fn landing(name: &str, stores: &Stores) {
     for i in 0..3 {
         let version = cv(&format!("v{i}"), vec![root]);
         let hash = repo.put_change_version(&version).await.unwrap();
-        repo.create_review(&review_of(version.change_id, hash, ReviewStatus::Landing))
-            .await
-            .unwrap();
+        repo.create_review(
+            &review_of(version.change_id, hash, ReviewStatus::Landing),
+            &Principal::human("alice"),
+        )
+        .await
+        .unwrap();
         entries.push(LandEntry {
             version: hash,
             change_id: version.change_id,
@@ -225,11 +240,10 @@ pub async fn landing(name: &str, stores: &Stores) {
     );
 
     // A change abandoned meanwhile does not land.
-    repo.create_review(&review_of(
-        next.change_id,
-        next_hash,
-        ReviewStatus::Abandoned,
-    ))
+    repo.create_review(
+        &review_of(next.change_id, next_hash, ReviewStatus::Abandoned),
+        &Principal::human("alice"),
+    )
     .await
     .unwrap();
     let abandoned = LandBatch {

@@ -4,6 +4,7 @@ use rill_store::repo::ReviewSnapshot;
 use rill_types::{ChangeId, ChangeVersionHash, LabelVote, ReviewState, ReviewStatus, Timestamp};
 
 use super::interdiff::VersionRelation;
+use super::retry::service_actor;
 use super::retry::MAX_WRITE_ATTEMPTS;
 use crate::error::{Error, Result};
 use crate::service::{ReviewEvent, ReviewService};
@@ -40,7 +41,11 @@ impl ReviewService {
             let Some(prepared) = self.prepare_version(change_id, new_version).await? else {
                 return self.get(change_id).await;
             };
-            match self.repo.write_review(&prepared.prev, &prepared.next).await {
+            match self
+                .repo
+                .write_review(&prepared.prev, &prepared.next, &service_actor())
+                .await
+            {
                 Ok(()) => {
                     let state = prepared.next.clone();
                     self.version_written(prepared);

@@ -1,7 +1,8 @@
 //! Change versions, the version log and signatures.
 
 use rill_types::{
-    ChangeId, ChangeInfo, ChangeVersion, ChangeVersionHash, Encodable, Signature, Versionstamp,
+    ChangeId, ChangeInfo, ChangeVersion, ChangeVersionHash, Encodable, EventKind, Signature,
+    Versionstamp,
 };
 
 use super::codec::{
@@ -22,7 +23,14 @@ impl RepoStore {
         if self.has_change_version(&hash).await? {
             return Ok(hash);
         }
-        let tx = self.stage_version(cv).await?;
+        let mut tx = self.stage_version(cv).await?;
+        tx.mutations.extend(self.event_by(
+            &cv.author,
+            EventKind::VersionStored {
+                version: hash,
+                change: cv.change_id,
+            },
+        )?);
         match self.meta().transact(tx).await {
             Ok(_) => Ok(hash),
             Err(Error::Conflict(_)) if self.has_change_version(&hash).await? => Ok(hash),

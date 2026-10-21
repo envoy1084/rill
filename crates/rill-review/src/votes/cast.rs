@@ -5,6 +5,7 @@ use rill_types::{
 };
 
 use crate::error::{Error, Result};
+use crate::lifecycle::service_actor;
 use crate::service::{ReviewEvent, ReviewService};
 use crate::votes::LabelSet;
 
@@ -24,7 +25,7 @@ impl ReviewService {
         let current = self.get(change_id).await?;
         let facts = self.change_facts(&current).await?;
         let (state, (vote, transition)) = self
-            .update(change_id, |s| {
+            .update(change_id, voter, |s| {
                 if !matches!(s.status, ReviewStatus::Open | ReviewStatus::Landable) {
                     return Err(Error::InvalidStatus {
                         change_id: *change_id,
@@ -55,8 +56,10 @@ impl ReviewService {
         let (state, transition) = match transition {
             Some(t) => (state, Some(t)),
             None => {
-                self.update(change_id, |s| self.refresh_status(s, &facts))
-                    .await?
+                self.update(change_id, &service_actor(), |s| {
+                    self.refresh_status(s, &facts)
+                })
+                .await?
             }
         };
         tracing::info!(change = %change_id, voter = %voter, label, value, "vote cast");

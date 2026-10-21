@@ -43,7 +43,7 @@ impl ReviewService {
         let facts = self.change_facts(&state).await?;
         self.apply_risk(&mut state, &facts);
         let transition = self.refresh_status(&mut state, &facts)?;
-        self.repo.create_review(&state).await.map_err(|e| {
+        self.repo.create_review(&state, author).await.map_err(|e| {
             if e.is_conflict() {
                 Error::AlreadySubmitted(*change_id)
             } else {

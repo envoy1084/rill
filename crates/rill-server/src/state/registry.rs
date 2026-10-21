@@ -246,12 +246,13 @@ impl RepoRegistry {
         spec: &str,
         description: &str,
         settings: rill_store::RepoSettings,
+        actor: &rill_types::Principal,
     ) -> Result<Arc<RepoContext>> {
         let (org, name) = split_repo(spec);
         let config = self
             .stores
             .org(org)
-            .create_repo_with(name, description, settings)
+            .create_repo_with(name, description, settings, actor)
             .await
             .map_err(|e| {
                 if e.is_conflict() {

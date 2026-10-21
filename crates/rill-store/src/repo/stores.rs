@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use rill_types::{Record, RefName, RepoId, Timestamp};
+use rill_types::{EventKind, Principal, Record, RefName, RepoId, Timestamp};
 use serde::{Deserialize, Serialize};
 
 use super::codec::{decode_record, encode_record};
@@ -119,8 +119,13 @@ impl Stores {
     }
 
     pub async fn create_repo(&self, name: &str, description: &str) -> Result<RepoConfig> {
-        self.create_repo_with(name, description, RepoSettings::default())
-            .await
+        self.create_repo_with(
+            name,
+            description,
+            RepoSettings::default(),
+            &Principal::service("rill"),
+        )
+        .await
     }
 
     /// [`Stores::create_repo`] with explicit settings.
@@ -129,6 +134,7 @@ impl Stores {
         name: &str,
         description: &str,
         settings: RepoSettings,
+        actor: &Principal,
     ) -> Result<RepoConfig> {
         super::orgs::validate_repo_name(name)?;
         if self.namespace() == super::orgs::DEFAULT_ORG {
@@ -145,7 +151,7 @@ impl Stores {
         };
         let ns = self.namespace();
         let (index_key, index_value) = self.repo_org_row(&config.id);
-        let tx = Transaction::new()
+        let mut tx = Transaction::new()
             .expect_present(keys::org(ns))
             .expect_absent(keys::repo_by_name(ns, name))
             .set(index_key, index_value)
@@ -154,6 +160,12 @@ impl Stores {
                 keys::repo_by_name(ns, name),
                 Bytes::copy_from_slice(config.id.as_bytes()),
             );
+        tx.mutations.extend(self.repo(config.id).event_by(
+            actor,
+            EventKind::RepoCreated {
+                name: name.to_string(),
+            },
+        )?);
         if let Err(e) = self.meta.transact(tx).await {
             return Err(match e {
                 Error::Conflict(_) if self.get_org(ns).await?.is_none() => {

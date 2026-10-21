@@ -71,6 +71,7 @@ impl RepoSvc {
                 rill_store::RepoSettings {
                     windows_safe: req.windows_safe,
                 },
+                &ctx.principal,
             )
             .await?;
         repo.authorizer
@@ -78,6 +79,7 @@ impl RepoSvc {
                 rill_policy::rebac::REPO_OBJECT,
                 Relation::Owner,
                 &Subject::principal(&ctx.principal),
+                &ctx.principal,
             )
             .await?;
         tracing::info!(repo = %req.repo, owner = %ctx.principal, "repository created");
@@ -176,7 +178,12 @@ impl RepoSvc {
         opened
             .repo
             .repo
-            .update_ref(&update.name, update.expected, update.target)
+            .update_ref(
+                &update.name,
+                update.expected,
+                update.target,
+                opened.principal(),
+            )
             .await
             .map_err(|e| {
                 if e.is_conflict() {

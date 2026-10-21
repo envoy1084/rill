@@ -245,6 +245,24 @@ pub trait MetaStore: Send + Sync + 'static {
     /// The value of a counter written by [`Mutation::Add`]; 0 if absent.
     async fn counter(&self, key: &[u8]) -> Result<i64>;
 
+    /// Wait until the counter at `key` differs from `seen`, or `timeout`
+    /// passes; returns its value. Polls unless the backend can watch.
+    async fn wait_counter(
+        &self,
+        key: &[u8],
+        seen: i64,
+        timeout: std::time::Duration,
+    ) -> Result<i64> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let value = self.counter(key).await?;
+            if value != seen || tokio::time::Instant::now() >= deadline {
+                return Ok(value);
+            }
+            tokio::time::sleep(POLL_INTERVAL.min(timeout)).await;
+        }
+    }
+
     /// Unconditional single-key write; a convenience over `transact`.
     async fn set(&self, key: Bytes, value: Bytes) -> Result<()> {
         self.transact(Transaction::new().set(key, value)).await?;
@@ -273,7 +291,19 @@ impl<T: MetaStore + ?Sized> MetaStore for Arc<T> {
     async fn counter(&self, key: &[u8]) -> Result<i64> {
         (**self).counter(key).await
     }
+
+    async fn wait_counter(
+        &self,
+        key: &[u8],
+        seen: i64,
+        timeout: std::time::Duration,
+    ) -> Result<i64> {
+        (**self).wait_counter(key, seen, timeout).await
+    }
 }
+
+/// How often [`MetaStore::wait_counter`] polls a backend that cannot watch.
+pub const POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(20);
 
 /// The key of entry `seq` in a log under `prefix`: the prefix followed by
 /// the tuple encoding of `seq`, which sorts numerically.

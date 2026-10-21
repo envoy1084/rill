@@ -165,11 +165,20 @@ mod tests {
     async fn objects_with_slashes_load_exactly() {
         let stores = rill_store::Stores::memory();
         let repo = stores.repo(stores.create_repo("r", "").await.unwrap().id);
-        repo.add_relation("dir:/src/billing", "owner", "team:core")
+        repo.add_relation(
+            "dir:/src/billing",
+            "owner",
+            "team:core",
+            &Principal::human("admin"),
+        )
+        .await
+        .unwrap();
+        repo.add_relation("dir:/src", "reader", "*", &Principal::human("admin"))
             .await
             .unwrap();
-        repo.add_relation("dir:/src", "reader", "*").await.unwrap();
-        repo.add_relation("repo", "boss", "*").await.unwrap();
+        repo.add_relation("repo", "boss", "*", &Principal::human("admin"))
+            .await
+            .unwrap();
         let snapshot = Snapshot::load(&repo).await.unwrap();
         let mut tuples: Vec<_> = snapshot
             .tuples()

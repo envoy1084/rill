@@ -43,7 +43,15 @@ pub async fn load(repo: &RepoStore, name: &str) -> Result<Option<StoredPolicy>> 
 /// Persist a policy document.
 pub async fn store(repo: &RepoStore, name: &str, policy: &StoredPolicy) -> Result<()> {
     let bytes = serde_json::to_vec(policy).map_err(|e| Error::internal(e.to_string()))?;
-    repo.set_misc(&misc_key(name), Bytes::from(bytes)).await?;
+    let event = rill_types::Event {
+        kind: rill_types::EventKind::PolicyChanged {
+            name: name.to_string(),
+        },
+        actor: policy.updated_by.clone(),
+        at: policy.updated_at,
+    };
+    repo.set_misc_with_event(&misc_key(name), Bytes::from(bytes), &event)
+        .await?;
     Ok(())
 }
 

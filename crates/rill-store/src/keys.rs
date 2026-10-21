@@ -32,6 +32,8 @@ pub mod table {
     pub const COMMENT: &str = "cmt";
     /// `(evt, ns, repo, stamp)` → Event
     pub const EVENT: &str = "evt";
+    /// `(evtn, ns, repo)` → counter of events written; tailers wait on it
+    pub const EVENT_COUNT: &str = "evtn";
     /// `(thd, ns, repo)` → be64 seq ++ version hash of the trunk head
     pub const TRUNK_HEAD: &str = "thd";
     /// `(land, ns, repo, seq)` → Landing

@@ -3,6 +3,7 @@
 use rill_types::{ChangeId, ChangeVersionHash, ReviewState};
 
 use crate::error::{Error, Result};
+use crate::lifecycle::service_actor;
 use crate::service::{ReviewEvent, ReviewService};
 
 /// What the lander must do after a stack member lands.
@@ -113,7 +114,7 @@ impl ReviewService {
         probe.stack = stack.to_vec();
         let facts = self.change_facts(&probe).await?;
         let (state, transition) = self
-            .update(change_id, |s| {
+            .update(change_id, &service_actor(), |s| {
                 s.stack = stack.to_vec();
                 self.apply_risk(s, &facts);
                 self.refresh_status(s, &facts)

@@ -5,6 +5,7 @@ use rill_types::{ChangeId, Comment, Principal, ReviewState, Thread, ThreadAnchor
 
 use super::anchor::context_hash;
 use crate::error::{Error, Result};
+use crate::lifecycle::service_actor;
 use crate::service::{ReviewEvent, ReviewService};
 
 /// A new thread id: 16 random bytes, hex encoded.
@@ -45,7 +46,7 @@ impl ReviewService {
             resolved: false,
             to,
         };
-        self.update(change_id, |s| {
+        self.update(change_id, author, |s| {
             s.threads.push(thread.clone());
             Ok(())
         })
@@ -70,7 +71,7 @@ impl ReviewService {
     ) -> Result<ReviewState> {
         let body = body.into();
         let (state, ()) = self
-            .update(change_id, |s| {
+            .update(change_id, author, |s| {
                 let thread = find_thread(s, change_id, thread_id)?;
                 thread.comments.push(comment(
                     author,
@@ -101,7 +102,7 @@ impl ReviewService {
         let current = self.get(change_id).await?;
         let facts = self.change_facts(&current).await?;
         let (state, transition) = self
-            .update(change_id, |s| {
+            .update(change_id, by, |s| {
                 let thread = find_thread(s, change_id, thread_id)?;
                 if thread.resolved {
                     return Err(Error::ThreadAlreadyResolved(thread_id.to_string()));
@@ -124,7 +125,7 @@ impl ReviewService {
         let current = self.get(change_id).await?;
         let facts = self.change_facts(&current).await?;
         let (state, transition) = self
-            .update(change_id, |s| {
+            .update(change_id, &service_actor(), |s| {
                 find_thread(s, change_id, thread_id)?.resolved = false;
                 self.refresh_status(s, &facts)
             })

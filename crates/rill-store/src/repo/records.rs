@@ -1,7 +1,9 @@
 //! Workspaces, operations and intents.
 
 use bytes::Bytes;
-use rill_types::{Intent, IntentId, Operation, OperationId, Workspace, WorkspaceId};
+use rill_types::{
+    EventKind, Intent, IntentId, Operation, OperationId, Principal, Workspace, WorkspaceId,
+};
 
 use super::codec::{decode_record, encode_record};
 use super::store::RepoStore;
@@ -17,16 +19,11 @@ impl RepoStore {
         }
     }
 
-    pub async fn put_workspace(&self, ws: &Workspace) -> Result<()> {
-        self.meta()
-            .set(self.keys().workspace(&ws.id), encode_record(ws)?)
-            .await
-    }
-
-    pub async fn delete_workspace(&self, id: &WorkspaceId) -> Result<()> {
-        self.meta()
-            .transact(Transaction::new().delete(self.keys().workspace(id)))
-            .await?;
+    pub async fn delete_workspace(&self, id: &WorkspaceId, actor: &Principal) -> Result<()> {
+        let mut tx = Transaction::new().delete(self.keys().workspace(id));
+        tx.mutations
+            .extend(self.event_by(actor, EventKind::WorkspaceDeleted { workspace: *id })?);
+        self.meta().transact(tx).await?;
         Ok(())
     }
 
@@ -58,12 +55,21 @@ impl RepoStore {
         let keys = self.keys();
         let index = keys.operation_index(&op.id);
         let ws_key = keys.workspace(&op.workspace);
-        Ok(Transaction::new()
+        let mut tx = Transaction::new()
             .expect_absent(index.clone())
             .expect(ws_key.clone(), expected.map(encode_record).transpose()?)
             .append_stamped(keys.operations(&op.workspace), encode_record(op)?)
             .set(ws_key, encode_record(&op.resulting)?)
-            .set(index, Bytes::new()))
+            .set(index, Bytes::new());
+        tx.mutations.extend(self.event(&rill_types::Event {
+            kind: EventKind::WorkspaceChanged {
+                workspace: op.workspace,
+                operation: op.id,
+            },
+            actor: op.actor.clone(),
+            at: op.at,
+        })?);
+        Ok(tx)
     }
 
     pub async fn has_operation(&self, op: &OperationId) -> Result<bool> {
@@ -99,10 +105,12 @@ impl RepoStore {
         }
     }
 
-    pub async fn put_intent(&self, intent: &Intent) -> Result<()> {
-        self.meta()
-            .set(self.keys().intent(&intent.id), encode_record(intent)?)
-            .await
+    pub async fn put_intent(&self, intent: &Intent, actor: &Principal) -> Result<()> {
+        let mut tx = Transaction::new().set(self.keys().intent(&intent.id), encode_record(intent)?);
+        tx.mutations
+            .extend(self.event_by(actor, EventKind::IntentChanged { intent: intent.id })?);
+        self.meta().transact(tx).await?;
+        Ok(())
     }
 
     pub async fn list_intents(&self) -> Result<Vec<Intent>> {

@@ -4,6 +4,7 @@ use rill_policy::{ChangeFacts, SubmitDecision};
 use rill_types::{ChangeId, Principal, ReviewState, ReviewStatus};
 
 use crate::error::Result;
+use crate::lifecycle::service_actor;
 use crate::service::ReviewService;
 
 impl ReviewService {
@@ -32,7 +33,9 @@ impl ReviewService {
         let current = self.get(change_id).await?;
         let facts = self.change_facts(&current).await?;
         let (state, transition) = self
-            .update(change_id, |s| self.refresh_status(s, &facts))
+            .update(change_id, &service_actor(), |s| {
+                self.refresh_status(s, &facts)
+            })
             .await?;
         self.emit_transition(change_id, transition);
         Ok(state)

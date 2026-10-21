@@ -21,15 +21,30 @@ async fn rewrites_owner_writer_reader() {
     let alice = Principal::human("alice");
     let bob = Principal::human("bob");
     let carol = Principal::human("carol");
-    auth.grant("repo", Relation::Owner, &Subject::principal(&alice))
-        .await
-        .unwrap();
-    auth.grant("repo", Relation::Writer, &Subject::principal(&bob))
-        .await
-        .unwrap();
-    auth.grant("repo", Relation::Reader, &Subject::principal(&carol))
-        .await
-        .unwrap();
+    auth.grant(
+        "repo",
+        Relation::Owner,
+        &Subject::principal(&alice),
+        &admin(),
+    )
+    .await
+    .unwrap();
+    auth.grant(
+        "repo",
+        Relation::Writer,
+        &Subject::principal(&bob),
+        &admin(),
+    )
+    .await
+    .unwrap();
+    auth.grant(
+        "repo",
+        Relation::Reader,
+        &Subject::principal(&carol),
+        &admin(),
+    )
+    .await
+    .unwrap();
 
     for r in Relation::ALL {
         assert!(auth.check(&alice, &[], r, "repo").await, "owner has {r}");
@@ -48,12 +63,22 @@ async fn directories_inherit_from_ancestors() {
     let auth = authorizer().await;
     let alice = Principal::human("alice");
     let bob = Principal::human("bob");
-    auth.grant("dir:/src", Relation::Writer, &Subject::principal(&alice))
-        .await
-        .unwrap();
-    auth.grant("repo", Relation::Reader, &Subject::principal(&bob))
-        .await
-        .unwrap();
+    auth.grant(
+        "dir:/src",
+        Relation::Writer,
+        &Subject::principal(&alice),
+        &admin(),
+    )
+    .await
+    .unwrap();
+    auth.grant(
+        "repo",
+        Relation::Reader,
+        &Subject::principal(&bob),
+        &admin(),
+    )
+    .await
+    .unwrap();
 
     assert!(
         auth.check(&alice, &[], Relation::Writer, "dir:/src/billing/deep")
@@ -74,17 +99,23 @@ async fn teams_kinds_and_wildcards() {
     let auth = authorizer().await;
     let alice = Principal::human("alice");
     let bot = Principal::agent("bot");
-    auth.grant("repo", Relation::Writer, &Subject::Team("core".into()))
-        .await
-        .unwrap();
+    auth.grant(
+        "repo",
+        Relation::Writer,
+        &Subject::Team("core".into()),
+        &admin(),
+    )
+    .await
+    .unwrap();
     auth.grant(
         "repo",
         Relation::Reviewer,
         &Subject::Kind(PrincipalKind::Agent),
+        &admin(),
     )
     .await
     .unwrap();
-    auth.grant("dir:/docs", Relation::Reader, &Subject::Any)
+    auth.grant("dir:/docs", Relation::Reader, &Subject::Any, &admin())
         .await
         .unwrap();
 
@@ -107,14 +138,18 @@ async fn revoke_and_cache_invalidation() {
     let alice = Principal::human("alice");
     let subj = Subject::principal(&alice);
     assert!(!auth.check(&alice, &[], Relation::Reader, "repo").await);
-    auth.grant("repo", Relation::Reader, &subj).await.unwrap();
+    auth.grant("repo", Relation::Reader, &subj, &admin())
+        .await
+        .unwrap();
     assert!(auth.check(&alice, &[], Relation::Reader, "repo").await);
-    auth.revoke("repo", Relation::Reader, &subj).await.unwrap();
+    auth.revoke("repo", Relation::Reader, &subj, &admin())
+        .await
+        .unwrap();
     assert!(!auth.check(&alice, &[], Relation::Reader, "repo").await);
 
     // A write that bypasses the authorizer is invisible until invalidated.
     auth.repo()
-        .add_relation("repo", "reader", &subj.to_string())
+        .add_relation("repo", "reader", &subj.to_string(), &admin())
         .await
         .unwrap();
     assert!(!auth.check(&alice, &[], Relation::Reader, "repo").await);
@@ -132,13 +167,19 @@ async fn allowed_paths_filter() {
         "dir:/src/billing",
         Relation::Reader,
         &Subject::principal(&alice),
+        &admin(),
     )
     .await
     .unwrap();
-    auth.grant("dir:/docs", Relation::Writer, &Subject::principal(&alice))
-        .await
-        .unwrap();
-    auth.grant("repo", Relation::Owner, &Subject::principal(&bob))
+    auth.grant(
+        "dir:/docs",
+        Relation::Writer,
+        &Subject::principal(&alice),
+        &admin(),
+    )
+    .await
+    .unwrap();
+    auth.grant("repo", Relation::Owner, &Subject::principal(&bob), &admin())
         .await
         .unwrap();
 
@@ -165,4 +206,8 @@ async fn allowed_paths_filter() {
     let f = auth.allowed_paths_for(&alice, &[], Relation::Writer).await;
     assert!(f.allows(&p("docs/c")));
     assert!(!f.allows(&p("src/billing/a")));
+}
+
+fn admin() -> Principal {
+    Principal::human("admin")
 }

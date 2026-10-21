@@ -103,19 +103,31 @@ impl Authorizer {
         &self.repo
     }
 
-    /// Grant `relation` on `object` to `subject`.
-    pub async fn grant(&self, object: &str, relation: Relation, subject: &Subject) -> Result<()> {
+    /// Grant `relation` on `object` to `subject`, on `by`'s authority.
+    pub async fn grant(
+        &self,
+        object: &str,
+        relation: Relation,
+        subject: &Subject,
+        by: &Principal,
+    ) -> Result<()> {
         self.repo
-            .add_relation(object, relation.as_str(), &subject.to_string())
+            .add_relation(object, relation.as_str(), &subject.to_string(), by)
             .await?;
         self.invalidate();
         Ok(())
     }
 
-    /// Revoke `relation` on `object` from `subject`.
-    pub async fn revoke(&self, object: &str, relation: Relation, subject: &Subject) -> Result<()> {
+    /// Revoke `relation` on `object` from `subject`, on `by`'s authority.
+    pub async fn revoke(
+        &self,
+        object: &str,
+        relation: Relation,
+        subject: &Subject,
+        by: &Principal,
+    ) -> Result<()> {
         self.repo
-            .remove_relation(object, relation.as_str(), &subject.to_string())
+            .remove_relation(object, relation.as_str(), &subject.to_string(), by)
             .await?;
         self.invalidate();
         Ok(())

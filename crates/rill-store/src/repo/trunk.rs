@@ -1,7 +1,7 @@
 //! Refs and the trunk sequence.
 
 use bytes::Bytes;
-use rill_types::{ChangeVersionHash, RefName, TrunkSeq};
+use rill_types::{ChangeVersionHash, EventKind, Principal, RefName, TrunkSeq};
 
 use super::codec::{hash_value, parse_hash, parse_seq};
 use super::store::RepoStore;
@@ -38,6 +38,7 @@ impl RepoStore {
         name: &RefName,
         expected: Option<ChangeVersionHash>,
         target: Option<ChangeVersionHash>,
+        actor: &Principal,
     ) -> Result<()> {
         let key = self.keys().reference(name);
         let mut tx = Transaction::new().expect(key.clone(), expected.as_ref().map(hash_value));
@@ -45,6 +46,14 @@ impl RepoStore {
             Some(h) => tx.set(key, hash_value(&h)),
             None => tx.delete(key),
         };
+        tx.mutations.extend(self.event_by(
+            actor,
+            EventKind::RefMoved {
+                name: name.to_string(),
+                old: expected,
+                new: target,
+            },
+        )?);
         self.meta().transact(tx).await?;
         Ok(())
     }

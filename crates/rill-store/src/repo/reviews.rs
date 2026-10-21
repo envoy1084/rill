@@ -13,7 +13,10 @@
 use std::collections::BTreeMap;
 
 use bytes::Bytes;
-use rill_types::{ChangeId, ChangeRecord, Comment, LabelVote, ReviewState, Thread, ThreadHeader};
+use rill_types::{
+    ChangeId, ChangeRecord, Comment, Event, EventKind, LabelVote, Principal, ReviewState, Thread,
+    ThreadHeader, Timestamp,
+};
 
 use super::codec::{decode_record, encode_record};
 use super::store::RepoStore;
@@ -81,11 +84,21 @@ impl RepoStore {
     }
 
     /// Store a new review; fails with a conflict if the change has one.
-    pub async fn create_review(&self, state: &ReviewState) -> Result<()> {
+    pub async fn create_review(&self, state: &ReviewState, actor: &Principal) -> Result<()> {
         let key = self.keys().change(&state.change_id);
         let mut tx = Transaction::new()
             .expect_absent(key.clone())
             .set(key, encode_record(&state.record())?);
+        if let Some(version) = state.current_version() {
+            tx.mutations.extend(self.event(&Event {
+                kind: EventKind::ReviewSubmitted {
+                    change: state.change_id,
+                    version,
+                },
+                actor: actor.clone(),
+                at: state.created_at,
+            })?);
+        }
         for vote in &state.votes {
             tx = self.put_vote(tx, &state.change_id, vote)?;
         }
@@ -97,14 +110,31 @@ impl RepoStore {
     }
 
     /// The transaction turning `prev` into `next`, to commit alone with
-    /// [`RepoStore::write_review`] or as part of a larger write.
-    pub fn review_writes(&self, prev: &ReviewSnapshot, next: &ReviewState) -> Result<Transaction> {
+    /// [`RepoStore::write_review`] or as part of a larger write. It records
+    /// one event per change it makes: votes, comments, thread resolutions,
+    /// stack and status changes. `actor` is who caused the record and
+    /// thread changes; votes and comments carry their own authors.
+    pub fn review_writes(
+        &self,
+        prev: &ReviewSnapshot,
+        next: &ReviewState,
+        actor: &Principal,
+    ) -> Result<Transaction> {
         let id = &next.change_id;
         if *id != prev.state.change_id {
             return Err(Error::Invalid("review write for another change".into()));
         }
         let keys = self.keys();
         let mut tx = Transaction::new().expect(keys.change(id), Some(prev.record_row.clone()));
+        let now = Timestamp::now();
+        let mut events: Vec<Event> = Vec::new();
+        let mut emit = |kind, by: &Principal| {
+            events.push(Event {
+                kind,
+                actor: by.clone(),
+                at: now,
+            })
+        };
 
         let before: BTreeMap<VoteKey, &LabelVote> =
             prev.state.votes.iter().map(|v| (vote_key(v), v)).collect();
@@ -115,6 +145,15 @@ impl RepoStore {
             if before.get(key) != Some(vote) {
                 tx = self.put_vote(tx, id, vote)?;
                 votes_changed = true;
+                emit(
+                    EventKind::Voted {
+                        change: *id,
+                        label: vote.label.clone(),
+                        value: vote.value,
+                        version: vote.version,
+                    },
+                    &vote.voter,
+                );
             }
         }
         for (label, voter, version) in before.keys().filter(|k| !after.contains_key(*k)) {
@@ -129,10 +168,30 @@ impl RepoStore {
         }
 
         let record = next.record();
-        if record != prev.state.record() {
+        let old_record = prev.state.record();
+        if record != old_record {
             tx = tx
                 .expect(keys.vote_epoch(id), prev.epoch.clone())
                 .set(keys.change(id), encode_record(&record)?);
+            if record.stack != old_record.stack {
+                emit(
+                    EventKind::StackSet {
+                        change: *id,
+                        stack: record.stack.clone(),
+                    },
+                    actor,
+                );
+            }
+            if record.status != old_record.status {
+                emit(
+                    EventKind::StatusChanged {
+                        change: *id,
+                        from: old_record.status,
+                        to: record.status,
+                    },
+                    actor,
+                );
+            }
         }
 
         let old_threads: BTreeMap<&str, &Thread> = prev
@@ -146,6 +205,16 @@ impl RepoStore {
                 None => {
                     tx = tx.expect_absent(keys.thread(id, &thread.id));
                     tx = self.put_thread(tx, id, thread)?;
+                    for (i, comment) in thread.comments.iter().enumerate() {
+                        emit(
+                            EventKind::Commented {
+                                change: *id,
+                                thread: thread.id.clone(),
+                                new_thread: i == 0,
+                            },
+                            &comment.author,
+                        );
+                    }
                 }
                 Some(old) => {
                     let stored = prev.comments.get(&thread.id).copied().unwrap_or(0);
@@ -162,21 +231,47 @@ impl RepoStore {
                             keys.thread(id, &thread.id),
                             encode_record(&thread.header())?,
                         );
+                        if thread.resolved != old.resolved {
+                            emit(
+                                EventKind::ThreadResolved {
+                                    change: *id,
+                                    thread: thread.id.clone(),
+                                    resolved: thread.resolved,
+                                },
+                                actor,
+                            );
+                        }
                     }
                     for comment in &thread.comments[stored..] {
                         tx = tx
                             .append_stamped(keys.comments(id, &thread.id), encode_record(comment)?);
+                        emit(
+                            EventKind::Commented {
+                                change: *id,
+                                thread: thread.id.clone(),
+                                new_thread: false,
+                            },
+                            &comment.author,
+                        );
                     }
                 }
             }
+        }
+        for event in &events {
+            tx.mutations.extend(self.event(event)?);
         }
         Ok(tx)
     }
 
     /// Write `next` over `prev`; a conflict means another writer changed
     /// what `prev` was read from.
-    pub async fn write_review(&self, prev: &ReviewSnapshot, next: &ReviewState) -> Result<()> {
-        let tx = self.review_writes(prev, next)?;
+    pub async fn write_review(
+        &self,
+        prev: &ReviewSnapshot,
+        next: &ReviewState,
+        actor: &Principal,
+    ) -> Result<()> {
+        let tx = self.review_writes(prev, next, actor)?;
         self.meta().transact(tx).await?;
         Ok(())
     }

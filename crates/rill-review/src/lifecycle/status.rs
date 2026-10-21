@@ -2,6 +2,7 @@
 
 use rill_types::{ChangeId, Principal, ReviewState, ReviewStatus, TrunkSeq};
 
+use super::retry::service_actor;
 use crate::error::{Error, Result};
 use crate::service::{ReviewEvent, ReviewService};
 
@@ -83,7 +84,7 @@ impl ReviewService {
         operation: &'static str,
     ) -> Result<ReviewState> {
         let (state, transition) = self
-            .update(change_id, |s| {
+            .update(change_id, &service_actor(), |s| {
                 if !from.contains(&s.status) {
                     return Err(Error::InvalidStatus {
                         change_id: *change_id,

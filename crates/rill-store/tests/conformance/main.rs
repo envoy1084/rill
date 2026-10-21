@@ -5,6 +5,7 @@
 //! file in `RILL_FDB_CLUSTER_FILE` (or the platform default) and a fresh
 //! root prefix per fixture.
 
+mod events;
 mod layer;
 mod meta;
 mod objects;
@@ -140,6 +141,7 @@ async fn repo_stores_conform() {
     for f in fixtures().await {
         repo::scenario(f.name, &f.stores).await;
         repo::landing(f.name, &f.stores).await;
+        events::scenario(f.name, &f.stores).await;
         f.finish().await;
     }
 }

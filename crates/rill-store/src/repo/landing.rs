@@ -111,7 +111,7 @@ impl RepoStore {
                     Bytes::copy_from_slice(&seq.get().to_be_bytes()),
                 )
                 .set(keys.landing(seq.get()), encode_record(&landing)?);
-            tx.mutations.push(self.event(&event(EventKind::Landed {
+            tx.mutations.extend(self.event(&event(EventKind::Landed {
                 seq,
                 version: entry.version,
                 change: entry.change_id,
@@ -130,13 +130,7 @@ impl RepoStore {
                 next.status = ReviewStatus::Landed;
                 next.landed_seq = Some(seq);
                 next.updated_at = now.max(snapshot.state.updated_at);
-                tx = tx.merge(self.review_writes(snapshot, &next)?);
-                tx.mutations
-                    .push(self.event(&event(EventKind::StatusChanged {
-                        change: entry.change_id,
-                        from,
-                        to: ReviewStatus::Landed,
-                    }))?);
+                tx = tx.merge(self.review_writes(snapshot, &next, &actor)?);
             }
             landings.push(landing);
         }
