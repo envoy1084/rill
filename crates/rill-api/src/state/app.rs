@@ -77,6 +77,11 @@ impl AppState {
         )));
         let static_tokens = auth::static_tokens(&config)?;
         let identity = crate::identity::IdentityView::open(&stores, &config.identity).await?;
+        // Compiling the secret rules takes a moment; do it before the
+        // first commit needs them.
+        tokio::task::spawn_blocking(|| {
+            std::sync::LazyLock::force(&rill_policy::secrets::CATALOG);
+        });
         let data_keys = sealer.map(|sealer| {
             let keys = Arc::new(rill_identity::keys::DataKeyManager::new(
                 stores.identity(),

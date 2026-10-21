@@ -4,7 +4,7 @@ use rill_types::{ObjectHash, ObjectKind};
 
 use super::super::*;
 
-pub const AWS_KEY: &str = "AKIAZ7T3KQ2MVXC4L9PW";
+pub const AWS_KEY: &str = "AKIAZ7T3KQ2MVXC4L5PW";
 
 pub fn admins_config() -> ServerConfig {
     let mut config = ServerConfig::default();
@@ -107,4 +107,22 @@ pub async fn apply_on(
         })
         .await
         .map(|r| r.into_inner())
+}
+
+/// `n` distinct, well-formed fake AWS access key ids (base32 after the
+/// prefix, as the detector requires).
+pub fn fake_aws_keys(n: u64) -> Vec<String> {
+    const BASE32: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    (0..n)
+        .map(|i| {
+            let mut x = 0x9E37_79B9_7F4A_7C15u64.wrapping_mul(i + 1);
+            let tail: String = (0..16)
+                .map(|_| {
+                    x = x.rotate_left(5) ^ 0xD6E8_FEB8_6659_FD93;
+                    BASE32[(x % 32) as usize] as char
+                })
+                .collect();
+            format!("AKIA{tail}")
+        })
+        .collect()
 }

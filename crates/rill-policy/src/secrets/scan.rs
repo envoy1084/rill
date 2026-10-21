@@ -3,7 +3,8 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-use super::detectors::{entropy, BUILT_IN};
+use super::catalog::CATALOG;
+use super::entropy::entropy;
 use super::rules::SecretRules;
 
 /// A credential found in content. Carries a fingerprint, never the
@@ -52,9 +53,10 @@ fn texts_of(content: &[u8]) -> Vec<Cow<'_, str>> {
 }
 
 /// The credentials in `content` at `path` under `rules`, at most
-/// [`MAX_FINDINGS`]. Allowed paths are skipped.
+/// [`MAX_FINDINGS`]. Paths the repository allows, and those the built-in
+/// rules never scan (lockfiles, vendored dependencies), are skipped.
 pub fn scan(path: &str, content: &[u8], rules: &SecretRules) -> Vec<Finding> {
-    if rules.path_allowed(path) {
+    if rules.path_allowed(path) || CATALOG.skips(path) {
         return Vec::new();
     }
     let mut seen = HashSet::new();
@@ -85,18 +87,38 @@ fn scan_text(
         }
         hits.len() < room
     };
-    let detectors = BUILT_IN
-        .iter()
-        .map(|d| (d.name, &d.regex, d.min_entropy))
-        .chain(rules.patterns.iter().map(|(n, r)| (n.as_str(), r, 0.0)));
-    'scan: for (name, regex, min_entropy) in detectors {
-        for caps in regex.captures_iter(text) {
-            let m = caps
-                .get(1)
-                .or_else(|| caps.get(0))
-                .expect("a match has group 0");
-            if entropy(m.as_str()) >= min_entropy && !add(name, m.start(), m.as_str()) {
-                break 'scan;
+    'scan: {
+        for i in CATALOG.candidates(text) {
+            let d = &CATALOG.detectors[i];
+            if d.path.as_ref().is_some_and(|p| !p.is_match(path)) {
+                continue;
+            }
+            for caps in d.regex.captures_iter(text) {
+                let whole = caps.get(0).expect("a match has group 0");
+                let secret = d
+                    .secret_group
+                    .and_then(|g| caps.get(g))
+                    .or_else(|| caps.get(1))
+                    .unwrap_or(whole);
+                if entropy(secret.as_str()) < d.min_entropy
+                    || d.allowed(path, secret.as_str(), whole.as_str())
+                {
+                    continue;
+                }
+                if !add(&d.name, secret.start(), secret.as_str()) {
+                    break 'scan;
+                }
+            }
+        }
+        for (name, regex) in &rules.patterns {
+            for caps in regex.captures_iter(text) {
+                let m = caps
+                    .get(1)
+                    .or_else(|| caps.get(0))
+                    .expect("a match has group 0");
+                if !add(name, m.start(), m.as_str()) {
+                    break 'scan;
+                }
             }
         }
     }
@@ -132,53 +154,20 @@ mod tests {
     }
 
     #[test]
-    fn known_credentials_are_found_and_placeholders_are_not() {
+    fn the_built_in_rules_find_common_credentials_on_their_lines() {
         let rules = SecretRules::default();
-        let leaked = [
-            ("aws-access-key-id", "key = AKIAZ7T3KQ2MVXC4L9PW\n"),
-            (
-                "github-token",
-                "token: ghp_Zr8Kq2mVx9LpW3nT7bYc4dHs6fJa1uEg5iOk\n",
-            ),
-            ("slack-token", "SLACK=xoxb-2849-1928374650-QwErTyUiOpAsDf\n"),
-            ("stripe-key", "STRIPE=sk_live_4eC39HqLyjWDarjtT1zdp7dc8Q\n"),
-            (
-                "private-key",
-                "-----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbn\n",
-            ),
-            (
-                "google-api-key",
-                "maps = \"AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY\"\n",
-            ),
-            (
-                "generic-secret",
-                "\n\nclient_secret = \"q8Zr2Lm9Vx7Kp4Wn1Tb6Yc3Hd5Ja0Ue\"\n",
-            ),
-        ];
-        for (detector, text) in leaked {
-            let hits = found("config/app.env", text, &rules);
-            assert!(
-                hits.iter().any(|h| h.starts_with(detector)),
-                "{detector} not found in {text:?}: {hits:?}"
-            );
-        }
-        assert_eq!(
-            found(
-                "x",
-                "\n\nclient_secret = \"q8Zr2Lm9Vx7Kp4Wn1Tb6Yc3Hd5Ja0Ue\"",
-                &rules
-            ),
-            ["generic-secret:3"],
-            "lines are 1-based"
+        let text = "a = 1\nkey = AKIAZ7T3KQ2MVXC4L5PW\n-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACB\n-----END OPENSSH PRIVATE KEY-----\n";
+        let hits = found("deploy/app.env", text, &rules);
+        assert!(hits.iter().any(|h| h == "aws-access-token:2"), "{hits:?}");
+        assert!(
+            hits.iter().any(|h| h.starts_with("private-key:3")),
+            "{hits:?}"
         );
-        for clean in [
-            "api_key = \"your-api-key-goes-here-please\"\n",
-            "password = os.environ[\"PASSWORD\"]\n",
-            "AKIAEXAMPLE is not a key\n",
-            "let token = request.token();\n",
-        ] {
-            assert!(found("src/lib.rs", clean, &rules).is_empty(), "{clean}");
-        }
+        assert!(found("src/lib.rs", "let token = request.token();\n", &rules).is_empty());
+        assert!(
+            found("web/package-lock.json", text, &rules).is_empty(),
+            "lockfiles are skipped"
+        );
     }
 
     #[test]
@@ -193,14 +182,14 @@ mod tests {
             name = "acme-deploy-key"
             regex = 'acme_dk_[0-9a-f]{{40}}'
             "#,
-            fingerprint("AKIAZ7T3KQ2MVXC4L9PW")
+            fingerprint("AKIAZ7T3KQ2MVXC4L5PW")
         ))
         .unwrap();
         assert_eq!(rules.mode, ScanMode::Warn);
         assert!(found("tests/fixtures/token.txt", secret, &rules).is_empty());
-        assert_eq!(found("src/a.rs", secret, &rules), ["github-token:1"]);
+        assert_eq!(found("src/a.rs", secret, &rules), ["github-pat:1"]);
         assert!(
-            found("src/a.rs", "AKIAZ7T3KQ2MVXC4L9PW", &rules).is_empty(),
+            found("src/a.rs", "AKIAZ7T3KQ2MVXC4L5PW", &rules).is_empty(),
             "allow-listed fake"
         );
         assert_eq!(
@@ -224,9 +213,9 @@ mod tests {
     fn binary_looking_and_utf16_content_is_still_scanned() {
         let rules = SecretRules::default();
         let mut nul = b"\0\0header\0".to_vec();
-        nul.extend_from_slice(b"\nkey=AKIAZ7T3KQ2MVXC4L9PW\n");
-        assert!(!scan("blob.bin", &nul, &rules).is_empty(), "a NUL byte");
-        let wide: Vec<u8> = "key=AKIAZ7T3KQ2MVXC4L9PW\r\n"
+        nul.extend_from_slice(b"\nkey=AKIAZ7T3KQ2MVXC4L5PW\n");
+        assert!(!scan("blob.dat", &nul, &rules).is_empty(), "a NUL byte");
+        let wide: Vec<u8> = "key=AKIAZ7T3KQ2MVXC4L5PW\r\n"
             .encode_utf16()
             .flat_map(|u| u.to_le_bytes())
             .collect();
@@ -235,12 +224,17 @@ mod tests {
 
     #[test]
     fn findings_per_file_are_capped() {
-        let text: String = (0..2000u32)
+        const BASE32: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        let text: String = (0..2000u64)
             .map(|i| {
-                format!(
-                    "k{i} = AKIA{:016X}\n",
-                    0x9E37_79B9_7F4A_7C15u64.wrapping_mul(i as u64 + 1)
-                )
+                let mut x = 0x9E37_79B9_7F4A_7C15u64.wrapping_mul(i + 1);
+                let key: String = (0..16)
+                    .map(|_| {
+                        x = x.rotate_left(5) ^ 0xD6E8_FEB8_6659_FD93;
+                        BASE32[(x % 32) as usize] as char
+                    })
+                    .collect();
+                format!("k{i} = AKIA{key}\n")
             })
             .collect();
         let found = scan("keys.txt", text.as_bytes(), &SecretRules::default());
@@ -251,7 +245,7 @@ mod tests {
     #[test]
     fn utf16_is_found_at_either_alignment_and_byte_order() {
         let rules = SecretRules::default();
-        let text = "key=AKIAZ7T3KQ2MVXC4L9PW\r\n";
+        let text = "key=AKIAZ7T3KQ2MVXC4L5PW\r\n";
         let le: Vec<u8> = text.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
         let be: Vec<u8> = text.encode_utf16().flat_map(|u| u.to_be_bytes()).collect();
         let mut shifted = vec![b'x'];

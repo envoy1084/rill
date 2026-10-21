@@ -254,13 +254,10 @@ async fn too_many_findings_to_review_are_refused_not_quarantined() {
     let mut c = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
     repo(&mut c, "app").await;
     land_rules(&mut c, "app", "mode = \"quarantine\"\n").await;
-    let fakes: String = (0..30u64)
-        .map(|i| {
-            format!(
-                "k{i} = AKIA{:016X}\n",
-                0x9E37_79B9_7F4A_7C15u64.wrapping_mul(i + 1)
-            )
-        })
+    let fakes: String = fake_aws_keys(30)
+        .into_iter()
+        .enumerate()
+        .map(|(i, key)| format!("k{i} = {key}\n"))
         .collect();
     let (edit, _) = blob(&server, "aaa/fixtures.txt", fakes.as_bytes()).await;
     let refused = apply(&mut c, "app", vec![edit]).await.unwrap_err();

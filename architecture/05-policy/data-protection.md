@@ -26,11 +26,17 @@ listed. An audit record names at most 20 findings. Content found clean is rememb
 digest, so a file is scanned once however many versions name it; content
 at an allowed path is never remembered as clean.
 
-The detectors ([`rill-policy/src/secrets`](../../crates/rill-policy/src/secrets/))
-are pure: AWS keys, GitHub, Slack, Stripe and Google keys, GCP service
-account keys, private keys, JWTs, Rill refresh tokens and SCIM credentials,
-plus a generic `key = "…"` assignment. Each has a minimum Shannon entropy, so
-placeholders like `AKIAEXAMPLEEXAMPLE00` do not trip it.
+The detectors are [gitleaks](https://github.com/gitleaks/gitleaks)' rule
+set (about 220 rules, MIT), vendored unmodified in
+[`rill-policy/rules/gitleaks.toml`](../../crates/rill-policy/rules/) and
+applied as gitleaks applies them: a case-insensitive keyword prefilter
+chooses the rules to run, each rule's secret group and minimum entropy
+decide a match, rule and global allowlists (regexes, stopwords, paths)
+drop known non-secrets, and paths gitleaks never scans (lockfiles,
+vendored dependencies, images, binaries) are skipped. Two Rill detectors
+cover the credentials Rill itself issues (refresh tokens `ss_…`, SCIM
+credentials `scim_…`). Updating the rules is replacing the vendored file.
+The catalog compiles once per process, warmed at server start.
 
 A finding names the detector, the path, the line and a fingerprint (a keyed
 hash prefix of the matched text). The secret itself is never stored, logged,
@@ -138,7 +144,7 @@ Sealing is on by default outside dev mode (`[encryption] enabled`,
 
 ## Code
 
-* [`rill-policy/src/secrets/`](../../crates/rill-policy/src/secrets/): detectors, rules, the scanner.
+* [`rill-policy/src/secrets/`](../../crates/rill-policy/src/secrets/): the rule catalog, repository rules, the scanner; [`rill-policy/rules/`](../../crates/rill-policy/rules/): the vendored gitleaks rules.
 * [`rill-api/src/services/repo/secrets.rs`](../../crates/rill-api/src/services/repo/secrets.rs), [`commit.rs`](../../crates/rill-api/src/services/repo/commit.rs): scanning at commit.
 * [`rill-api/src/services/protection.rs`](../../crates/rill-api/src/services/protection.rs): `ProtectionService`.
 * [`rill-store/src/repo/quarantine.rs`](../../crates/rill-store/src/repo/quarantine.rs), [`redact.rs`](../../crates/rill-store/src/redact.rs).

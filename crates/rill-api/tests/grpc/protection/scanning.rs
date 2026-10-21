@@ -20,7 +20,7 @@ async fn a_planted_secret_is_blocked_at_every_write() {
     .unwrap_err();
     assert_eq!(inline.code(), Code::FailedPrecondition);
     assert!(
-        inline.message().contains("aws-access-key-id"),
+        inline.message().contains("aws-access-token"),
         "{}",
         inline.message()
     );
