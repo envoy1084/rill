@@ -18,6 +18,7 @@ use rill_types::{Principal, RepoPathBuf, Timestamp};
 use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult, Opened};
+use super::idem;
 use crate::auth::caller;
 use crate::error::{Error, Result};
 use crate::state::policy::{self, StoredPolicy};
@@ -183,7 +184,7 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::IssueTokenRequest>,
     ) -> GrpcResult<pb::IssueTokenResponse> {
-        let result: crate::error::Result<Response<pb::IssueTokenResponse>> = async {
+        let result: crate::error::Result<Response<pb::IssueTokenResponse>> = idem::once(&self.state, request, |request| async move {
             let ctx = caller(&request)?;
             let req = request.get_ref();
             if req.capabilities.is_empty() {
@@ -237,7 +238,7 @@ impl AdminService for AdminSvc {
                 token,
                 expires_at: timestamp_to_proto(expires_at),
             }))
-        }
+        })
         .await;
         result.map_err(Status::from)
     }
@@ -246,27 +247,28 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::AddRelationRequest>,
     ) -> GrpcResult<pb::AddRelationResponse> {
-        let result: crate::error::Result<Response<pb::AddRelationResponse>> = async {
-            let rel = request
-                .get_ref()
-                .relation
-                .clone()
-                .ok_or_else(|| Error::invalid("relation is required"))?;
-            let (repo, object) = parse_object(&rel.object)?;
-            let opened = self.open_named(&request, &repo).await?;
-            opened.permit().admin().await?;
-            opened
-                .repo
-                .authorizer
-                .grant(
-                    &object,
-                    parse_relation(&rel.relation)?,
-                    &parse_subject(&rel.subject)?,
-                )
-                .await?;
-            Ok(Response::new(pb::AddRelationResponse {}))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::AddRelationResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let rel = request
+                    .get_ref()
+                    .relation
+                    .clone()
+                    .ok_or_else(|| Error::invalid("relation is required"))?;
+                let (repo, object) = parse_object(&rel.object)?;
+                let opened = self.open_named(&request, &repo).await?;
+                opened.permit().admin().await?;
+                opened
+                    .repo
+                    .authorizer
+                    .grant(
+                        &object,
+                        parse_relation(&rel.relation)?,
+                        &parse_subject(&rel.subject)?,
+                    )
+                    .await?;
+                Ok(Response::new(pb::AddRelationResponse {}))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -274,27 +276,28 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::RemoveRelationRequest>,
     ) -> GrpcResult<pb::RemoveRelationResponse> {
-        let result: crate::error::Result<Response<pb::RemoveRelationResponse>> = async {
-            let rel = request
-                .get_ref()
-                .relation
-                .clone()
-                .ok_or_else(|| Error::invalid("relation is required"))?;
-            let (repo, object) = parse_object(&rel.object)?;
-            let opened = self.open_named(&request, &repo).await?;
-            opened.permit().admin().await?;
-            opened
-                .repo
-                .authorizer
-                .revoke(
-                    &object,
-                    parse_relation(&rel.relation)?,
-                    &parse_subject(&rel.subject)?,
-                )
-                .await?;
-            Ok(Response::new(pb::RemoveRelationResponse {}))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::RemoveRelationResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let rel = request
+                    .get_ref()
+                    .relation
+                    .clone()
+                    .ok_or_else(|| Error::invalid("relation is required"))?;
+                let (repo, object) = parse_object(&rel.object)?;
+                let opened = self.open_named(&request, &repo).await?;
+                opened.permit().admin().await?;
+                opened
+                    .repo
+                    .authorizer
+                    .revoke(
+                        &object,
+                        parse_relation(&rel.relation)?,
+                        &parse_subject(&rel.subject)?,
+                    )
+                    .await?;
+                Ok(Response::new(pb::RemoveRelationResponse {}))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -359,24 +362,25 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::SetPolicyRequest>,
     ) -> GrpcResult<pb::SetPolicyResponse> {
-        let result: crate::error::Result<Response<pb::SetPolicyResponse>> = async {
-            let (repo, name) = parse_policy_name(&request.get_ref().name)?;
-            let opened = self.open_named(&request, &repo).await?;
-            opened.permit().admin().await?;
-            let text = request.get_ref().text.clone();
-            policy::validate(&name, &text)?;
-            let stored = StoredPolicy {
-                text,
-                updated_at: Timestamp::now(),
-                updated_by: opened.principal().clone(),
-            };
-            policy::store(&opened.repo.repo, &name, &stored).await?;
-            opened.repo.reload_policy().await?;
-            Ok(Response::new(pb::SetPolicyResponse {
-                updated_at: timestamp_to_proto(stored.updated_at),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::SetPolicyResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let (repo, name) = parse_policy_name(&request.get_ref().name)?;
+                let opened = self.open_named(&request, &repo).await?;
+                opened.permit().admin().await?;
+                let text = request.get_ref().text.clone();
+                policy::validate(&name, &text)?;
+                let stored = StoredPolicy {
+                    text,
+                    updated_at: Timestamp::now(),
+                    updated_by: opened.principal().clone(),
+                };
+                policy::store(&opened.repo.repo, &name, &stored).await?;
+                opened.repo.reload_policy().await?;
+                Ok(Response::new(pb::SetPolicyResponse {
+                    updated_at: timestamp_to_proto(stored.updated_at),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -384,9 +388,10 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::CreateOrgRequest>,
     ) -> GrpcResult<pb::CreateOrgResponse> {
-        Ok(Response::new(
-            super::orgs::create(&self.state, request).await?,
-        ))
+        Ok(idem::once(&self.state, request, |r| async move {
+            Ok(Response::new(super::orgs::create(&self.state, r).await?))
+        })
+        .await?)
     }
 
     async fn list_orgs(

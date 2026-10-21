@@ -4,6 +4,7 @@
 pub mod admin;
 pub mod common;
 pub mod diff;
+pub mod idem;
 pub mod intent;
 pub mod lander;
 pub mod orgs;

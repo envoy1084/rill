@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult};
+use super::idem;
 use crate::error::{Error, Result};
 use crate::state::{AppState, RepoContext};
 
@@ -253,42 +254,45 @@ impl LanderService for LanderSvc {
         &self,
         request: Request<pb::ReportVerificationRequest>,
     ) -> GrpcResult<pb::ReportVerificationResponse> {
-        let result: crate::error::Result<Response<pb::ReportVerificationResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().land().await?;
-            let req = request.get_ref();
-            let ctx = &opened.repo;
-            let seq = TrunkSeq(req.seq);
-            if ctx.repo.trunk_at(seq).await?.is_none() {
-                return Err(Error::not_found(format!("nothing landed at {seq}")));
-            }
-            if req.target.is_empty() {
-                return Err(Error::invalid("target is required"));
-            }
-            pb::VerificationStatus::try_from(req.status)
-                .ok()
-                .filter(|s| *s != pb::VerificationStatus::Unspecified)
-                .ok_or_else(|| {
-                    Error::invalid(format!("unknown verification status {}", req.status))
-                })?;
-            let mut reports = load_reports(ctx, seq).await?;
-            // One report per (target, reporter): a re-run replaces its earlier
-            // result rather than appending a contradictory one.
-            reports.retain(|r| !(r.target == req.target && r.reporter.id == opened.principal().id));
-            reports.push(Report {
-                target: req.target.clone(),
-                status: req.status,
-                reporter: opened.principal().clone(),
-                reported_at: Timestamp::now(),
-                details: req.details.clone(),
-                artifact: req.artifact.as_ref().map(|a| a.to_vec()),
-            });
-            store_reports(ctx, seq, &reports).await?;
-            Ok(Response::new(pb::ReportVerificationResponse {
-                result: Some(verification_result(ctx, seq).await?),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::ReportVerificationResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().land().await?;
+                let req = request.get_ref();
+                let ctx = &opened.repo;
+                let seq = TrunkSeq(req.seq);
+                if ctx.repo.trunk_at(seq).await?.is_none() {
+                    return Err(Error::not_found(format!("nothing landed at {seq}")));
+                }
+                if req.target.is_empty() {
+                    return Err(Error::invalid("target is required"));
+                }
+                pb::VerificationStatus::try_from(req.status)
+                    .ok()
+                    .filter(|s| *s != pb::VerificationStatus::Unspecified)
+                    .ok_or_else(|| {
+                        Error::invalid(format!("unknown verification status {}", req.status))
+                    })?;
+                let mut reports = load_reports(ctx, seq).await?;
+                // One report per (target, reporter): a re-run replaces its earlier
+                // result rather than appending a contradictory one.
+                reports.retain(|r| {
+                    !(r.target == req.target && r.reporter.id == opened.principal().id)
+                });
+                reports.push(Report {
+                    target: req.target.clone(),
+                    status: req.status,
+                    reporter: opened.principal().clone(),
+                    reported_at: Timestamp::now(),
+                    details: req.details.clone(),
+                    artifact: req.artifact.as_ref().map(|a| a.to_vec()),
+                });
+                store_reports(ctx, seq, &reports).await?;
+                Ok(Response::new(pb::ReportVerificationResponse {
+                    result: Some(verification_result(ctx, seq).await?),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -296,62 +300,64 @@ impl LanderService for LanderSvc {
         &self,
         request: Request<pb::RevertSeqRequest>,
     ) -> GrpcResult<pb::RevertSeqResponse> {
-        let result: crate::error::Result<Response<pb::RevertSeqResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().land().await?;
-            let req = request.get_ref();
-            let seq = TrunkSeq(req.seq);
-            let reason = if req.reason.is_empty() {
-                "reverted via RevertSeq".to_string()
-            } else {
-                req.reason.clone()
-            };
-            let outcome = rill_lander::revert(
-                &opened.repo.lander,
-                seq,
-                &reason,
-                opened.principal().clone(),
-            )
-            .await?;
-            let landing = common::land_event(&opened.repo, outcome.seq, outcome.hash).await?;
-            Ok(Response::new(pb::RevertSeqResponse {
-                landing: Some(landing),
-                version: Some(pb::ChangeVersion::from(outcome.version)),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::RevertSeqResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().land().await?;
+                let req = request.get_ref();
+                let seq = TrunkSeq(req.seq);
+                let reason = if req.reason.is_empty() {
+                    "reverted via RevertSeq".to_string()
+                } else {
+                    req.reason.clone()
+                };
+                let outcome = rill_lander::revert(
+                    &opened.repo.lander,
+                    seq,
+                    &reason,
+                    opened.principal().clone(),
+                )
+                .await?;
+                let landing = common::land_event(&opened.repo, outcome.seq, outcome.hash).await?;
+                Ok(Response::new(pb::RevertSeqResponse {
+                    landing: Some(landing),
+                    version: Some(pb::ChangeVersion::from(outcome.version)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
     async fn bisect(&self, request: Request<pb::BisectRequest>) -> GrpcResult<pb::BisectResponse> {
-        let result: crate::error::Result<Response<pb::BisectResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().land().await?;
-            let req = request.get_ref();
-            let ctx = &opened.repo;
-            let postland = ctx.postland.clone().ok_or_else(|| {
-                Error::precondition(
-                    "post-land verification is disabled; enable `postland` to bisect",
-                )
-            })?;
-            if req.to <= req.from {
-                return Err(Error::invalid("to must be greater than from"));
-            }
-            let culprit = postland
-                .bisect(TrunkSeq(req.from), TrunkSeq(req.to))
-                .await?;
-            let mut tested = Vec::new();
-            for seq in req.from + 1..=req.to {
-                if record_at(&ctx.repo, TrunkSeq(seq)).await?.is_some() {
-                    tested.push(verification_result(ctx, TrunkSeq(seq)).await?);
+        let result: crate::error::Result<Response<pb::BisectResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().land().await?;
+                let req = request.get_ref();
+                let ctx = &opened.repo;
+                let postland = ctx.postland.clone().ok_or_else(|| {
+                    Error::precondition(
+                        "post-land verification is disabled; enable `postland` to bisect",
+                    )
+                })?;
+                if req.to <= req.from {
+                    return Err(Error::invalid("to must be greater than from"));
                 }
-            }
-            Ok(Response::new(pb::BisectResponse {
-                culprit: Some(culprit.get()),
-                tested,
-            }))
-        }
-        .await;
+                let culprit = postland
+                    .bisect(TrunkSeq(req.from), TrunkSeq(req.to))
+                    .await?;
+                let mut tested = Vec::new();
+                for seq in req.from + 1..=req.to {
+                    if record_at(&ctx.repo, TrunkSeq(seq)).await?.is_some() {
+                        tested.push(verification_result(ctx, TrunkSeq(seq)).await?);
+                    }
+                }
+                Ok(Response::new(pb::BisectResponse {
+                    culprit: Some(culprit.get()),
+                    tested,
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 }

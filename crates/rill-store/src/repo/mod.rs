@@ -2,6 +2,7 @@
 
 mod codec;
 mod derived;
+mod idem;
 mod orgs;
 mod quota;
 mod records;
@@ -13,6 +14,7 @@ mod trunk;
 mod versions;
 
 pub use codec::{decode_record, decode_tagged, encode_record, encode_tagged};
+pub use idem::{Claim, CLAIM_TTL_MS, IDEM_TTL_MS};
 pub use orgs::{validate_org_name, validate_repo_name, OrgConfig, DEFAULT_ORG};
 pub use quota::{day_of, metric, QUOTA_SHARDS};
 pub use reviews::ReviewSnapshot;

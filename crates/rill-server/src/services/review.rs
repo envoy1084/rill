@@ -21,6 +21,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult, Opened};
+use super::idem;
 use crate::error::{Error, Result};
 use crate::state::{AppState, RepoEvent};
 
@@ -118,51 +119,54 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::SubmitForReviewRequest>,
     ) -> GrpcResult<pb::SubmitForReviewResponse> {
-        let result: crate::error::Result<Response<pb::SubmitForReviewResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().write(&RepoPathBuf::root()).await?;
-            let id = change_id(&request.get_ref().change_id)?;
-            let state = opened.repo.review().submit(&id, opened.principal()).await?;
-            Ok(Response::new(pb::SubmitForReviewResponse {
-                review: Some(review_response(state)),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::SubmitForReviewResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().write(&RepoPathBuf::root()).await?;
+                let id = change_id(&request.get_ref().change_id)?;
+                let state = opened.repo.review().submit(&id, opened.principal()).await?;
+                Ok(Response::new(pb::SubmitForReviewResponse {
+                    review: Some(review_response(state)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
     async fn vote(&self, request: Request<pb::VoteRequest>) -> GrpcResult<pb::VoteResponse> {
-        let result: crate::error::Result<Response<pb::VoteResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().review().await?;
-            let req = request.get_ref();
-            let id = change_id(&req.change_id)?;
-            let value = i8::try_from(req.value)
-                .map_err(|_| Error::invalid(format!("vote value {} out of range", req.value)))?;
-            if let Some(version) = common::opt_hash("version", req.version.as_ref())? {
-                let current = opened.repo.review().get(&id).await?.current_version();
-                if current != Some(version) {
-                    return Err(Error::precondition(format!(
-                        "version {version} is not the current version of {id}"
-                    )));
+        let result: crate::error::Result<Response<pb::VoteResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().review().await?;
+                let req = request.get_ref();
+                let id = change_id(&req.change_id)?;
+                let value = i8::try_from(req.value).map_err(|_| {
+                    Error::invalid(format!("vote value {} out of range", req.value))
+                })?;
+                if let Some(version) = common::opt_hash("version", req.version.as_ref())? {
+                    let current = opened.repo.review().get(&id).await?.current_version();
+                    if current != Some(version) {
+                        return Err(Error::precondition(format!(
+                            "version {version} is not the current version of {id}"
+                        )));
+                    }
                 }
-            }
-            let state = opened
-                .repo
-                .review()
-                .vote(
-                    &id,
-                    opened.principal(),
-                    &req.label,
-                    value,
-                    req.reason.clone(),
-                )
-                .await?;
-            Ok(Response::new(pb::VoteResponse {
-                review: Some(review_response(state)),
-            }))
-        }
-        .await;
+                let state = opened
+                    .repo
+                    .review()
+                    .vote(
+                        &id,
+                        opened.principal(),
+                        &req.label,
+                        value,
+                        req.reason.clone(),
+                    )
+                    .await?;
+                Ok(Response::new(pb::VoteResponse {
+                    review: Some(review_response(state)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -170,44 +174,45 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::CommentRequest>,
     ) -> GrpcResult<pb::CommentResponse> {
-        let result: crate::error::Result<Response<pb::CommentResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().review().await?;
-            let req = request.into_inner();
-            let id = change_id(&req.change_id)?;
-            let anchor = match req.anchor {
-                Some(a) => ThreadAnchor::try_from(a)?,
-                None => ThreadAnchor::Change,
-            };
-            let category = req
-                .category
-                .map(|c| comment_category_from_proto("category", c))
-                .transpose()?;
-            let confidence = req
-                .confidence
-                .map(|c| confidence_from_proto("confidence", c))
-                .transpose()?;
-            let to = req.to.map(Principal::try_from).transpose()?;
-            let thread_id = opened
-                .repo
-                .review()
-                .comment(
-                    &id,
-                    opened.principal(),
-                    anchor,
-                    req.body,
-                    category,
-                    confidence,
-                    to,
-                )
-                .await?;
-            let thread = thread_of(&opened, &id, &thread_id).await?;
-            Ok(Response::new(pb::CommentResponse {
-                thread_id,
-                thread: Some(thread),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::CommentResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().review().await?;
+                let req = request.into_inner();
+                let id = change_id(&req.change_id)?;
+                let anchor = match req.anchor {
+                    Some(a) => ThreadAnchor::try_from(a)?,
+                    None => ThreadAnchor::Change,
+                };
+                let category = req
+                    .category
+                    .map(|c| comment_category_from_proto("category", c))
+                    .transpose()?;
+                let confidence = req
+                    .confidence
+                    .map(|c| confidence_from_proto("confidence", c))
+                    .transpose()?;
+                let to = req.to.map(Principal::try_from).transpose()?;
+                let thread_id = opened
+                    .repo
+                    .review()
+                    .comment(
+                        &id,
+                        opened.principal(),
+                        anchor,
+                        req.body,
+                        category,
+                        confidence,
+                        to,
+                    )
+                    .await?;
+                let thread = thread_of(&opened, &id, &thread_id).await?;
+                Ok(Response::new(pb::CommentResponse {
+                    thread_id,
+                    thread: Some(thread),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -215,32 +220,33 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::ReplyThreadRequest>,
     ) -> GrpcResult<pb::ReplyThreadResponse> {
-        let result: crate::error::Result<Response<pb::ReplyThreadResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().review().await?;
-            let req = request.into_inner();
-            let id = change_id(&req.change_id)?;
-            let meta = CommentMeta {
-                category: req
-                    .category
-                    .map(|c| comment_category_from_proto("category", c))
-                    .transpose()?,
-                confidence: req
-                    .confidence
-                    .map(|c| confidence_from_proto("confidence", c))
-                    .transpose()?,
-            };
-            opened
-                .repo
-                .review()
-                .reply(&id, &req.thread_id, opened.principal(), req.body, meta)
-                .await?;
-            let thread = thread_of(&opened, &id, &req.thread_id).await?;
-            Ok(Response::new(pb::ReplyThreadResponse {
-                thread: Some(thread),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::ReplyThreadResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().review().await?;
+                let req = request.into_inner();
+                let id = change_id(&req.change_id)?;
+                let meta = CommentMeta {
+                    category: req
+                        .category
+                        .map(|c| comment_category_from_proto("category", c))
+                        .transpose()?,
+                    confidence: req
+                        .confidence
+                        .map(|c| confidence_from_proto("confidence", c))
+                        .transpose()?,
+                };
+                opened
+                    .repo
+                    .review()
+                    .reply(&id, &req.thread_id, opened.principal(), req.body, meta)
+                    .await?;
+                let thread = thread_of(&opened, &id, &req.thread_id).await?;
+                Ok(Response::new(pb::ReplyThreadResponse {
+                    thread: Some(thread),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -248,25 +254,26 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::ResolveThreadRequest>,
     ) -> GrpcResult<pb::ResolveThreadResponse> {
-        let result: crate::error::Result<Response<pb::ResolveThreadResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().review().await?;
-            let req = request.get_ref();
-            let id = change_id(&req.change_id)?;
-            let review = opened.repo.review();
-            if req.resolved {
-                review
-                    .resolve(&id, &req.thread_id, opened.principal())
-                    .await?;
-            } else {
-                review.unresolve(&id, &req.thread_id).await?;
-            }
-            let thread = thread_of(&opened, &id, &req.thread_id).await?;
-            Ok(Response::new(pb::ResolveThreadResponse {
-                thread: Some(thread),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::ResolveThreadResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().review().await?;
+                let req = request.get_ref();
+                let id = change_id(&req.change_id)?;
+                let review = opened.repo.review();
+                if req.resolved {
+                    review
+                        .resolve(&id, &req.thread_id, opened.principal())
+                        .await?;
+                } else {
+                    review.unresolve(&id, &req.thread_id).await?;
+                }
+                let thread = thread_of(&opened, &id, &req.thread_id).await?;
+                Ok(Response::new(pb::ResolveThreadResponse {
+                    thread: Some(thread),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -274,16 +281,18 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::SetStackRequest>,
     ) -> GrpcResult<pb::SetStackResponse> {
-        let result: crate::error::Result<Response<pb::SetStackResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().write(&RepoPathBuf::root()).await?;
-            let ids: Vec<ChangeId> = ids_from_proto("change_ids", &request.get_ref().change_ids)?;
-            let states = opened.repo.review().set_stack(&ids).await?;
-            Ok(Response::new(pb::SetStackResponse {
-                reviews: states.into_iter().map(review_response).collect(),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::SetStackResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().write(&RepoPathBuf::root()).await?;
+                let ids: Vec<ChangeId> =
+                    ids_from_proto("change_ids", &request.get_ref().change_ids)?;
+                let states = opened.repo.review().set_stack(&ids).await?;
+                Ok(Response::new(pb::SetStackResponse {
+                    reviews: states.into_iter().map(review_response).collect(),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -316,33 +325,34 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::AbandonRequest>,
     ) -> GrpcResult<pb::AbandonResponse> {
-        let result: crate::error::Result<Response<pb::AbandonResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().write(&RepoPathBuf::root()).await?;
-            let req = request.get_ref();
-            let id = change_id(&req.change_id)?;
-            let review = opened.repo.review();
-            let current = review.get(&id).await?;
-            opened.permit().owns_or_admin(&current.owner).await?;
-            let state = review.abandon(&id, opened.principal()).await?;
-            if let Some(reason) = req.reason.clone().filter(|r| !r.is_empty()) {
-                review
-                    .comment(
-                        &id,
-                        opened.principal(),
-                        ThreadAnchor::Change,
-                        format!("Abandoned: {reason}"),
-                        None,
-                        None,
-                        None,
-                    )
-                    .await?;
-            }
-            Ok(Response::new(pb::AbandonResponse {
-                review: Some(review_response(state)),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::AbandonResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().write(&RepoPathBuf::root()).await?;
+                let req = request.get_ref();
+                let id = change_id(&req.change_id)?;
+                let review = opened.repo.review();
+                let current = review.get(&id).await?;
+                opened.permit().owns_or_admin(&current.owner).await?;
+                let state = review.abandon(&id, opened.principal()).await?;
+                if let Some(reason) = req.reason.clone().filter(|r| !r.is_empty()) {
+                    review
+                        .comment(
+                            &id,
+                            opened.principal(),
+                            ThreadAnchor::Change,
+                            format!("Abandoned: {reason}"),
+                            None,
+                            None,
+                            None,
+                        )
+                        .await?;
+                }
+                Ok(Response::new(pb::AbandonResponse {
+                    review: Some(review_response(state)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -352,53 +362,54 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::RequestLandRequest>,
     ) -> GrpcResult<pb::RequestLandResponse> {
-        let result: crate::error::Result<Response<pb::RequestLandResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().land().await?;
-            let id = change_id(&request.get_ref().change_id)?;
-            let review = opened.repo.review();
-            let state = review.get(&id).await?;
-            match state.status {
-                ReviewStatus::Landed => {
-                    return Err(Error::precondition(format!("change {id} already landed")))
+        let result: crate::error::Result<Response<pb::RequestLandResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().land().await?;
+                let id = change_id(&request.get_ref().change_id)?;
+                let review = opened.repo.review();
+                let state = review.get(&id).await?;
+                match state.status {
+                    ReviewStatus::Landed => {
+                        return Err(Error::precondition(format!("change {id} already landed")))
+                    }
+                    ReviewStatus::Landing => {
+                        return Err(Error::precondition(format!(
+                            "change {id} is already landing"
+                        )))
+                    }
+                    ReviewStatus::Abandoned => {
+                        return Err(Error::precondition(format!("change {id} is abandoned")))
+                    }
+                    _ => {}
                 }
-                ReviewStatus::Landing => {
+                let decision = review.evaluate_for(&state, opened.principal()).await?;
+                if !decision.allowed {
                     return Err(Error::precondition(format!(
-                        "change {id} is already landing"
-                    )))
+                        "submit policy does not allow landing: {}",
+                        decision.reasons.join("; ")
+                    )));
                 }
-                ReviewStatus::Abandoned => {
-                    return Err(Error::precondition(format!("change {id} is abandoned")))
-                }
-                _ => {}
-            }
-            let decision = review.evaluate_for(&state, opened.principal()).await?;
-            if !decision.allowed {
-                return Err(Error::precondition(format!(
-                    "submit policy does not allow landing: {}",
-                    decision.reasons.join("; ")
-                )));
-            }
-            let version = state
-                .current_version()
-                .ok_or_else(|| Error::precondition(format!("change {id} has no versions")))?;
-            let ticket = opened
-                .repo
-                .lander
-                .enqueue(LandRequest::new(
-                    id,
-                    version,
-                    opened.principal().clone(),
-                    state.risk,
-                ))
-                .await;
-            common::remember_ticket(&opened.repo, ticket, id);
-            let (proto, _) = common::ticket_status(&opened.repo, ticket).await?;
-            Ok(Response::new(pb::RequestLandResponse {
-                ticket: Some(proto),
-            }))
-        }
-        .await;
+                let version = state
+                    .current_version()
+                    .ok_or_else(|| Error::precondition(format!("change {id} has no versions")))?;
+                let ticket = opened
+                    .repo
+                    .lander
+                    .enqueue(LandRequest::new(
+                        id,
+                        version,
+                        opened.principal().clone(),
+                        state.risk,
+                    ))
+                    .await;
+                common::remember_ticket(&opened.repo, ticket, id);
+                let (proto, _) = common::ticket_status(&opened.repo, ticket).await?;
+                Ok(Response::new(pb::RequestLandResponse {
+                    ticket: Some(proto),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 

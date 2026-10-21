@@ -13,6 +13,7 @@ use rill_types::{ChangeId, Intent, IntentId, IntentKind, IntentStatus, RepoPathB
 use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult, Opened};
+use super::idem;
 use crate::error::{Error, Result};
 use crate::state::AppState;
 
@@ -45,32 +46,33 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::CreateIntentRequest>,
     ) -> GrpcResult<pb::CreateIntentResponse> {
-        let result: crate::error::Result<Response<pb::CreateIntentResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().write(&RepoPathBuf::root()).await?;
-            let req = request.into_inner();
-            if req.title.trim().is_empty() {
-                return Err(Error::invalid("title is required"));
-            }
-            let kind = intent_kind_from_proto("kind", req.kind).unwrap_or(IntentKind::Feature);
-            let mut intent = Intent::new(req.title, kind, opened.principal().clone());
-            intent.body = req.body;
-            intent.parent = opt_id_from_proto("parent", req.parent.as_ref())?;
-            intent.risk_override = req
-                .risk_override
-                .map(|r| risk_from_proto("risk_override", r))
-                .transpose()?;
-            if let Some(parent) = intent.parent {
-                if opened.repo.repo.get_intent(&parent).await?.is_none() {
-                    return Err(Error::not_found(format!("parent intent {parent}")));
+        let result: crate::error::Result<Response<pb::CreateIntentResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().write(&RepoPathBuf::root()).await?;
+                let req = request.into_inner();
+                if req.title.trim().is_empty() {
+                    return Err(Error::invalid("title is required"));
                 }
-            }
-            opened.repo.repo.put_intent(&intent).await?;
-            Ok(Response::new(pb::CreateIntentResponse {
-                intent: Some(pb::Intent::from(intent)),
-            }))
-        }
-        .await;
+                let kind = intent_kind_from_proto("kind", req.kind).unwrap_or(IntentKind::Feature);
+                let mut intent = Intent::new(req.title, kind, opened.principal().clone());
+                intent.body = req.body;
+                intent.parent = opt_id_from_proto("parent", req.parent.as_ref())?;
+                intent.risk_override = req
+                    .risk_override
+                    .map(|r| risk_from_proto("risk_override", r))
+                    .transpose()?;
+                if let Some(parent) = intent.parent {
+                    if opened.repo.repo.get_intent(&parent).await?.is_none() {
+                        return Err(Error::not_found(format!("parent intent {parent}")));
+                    }
+                }
+                opened.repo.repo.put_intent(&intent).await?;
+                Ok(Response::new(pb::CreateIntentResponse {
+                    intent: Some(pb::Intent::from(intent)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -94,43 +96,44 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::UpdateIntentRequest>,
     ) -> GrpcResult<pb::UpdateIntentResponse> {
-        let result: crate::error::Result<Response<pb::UpdateIntentResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().write(&RepoPathBuf::root()).await?;
-            let req = request.into_inner();
-            let mut intent = load(&opened, &req.id).await?;
-            opened.permit().owns_or_admin(&intent.owner).await?;
-            if let Some(title) = req.title {
-                intent.title = title;
-            }
-            if let Some(body) = req.body {
-                intent.body = body;
-            }
-            if let Some(status) = req.status {
-                intent.status = intent_status_from_proto("status", status)?;
-            }
-            if req.clear_parent {
-                intent.parent = None;
-            } else if let Some(parent) =
-                opt_id_from_proto::<IntentId>("parent", req.parent.as_ref())?
-            {
-                if parent == intent.id {
-                    return Err(Error::invalid("an intent cannot be its own parent"));
+        let result: crate::error::Result<Response<pb::UpdateIntentResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().write(&RepoPathBuf::root()).await?;
+                let req = request.into_inner();
+                let mut intent = load(&opened, &req.id).await?;
+                opened.permit().owns_or_admin(&intent.owner).await?;
+                if let Some(title) = req.title {
+                    intent.title = title;
                 }
-                intent.parent = Some(parent);
-            }
-            if req.clear_risk_override {
-                intent.risk_override = None;
-            } else if let Some(risk) = req.risk_override {
-                intent.risk_override = Some(risk_from_proto("risk_override", risk)?);
-            }
-            intent.updated_at = Timestamp::now();
-            opened.repo.repo.put_intent(&intent).await?;
-            Ok(Response::new(pb::UpdateIntentResponse {
-                intent: Some(pb::Intent::from(intent)),
-            }))
-        }
-        .await;
+                if let Some(body) = req.body {
+                    intent.body = body;
+                }
+                if let Some(status) = req.status {
+                    intent.status = intent_status_from_proto("status", status)?;
+                }
+                if req.clear_parent {
+                    intent.parent = None;
+                } else if let Some(parent) =
+                    opt_id_from_proto::<IntentId>("parent", req.parent.as_ref())?
+                {
+                    if parent == intent.id {
+                        return Err(Error::invalid("an intent cannot be its own parent"));
+                    }
+                    intent.parent = Some(parent);
+                }
+                if req.clear_risk_override {
+                    intent.risk_override = None;
+                } else if let Some(risk) = req.risk_override {
+                    intent.risk_override = Some(risk_from_proto("risk_override", risk)?);
+                }
+                intent.updated_at = Timestamp::now();
+                opened.repo.repo.put_intent(&intent).await?;
+                Ok(Response::new(pb::UpdateIntentResponse {
+                    intent: Some(pb::Intent::from(intent)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -180,42 +183,43 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::LinkChangeRequest>,
     ) -> GrpcResult<pb::LinkChangeResponse> {
-        let result: crate::error::Result<Response<pb::LinkChangeResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            opened.permit().write(&RepoPathBuf::root()).await?;
-            let req = request.get_ref();
-            let mut intent = load(&opened, &req.intent).await?;
-            let change_id: ChangeId = id_from_proto("change_id", &req.change_id)?;
-            if opened
-                .repo
-                .repo
-                .change_versions(&change_id)
-                .await?
-                .is_empty()
-            {
-                return Err(Error::not_found(format!("change {change_id}")));
-            }
-            if !intent.changes.contains(&change_id) {
-                intent.changes.push(change_id);
-                intent.updated_at = Timestamp::now();
-                if intent.status == IntentStatus::Open {
-                    intent.status = IntentStatus::InProgress;
+        let result: crate::error::Result<Response<pb::LinkChangeResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                opened.permit().write(&RepoPathBuf::root()).await?;
+                let req = request.get_ref();
+                let mut intent = load(&opened, &req.intent).await?;
+                let change_id: ChangeId = id_from_proto("change_id", &req.change_id)?;
+                if opened
+                    .repo
+                    .repo
+                    .change_versions(&change_id)
+                    .await?
+                    .is_empty()
+                {
+                    return Err(Error::not_found(format!("change {change_id}")));
                 }
-                opened.repo.repo.put_intent(&intent).await?;
-            }
-            if let Some(prev) = opened.repo.repo.read_review(&change_id).await? {
-                if prev.state.intent != Some(intent.id) {
-                    let mut next = prev.state.clone();
-                    next.intent = Some(intent.id);
-                    next.updated_at = Timestamp::now();
-                    opened.repo.repo.write_review(&prev, &next).await?;
+                if !intent.changes.contains(&change_id) {
+                    intent.changes.push(change_id);
+                    intent.updated_at = Timestamp::now();
+                    if intent.status == IntentStatus::Open {
+                        intent.status = IntentStatus::InProgress;
+                    }
+                    opened.repo.repo.put_intent(&intent).await?;
                 }
-            }
-            Ok(Response::new(pb::LinkChangeResponse {
-                intent: Some(pb::Intent::from(intent)),
-            }))
-        }
-        .await;
+                if let Some(prev) = opened.repo.repo.read_review(&change_id).await? {
+                    if prev.state.intent != Some(intent.id) {
+                        let mut next = prev.state.clone();
+                        next.intent = Some(intent.id);
+                        next.updated_at = Timestamp::now();
+                        opened.repo.repo.write_review(&prev, &next).await?;
+                    }
+                }
+                Ok(Response::new(pb::LinkChangeResponse {
+                    intent: Some(pb::Intent::from(intent)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 

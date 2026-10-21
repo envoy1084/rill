@@ -54,7 +54,10 @@ impl RepoService for RepoSvc {
         &self,
         request: Request<pb::CreateRepoRequest>,
     ) -> GrpcResult<pb::CreateRepoResponse> {
-        Ok(Response::new(self.create_repo_impl(request).await?))
+        Ok(super::idem::once(&self.state, request, |r| async move {
+            Ok(Response::new(self.create_repo_impl(r).await?))
+        })
+        .await?)
     }
     async fn get_change_version(
         &self,
@@ -149,27 +152,40 @@ impl RepoService for RepoSvc {
         &self,
         request: Request<pb::CreateChangeVersionRequest>,
     ) -> GrpcResult<pb::CreateChangeVersionResponse> {
-        Ok(Response::new(
-            self.create_change_version_impl(request).await?,
-        ))
+        Ok(super::idem::once(&self.state, request, |r| async move {
+            Ok(Response::new(self.create_change_version_impl(r).await?))
+        })
+        .await?)
     }
     async fn apply_edits(
         &self,
         request: Request<pb::ApplyEditsRequest>,
     ) -> GrpcResult<pb::ApplyEditsResponse> {
-        Ok(Response::new(self.apply_edits_impl(request).await?))
+        Ok(super::idem::once(&self.state, request, |r| async move {
+            Ok(Response::new(self.apply_edits_impl(r).await?))
+        })
+        .await?)
     }
     async fn rebase(&self, request: Request<pb::RebaseRequest>) -> GrpcResult<pb::RebaseResponse> {
-        Ok(Response::new(self.rebase_impl(request).await?))
+        Ok(super::idem::once(&self.state, request, |r| async move {
+            Ok(Response::new(self.rebase_impl(r).await?))
+        })
+        .await?)
     }
     async fn merge(&self, request: Request<pb::MergeRequest>) -> GrpcResult<pb::MergeResponse> {
-        Ok(Response::new(self.merge_impl(request).await?))
+        Ok(super::idem::once(&self.state, request, |r| async move {
+            Ok(Response::new(self.merge_impl(r).await?))
+        })
+        .await?)
     }
     async fn resolve(
         &self,
         request: Request<pb::ResolveRequest>,
     ) -> GrpcResult<pb::ResolveResponse> {
-        Ok(Response::new(self.resolve_impl(request).await?))
+        Ok(super::idem::once(&self.state, request, |r| async move {
+            Ok(Response::new(self.resolve_impl(r).await?))
+        })
+        .await?)
     }
     async fn resolve_ref(
         &self,
@@ -187,7 +203,10 @@ impl RepoService for RepoSvc {
         &self,
         request: Request<pb::MoveRefRequest>,
     ) -> GrpcResult<pb::MoveRefResponse> {
-        Ok(Response::new(self.move_ref_impl(request).await?))
+        Ok(super::idem::once(&self.state, request, |r| async move {
+            Ok(Response::new(self.move_ref_impl(r).await?))
+        })
+        .await?)
     }
     async fn trunk_head(
         &self,

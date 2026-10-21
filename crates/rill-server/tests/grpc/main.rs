@@ -5,6 +5,7 @@ mod auth;
 mod commits;
 mod end_to_end;
 mod orgs;
+mod retries;
 mod workspaces;
 
 use std::sync::Arc;

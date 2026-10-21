@@ -20,6 +20,7 @@ use tonic::{Request, Response, Status};
 
 use super::common::{self, open, operation_id, provenance, resolve_version, GrpcResult, Opened};
 use super::diff::{file_diffs, DiffOptions};
+use super::idem;
 use super::repo::{commit_version, version_from_diff};
 use crate::error::{Error, Result};
 use crate::state::AppState;
@@ -121,47 +122,48 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::CreateWorkspaceRequest>,
     ) -> GrpcResult<pb::CreateWorkspaceResponse> {
-        let result: crate::error::Result<Response<pb::CreateWorkspaceResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            let req = request.into_inner();
-            opened.permit().write(&RepoPathBuf::root()).await?;
-            let base = resolve_version(&opened.repo, req.base.as_ref())
-                .await?
-                .unwrap_or(ObjectHash::ZERO);
-            let sparse = match req.sparse {
-                Some(s) => SparseProfile::try_from(s)?,
-                None => SparseProfile::full(),
-            };
-            let now = Timestamp::now();
-            let mut ws = Workspace {
-                id: WorkspaceId::new(),
-                repo: opened.repo.id(),
-                owner: opened.principal().clone(),
-                name: req.name,
-                base,
-                working_change: ChangeId::new(),
-                snapshot: None,
-                sparse,
-                head_op: None,
-                created_at: now,
-                updated_at: now,
-            };
-            let op = self
-                .record(
-                    &opened,
-                    None,
-                    &mut ws,
-                    operation_id(&req.operation_id)?,
-                    OperationKind::Create,
-                )
-                .await?;
-            let (workspace, operation) = response_pair(&ws, &op);
-            Ok(Response::new(pb::CreateWorkspaceResponse {
-                workspace,
-                operation,
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::CreateWorkspaceResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                let req = request.into_inner();
+                opened.permit().write(&RepoPathBuf::root()).await?;
+                let base = resolve_version(&opened.repo, req.base.as_ref())
+                    .await?
+                    .unwrap_or(ObjectHash::ZERO);
+                let sparse = match req.sparse {
+                    Some(s) => SparseProfile::try_from(s)?,
+                    None => SparseProfile::full(),
+                };
+                let now = Timestamp::now();
+                let mut ws = Workspace {
+                    id: WorkspaceId::new(),
+                    repo: opened.repo.id(),
+                    owner: opened.principal().clone(),
+                    name: req.name,
+                    base,
+                    working_change: ChangeId::new(),
+                    snapshot: None,
+                    sparse,
+                    head_op: None,
+                    created_at: now,
+                    updated_at: now,
+                };
+                let op = self
+                    .record(
+                        &opened,
+                        None,
+                        &mut ws,
+                        operation_id(&req.operation_id)?,
+                        OperationKind::Create,
+                    )
+                    .await?;
+                let (workspace, operation) = response_pair(&ws, &op);
+                Ok(Response::new(pb::CreateWorkspaceResponse {
+                    workspace,
+                    operation,
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -214,32 +216,33 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::SetSparseProfileRequest>,
     ) -> GrpcResult<pb::SetSparseProfileResponse> {
-        let result: crate::error::Result<Response<pb::SetSparseProfileResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            let req = request.into_inner();
-            let before = self.load_mut(&opened, &req.workspace).await?;
-            let mut ws = before.clone();
-            let profile = match req.sparse {
-                Some(s) => SparseProfile::try_from(s)?,
-                None => SparseProfile::full(),
-            };
-            ws.sparse = profile.clone();
-            let op = self
-                .record(
-                    &opened,
-                    Some(&before),
-                    &mut ws,
-                    operation_id(&req.operation_id)?,
-                    OperationKind::SetSparse { profile },
-                )
-                .await?;
-            let (workspace, operation) = response_pair(&ws, &op);
-            Ok(Response::new(pb::SetSparseProfileResponse {
-                workspace,
-                operation,
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::SetSparseProfileResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                let req = request.into_inner();
+                let before = self.load_mut(&opened, &req.workspace).await?;
+                let mut ws = before.clone();
+                let profile = match req.sparse {
+                    Some(s) => SparseProfile::try_from(s)?,
+                    None => SparseProfile::full(),
+                };
+                ws.sparse = profile.clone();
+                let op = self
+                    .record(
+                        &opened,
+                        Some(&before),
+                        &mut ws,
+                        operation_id(&req.operation_id)?,
+                        OperationKind::SetSparse { profile },
+                    )
+                    .await?;
+                let (workspace, operation) = response_pair(&ws, &op);
+                Ok(Response::new(pb::SetSparseProfileResponse {
+                    workspace,
+                    operation,
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -247,30 +250,31 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::SnapshotRequest>,
     ) -> GrpcResult<pb::SnapshotResponse> {
-        let result: crate::error::Result<Response<pb::SnapshotResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            let req = request.into_inner();
-            let before = self.load_mut(&opened, &req.workspace).await?;
-            let mut ws = before.clone();
-            let tree = common::hash("tree_hash", &req.tree_hash)?;
-            opened.repo.trees.get_tree(&tree).await.map_err(|_| {
-                Error::precondition(format!("snapshot tree {tree} has not been uploaded"))
-            })?;
-            ws.snapshot = Some(tree);
-            let op = self
-                .record(
-                    &opened,
-                    Some(&before),
-                    &mut ws,
-                    operation_id(&req.operation_id)?,
-                    OperationKind::Snapshot { tree },
-                )
-                .await?;
-            Ok(Response::new(pb::SnapshotResponse {
-                operation: Some(pb::Operation::from(op)),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::SnapshotResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                let req = request.into_inner();
+                let before = self.load_mut(&opened, &req.workspace).await?;
+                let mut ws = before.clone();
+                let tree = common::hash("tree_hash", &req.tree_hash)?;
+                opened.repo.trees.get_tree(&tree).await.map_err(|_| {
+                    Error::precondition(format!("snapshot tree {tree} has not been uploaded"))
+                })?;
+                ws.snapshot = Some(tree);
+                let op = self
+                    .record(
+                        &opened,
+                        Some(&before),
+                        &mut ws,
+                        operation_id(&req.operation_id)?,
+                        OperationKind::Snapshot { tree },
+                    )
+                    .await?;
+                Ok(Response::new(pb::SnapshotResponse {
+                    operation: Some(pb::Operation::from(op)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -281,63 +285,64 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::NewChangeRequest>,
     ) -> GrpcResult<pb::NewChangeResponse> {
-        let result: crate::error::Result<Response<pb::NewChangeResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            let req = request.into_inner();
-            let before = self.load_mut(&opened, &req.workspace).await?;
-            let mut ws = before.clone();
-            let snapshot = ws.snapshot.ok_or_else(|| {
-                Error::precondition("workspace has no snapshot to turn into a change")
-            })?;
-            let base_root = base_root(&opened, &ws).await?;
-            let entries = diff_trees(&opened.repo.trees, base_root, Some(snapshot)).await?;
-            if entries.is_empty() {
-                return Err(Error::precondition(
-                    "snapshot is identical to the base; nothing to change",
-                ));
-            }
-            for entry in &entries {
-                opened.permit().write(&entry.path).await?;
-            }
-            let predecessor = opened
-                .repo
-                .repo
-                .change_versions(&ws.working_change)
-                .await?
-                .last()
-                .copied();
-            let cv = version_from_diff(
-                entries,
-                ws.working_change,
-                base_of(&ws).into_iter().collect(),
-                predecessor,
-                opened.principal().clone(),
-                req.message,
-                provenance(req.provenance)?,
-                opt_id_from_proto("intent", req.intent.as_ref())?,
-            );
-            let (hash, cv) = commit_version(&opened, cv).await?;
-            let change = cv.change_id;
-            let base = ws.base;
-            ws.base = hash;
-            ws.working_change = ChangeId::new();
-            let op = self
-                .record(
-                    &opened,
-                    Some(&before),
-                    &mut ws,
-                    operation_id(&req.operation_id)?,
-                    OperationKind::NewChange { change, base },
-                )
-                .await?;
-            Ok(Response::new(pb::NewChangeResponse {
-                change_id: id_to_proto(&change),
-                version_hash: hash_to_proto(&hash),
-                version: Some(pb::ChangeVersion::from(cv)),
-                operation: Some(pb::Operation::from(op)),
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::NewChangeResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                let req = request.into_inner();
+                let before = self.load_mut(&opened, &req.workspace).await?;
+                let mut ws = before.clone();
+                let snapshot = ws.snapshot.ok_or_else(|| {
+                    Error::precondition("workspace has no snapshot to turn into a change")
+                })?;
+                let base_root = base_root(&opened, &ws).await?;
+                let entries = diff_trees(&opened.repo.trees, base_root, Some(snapshot)).await?;
+                if entries.is_empty() {
+                    return Err(Error::precondition(
+                        "snapshot is identical to the base; nothing to change",
+                    ));
+                }
+                for entry in &entries {
+                    opened.permit().write(&entry.path).await?;
+                }
+                let predecessor = opened
+                    .repo
+                    .repo
+                    .change_versions(&ws.working_change)
+                    .await?
+                    .last()
+                    .copied();
+                let cv = version_from_diff(
+                    entries,
+                    ws.working_change,
+                    base_of(&ws).into_iter().collect(),
+                    predecessor,
+                    opened.principal().clone(),
+                    req.message,
+                    provenance(req.provenance)?,
+                    opt_id_from_proto("intent", req.intent.as_ref())?,
+                );
+                let (hash, cv) = commit_version(&opened, cv).await?;
+                let change = cv.change_id;
+                let base = ws.base;
+                ws.base = hash;
+                ws.working_change = ChangeId::new();
+                let op = self
+                    .record(
+                        &opened,
+                        Some(&before),
+                        &mut ws,
+                        operation_id(&req.operation_id)?,
+                        OperationKind::NewChange { change, base },
+                    )
+                    .await?;
+                Ok(Response::new(pb::NewChangeResponse {
+                    change_id: id_to_proto(&change),
+                    version_hash: hash_to_proto(&hash),
+                    version: Some(pb::ChangeVersion::from(cv)),
+                    operation: Some(pb::Operation::from(op)),
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -347,54 +352,56 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::UpdateBaseRequest>,
     ) -> GrpcResult<pb::UpdateBaseResponse> {
-        let result: crate::error::Result<Response<pb::UpdateBaseResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            let req = request.into_inner();
-            let before = self.load_mut(&opened, &req.workspace).await?;
-            let mut ws = before.clone();
-            let new_base = resolve_version(&opened.repo, req.new_base.as_ref())
-                .await?
-                .ok_or_else(|| Error::precondition("the repository has no trunk head yet"))?;
-            let from = ws.base;
-            let current = opened
-                .repo
-                .repo
-                .change_versions(&ws.working_change)
-                .await?
-                .last()
-                .copied();
-            let (version, version_hash) = match current {
-                Some(current) if new_base != from => {
-                    let rebased =
-                        rebase(&opened.repo.derive, &current, &new_base, Timestamp::now()).await?;
-                    let (hash, cv) = commit_version(&opened, rebased).await?;
-                    ws.snapshot = Some(common::root_of(&opened.repo, &hash).await?);
-                    (
-                        Some(pb::ChangeVersion::from(cv)),
-                        Some(hash_to_proto(&hash)),
+        let result: crate::error::Result<Response<pb::UpdateBaseResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                let req = request.into_inner();
+                let before = self.load_mut(&opened, &req.workspace).await?;
+                let mut ws = before.clone();
+                let new_base = resolve_version(&opened.repo, req.new_base.as_ref())
+                    .await?
+                    .ok_or_else(|| Error::precondition("the repository has no trunk head yet"))?;
+                let from = ws.base;
+                let current = opened
+                    .repo
+                    .repo
+                    .change_versions(&ws.working_change)
+                    .await?
+                    .last()
+                    .copied();
+                let (version, version_hash) = match current {
+                    Some(current) if new_base != from => {
+                        let rebased =
+                            rebase(&opened.repo.derive, &current, &new_base, Timestamp::now())
+                                .await?;
+                        let (hash, cv) = commit_version(&opened, rebased).await?;
+                        ws.snapshot = Some(common::root_of(&opened.repo, &hash).await?);
+                        (
+                            Some(pb::ChangeVersion::from(cv)),
+                            Some(hash_to_proto(&hash)),
+                        )
+                    }
+                    _ => (None, None),
+                };
+                ws.base = new_base;
+                let op = self
+                    .record(
+                        &opened,
+                        Some(&before),
+                        &mut ws,
+                        operation_id(&req.operation_id)?,
+                        OperationKind::Rebase { from, to: new_base },
                     )
-                }
-                _ => (None, None),
-            };
-            ws.base = new_base;
-            let op = self
-                .record(
-                    &opened,
-                    Some(&before),
-                    &mut ws,
-                    operation_id(&req.operation_id)?,
-                    OperationKind::Rebase { from, to: new_base },
-                )
-                .await?;
-            let (workspace, operation) = response_pair(&ws, &op);
-            Ok(Response::new(pb::UpdateBaseResponse {
-                workspace,
-                operation,
-                version,
-                version_hash,
-            }))
-        }
-        .await;
+                    .await?;
+                let (workspace, operation) = response_pair(&ws, &op);
+                Ok(Response::new(pb::UpdateBaseResponse {
+                    workspace,
+                    operation,
+                    version,
+                    version_hash,
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -402,87 +409,90 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::HandoffRequest>,
     ) -> GrpcResult<pb::HandoffResponse> {
-        let result: crate::error::Result<Response<pb::HandoffResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            let req = request.into_inner();
-            let before = self.load_mut(&opened, &req.workspace).await?;
-            let mut ws = before.clone();
-            let to = Principal::try_from(req.to.ok_or_else(|| Error::invalid("to is required"))?)?;
-            ws.owner = to.clone();
-            let op = self
-                .record(
-                    &opened,
-                    Some(&before),
-                    &mut ws,
-                    operation_id(&req.operation_id)?,
-                    OperationKind::Handoff { to },
-                )
-                .await?;
-            let (workspace, operation) = response_pair(&ws, &op);
-            Ok(Response::new(pb::HandoffResponse {
-                workspace,
-                operation,
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::HandoffResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                let req = request.into_inner();
+                let before = self.load_mut(&opened, &req.workspace).await?;
+                let mut ws = before.clone();
+                let to =
+                    Principal::try_from(req.to.ok_or_else(|| Error::invalid("to is required"))?)?;
+                ws.owner = to.clone();
+                let op = self
+                    .record(
+                        &opened,
+                        Some(&before),
+                        &mut ws,
+                        operation_id(&req.operation_id)?,
+                        OperationKind::Handoff { to },
+                    )
+                    .await?;
+                let (workspace, operation) = response_pair(&ws, &op);
+                Ok(Response::new(pb::HandoffResponse {
+                    workspace,
+                    operation,
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
     /// Restore the workspace to the state before `target` (default: the
     /// head operation), recorded as a new `Undo` operation.
     async fn undo(&self, request: Request<pb::UndoRequest>) -> GrpcResult<pb::UndoResponse> {
-        let result: crate::error::Result<Response<pb::UndoResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            let req = request.into_inner();
-            let before = self.load_mut(&opened, &req.workspace).await?;
-            let mut ws = before.clone();
-            let ops = opened
-                .repo
-                .repo
-                .list_operations(&ws.id, MAX_OPS_LIMIT)
-                .await?;
-            let target: OperationId = match opt_id_from_proto("target", req.target.as_ref())? {
-                Some(id) => id,
-                None => ws
-                    .head_op
-                    .ok_or_else(|| Error::precondition("workspace has no operations"))?,
-            };
-            let undone = ops
-                .iter()
-                .find(|o| o.id == target)
-                .ok_or_else(|| Error::not_found(format!("operation {target}")))?;
-            let parent_id = undone.parent.ok_or_else(|| {
-                Error::precondition("the workspace's first operation cannot be undone")
-            })?;
-            let previous = ops.iter().find(|o| o.id == parent_id).ok_or_else(|| {
-                Error::not_found(format!("operation {parent_id} is beyond the retained log"))
-            })?;
-            // Everything but identity comes back: base, snapshot, working
-            // change, sparse profile and owner.
-            ws = Workspace {
-                id: ws.id,
-                repo: ws.repo,
-                created_at: ws.created_at,
-                head_op: ws.head_op,
-                updated_at: ws.updated_at,
-                ..previous.resulting.clone()
-            };
-            let op = self
-                .record(
-                    &opened,
-                    Some(&before),
-                    &mut ws,
-                    operation_id(&req.operation_id)?,
-                    OperationKind::Undo { undone: target },
-                )
-                .await?;
-            let (workspace, operation) = response_pair(&ws, &op);
-            Ok(Response::new(pb::UndoResponse {
-                workspace,
-                operation,
-            }))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::UndoResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                let req = request.into_inner();
+                let before = self.load_mut(&opened, &req.workspace).await?;
+                let mut ws = before.clone();
+                let ops = opened
+                    .repo
+                    .repo
+                    .list_operations(&ws.id, MAX_OPS_LIMIT)
+                    .await?;
+                let target: OperationId = match opt_id_from_proto("target", req.target.as_ref())? {
+                    Some(id) => id,
+                    None => ws
+                        .head_op
+                        .ok_or_else(|| Error::precondition("workspace has no operations"))?,
+                };
+                let undone = ops
+                    .iter()
+                    .find(|o| o.id == target)
+                    .ok_or_else(|| Error::not_found(format!("operation {target}")))?;
+                let parent_id = undone.parent.ok_or_else(|| {
+                    Error::precondition("the workspace's first operation cannot be undone")
+                })?;
+                let previous = ops.iter().find(|o| o.id == parent_id).ok_or_else(|| {
+                    Error::not_found(format!("operation {parent_id} is beyond the retained log"))
+                })?;
+                // Everything but identity comes back: base, snapshot, working
+                // change, sparse profile and owner.
+                ws = Workspace {
+                    id: ws.id,
+                    repo: ws.repo,
+                    created_at: ws.created_at,
+                    head_op: ws.head_op,
+                    updated_at: ws.updated_at,
+                    ..previous.resulting.clone()
+                };
+                let op = self
+                    .record(
+                        &opened,
+                        Some(&before),
+                        &mut ws,
+                        operation_id(&req.operation_id)?,
+                        OperationKind::Undo { undone: target },
+                    )
+                    .await?;
+                let (workspace, operation) = response_pair(&ws, &op);
+                Ok(Response::new(pb::UndoResponse {
+                    workspace,
+                    operation,
+                }))
+            })
+            .await;
         result.map_err(Status::from)
     }
 
@@ -518,13 +528,14 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::DeleteWorkspaceRequest>,
     ) -> GrpcResult<pb::DeleteWorkspaceResponse> {
-        let result: crate::error::Result<Response<pb::DeleteWorkspaceResponse>> = async {
-            let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-            let ws = self.load_mut(&opened, &request.get_ref().workspace).await?;
-            opened.repo.repo.delete_workspace(&ws.id).await?;
-            Ok(Response::new(pb::DeleteWorkspaceResponse {}))
-        }
-        .await;
+        let result: crate::error::Result<Response<pb::DeleteWorkspaceResponse>> =
+            idem::once(&self.state, request, |request| async move {
+                let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+                let ws = self.load_mut(&opened, &request.get_ref().workspace).await?;
+                opened.repo.repo.delete_workspace(&ws.id).await?;
+                Ok(Response::new(pb::DeleteWorkspaceResponse {}))
+            })
+            .await;
         result.map_err(Status::from)
     }
 

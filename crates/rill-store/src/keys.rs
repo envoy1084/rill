@@ -66,6 +66,8 @@ pub mod table {
     pub const REPO_ORG: &str = "repoid";
     /// `(quota, org, principal, metric, day, shard)` → usage counter
     pub const QUOTA: &str = "quota";
+    /// `(idem, principal, operation)` → the request's claim or response
+    pub const IDEM: &str = "idem";
 }
 
 fn key<T: TuplePack>(t: &T) -> Bytes {
@@ -99,6 +101,14 @@ pub fn repo_org(id: &RepoId) -> Bytes {
 
 pub fn quota(org: &str, principal: &str, metric: &str, day: i64, shard: u8) -> Bytes {
     key(&(table::QUOTA, org, principal, metric, day, shard as u64))
+}
+
+pub fn idem(principal: &str, operation: &[u8]) -> Bytes {
+    key(&(table::IDEM, principal, operation))
+}
+
+pub fn idem_table() -> Bytes {
+    key(&(table::IDEM,))
 }
 
 pub fn repo(ns: &str, id: &RepoId) -> Bytes {

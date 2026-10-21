@@ -60,6 +60,10 @@ pub async fn serve_with_state(
     let (grpc_addr, http_addr) = listeners.addrs()?;
     tracing::info!(%grpc_addr, %http_addr, dev_mode = state.dev_mode(), "rill server listening");
 
+    tokio::spawn(crate::workers::sweep_idempotency(
+        state.stores.clone(),
+        shutdown.clone(),
+    ));
     let grpc = tokio::spawn(serve_grpc(state.clone(), listeners.grpc, shutdown.clone()));
     let http = tokio::spawn(serve_http(state, listeners.http, shutdown.clone()));
 
