@@ -122,12 +122,20 @@ sequenceDiagram
   B->>R: callback
   R->>R: take PendingLogin (once)
   R->>P: exchange code + verifier (+ client secret)
-  R->>R: verify ID token (issuer, audience, nonce, keys)
+  R->>R: verify ID token (signature, issuer, audience, azp, expiry, nonce)
   R->>R: resolve_user, open_session (Browser)
   R-->>B: Set-Cookie rill_session (HttpOnly, SameSite=Lax, Path=/auth)
   B->>R: POST /auth/token (x-rill-request)
   R-->>B: access token, cookie rotated
 ```
+
+The browser flow is [`openidconnect`](https://crates.io/crates/openidconnect)
+([`oidc/browser.rs`](../../crates/rill-identity/src/oidc/browser.rs)):
+discovery, the authorization URL with PKCE (S256) and a nonce, the code
+exchange (client secret by HTTP Basic) and ID-token validation. It calls
+providers through the workspace's `reqwest` and never follows redirects.
+Workload and device-flow ID tokens are verified by Rill's JWT verifier over
+discovered JWKS (`oidc/jwt.rs`, `jsonwebtoken`, asymmetric algorithms only).
 
 [`resolve_user`](../../crates/rill-identity/src/signin/users.rs) finds the
 user an `(issuer, subject)` is linked to, or creates one named by the

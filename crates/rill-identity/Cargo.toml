@@ -19,6 +19,8 @@ saml = ["dep:samael"]
 testing = ["dep:axum", "dep:p256"]
 
 [dependencies]
+http = { workspace = true }
+openidconnect = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true }
 rill-policy = { workspace = true }

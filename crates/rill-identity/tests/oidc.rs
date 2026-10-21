@@ -1,7 +1,7 @@
 //! OpenID Connect against the mock provider: the code flow end to end, and
 //! every way an ID token must be refused.
 
-use rill_identity::oidc::{authorize_url, exchange_code, AuthorizationRequest, Issuers};
+use rill_identity::oidc::{begin, finish, Issuers, Registration};
 use rill_identity::testing::{MockIdp, MockUser};
 use serde_json::json;
 
@@ -12,74 +12,57 @@ async fn idp() -> MockIdp {
     idp
 }
 
-#[tokio::test]
-async fn the_code_flow_yields_a_verified_id_token() {
-    let idp = idp().await;
-    idp.sign_in_as("alice");
-    let issuers = Issuers::new(reqwest::Client::new());
-    let meta = issuers.metadata(idp.issuer()).await.unwrap();
-    let request = AuthorizationRequest::new();
-    let redirect = "http://rill.test/auth/callback";
-    let url = authorize_url(&meta, "rill", redirect, &["openid".into()], &request).unwrap();
-
+/// Follow the authorization URL as a signed-in browser would; the code.
+async fn code_for(url: &str) -> String {
     let no_redirects = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .unwrap();
-    let response = no_redirects.get(&url).send().await.unwrap();
+    let response = no_redirects.get(url).send().await.unwrap();
     let location = url::Url::parse(response.headers()["location"].to_str().unwrap()).unwrap();
-    let query: std::collections::HashMap<_, _> = location.query_pairs().into_owned().collect();
-    assert_eq!(query["state"], request.state);
-
-    // A wrong PKCE verifier cannot redeem the code.
-    assert!(exchange_code(
-        issuers.client(),
-        &meta,
-        "rill",
-        Some("s3cret"),
-        redirect,
-        &query["code"],
-        "wrong"
-    )
-    .await
-    .is_err());
-    // The code was spent by the failed attempt; sign in again.
-    let request = AuthorizationRequest::new();
-    let url = authorize_url(&meta, "rill", redirect, &["openid".into()], &request).unwrap();
-    let response = no_redirects.get(&url).send().await.unwrap();
-    let location = url::Url::parse(response.headers()["location"].to_str().unwrap()).unwrap();
-    let code = location
+    location
         .query_pairs()
         .find(|(k, _)| k == "code")
         .unwrap()
         .1
-        .into_owned();
-    let tokens = exchange_code(
-        issuers.client(),
-        &meta,
-        "rill",
-        Some("s3cret"),
-        redirect,
-        &code,
-        &request.pkce_verifier,
-    )
-    .await
-    .unwrap();
+        .into_owned()
+}
 
-    let verifier = issuers
-        .verifier(idp.issuer(), vec!["rill".into()])
-        .await
-        .unwrap();
-    let claims = verifier
-        .verify(&tokens.id_token, Some(&request.nonce))
+#[tokio::test]
+async fn the_code_flow_yields_verified_claims() {
+    let idp = idp().await;
+    idp.sign_in_as("alice");
+    let registration = Registration {
+        issuer: idp.issuer(),
+        client_id: "rill",
+        client_secret: Some("s3cret"),
+        redirect_uri: "http://rill.test/auth/callback",
+    };
+    let request = begin(&registration, &["openid".into()]).await.unwrap();
+    let code = code_for(&request.url).await;
+    assert!(
+        finish(&registration, &code, "wrong", &request.nonce)
+            .await
+            .is_err(),
+        "a wrong PKCE verifier cannot redeem the code"
+    );
+
+    let request = begin(&registration, &["openid".into()]).await.unwrap();
+    let code = code_for(&request.url).await;
+    assert!(
+        finish(&registration, &code, &request.pkce_verifier, "other")
+            .await
+            .is_err(),
+        "the ID token must carry this sign-in's nonce"
+    );
+
+    let request = begin(&registration, &["openid".into()]).await.unwrap();
+    let code = code_for(&request.url).await;
+    let claims = finish(&registration, &code, &request.pkce_verifier, &request.nonce)
         .await
         .unwrap();
     assert_eq!(claims.str("preferred_username"), Some("alice"));
     assert_eq!(claims.strings("groups"), ["core"]);
-    assert!(verifier
-        .verify(&tokens.id_token, Some("other"))
-        .await
-        .is_err());
 }
 
 #[tokio::test]

@@ -9,7 +9,7 @@ use axum::extract::{Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
-use rill_identity::oidc::{authorize_url, exchange_code, AuthorizationRequest, Claims};
+use rill_identity::oidc::{begin, finish as finish_flow, Claims, Registration};
 use rill_identity::signin::{open_session, resolve_user, RefreshToken};
 use rill_types::identity::{IdentityProvider, PendingLogin, SessionKind, UserRecord};
 use rill_types::Timestamp;
@@ -60,8 +60,15 @@ async fn start(state: &AppState, q: LoginQuery) -> Result<String> {
         #[cfg(not(feature = "saml"))]
         return Err(Error::invalid("this server was built without SAML support"));
     }
-    let meta = state.identity.issuers().metadata(&provider.issuer).await?;
-    let request = AuthorizationRequest::new();
+    let redirect = redirect_uri(state);
+    let secret = client_secret(state, &provider).await?;
+    let registration = Registration {
+        issuer: &provider.issuer,
+        client_id: &provider.client_id,
+        client_secret: secret.as_deref(),
+        redirect_uri: &redirect,
+    };
+    let request = begin(&registration, &provider.scopes).await?;
     let login = PendingLogin {
         state: request.state.clone(),
         org: provider.org.clone(),
@@ -72,13 +79,7 @@ async fn start(state: &AppState, q: LoginQuery) -> Result<String> {
         expires_at: Timestamp::from_millis(Timestamp::now().millis() + LOGIN_TTL_MS),
     };
     state.identity.store().put_pending_login(&login).await?;
-    Ok(authorize_url(
-        &meta,
-        &provider.client_id,
-        &redirect_uri(state),
-        &provider.scopes,
-        &request,
-    )?)
+    Ok(request.url)
 }
 
 #[derive(Deserialize)]
@@ -138,24 +139,15 @@ async fn finish(
         .await?
         .ok_or_else(|| Error::Unauthenticated("this sign-in expired or was already used".into()))?;
     let provider = provider(state, &login.org, &login.provider).await?;
-    let issuers = state.identity.issuers();
-    let meta = issuers.metadata(&provider.issuer).await?;
     let secret = client_secret(state, &provider).await?;
-    let tokens = exchange_code(
-        issuers.client(),
-        &meta,
-        &provider.client_id,
-        secret.as_deref(),
-        &redirect_uri(state),
-        code,
-        &login.pkce_verifier,
-    )
-    .await?;
-    let claims = issuers
-        .verifier(&provider.issuer, vec![provider.client_id.clone()])
-        .await?
-        .verify(&tokens.id_token, Some(&login.nonce))
-        .await?;
+    let redirect = redirect_uri(state);
+    let registration = Registration {
+        issuer: &provider.issuer,
+        client_id: &provider.client_id,
+        client_secret: secret.as_deref(),
+        redirect_uri: &redirect,
+    };
+    let claims = finish_flow(&registration, code, &login.pkce_verifier, &login.nonce).await?;
     let (cookie, user) = sign_in(state, &provider, &claims, now).await?;
     Ok((cookie, user, login.return_to))
 }

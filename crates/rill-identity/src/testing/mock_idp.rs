@@ -226,6 +226,11 @@ async fn discovery(State(idp): State<Arc<Idp>>) -> Json<Value> {
         "token_endpoint": format!("{i}/token"),
         "jwks_uri": format!("{i}/jwks"),
         "device_authorization_endpoint": format!("{i}/device"),
+        "response_types_supported": ["code"],
+        "subject_types_supported": ["public"],
+        "id_token_signing_alg_values_supported": ["ES256"],
+        "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+        "code_challenge_methods_supported": ["S256"],
     }))
 }
 
@@ -271,6 +276,7 @@ async fn authorize(State(idp): State<Arc<Idp>>, Query(q): Query<AuthorizeQuery>)
 #[derive(Deserialize)]
 struct TokenForm {
     grant_type: String,
+    #[serde(default)]
     client_id: String,
     client_secret: Option<String>,
     code: Option<String>,
@@ -279,7 +285,17 @@ struct TokenForm {
     device_code: Option<String>,
 }
 
-async fn token(State(idp): State<Arc<Idp>>, Form(f): Form<TokenForm>) -> Response {
+async fn token(
+    State(idp): State<Arc<Idp>>,
+    headers: axum::http::HeaderMap,
+    Form(mut f): Form<TokenForm>,
+) -> Response {
+    // Client credentials may come as HTTP Basic (RFC 6749 §2.3.1) or in
+    // the form.
+    if let Some((id, secret)) = basic_credentials(&headers) {
+        f.client_id = id;
+        f.client_secret = Some(secret);
+    }
     if !idp.client_ok(&f.client_id, f.client_secret.as_deref()) {
         return oauth_error(StatusCode::UNAUTHORIZED, "invalid_client");
     }
@@ -352,4 +368,21 @@ async fn device(State(idp): State<Arc<Idp>>, Form(f): Form<DeviceForm>) -> Respo
         "expires_in": 300, "interval": 1,
     }))
     .into_response()
+}
+
+/// `client_id` and `client_secret` from an `Authorization: Basic` header,
+/// each form-urlencoded as RFC 6749 requires.
+fn basic_credentials(headers: &axum::http::HeaderMap) -> Option<(String, String)> {
+    let value = headers.get(axum::http::header::AUTHORIZATION)?.to_str().ok()?;
+    let encoded = value.strip_prefix("Basic ")?;
+    let decoded = base64::engine::general_purpose::STANDARD.decode(encoded).ok()?;
+    let text = String::from_utf8(decoded).ok()?;
+    let (id, secret) = text.split_once(':')?;
+    let unescape = |s: &str| {
+        url::form_urlencoded::parse(format!("x={s}").as_bytes())
+            .next()
+            .map(|(_, v)| v.into_owned())
+            .unwrap_or_default()
+    };
+    Some((unescape(id), unescape(secret)))
 }

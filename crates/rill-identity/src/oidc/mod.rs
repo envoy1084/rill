@@ -1,14 +1,13 @@
-//! OpenID Connect: discovering providers, verifying the JWTs they sign
-//! (ID tokens, and workload tokens from any OIDC issuer), and the
-//! authorization-code flow with PKCE.
+//! OpenID Connect: browser sign-in through `openidconnect`, and verifying
+//! workload JWTs from any OIDC issuer (discovery, JWKS, `jsonwebtoken`).
 
-mod code_flow;
+mod browser;
 mod discovery;
 mod jwks;
 mod jwt;
 mod registry;
 
-pub use code_flow::{authorize_url, exchange_code, AuthorizationRequest, CodeExchange};
+pub use browser::{begin, finish, AuthorizationRequest, Registration};
 pub use discovery::{discover, ProviderMetadata};
 pub use jwks::{JwksCache, JwksSource};
 pub use jwt::{unverified_issuer, Claims, JwtVerifier};
