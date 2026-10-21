@@ -22,7 +22,24 @@ pub fn dev_context() -> AuthContext {
         capability: None,
         claims: None,
         scope: None,
+        relations_seen: Vec::new(),
     }
+}
+
+/// The header naming relation versions a client has observed:
+/// `rp_<hex>=<version>` pairs separated by commas.
+pub const RELATIONS_SEEN_HEADER: &str = "x-rill-relations";
+
+/// Parse [`RELATIONS_SEEN_HEADER`], skipping malformed pairs.
+pub fn relations_seen(header: Option<&str>) -> Vec<(rill_types::RepoId, i64)> {
+    header
+        .into_iter()
+        .flat_map(|h| h.split(','))
+        .filter_map(|pair| {
+            let (repo, version) = pair.trim().split_once('=')?;
+            Some((repo.parse().ok()?, version.parse().ok()?))
+        })
+        .collect()
 }
 
 /// The caller the auth middleware attached to a request. Missing means the

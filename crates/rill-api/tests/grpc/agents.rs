@@ -174,11 +174,12 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
             .await
             .unwrap();
         root_clients
-            .admin
+            .access
             .add_relation(pb::AddRelationRequest {
                 operation_id: Bytes::new(),
                 relation: Some(pb::Relation {
-                    object: format!("repo:{repo}"),
+                    repo: repo.to_string(),
+                    path: String::new(),
                     relation: "writer".into(),
                     subject: format!("principal:{}", Principal::agent("builder").id),
                 }),

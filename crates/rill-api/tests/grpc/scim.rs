@@ -112,11 +112,12 @@ async fn a_provisioning_system_manages_users_and_teams() {
         .await
         .unwrap();
     admin
-        .admin
+        .access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
             relation: Some(pb::Relation {
-                object: "repo:r".into(),
+                repo: "r".into(),
+                path: String::new(),
                 relation: "reader".into(),
                 subject: "team:devs".into(),
             }),

@@ -1,11 +1,11 @@
-//! `rill admin`: whoami, token issue, relation add/remove/list, policy
-//! get/set, health.
+//! `rill admin`: whoami, token issue, policy get/set, health, and the
+//! identity commands.
 
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 use rill_mcp::json;
-use rill_sdk::{Capability, Relation, TokenRequest};
+use rill_sdk::{Capability, TokenRequest};
 use rill_types::Timestamp;
 use serde_json::json as j;
 
@@ -22,9 +22,6 @@ pub enum AdminCmd {
     /// Capability tokens.
     #[command(subcommand)]
     Token(TokenCmd),
-    /// ReBAC relationship tuples.
-    #[command(subcommand)]
-    Relation(RelationCmd),
     /// Named Cedar policies.
     #[command(subcommand)]
     Policy(PolicyCmd),
@@ -80,38 +77,6 @@ pub struct IssueArgs {
     /// Principal the token acts as: `name`, `agent:name` or `svc:name`.
     #[arg(long, value_name = "PRINCIPAL")]
     pub r#for: Option<String>,
-}
-
-/// `rill admin relation <subcommand>`.
-#[derive(Subcommand, Debug)]
-pub enum RelationCmd {
-    /// Add a tuple: <object> <relation> <subject>.
-    Add(RelationArgs),
-    /// Remove a tuple.
-    Remove(RelationArgs),
-    /// List tuples on an object.
-    List(RelationListArgs),
-}
-
-/// A relation tuple.
-#[derive(Args, Debug)]
-pub struct RelationArgs {
-    /// Object, e.g. `repo:main` or `path:main/src/auth`.
-    pub object: String,
-    /// Relation, e.g. `owner`, `reviewer`, `member`.
-    pub relation: String,
-    /// Subject, e.g. `principal:pr_...` or `team:infra#member`.
-    pub subject: String,
-}
-
-/// `rill admin relation list`.
-#[derive(Args, Debug)]
-pub struct RelationListArgs {
-    /// Object.
-    pub object: String,
-    /// Only this relation.
-    #[arg(long)]
-    pub relation: Option<String>,
 }
 
 /// `rill admin policy <subcommand>`.
@@ -176,9 +141,6 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: AdminCmd) -> Result<()> {
         AdminCmd::Kill(args) => super::identity::agents::kill(ctx, args).await,
         AdminCmd::Scim(cmd) => super::identity::scim::run(ctx, cmd).await,
         AdminCmd::Token(TokenCmd::Issue(args)) => issue(ctx, args).await,
-        AdminCmd::Relation(RelationCmd::Add(args)) => relation_add(ctx, args, true).await,
-        AdminCmd::Relation(RelationCmd::Remove(args)) => relation_add(ctx, args, false).await,
-        AdminCmd::Relation(RelationCmd::List(args)) => relation_list(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Get(args)) => policy_get(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Set(args)) => policy_set(ctx, args).await,
         AdminCmd::Health => health(ctx).await,
@@ -263,53 +225,6 @@ async fn issue(ctx: &mut Ctx<'_>, args: IssueArgs) -> Result<()> {
         out.line(token.token.clone())?;
         out.line(out.dim(&format!("expires {}", when(&token.expires_at))))
     })
-}
-
-async fn relation_add(ctx: &mut Ctx<'_>, args: RelationArgs, add: bool) -> Result<()> {
-    let relation = Relation::new(args.object, args.relation, args.subject);
-    let admin = ctx.client()?.admin();
-    if add {
-        admin.add_relation(&relation).await?;
-    } else {
-        admin.remove_relation(&relation).await?;
-    }
-    ctx.emit(
-        j!({ "relation": json::relation(&relation), "added": add }),
-        |out| {
-            out.line(format!(
-                "{} {} {} {}",
-                if add { "added" } else { "removed" },
-                relation.object,
-                relation.relation,
-                relation.subject
-            ))
-        },
-    )
-}
-
-async fn relation_list(ctx: &mut Ctx<'_>, args: RelationListArgs) -> Result<()> {
-    let relations = ctx
-        .client()?
-        .admin()
-        .list_relations(&args.object, args.relation.as_deref())
-        .await?;
-    ctx.emit(
-        j!({ "relations": relations.iter().map(json::relation).collect::<Vec<_>>() }),
-        |out| {
-            if relations.is_empty() {
-                return out.line(out.dim("no relations"));
-            }
-            let mut table = Table::new(&["OBJECT", "RELATION", "SUBJECT"]);
-            for r in &relations {
-                table.row(vec![
-                    r.object.clone(),
-                    r.relation.clone(),
-                    r.subject.clone(),
-                ]);
-            }
-            out.table(table)
-        },
-    )
 }
 
 async fn policy_get(ctx: &mut Ctx<'_>, args: PolicyGetArgs) -> Result<()> {

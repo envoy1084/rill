@@ -46,6 +46,9 @@ pub struct AuthContext {
     pub claims: Option<TokenClaims>,
     /// What a registered agent may touch; `None` for everyone else.
     pub scope: Option<AgentScope>,
+    /// Relation versions the caller has observed, by repository: checks
+    /// on those repositories must reflect at least that version.
+    pub relations_seen: Vec<(RepoId, i64)>,
 }
 
 /// The repositories and paths a registered agent may use.
@@ -73,6 +76,16 @@ impl AgentScope {
 }
 
 impl AuthContext {
+    /// The relation version checks on `repo` must reflect; 0 if none.
+    pub fn relations_seen_in(&self, repo: RepoId) -> i64 {
+        self.relations_seen
+            .iter()
+            .filter(|(r, _)| *r == repo)
+            .map(|(_, v)| *v)
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Whether the context's capability (if any) permits `verb` on `path`
     /// in `repo`. Without a capability this is `true`; callers must still
     /// run relationship checks.
@@ -155,6 +168,7 @@ impl Authenticator for StaticTokenAuthenticator {
             capability: None,
             claims: None,
             scope: None,
+            relations_seen: Vec::new(),
         })
     }
 }
@@ -219,6 +233,7 @@ mod tests {
             capability: Some(cap),
             claims: None,
             scope: None,
+            relations_seen: Vec::new(),
         };
         assert!(ctx.capability_allows(repo, &RepoPathBuf::new("src/x").unwrap(), Verb::Read));
         assert!(!ctx.capability_allows(repo, &RepoPathBuf::new("src/x").unwrap(), Verb::Write));

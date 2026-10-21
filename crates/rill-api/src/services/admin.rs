@@ -1,16 +1,14 @@
-//! `rill.v1.AdminService`: identity, capability tokens, relations and
-//! policies.
+//! `rill.v1.AdminService`: identity, capability tokens and policies.
 //!
 //! Admin requests carry no `repo` field; the repository is named inside
-//! the object or policy name instead:
+//! the scope or policy name instead:
 //!
-//! * relation objects are `repo:<repo>` or `path:<repo>/<dir>`;
 //! * capability scopes are `repo:<repo>` or `repo:<repo>/<dir>[/*]`;
 //! * policy names are `<repo>/submit` (Cedar) or `<repo>/risk` (JSON).
 
 use std::sync::Arc;
 
-use rill_policy::{Capability, Relation, Subject, Verb};
+use rill_policy::{Capability, Verb};
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::admin_service_server::AdminService;
@@ -38,38 +36,6 @@ impl AdminSvc {
 
     async fn open_named<T>(&self, request: &Request<T>, repo: &str) -> Result<Opened> {
         open(&self.state, request, repo).await
-    }
-}
-
-/// `repo:<repo>` or `path:<repo>/<dir>` to (repo, authorizer object).
-fn parse_object(object: &str) -> Result<(String, String)> {
-    if let Some(repo) = object.strip_prefix("repo:") {
-        if repo.is_empty() || repo.contains('/') {
-            return Err(Error::invalid(format!("invalid object {object:?}")));
-        }
-        return Ok((
-            repo.to_string(),
-            rill_policy::rebac::REPO_OBJECT.to_string(),
-        ));
-    }
-    if let Some(rest) = object.strip_prefix("path:") {
-        let (repo, dir) = rest.split_once('/').unwrap_or((rest, ""));
-        let dir = RepoPathBuf::new(dir)?;
-        return Ok((repo.to_string(), rill_policy::rebac::dir_object(&dir)));
-    }
-    Err(Error::invalid(format!(
-        "object {object:?} must be repo:<repo> or path:<repo>/<dir>"
-    )))
-}
-
-/// The inverse of [`parse_object`].
-fn format_object(repo: &str, object: &str) -> String {
-    if object == rill_policy::rebac::REPO_OBJECT {
-        return format!("repo:{repo}");
-    }
-    match object.strip_prefix("dir:/") {
-        Some(dir) => format!("path:{repo}/{dir}"),
-        None => format!("{repo}:{object}"),
     }
 }
 
@@ -119,15 +85,6 @@ fn capability_protos(repo_name: &str, cap: &Capability) -> Vec<pb::Capability> {
         }
     }
     out
-}
-
-fn parse_subject(subject: &str) -> Result<Subject> {
-    let trimmed = subject.strip_suffix("#member").unwrap_or(subject);
-    Ok(trimmed.parse::<Subject>()?)
-}
-
-fn parse_relation(relation: &str) -> Result<Relation> {
-    Ok(relation.parse::<Relation>()?)
 }
 
 /// `<repo>/<policy>`.
@@ -255,95 +212,6 @@ impl AdminService for AdminSvc {
                 expires_at: timestamp_to_proto(expires_at),
             }))
         })
-        .await;
-        result.map_err(Status::from)
-    }
-
-    async fn add_relation(
-        &self,
-        request: Request<pb::AddRelationRequest>,
-    ) -> GrpcResult<pb::AddRelationResponse> {
-        let result: crate::error::Result<Response<pb::AddRelationResponse>> =
-            idem::once(&self.state, request, |request| async move {
-                let rel = request
-                    .get_ref()
-                    .relation
-                    .clone()
-                    .ok_or_else(|| Error::invalid("relation is required"))?;
-                let (repo, object) = parse_object(&rel.object)?;
-                let opened = self.open_named(&request, &repo).await?;
-                opened.permit().admin().await?;
-                opened
-                    .repo
-                    .authorizer
-                    .grant(
-                        &object,
-                        parse_relation(&rel.relation)?,
-                        &parse_subject(&rel.subject)?,
-                        opened.principal(),
-                    )
-                    .await?;
-                Ok(Response::new(pb::AddRelationResponse {}))
-            })
-            .await;
-        result.map_err(Status::from)
-    }
-
-    async fn remove_relation(
-        &self,
-        request: Request<pb::RemoveRelationRequest>,
-    ) -> GrpcResult<pb::RemoveRelationResponse> {
-        let result: crate::error::Result<Response<pb::RemoveRelationResponse>> =
-            idem::once(&self.state, request, |request| async move {
-                let rel = request
-                    .get_ref()
-                    .relation
-                    .clone()
-                    .ok_or_else(|| Error::invalid("relation is required"))?;
-                let (repo, object) = parse_object(&rel.object)?;
-                let opened = self.open_named(&request, &repo).await?;
-                opened.permit().admin().await?;
-                opened
-                    .repo
-                    .authorizer
-                    .revoke(
-                        &object,
-                        parse_relation(&rel.relation)?,
-                        &parse_subject(&rel.subject)?,
-                        opened.principal(),
-                    )
-                    .await?;
-                Ok(Response::new(pb::RemoveRelationResponse {}))
-            })
-            .await;
-        result.map_err(Status::from)
-    }
-
-    async fn list_relations(
-        &self,
-        request: Request<pb::ListRelationsRequest>,
-    ) -> GrpcResult<pb::ListRelationsResponse> {
-        let result: crate::error::Result<Response<pb::ListRelationsResponse>> = async {
-            let req = request.get_ref();
-            let (repo, object) = parse_object(&req.object)?;
-            let opened = self.open_named(&request, &repo).await?;
-            opened.permit().read(&RepoPathBuf::root()).await?;
-            let filter = req.relation.clone().filter(|r| !r.is_empty());
-            let relations = opened
-                .repo
-                .repo
-                .relations_of(&object)
-                .await?
-                .into_iter()
-                .filter(|(rel, _)| filter.as_ref().is_none_or(|f| f == rel))
-                .map(|(relation, subject)| pb::Relation {
-                    object: format_object(&opened.repo.config.name, &object),
-                    relation,
-                    subject,
-                })
-                .collect();
-            Ok(Response::new(pb::ListRelationsResponse { relations }))
-        }
         .await;
         result.map_err(Status::from)
     }
@@ -548,18 +416,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_objects_scopes_and_names() {
-        assert_eq!(
-            parse_object("repo:main").unwrap(),
-            ("main".into(), "repo".into())
-        );
-        assert_eq!(
-            parse_object("path:main/src/auth").unwrap(),
-            ("main".into(), "dir:/src/auth".into())
-        );
-        assert!(parse_object("team:x").is_err());
-        assert_eq!(format_object("main", "dir:/src"), "path:main/src");
-        assert_eq!(format_object("main", "repo"), "repo:main");
+    fn parses_scopes_and_names() {
         assert_eq!(
             parse_scope("repo:main/src/*").unwrap(),
             ("main".into(), RepoPathBuf::new("src").unwrap())
@@ -571,8 +428,5 @@ mod tests {
             ("main".into(), "submit".into())
         );
         assert!(parse_policy_name("submit").is_err());
-        assert!(
-            matches!(parse_subject("team:infra#member").unwrap(), Subject::Team(t) if t == "infra")
-        );
     }
 }

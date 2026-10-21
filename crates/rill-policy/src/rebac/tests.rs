@@ -51,9 +51,8 @@ async fn rewrites_owner_writer_reader() {
     }
     assert!(auth.check(&bob, &[], Relation::Writer, "repo").await);
     assert!(auth.check(&bob, &[], Relation::Reader, "repo").await);
-    assert!(auth.check(&bob, &[], Relation::Contributor, "repo").await);
+    assert!(auth.check(&bob, &[], Relation::Reviewer, "repo").await);
     assert!(!auth.check(&bob, &[], Relation::Owner, "repo").await);
-    assert!(!auth.check(&bob, &[], Relation::Reviewer, "repo").await);
     assert!(auth.check(&carol, &[], Relation::Reader, "repo").await);
     assert!(!auth.check(&carol, &[], Relation::Writer, "repo").await);
 }
@@ -123,13 +122,14 @@ async fn teams_kinds_and_wildcards() {
     assert!(auth.check(&alice, &core, Relation::Writer, "repo").await);
     assert!(!auth.check(&alice, &[], Relation::Writer, "repo").await);
     assert!(auth.check(&bot, &[], Relation::Reviewer, "repo").await);
+    assert!(auth.check(&bot, &[], Relation::Reader, "repo").await);
+    assert!(!auth.check(&bot, &[], Relation::Writer, "repo").await);
     assert!(!auth.check(&alice, &[], Relation::Reviewer, "repo").await);
     assert!(
         auth.check(&alice, &[], Relation::Reader, "dir:/docs/x")
             .await
     );
     assert!(auth.check(&bot, &[], Relation::Reader, "dir:/docs").await);
-    assert!(!auth.check(&bot, &[], Relation::Reader, "repo").await);
 }
 
 #[tokio::test]
@@ -147,14 +147,15 @@ async fn revoke_and_cache_invalidation() {
         .unwrap();
     assert!(!auth.check(&alice, &[], Relation::Reader, "repo").await);
 
-    // A write that bypasses the authorizer is invisible until invalidated.
-    auth.repo()
+    // Another server's write is seen by asking for its version.
+    let version = auth
+        .repo()
         .add_relation("repo", "reader", &subj.to_string(), &admin())
         .await
         .unwrap();
     assert!(!auth.check(&alice, &[], Relation::Reader, "repo").await);
-    auth.invalidate();
-    assert!(auth.check(&alice, &[], Relation::Reader, "repo").await);
+    let snap = auth.snapshot_at_least(version).await.unwrap();
+    assert!(snap.check(&alice, &[], Relation::Reader, "repo"));
 }
 
 #[tokio::test]

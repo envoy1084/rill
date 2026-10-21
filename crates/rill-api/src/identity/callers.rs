@@ -173,6 +173,7 @@ impl IdentityView {
             capability: verified.capability,
             claims: Some(verified.claims),
             scope,
+            relations_seen: Vec::new(),
         })
     }
 }

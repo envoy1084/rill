@@ -5687,6 +5687,7 @@ dependencies = [
  "globset",
  "hex",
  "p256",
+ "parking_lot",
  "rand 0.10.3",
  "rill-store",
  "rill-types",

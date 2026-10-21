@@ -39,7 +39,8 @@ in, without it. It also registers `tonic-reflection` and
 | `ReviewService` | `review.proto` | `services/review/` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand`, `GetLandStatus`, `WatchReview` |
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
-| `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
+| `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
+| `AccessService` | `access.proto` | `services/access/` | `AddRelation`, `RemoveRelation`, `ListRelations`, `Check`, `Expand`, `LookupPaths` ([permissions](../05-policy/permissions.md#accessservice)) |
 | `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser`, agents (`RegisterAgent`, `UpdateAgent`, `ListAgents`), workload issuers (`Put`/`List`/`DeleteWorkloadIssuer`), `KillSwitch`, SCIM credentials ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
 | `SessionService` | `identity.proto` | `services/session.rs` | `ListSignInProviders`, `ExchangeToken`, `RefreshSession`; no auth layer ([sign-in](../05-policy/identity-and-auth.md#sign-in)) |
 
@@ -58,8 +59,9 @@ watches behave.
 `LandStatus` on the wire is `QUEUED | REBASING | LANDED | FAILED | CANCELLED`.
 `land_status_proto` folds `Verifying` and `Landing` into `REBASING`,
 `Conflict` into `FAILED`, and `Returned` into `CANCELLED`. Admin requests
-have no `repo` field. The repository is named inside the relation object,
-the token scope, or the policy name (`<repo>/submit`, `<repo>/risk`).
+have no `repo` field. The repository is named inside the token scope or the
+policy name (`<repo>/submit`, `<repo>/risk`); access tuples carry `repo` and
+`path` fields.
 
 ## Message conventions
 

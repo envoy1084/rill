@@ -24,6 +24,7 @@
 
 #![warn(missing_docs)]
 
+pub mod access;
 pub mod admin;
 pub mod auth;
 pub mod client;
@@ -39,6 +40,7 @@ pub mod stream;
 pub mod types;
 pub mod workspace;
 
+pub use access::AccessClient;
 pub use admin::AdminClient;
 pub use client::Client;
 pub use config::{ClientConfig, SessionConfig, TlsOptions};

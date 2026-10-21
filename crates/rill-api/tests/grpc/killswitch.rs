@@ -85,11 +85,12 @@ async fn repo(server: &TestServer) {
         })
         .await
         .unwrap();
-    c.admin
+    c.access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
             relation: Some(pb::Relation {
-                object: "repo:r".into(),
+                repo: "r".into(),
+                path: String::new(),
                 relation: "writer".into(),
                 subject: format!("principal:{}", Principal::agent("bot").id),
             }),

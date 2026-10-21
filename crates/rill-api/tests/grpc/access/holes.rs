@@ -61,7 +61,7 @@ fn subtree_version(acl: &Acl, at: &str, change: SubtreeChange) -> pb::ChangeVers
 #[tokio::test]
 async fn subtree_changes_need_write_on_the_target_and_read_on_the_source() {
     let mut acl = Acl::start().await;
-    acl.grant("dir:/pub", "writer", &bob()).await;
+    acl.grant("pub", "writer", &bob()).await;
     let mut c = acl.as_principal(&bob()).await;
     let attempts = [
         (

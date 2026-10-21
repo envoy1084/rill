@@ -108,51 +108,6 @@ pub struct IssuedToken {
     pub expires_at: Timestamp,
 }
 
-/// A ReBAC tuple: `subject` has `relation` on `object`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Relation {
-    /// `repo:main`, `path:main/src/auth`, `team:infra`, ...
-    pub object: String,
-    /// `owner`, `reviewer`, `member`, ...
-    pub relation: String,
-    /// `principal:pr_...`, `team:infra#member`, ...
-    pub subject: String,
-}
-
-impl Relation {
-    /// Build a tuple.
-    pub fn new(
-        object: impl Into<String>,
-        relation: impl Into<String>,
-        subject: impl Into<String>,
-    ) -> Self {
-        Relation {
-            object: object.into(),
-            relation: relation.into(),
-            subject: subject.into(),
-        }
-    }
-
-    /// Wire encoding.
-    pub fn to_proto(&self) -> pb::Relation {
-        pb::Relation {
-            object: self.object.clone(),
-            relation: self.relation.clone(),
-            subject: self.subject.clone(),
-        }
-    }
-}
-
-impl From<pb::Relation> for Relation {
-    fn from(r: pb::Relation) -> Self {
-        Relation {
-            object: r.object,
-            relation: r.relation,
-            subject: r.subject,
-        }
-    }
-}
-
 /// A named Cedar policy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Policy {

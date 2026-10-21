@@ -1,4 +1,4 @@
-// Admin service: identity, capability tokens, relationships and policies.
+// Admin service: identity, capability tokens and policies.
 syntax = "proto3";
 
 package rill.v1;
@@ -8,9 +8,6 @@ import "rill/v1/types.proto";
 service AdminService {
   rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse);
   rpc IssueToken(IssueTokenRequest) returns (IssueTokenResponse);
-  rpc AddRelation(AddRelationRequest) returns (AddRelationResponse);
-  rpc RemoveRelation(RemoveRelationRequest) returns (RemoveRelationResponse);
-  rpc ListRelations(ListRelationsRequest) returns (ListRelationsResponse);
   rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
   rpc SetPolicy(SetPolicyRequest) returns (SetPolicyResponse);
   rpc Health(HealthRequest) returns (HealthResponse);
@@ -83,36 +80,6 @@ message IssueTokenRequest {
 message IssueTokenResponse {
   string token = 1;
   int64 expires_at = 2;
-}
-
-// A ReBAC tuple: `subject` has `relation` on `object`.
-message Relation {
-  // `repo:main`, `path:main/src/auth`, `team:infra`, `intent:in_...`.
-  string object = 1;
-  // `owner`, `reviewer`, `member`, `lander`, ...
-  string relation = 2;
-  // `principal:pr_...`, `team:infra#member`.
-  string subject = 3;
-}
-
-message AddRelationRequest {
-  bytes operation_id = 1;
-  Relation relation = 2;
-}
-message AddRelationResponse {}
-
-message RemoveRelationRequest {
-  bytes operation_id = 1;
-  Relation relation = 2;
-}
-message RemoveRelationResponse {}
-
-message ListRelationsRequest {
-  string object = 1;
-  optional string relation = 2;
-}
-message ListRelationsResponse {
-  repeated Relation relations = 1;
 }
 
 message GetPolicyRequest {

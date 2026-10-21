@@ -98,11 +98,12 @@ path globs, size, agent-resolved conflicts) and the reasons are shown by
 A freshly created repo grants its creator `owner`. Add relations with
 
 ```
-rill admin relation add repo owner team:platform
-rill admin relation add dir:/billing reader kind:agent
+rill access grant team:platform owner
+rill access grant kind:agent reader billing
+rill access who writer billing        # everyone who may write there
 ```
 
-Owner ⊇ writer ⊇ reader; directory grants inherit downward. Capability
+Owner ⊇ writer ⊇ reviewer ⊇ reader; directory grants inherit downward. Capability
 tokens for agents: `rill admin token issue --repo demo --verbs read,write
 --paths src/ --expires 2h`. A holder can derive a narrower token offline
 (`attenuate` in the SDK) but never a wider one.

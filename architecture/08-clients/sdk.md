@@ -12,6 +12,7 @@ flowchart LR
     Cfg[ClientConfig] --> Cl[Client<br/>Channel + AuthInterceptor]
     Cl --> Repo[RepoClient]
     Cl --> Admin[AdminClient]
+    Cl --> Access[AccessClient]
     Repo --> WS[WorkspaceClient]
     Repo --> Rv[ReviewClient]
     Repo --> In[IntentClient]
@@ -21,8 +22,12 @@ flowchart LR
 ```
 
 A `Client` is one HTTP/2 `Channel` plus an `AuthInterceptor`. The
-interceptor adds `authorization: Bearer <token>` when a token is set and
-nothing otherwise. `Client::repo(name_or_id)` returns a `RepoClient`, which
+interceptor adds `authorization: Bearer <token>` when a token is set, and
+`x-rill-relations` with the relation versions the client has seen
+(`Client::relations_seen`, shared by clones). `AccessClient::grant` and
+`revoke` record the version they produce, so every server honours a change
+on the client's next request
+([permissions](../05-policy/permissions.md#consistency-across-servers)). `Client::repo(name_or_id)` returns a `RepoClient`, which
 puts the repository on every request and hands out the per-service clients.
 Inputs and outputs are `rill-types` values where one exists. Otherwise they
 are small structs in `types/`.

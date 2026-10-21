@@ -95,7 +95,7 @@ Storage is `memory`, `local:<dir>` (objects as files, metadata in redb) or
 Biscuit signed by the instance's P-256 keys, which a key service (a local
 master key, Vault, AWS KMS or Google Cloud KMS) wraps; the first comes from
 `rill api mint-token`, narrower ones from `rill admin token issue`. Per-directory permissions are relationship tuples
-(`rill admin relation add dir:/billing owner principal:<id>`). Submit rules are
+(`rill access grant user:ann owner billing`). Submit rules are
 Cedar policies (`rill admin policy set <repo>/submit`). `RILL_*` environment
 variables override individual keys.
 

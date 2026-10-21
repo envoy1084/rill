@@ -1,26 +1,29 @@
 //! The permission check every handler runs before touching a repository.
 //!
-//! Two layers must both agree:
+//! Every layer must agree:
 //!
 //! 1. the caller's capability token, if it has one, must allow the verb on
-//!    the path (`AuthContext::capability_allows`); a token is an
-//!    attenuation of whatever the principal could otherwise do, so this is
-//!    enforced even in dev mode;
-//! 2. the ReBAC relations stored on the repository must grant the relation
-//!    on the path's directory or an ancestor (`Authorizer::check_path`).
+//!    the path (`AuthContext::capability_allows`); a token attenuates what
+//!    the principal could otherwise do, so this holds even in dev mode;
+//! 2. a registered agent is held to the repositories and paths its
+//!    registration names;
+//! 3. the ReBAC relations on the repository must grant the relation on
+//!    the path's directory or an ancestor, or the caller administers the
+//!    repository's organization (which makes it an owner of every
+//!    repository there).
 //!
-//! A registered agent is also held to the repositories and paths its
-//! registration names, before either layer.
-//!
-//! The second layer is skipped in dev mode and for a repository that has
-//! no relation tuples at all. The latter is the bootstrap rule: a fresh
-//! repository is open until someone grants the first relation, at which
-//! point only granted principals get in. `CreateRepo` grants `owner` to
-//! the creator, so repositories made through the API are never in the
-//! open state unless the creator removes themselves.
+//! The third layer is skipped in dev mode. Outside it a repository with no
+//! tuples is closed to all but org administrators; `CreateRepo` makes its
+//! creator the owner. Checks reflect at least the relation version the
+//! caller says it has seen, so a grant or revoke is honoured by every
+//! server from the next request of whoever made it.
 
+use std::sync::Arc;
+
+use rill_policy::rebac::Snapshot;
 use rill_policy::{AuthContext, PathFilter, Relation, Verb};
 use rill_types::{PrincipalKind, RepoPath, RepoPathBuf};
+use tokio::sync::OnceCell;
 
 use crate::error::{Error, Result};
 use crate::state::RepoContext;
@@ -30,6 +33,7 @@ pub struct Permit<'a> {
     ctx: &'a AuthContext,
     repo: &'a RepoContext,
     dev_mode: bool,
+    org_admin: OnceCell<bool>,
 }
 
 impl<'a> Permit<'a> {
@@ -39,6 +43,7 @@ impl<'a> Permit<'a> {
             ctx,
             repo,
             dev_mode,
+            org_admin: OnceCell::new(),
         }
     }
 
@@ -88,7 +93,7 @@ impl<'a> Permit<'a> {
         })
     }
 
-    /// Run both layers for `verb`/`relation` on `path`.
+    /// Run every layer for `verb`/`relation` on `path`.
     pub async fn check(&self, verb: Verb, relation: Relation, path: &RepoPath) -> Result<()> {
         let owned = path.to_owned();
         if !self.ctx.capability_allows(self.repo.id(), &owned, verb) {
@@ -109,36 +114,36 @@ impl<'a> Permit<'a> {
                 )));
             }
         }
-        if self.dev_mode || self.bootstrap().await? {
+        if self.dev_mode {
             return Ok(());
         }
-        let allowed = self
-            .repo
-            .authorizer
-            .check_path(&self.ctx.principal, &self.ctx.teams, relation, path)
-            .await;
-        if allowed {
-            Ok(())
-        } else {
-            Err(Error::denied(format!(
-                "{} is not {relation} of {} in repository {}",
-                self.ctx.principal,
-                describe(path),
-                self.repo.config.name
-            )))
+        let object = rill_policy::rebac::dir_object(path);
+        let snapshot = self.snapshot().await?;
+        if snapshot.check(&self.ctx.principal, &self.ctx.teams, relation, &object)
+            || self.org_admin().await?
+        {
+            return Ok(());
         }
+        Err(Error::denied(format!(
+            "{} is not {relation} of {} in repository {}",
+            self.ctx.principal,
+            describe(path),
+            self.repo.config.name
+        )))
     }
 
     /// A filter over paths the caller may read, for listings and diffs
     /// that must not leak names of directories the caller cannot see.
     pub async fn read_filter(&self) -> Result<PathFilter> {
-        let relations = if self.dev_mode || self.bootstrap().await? {
+        let relations = if self.dev_mode || self.org_admin().await? {
             PathFilter::allow_all()
         } else {
-            self.repo
-                .authorizer
-                .allowed_paths_for(&self.ctx.principal, &self.ctx.teams, Relation::Reader)
-                .await
+            let snapshot = self.snapshot().await?;
+            PathFilter::under(snapshot.granted_dirs(
+                &self.ctx.principal,
+                &self.ctx.teams,
+                Relation::Reader,
+            ))
         };
         let relations = match self.ctx.capability.clone() {
             None => relations,
@@ -146,7 +151,7 @@ impl<'a> Permit<'a> {
                 if cap.repo != self.repo.id() || !cap.allows(Verb::Read) {
                     return Ok(PathFilter::deny_all());
                 }
-                PathFilter::new(move |p| cap.covers_path(p) && relations.allows(p))
+                relations.and(PathFilter::new(move |p| cap.covers_path(p)))
             }
         };
         Ok(match self.ctx.scope.clone() {
@@ -156,7 +161,7 @@ impl<'a> Permit<'a> {
                 if !scope.covers_repo(&config.org, &config.name) {
                     return Ok(PathFilter::deny_all());
                 }
-                PathFilter::new(move |p| scope.covers_path(p) && relations.allows(p))
+                relations.and(PathFilter::new(move |p| scope.covers_path(p)))
             }
         })
     }
@@ -170,9 +175,32 @@ impl<'a> Permit<'a> {
         }
     }
 
-    async fn bootstrap(&self) -> Result<bool> {
-        let snapshot = self.repo.authorizer.snapshot().await?;
-        Ok(snapshot.tuples().is_empty())
+    /// The tuples as of at least the version the caller has seen. A
+    /// version the store has not reached is a forged or foreign token.
+    async fn snapshot(&self) -> Result<Arc<Snapshot>> {
+        let seen = self.ctx.relations_seen_in(self.repo.id());
+        let snapshot = self.repo.authorizer.snapshot_at_least(seen).await?;
+        if snapshot.version() < seen {
+            return Err(Error::invalid(format!(
+                "relation version {seen} is newer than repository {} has",
+                self.repo.config.name
+            )));
+        }
+        Ok(snapshot)
+    }
+
+    async fn org_admin(&self) -> Result<bool> {
+        self.org_admin
+            .get_or_try_init(|| {
+                crate::auth::administers_org(
+                    &self.repo.identity,
+                    self.dev_mode,
+                    self.ctx,
+                    &self.repo.config.org,
+                )
+            })
+            .await
+            .copied()
     }
 }
 

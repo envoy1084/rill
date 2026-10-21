@@ -58,6 +58,8 @@ pub struct RepoContext {
     pub search: Arc<SearchIndex>,
     /// ReBAC relation checks.
     pub authorizer: Arc<Authorizer>,
+    /// Users, agents and org roles, for org administrators' access.
+    pub identity: Arc<crate::identity::IdentityView>,
     /// Vote labels.
     pub labels: Arc<LabelSet>,
     /// Cancelled when the server shuts down; long-lived streams and
@@ -365,6 +367,7 @@ impl RepoRegistry {
             runner,
             search,
             authorizer,
+            identity: self.identity.clone(),
             labels,
             shutdown: self.lifecycle.stop.child_token(),
             lifecycle: self.lifecycle.clone(),

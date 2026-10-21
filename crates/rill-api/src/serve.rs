@@ -3,6 +3,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use rill_proto::rill::v1::access_service_server::AccessServiceServer;
 use rill_proto::rill::v1::admin_service_server::AdminServiceServer;
 use rill_proto::rill::v1::identity_service_server::IdentityServiceServer;
 use rill_proto::rill::v1::intent_service_server::IntentServiceServer;
@@ -21,7 +22,8 @@ use crate::auth::{AuthLayer, AuthService};
 use crate::error::{Error, Result};
 use crate::objects;
 use crate::services::{
-    AdminSvc, IdentitySvc, IntentSvc, LanderSvc, RepoSvc, ReviewSvc, SessionSvc, WorkspaceSvc,
+    AccessSvc, AdminSvc, IdentitySvc, IntentSvc, LanderSvc, RepoSvc, ReviewSvc, SessionSvc,
+    WorkspaceSvc,
 };
 use crate::state::AppState;
 
@@ -147,6 +149,7 @@ async fn serve_grpc(
         .add_service(auth.layer(IntentServiceServer::new(IntentSvc::new(state.clone()))))
         .add_service(auth.layer(LanderServiceServer::new(LanderSvc::new(state.clone()))))
         .add_service(auth.layer(IdentityServiceServer::new(IdentitySvc::new(state.clone()))))
+        .add_service(auth.layer(AccessServiceServer::new(AccessSvc::new(state.clone()))))
         .add_service(auth.layer(AdminServiceServer::new(AdminSvc::new(state))))
         .serve_with_incoming_shutdown(grpc_incoming(listener), shutdown.cancelled_owned())
         .await
@@ -211,6 +214,7 @@ async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bo
         <IntentServiceServer<IntentSvc> as tonic::server::NamedService>::NAME,
         <LanderServiceServer<LanderSvc> as tonic::server::NamedService>::NAME,
         <AdminServiceServer<AdminSvc> as tonic::server::NamedService>::NAME,
+        <AccessServiceServer<AccessSvc> as tonic::server::NamedService>::NAME,
         <IdentityServiceServer<IdentitySvc> as tonic::server::NamedService>::NAME,
         <SessionServiceServer<SessionSvc> as tonic::server::NamedService>::NAME,
     ] {

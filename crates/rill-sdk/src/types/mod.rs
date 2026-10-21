@@ -1,6 +1,7 @@
 //! SDK-only types: values the API exposes that have no `rill-types`
 //! counterpart, plus typed inputs to write RPCs.
 
+mod access;
 mod admin;
 mod diff;
 mod edit;
@@ -14,9 +15,8 @@ mod root;
 mod search;
 mod workspace;
 
-pub use admin::{
-    Capability, ComponentHealth, Health, IssuedToken, Policy, Relation, TokenRequest, WhoAmI,
-};
+pub use access::{AccessCheck, ExpandedRelation, Relation, RelationFilter};
+pub use admin::{Capability, ComponentHealth, Health, IssuedToken, Policy, TokenRequest, WhoAmI};
 pub use diff::{DiffFormat, DiffLine, DiffOp, DiffOptions, DiffResult, FileDiff, Hunk};
 pub(crate) use edit::set_content_proto;
 pub use edit::{ApplyOptions, Edit, EditBase, MergeOptions, Resolution, VersionResult};

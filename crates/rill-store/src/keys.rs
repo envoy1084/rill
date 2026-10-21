@@ -90,6 +90,11 @@ pub mod table {
     pub const REPO_BY_NAME: &str = "repon";
     /// `(rebac, ns, repo, object, relation, subject)` → empty
     pub const REBAC: &str = "rebac";
+    /// `(rebacs, ns, repo, subject, object, relation)` → empty; the same
+    /// tuples by subject
+    pub const REBAC_BY_SUBJECT: &str = "rebacs";
+    /// `(rebacv, ns, repo)` → counter bumped by every relation change
+    pub const REBAC_VERSION: &str = "rebacv";
     /// `(misc, ns, repo, name)` → small values (policy, rings, cursors)
     pub const MISC: &str = "misc";
     /// `(meta, "format")` → store format
@@ -355,6 +360,14 @@ impl RepoKeys {
 
     pub fn relations_of(&self, object: &str) -> Bytes {
         self.row(table::REBAC, &object)
+    }
+
+    pub fn relation_by_subject(&self, subject: &str, object: &str, relation: &str) -> Bytes {
+        self.row(table::REBAC_BY_SUBJECT, &(subject, object, relation))
+    }
+
+    pub fn relations_of_subject(&self, subject: &str) -> Bytes {
+        self.row(table::REBAC_BY_SUBJECT, &subject)
     }
 
     pub fn misc(&self, name: &str) -> Bytes {

@@ -1,4 +1,4 @@
-//! Admin: identity, capability tokens, relationships, policies and health.
+//! Admin: identity, capability tokens, policies and health.
 
 use rill_proto::convert::{id_to_proto, timestamp_from_proto};
 use rill_proto::rill::v1 as pb;
@@ -6,7 +6,7 @@ use rill_types::{OperationId, Timestamp};
 
 use crate::client::Client;
 use crate::error::Result;
-use crate::types::{Health, IssuedToken, OrgInfo, Policy, Relation, TokenRequest, WhoAmI};
+use crate::types::{Health, IssuedToken, OrgInfo, Policy, TokenRequest, WhoAmI};
 
 /// Instance-wide administrative operations; not scoped to a repository.
 #[derive(Clone, Debug)]
@@ -62,69 +62,6 @@ impl AdminClient {
             token: resp.token,
             expires_at: timestamp_from_proto(resp.expires_at),
         })
-    }
-
-    /// Add a ReBAC tuple.
-    pub async fn add_relation(&self, relation: &Relation) -> Result<()> {
-        self.add_relation_with_op(OperationId::new(), relation)
-            .await
-    }
-
-    /// [`AdminClient::add_relation`] with a caller-chosen idempotency key.
-    pub async fn add_relation_with_op(&self, op: OperationId, relation: &Relation) -> Result<()> {
-        let request = pb::AddRelationRequest {
-            operation_id: id_to_proto(&op),
-            relation: Some(relation.to_proto()),
-        };
-        crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
-            async move { svc.add_relation(request).await }
-        })
-        .await?;
-        Ok(())
-    }
-
-    /// Remove a ReBAC tuple.
-    pub async fn remove_relation(&self, relation: &Relation) -> Result<()> {
-        self.remove_relation_with_op(OperationId::new(), relation)
-            .await
-    }
-
-    /// [`AdminClient::remove_relation`] with a caller-chosen idempotency key.
-    pub async fn remove_relation_with_op(
-        &self,
-        op: OperationId,
-        relation: &Relation,
-    ) -> Result<()> {
-        let request = pb::RemoveRelationRequest {
-            operation_id: id_to_proto(&op),
-            relation: Some(relation.to_proto()),
-        };
-        crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
-            async move { svc.remove_relation(request).await }
-        })
-        .await?;
-        Ok(())
-    }
-
-    /// Tuples on an object, optionally restricted to one relation.
-    pub async fn list_relations(
-        &self,
-        object: &str,
-        relation: Option<&str>,
-    ) -> Result<Vec<Relation>> {
-        let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
-            let request = pb::ListRelationsRequest {
-                object: object.to_string(),
-                relation: relation.map(str::to_string),
-            };
-            async move { svc.list_relations(request).await }
-        })
-        .await?
-        .into_inner();
-        Ok(resp.relations.into_iter().map(Relation::from).collect())
     }
 
     /// A named policy.

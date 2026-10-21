@@ -119,8 +119,9 @@ Narrow tokens: `rill admin token issue --for agent:fixer --repo app
 
 ## 9. Team setup
 
-    rill admin relation add repo writer team:backend
-    rill admin relation add dir:/billing owner principal:<id>
+    rill --repo app access grant team:backend writer
+    rill --repo app access grant user:ann owner billing
+    rill --repo app access check writer billing --as user:ann   # and why
     rill admin policy get app/submit > submit.cedar   # edit, then policy set
     rill admin policy get app/risk > risk.json        # add sensitive globs
 

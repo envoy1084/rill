@@ -2,6 +2,7 @@
 //! clap argument types and `run` functions that take the shared
 //! [`Ctx`](crate::context::Ctx).
 
+pub mod access;
 pub mod admin;
 pub mod change;
 pub mod checkout;
@@ -75,6 +76,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Ws(cmd) => ws::run(ctx, cmd).await,
         Command::Ref(cmd) => refs::run(ctx, cmd).await,
         Command::Admin(cmd) => admin::run(ctx, cmd).await,
+        Command::Access(cmd) => access::run(ctx, cmd).await,
         Command::Login(args) => session::login(ctx, args).await,
         Command::Logout => session::logout(ctx).await,
         Command::Import(cmd) => import::run(ctx, cmd).await,

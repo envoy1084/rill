@@ -79,8 +79,14 @@ where
                 .get(AUTHORIZATION)
                 .and_then(|v| v.to_str().ok())
                 .map(str::to_owned);
+            let seen = request
+                .headers()
+                .get(super::context::RELATIONS_SEEN_HEADER)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned);
             match authenticate(&state, header.as_deref()).await {
-                Ok(ctx) => {
+                Ok(mut ctx) => {
+                    ctx.relations_seen = super::context::relations_seen(seen.as_deref());
                     tracing::Span::current().record("principal", ctx.principal.name.as_str());
                     request.extensions_mut().insert::<AuthContext>(ctx);
                     inner.call(request).await

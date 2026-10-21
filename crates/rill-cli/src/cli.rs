@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    admin, change, checkout, history, import, intent, land, org, refs, repo, review, stack, status,
-    watch, ws,
+    access, admin, change, checkout, history, import, intent, land, org, refs, repo, review, stack,
+    status, watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -169,9 +169,13 @@ pub enum Command {
     /// End the stored session for the server.
     Logout,
 
-    /// Identity, tokens, relations, policies and health.
+    /// Identity, tokens, policies and health.
     #[command(subcommand)]
     Admin(admin::AdminCmd),
+
+    /// Who may read, review, write or own what in a repository.
+    #[command(subcommand)]
+    Access(access::AccessCmd),
 
     /// Import history from another system (git).
     #[command(subcommand)]

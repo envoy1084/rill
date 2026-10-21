@@ -4,6 +4,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use rill_proto::rill::v1::access_service_client::AccessServiceClient;
 use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
 use rill_proto::rill::v1::intent_service_client::IntentServiceClient;
@@ -17,17 +18,44 @@ use tonic::service::Interceptor;
 use tonic::transport::{Channel, Endpoint};
 use tonic::{Request, Status};
 
+use crate::access::AccessClient;
 use crate::admin::AdminClient;
 use crate::auth::{SessionSource, StaticToken, TokenSource, WorkloadSource};
 use crate::config::ClientConfig;
 use crate::error::{Error, Result};
 use crate::repo::RepoClient;
 
+/// Relation versions this client has observed, by repository id. Every
+/// request names them so any server answers with at least those tuples.
+#[derive(Clone, Debug, Default)]
+pub struct RelationsSeen(Arc<parking_lot::Mutex<std::collections::BTreeMap<String, i64>>>);
+
+impl RelationsSeen {
+    /// Remember that `repo_id` reached `version`.
+    pub fn observe(&self, repo_id: &str, version: i64) {
+        let mut seen = self.0.lock();
+        let entry = seen.entry(repo_id.to_string()).or_default();
+        *entry = (*entry).max(version);
+    }
+
+    fn header(&self) -> Option<String> {
+        let seen = self.0.lock();
+        (!seen.is_empty()).then(|| {
+            seen.iter()
+                .map(|(repo, v)| format!("{repo}={v}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        })
+    }
+}
+
 /// Attaches `authorization: Bearer <token>` to every outgoing request, the
-/// token read from the client's token source each time.
+/// token read from the client's token source each time, and the relation
+/// versions the client has seen.
 #[derive(Clone)]
 pub struct AuthInterceptor {
     source: Option<Arc<dyn TokenSource>>,
+    seen: RelationsSeen,
 }
 
 impl std::fmt::Debug for AuthInterceptor {
@@ -46,6 +74,9 @@ impl Interceptor for AuthInterceptor {
                     .parse()
                     .map_err(|_| Status::unauthenticated("token contains non-ASCII characters"))?;
             request.metadata_mut().insert("authorization", header);
+        }
+        if let Some(value) = self.seen.header().and_then(|h| h.parse().ok()) {
+            request.metadata_mut().insert("x-rill-relations", value);
         }
         // An id per request, so a failure here and the server's log lines
         // for it can be matched.
@@ -107,6 +138,8 @@ pub type IntentSvc = IntentServiceClient<Svc>;
 pub type LanderSvc = LanderServiceClient<Svc>;
 /// Generated admin client over the SDK transport.
 pub type AdminSvc = AdminServiceClient<Svc>;
+/// Generated access client over the SDK transport.
+pub type AccessSvc = AccessServiceClient<Svc>;
 /// Generated identity client over the SDK transport.
 pub type IdentitySvc = IdentityServiceClient<Svc>;
 
@@ -144,6 +177,7 @@ impl Client {
                     channel,
                     auth: AuthInterceptor {
                         source: Some(source),
+                        seen: RelationsSeen::default(),
                     },
                 });
             }
@@ -182,7 +216,10 @@ impl Client {
             }
             (None, None) => None,
         };
-        let auth = AuthInterceptor { source };
+        let auth = AuthInterceptor {
+            source,
+            seen: RelationsSeen::default(),
+        };
         Ok(Client {
             config,
             channel,
@@ -224,9 +261,19 @@ impl Client {
         RepoClient::new(self.clone(), name_or_id.into())
     }
 
-    /// Identity, tokens, relations and policies.
+    /// Identity, tokens and policies.
     pub fn admin(&self) -> AdminClient {
         AdminClient::new(self.clone())
+    }
+
+    /// Relationship tuples and questions about them.
+    pub fn access(&self) -> AccessClient {
+        AccessClient::new(self.clone())
+    }
+
+    /// Relation versions this client has seen; shared by its clones.
+    pub fn relations_seen(&self) -> &RelationsSeen {
+        &self.auth.seen
     }
 
     /// The underlying channel, for services the SDK does not wrap.
@@ -266,6 +313,11 @@ impl Client {
     /// A fresh generated admin client.
     pub fn admin_svc(&self) -> AdminSvc {
         AdminServiceClient::new(self.svc())
+    }
+
+    /// A fresh generated access client.
+    pub fn access_svc(&self) -> AccessSvc {
+        AccessServiceClient::new(self.svc())
     }
 
     /// A fresh generated identity client.

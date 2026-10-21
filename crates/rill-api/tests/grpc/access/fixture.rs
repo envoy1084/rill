@@ -24,6 +24,38 @@ pub fn bob() -> Principal {
     Principal::human("bob")
 }
 
+/// Create a user of the default org.
+pub async fn add_user(
+    server: &TestServer,
+    name: &str,
+    roles: Vec<rill_types::identity::OrgRole>,
+    teams: &[&str],
+) -> Principal {
+    let now = rill_types::Timestamp::now();
+    let user = rill_types::identity::UserRecord {
+        org: "default".into(),
+        principal: Principal::human(name),
+        email: None,
+        display_name: None,
+        external: Vec::new(),
+        status: rill_types::identity::AccountStatus::Active,
+        roles,
+        teams: teams.iter().map(|t| t.to_string()).collect(),
+        scim_id: None,
+        external_id: None,
+        created_at: now,
+        updated_at: now,
+    };
+    server
+        .state
+        .identity
+        .store()
+        .create_user(&user, &Principal::human("admin"))
+        .await
+        .unwrap();
+    user.principal
+}
+
 impl Acl {
     pub async fn start() -> Self {
         let server = TestServer::start(ServerConfig::default()).await;
@@ -73,18 +105,16 @@ impl Acl {
         }
     }
 
-    /// Grant `relation` on `object` (`repo` or `dir:/x`) to `who`.
-    pub async fn grant(&mut self, object: &str, relation: &str, who: &Principal) {
-        let object = match object {
-            "repo" => "repo:acl".to_string(),
-            dir => format!("path:acl/{}", dir.trim_start_matches("dir:/")),
-        };
+    /// Grant `relation` on directory `path` (`""` for the repository) to
+    /// `who`.
+    pub async fn grant(&mut self, path: &str, relation: &str, who: &Principal) {
         self.owner
-            .admin
+            .access
             .add_relation(pb::AddRelationRequest {
                 operation_id: Bytes::new(),
                 relation: Some(pb::Relation {
-                    object,
+                    repo: "acl".into(),
+                    path: path.into(),
                     relation: relation.into(),
                     subject: format!("principal:{}", who.id),
                 }),

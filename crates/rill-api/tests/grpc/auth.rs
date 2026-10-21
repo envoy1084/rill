@@ -32,9 +32,11 @@ async fn issued_tokens_are_bound_by_relations() {
         .await
         .unwrap();
     let relations = alice
-        .admin
+        .access
         .list_relations(pb::ListRelationsRequest {
-            object: "repo:private".into(),
+            repo: "private".into(),
+            path: None,
+            subject: None,
             relation: None,
         })
         .await
@@ -68,11 +70,12 @@ async fn issued_tokens_are_bound_by_relations() {
 
     // Granting a reader relation opens reads but not writes.
     alice
-        .admin
+        .access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
             relation: Some(pb::Relation {
-                object: "repo:private".into(),
+                repo: "private".into(),
+                path: String::new(),
                 relation: "reader".into(),
                 subject: format!("principal:{}", rill_types::Principal::agent("mallory").id),
             }),

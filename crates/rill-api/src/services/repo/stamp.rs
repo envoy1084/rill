@@ -86,6 +86,7 @@ mod tests {
             capability: None,
             claims,
             scope: None,
+            relations_seen: Vec::new(),
         }
     }
 

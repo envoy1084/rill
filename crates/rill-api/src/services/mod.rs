@@ -1,6 +1,7 @@
 //! The gRPC services. Handlers are thin: decode, check permission, call
 //! one lower crate, encode.
 
+pub mod access;
 pub mod admin;
 pub mod budget;
 pub mod common;
@@ -15,6 +16,7 @@ pub mod review;
 pub mod session;
 pub mod workspace;
 
+pub use access::AccessSvc;
 pub use admin::AdminSvc;
 pub use identity::IdentitySvc;
 pub use intent::IntentSvc;

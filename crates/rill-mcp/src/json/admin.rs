@@ -36,7 +36,7 @@ pub fn issued_token(t: &IssuedToken) -> Value {
 
 /// A ReBAC tuple.
 pub fn relation(r: &Relation) -> Value {
-    json!({ "object": r.object, "relation": r.relation, "subject": r.subject })
+    json!({ "repo": r.repo, "path": r.path, "relation": r.relation, "subject": r.subject })
 }
 
 /// A named policy.

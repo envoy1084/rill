@@ -2,7 +2,7 @@
 
 use clap::Parser;
 use rill_cli::cli::{Cli, Command};
-use rill_cli::commands::{admin, intent, land, refs, repo, review, stack, watch, ws};
+use rill_cli::commands::{access, admin, intent, land, refs, repo, review, stack, watch, ws};
 
 fn parse(args: &[&str]) -> Cli {
     let mut full = vec!["rill"];
@@ -300,25 +300,28 @@ fn intent_ws_ref_admin() {
         }
         other => panic!("{other:?}"),
     }
+    match parse(&["access", "grant", "team:infra", "writer", "src/infra"]).command {
+        Command::Access(access::AccessCmd::Grant(a)) => {
+            assert_eq!(
+                (a.subject.as_str(), a.path.as_str()),
+                ("team:infra", "src/infra")
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    match parse(&["access", "revoke", "user:ann", "reader"]).command {
+        Command::Access(access::AccessCmd::Revoke(a)) => assert_eq!(a.path, ""),
+        other => panic!("{other:?}"),
+    }
+    match parse(&["access", "check", "writer", "src", "--as", "agent:bot"]).command {
+        Command::Access(access::AccessCmd::Check(a)) => {
+            assert_eq!(a.subject.as_deref(), Some("agent:bot"));
+        }
+        other => panic!("{other:?}"),
+    }
     assert!(matches!(
-        parse(&["admin", "relation", "add", "repo:m", "owner", "principal:p"]).command,
-        Command::Admin(admin::AdminCmd::Relation(admin::RelationCmd::Add(_)))
-    ));
-    assert!(matches!(
-        parse(&[
-            "admin",
-            "relation",
-            "remove",
-            "repo:m",
-            "owner",
-            "principal:p"
-        ])
-        .command,
-        Command::Admin(admin::AdminCmd::Relation(admin::RelationCmd::Remove(_)))
-    ));
-    assert!(matches!(
-        parse(&["admin", "relation", "list", "repo:m", "--relation", "owner"]).command,
-        Command::Admin(admin::AdminCmd::Relation(admin::RelationCmd::List(_)))
+        parse(&["access", "list", "--relation", "owner"]).command,
+        Command::Access(access::AccessCmd::List(_))
     ));
     assert!(matches!(
         parse(&["admin", "policy", "get", "submit"]).command,

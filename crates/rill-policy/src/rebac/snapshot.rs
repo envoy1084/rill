@@ -1,7 +1,6 @@
-//! A point-in-time copy of a repository's relationship tuples.
+//! A versioned, indexed copy of a repository's relationship tuples.
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::collections::HashMap;
 
 use rill_store::RepoStore;
 use rill_types::{Principal, RepoPathBuf};
@@ -20,26 +19,34 @@ pub struct Tuple {
     pub subject: Subject,
 }
 
-/// All tuples of a repository as of one scan.
-#[derive(Debug)]
+/// All tuples of a repository as of relation version `version`.
+#[derive(Debug, Default)]
 pub struct Snapshot {
+    version: i64,
     tuples: Vec<Tuple>,
-    taken_at: Instant,
+    by_object: HashMap<String, Vec<usize>>,
 }
 
 impl Snapshot {
-    /// Build a snapshot from tuples (for tests and offline evaluation).
-    pub fn from_tuples(tuples: Vec<Tuple>) -> Self {
+    /// A snapshot of `tuples` at `version` (for tests and offline
+    /// evaluation).
+    pub fn from_tuples(version: i64, tuples: Vec<Tuple>) -> Self {
+        let mut by_object: HashMap<String, Vec<usize>> = HashMap::new();
+        for (i, t) in tuples.iter().enumerate() {
+            by_object.entry(t.object.clone()).or_default().push(i);
+        }
         Snapshot {
+            version,
             tuples,
-            taken_at: Instant::now(),
+            by_object,
         }
     }
 
-    /// Read every relationship tuple of the repository. Tuples that do
-    /// not parse are logged and skipped rather than failing every check in
-    /// the repository.
+    /// Read the repository's tuples. The version is read first, so the
+    /// tuples reflect at least that many changes. Tuples that do not parse
+    /// are logged and skipped rather than failing every check.
     pub async fn load(repo: &RepoStore) -> Result<Self> {
+        let version = repo.relations_version().await?;
         let rows = repo.list_relations().await?;
         let mut tuples = Vec::with_capacity(rows.len());
         for (object, relation, subject) in rows {
@@ -50,12 +57,12 @@ impl Snapshot {
                 }
             }
         }
-        Ok(Snapshot::from_tuples(tuples))
+        Ok(Snapshot::from_tuples(version, tuples))
     }
 
-    /// Whether the snapshot is older than `ttl`.
-    pub fn is_stale(&self, ttl: Duration) -> bool {
-        self.taken_at.elapsed() > ttl
+    /// The relation version the snapshot reflects.
+    pub fn version(&self) -> i64 {
+        self.version
     }
 
     /// All tuples.
@@ -63,8 +70,21 @@ impl Snapshot {
         &self.tuples
     }
 
+    /// The tuples on `object` and its ancestors that satisfy `relation`,
+    /// nearest object first: why someone holds it.
+    pub fn grants_for(&self, relation: Relation, object: &str) -> Vec<&Tuple> {
+        let accepted = relation.satisfied_by();
+        inheritance_chain(object)
+            .iter()
+            .filter_map(|o| self.by_object.get(o))
+            .flatten()
+            .map(|&i| &self.tuples[i])
+            .filter(|t| accepted.contains(&t.relation))
+            .collect()
+    }
+
     /// Whether `principal` holds `relation` on `object`, directly or through
-    /// a rewrite or an ancestor directory.
+    /// a stronger relation or an ancestor directory.
     pub fn check(
         &self,
         principal: &Principal,
@@ -72,13 +92,9 @@ impl Snapshot {
         relation: Relation,
         object: &str,
     ) -> bool {
-        let accepted = relation.satisfied_by();
-        let chain = inheritance_chain(object);
-        self.tuples.iter().any(|t| {
-            accepted.contains(&t.relation)
-                && chain.contains(&t.object)
-                && t.subject.matches(principal, teams)
-        })
+        self.grants_for(relation, object)
+            .iter()
+            .any(|t| t.subject.matches(principal, teams))
     }
 
     /// Directories (as paths; the root for `repo`) on which `principal`
@@ -111,52 +127,6 @@ fn parse_tuple(object: &str, relation: &str, subject: &str) -> Result<Tuple> {
     })
 }
 
-/// A cache holding one snapshot per repository for a short time, so a burst
-/// of checks during one request shares a single scan.
-#[derive(Debug)]
-pub struct SnapshotCache {
-    ttl: Duration,
-    current: std::sync::Mutex<Option<Arc<Snapshot>>>,
-}
-
-impl SnapshotCache {
-    /// Cache with the given time-to-live.
-    pub fn new(ttl: Duration) -> Self {
-        SnapshotCache {
-            ttl,
-            current: std::sync::Mutex::new(None),
-        }
-    }
-
-    /// The current snapshot, reloading it when stale or absent.
-    pub async fn get(&self, repo: &RepoStore) -> Result<Arc<Snapshot>> {
-        if let Some(snap) = self.peek() {
-            return Ok(snap);
-        }
-        let fresh = Arc::new(Snapshot::load(repo).await?);
-        *self.lock() = Some(fresh.clone());
-        Ok(fresh)
-    }
-
-    /// Drop the cached snapshot so the next check sees new tuples.
-    pub fn invalidate(&self) {
-        *self.lock() = None;
-    }
-
-    fn peek(&self) -> Option<Arc<Snapshot>> {
-        let guard = self.lock();
-        guard.as_ref().filter(|s| !s.is_stale(self.ttl)).cloned()
-    }
-
-    fn lock(&self) -> std::sync::MutexGuard<'_, Option<Arc<Snapshot>>> {
-        // The guard only ever wraps an Arc swap; a poisoned lock holds
-        // nothing worse than a stale snapshot.
-        self.current
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,21 +135,18 @@ mod tests {
     async fn objects_with_slashes_load_exactly() {
         let stores = rill_store::Stores::memory();
         let repo = stores.repo(stores.create_repo("r", "").await.unwrap().id);
-        repo.add_relation(
-            "dir:/src/billing",
-            "owner",
-            "team:core",
-            &Principal::human("admin"),
-        )
-        .await
-        .unwrap();
-        repo.add_relation("dir:/src", "reader", "*", &Principal::human("admin"))
+        let admin = Principal::human("admin");
+        repo.add_relation("dir:/src/billing", "owner", "team:core", &admin)
             .await
             .unwrap();
-        repo.add_relation("repo", "boss", "*", &Principal::human("admin"))
+        repo.add_relation("dir:/src", "reader", "*", &admin)
+            .await
+            .unwrap();
+        repo.add_relation("repo", "boss", "*", &admin)
             .await
             .unwrap();
         let snapshot = Snapshot::load(&repo).await.unwrap();
+        assert_eq!(snapshot.version(), 3);
         let mut tuples: Vec<_> = snapshot
             .tuples()
             .iter()
@@ -197,5 +164,11 @@ mod tests {
                 ),
             ]
         );
+        let why: Vec<_> = snapshot
+            .grants_for(Relation::Reader, "dir:/src/billing/x")
+            .into_iter()
+            .map(|t| t.object.as_str())
+            .collect();
+        assert_eq!(why, ["dir:/src/billing", "dir:/src"], "nearest first");
     }
 }

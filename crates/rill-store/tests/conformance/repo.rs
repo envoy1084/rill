@@ -118,12 +118,15 @@ pub async fn scenario(name: &str, stores: &Stores) {
         .unwrap();
     assert_eq!(repo.get_ref(&feature).await.unwrap(), None);
 
+    let before = repo.relations_version().await.unwrap();
     repo.add_relation("doc", "owner", "alice", &Principal::human("alice"))
         .await
         .unwrap();
-    repo.add_relation("doc", "viewer", "bob", &Principal::human("alice"))
+    let after = repo
+        .add_relation("doc", "viewer", "bob", &Principal::human("alice"))
         .await
         .unwrap();
+    assert_eq!(after, before + 2, "{name}: every change bumps the version");
     assert_eq!(
         repo.relations_of("doc").await.unwrap(),
         vec![
@@ -139,6 +142,15 @@ pub async fn scenario(name: &str, stores: &Stores) {
         .unwrap();
     assert_eq!(repo.relations_of("doc").await.unwrap().len(), 1, "{name}");
     assert_eq!(repo.list_relations().await.unwrap().len(), 2, "{name}");
+    assert_eq!(
+        repo.relations_of_subject("carol").await.unwrap(),
+        vec![("doc/x".to_string(), "owner".to_string())],
+        "{name}: tuples are indexed by subject"
+    );
+    assert!(
+        repo.relations_of_subject("alice").await.unwrap().is_empty(),
+        "{name}: removing a tuple removes its subject row"
+    );
 }
 
 fn review_of(change: ChangeId, version: ChangeVersionHash, status: ReviewStatus) -> ReviewState {

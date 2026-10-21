@@ -23,8 +23,14 @@ pub async fn require_auth(
         .get(AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .map(str::to_owned);
+    let seen = request
+        .headers()
+        .get(super::context::RELATIONS_SEEN_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
     match authenticate(&state, header.as_deref()).await {
-        Ok(ctx) => {
+        Ok(mut ctx) => {
+            ctx.relations_seen = super::context::relations_seen(seen.as_deref());
             request.extensions_mut().insert::<AuthContext>(ctx);
             next.run(request).await
         }

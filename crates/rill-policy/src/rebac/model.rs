@@ -8,30 +8,27 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
-/// A relation a subject can hold on an object.
+/// A relation a subject can hold on an object. Each implies the ones
+/// after it: `owner ⊃ writer ⊃ reviewer ⊃ reader`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Relation {
-    /// Full control; implies every other relation.
+    /// Full control: relations, policy, token issuance.
     Owner,
-    /// May create changes under the object; implies `Reader` and
-    /// `Contributor`.
+    /// May create changes under the object and land them.
     Writer,
+    /// May vote and comment on changes under the object.
+    Reviewer,
     /// May read the object's content and history.
     Reader,
-    /// May cast Review votes on changes under the object.
-    Reviewer,
-    /// May submit changes for review without landing rights.
-    Contributor,
 }
 
 impl Relation {
-    /// All relations, for iteration.
-    pub const ALL: [Relation; 5] = [
+    /// All relations, strongest first.
+    pub const ALL: [Relation; 4] = [
         Relation::Owner,
         Relation::Writer,
-        Relation::Reader,
         Relation::Reviewer,
-        Relation::Contributor,
+        Relation::Reader,
     ];
 
     /// Wire name.
@@ -39,23 +36,19 @@ impl Relation {
         match self {
             Relation::Owner => "owner",
             Relation::Writer => "writer",
-            Relation::Reader => "reader",
             Relation::Reviewer => "reviewer",
-            Relation::Contributor => "contributor",
+            Relation::Reader => "reader",
         }
     }
 
-    /// The relations whose tuples satisfy a check for `self`: the userset
-    /// rewrite `owner ⊇ writer ⊇ reader`, plus `owner ⊇ reviewer` and
-    /// `writer ⊇ contributor`.
+    /// The relations whose tuples satisfy a check for `self`: itself and
+    /// every stronger one.
     pub fn satisfied_by(self) -> &'static [Relation] {
-        match self {
-            Relation::Owner => &[Relation::Owner],
-            Relation::Writer => &[Relation::Owner, Relation::Writer],
-            Relation::Reader => &[Relation::Owner, Relation::Writer, Relation::Reader],
-            Relation::Reviewer => &[Relation::Owner, Relation::Reviewer],
-            Relation::Contributor => &[Relation::Owner, Relation::Writer, Relation::Contributor],
-        }
+        let at = Relation::ALL
+            .iter()
+            .position(|r| *r == self)
+            .unwrap_or(Relation::ALL.len() - 1);
+        &Relation::ALL[..=at]
     }
 }
 
@@ -198,7 +191,11 @@ mod tests {
             assert!(r.satisfied_by().contains(&r));
         }
         assert!("boss".parse::<Relation>().is_err());
-        assert!(Relation::Reader.satisfied_by().contains(&Relation::Writer));
+        assert!("contributor".parse::<Relation>().is_err());
+        assert_eq!(
+            Relation::Reviewer.satisfied_by(),
+            [Relation::Owner, Relation::Writer, Relation::Reviewer]
+        );
         assert!(!Relation::Writer.satisfied_by().contains(&Relation::Reader));
     }
 
