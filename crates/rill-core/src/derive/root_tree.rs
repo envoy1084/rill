@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use rill_types::{ChangeVersion, TreeHash};
 
 use super::ctx::DeriveCtx;
-use super::traits::Derivable;
+use super::traits::{Derivable, Schedule};
 use crate::error::Result;
 
 /// Root tree hash of a change version.
@@ -14,6 +14,7 @@ pub struct RootTree;
 impl Derivable for RootTree {
     const KIND: &'static str = "root";
     const VERSION: u8 = 1;
+    const SCHEDULE: Schedule = Schedule::LandCritical;
     type Value = TreeHash;
 
     async fn derive(

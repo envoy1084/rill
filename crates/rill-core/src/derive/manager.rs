@@ -77,6 +77,48 @@ impl DeriveManager {
         result
     }
 
+    /// Compute every value landing needs for `hash`: its root tree,
+    /// changed paths and ancestry. Storing a version calls this before
+    /// acknowledging it, and the lander again before it moves trunk, so
+    /// every trunk version has them.
+    pub async fn ensure_land_critical(self: &Arc<Self>, hash: &ChangeVersionHash) -> Result<()> {
+        for kind in super::registry::scheduled(super::Schedule::LandCritical) {
+            kind.compute(self, *hash).await?;
+        }
+        Ok(())
+    }
+
+    /// Whether every land-critical value of `hash` is stored.
+    pub async fn has_land_critical(self: &Arc<Self>, hash: &ChangeVersionHash) -> Result<bool> {
+        for kind in super::registry::scheduled(super::Schedule::LandCritical) {
+            if !kind.is_stored(self, *hash).await? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// Compute the built-in kind stored as `key` (`kind@version`) for
+    /// `hash`. Returns `false` for a kind the registry does not know.
+    pub async fn compute_kind(
+        self: &Arc<Self>,
+        key: &str,
+        hash: &ChangeVersionHash,
+    ) -> Result<bool> {
+        match super::registry::kinds().into_iter().find(|k| k.key == key) {
+            Some(kind) => kind.compute(self, *hash).await.map(|_| true),
+            None => Ok(false),
+        }
+    }
+
+    /// Whether the value of `D` for `hash` is stored.
+    pub async fn has<D: Derivable>(&self, hash: &ChangeVersionHash) -> Result<bool> {
+        Ok(self
+            .load_raw::<D::Value>(&derived_kind_key::<D>(), hash)
+            .await?
+            .is_some())
+    }
+
     /// A stored value under `kind` for a key that is not a change version
     /// (for example a `(version, path)` digest).
     pub async fn get_keyed<V: DeserializeOwned>(

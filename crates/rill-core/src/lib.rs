@@ -22,8 +22,8 @@ pub use blobs::{
 };
 pub use builder::ChangeBuilder;
 pub use derive::{
-    Blame, BlameLine, ChangeSummary, Derivable, DeriveCtx, DeriveManager, Generation, PathHistory,
-    RootTree,
+    Ancestry, AncestryInfo, Blame, BlameLine, ChangeSummary, ChangedPathSet, ChangedPaths,
+    Derivable, DeriveCtx, DeriveManager, PathHistory, RootTree, Schedule,
 };
 pub use diff::{
     apply_unified, diff_lines, diff_trees, is_binary, to_unified, Hunk, LineTag, TreeDiffEntry,

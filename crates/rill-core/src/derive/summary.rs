@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ctx::DeriveCtx;
 use super::root_tree::RootTree;
-use super::traits::Derivable;
+use super::traits::{Derivable, Schedule};
 use crate::diff::file_state;
 use crate::error::Result;
 
@@ -55,6 +55,7 @@ impl ChangeSummary {
 #[async_trait]
 impl Derivable for ChangeSummary {
     const KIND: &'static str = "summary";
+    const SCHEDULE: Schedule = Schedule::Background;
     const VERSION: u8 = 1;
     const NEEDS_PARENTS: bool = false;
     type Value = ChangeSummary;

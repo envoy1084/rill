@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ctx::DeriveCtx;
 use super::manager::DeriveManager;
-use super::traits::Derivable;
+use super::traits::{Derivable, Schedule};
 use crate::error::{Error, Result};
 use crate::tree::TreeOps;
 
@@ -58,6 +58,7 @@ pub struct PathHistory;
 #[async_trait]
 impl Derivable for PathHistory {
     const KIND: &'static str = "phist";
+    const SCHEDULE: Schedule = Schedule::Background;
     const VERSION: u8 = 1;
     type Value = ObjectHash;
 

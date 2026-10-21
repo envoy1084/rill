@@ -8,7 +8,7 @@ use dashmap::DashMap;
 use rill_store::RepoStore;
 use rill_types::{ChangeInfo, ChangeVersionHash};
 
-use crate::derive::{DeriveManager, Generation};
+use crate::derive::{Ancestry, AncestryInfo, DeriveManager};
 use crate::error::{Error, Result};
 
 /// In-process view of the change graph with cached parents and
@@ -17,7 +17,7 @@ pub struct CommitGraph {
     repo: RepoStore,
     derive: Arc<DeriveManager>,
     parents: DashMap<ChangeVersionHash, Arc<[ChangeVersionHash]>>,
-    generations: DashMap<ChangeVersionHash, u64>,
+    ancestry: DashMap<ChangeVersionHash, AncestryInfo>,
 }
 
 /// Walk colors for the merge-base search.
@@ -32,7 +32,7 @@ impl CommitGraph {
             repo,
             derive,
             parents: DashMap::new(),
-            generations: DashMap::new(),
+            ancestry: DashMap::new(),
         }
     }
 
@@ -56,21 +56,50 @@ impl CommitGraph {
         Ok(info.parents.into())
     }
 
+    /// Ancestry record of a version, cached.
+    pub async fn ancestry(&self, hash: &ChangeVersionHash) -> Result<AncestryInfo> {
+        if let Some(a) = self.ancestry.get(hash) {
+            return Ok(*a);
+        }
+        let a = self.derive.get::<Ancestry>(hash).await?;
+        self.ancestry.insert(*hash, a);
+        Ok(a)
+    }
+
     /// Generation number of a version, cached.
     pub async fn generation(&self, hash: &ChangeVersionHash) -> Result<u64> {
-        if let Some(g) = self.generations.get(hash) {
-            return Ok(*g);
+        Ok(self.ancestry(hash).await?.generation)
+    }
+
+    /// The first-parent ancestor of `from` at `depth`, in O(log) steps.
+    pub async fn ancestor_at_depth(
+        &self,
+        from: &ChangeVersionHash,
+        depth: u64,
+    ) -> Result<Option<ChangeVersionHash>> {
+        let mut hash = *from;
+        let mut info = self.ancestry(&hash).await?;
+        if depth > info.depth {
+            return Ok(None);
         }
-        let g = self.derive.get::<Generation>(hash).await?;
-        self.generations.insert(*hash, g);
-        Ok(g)
+        while info.depth > depth {
+            hash = if info.jump_depth >= depth {
+                info.jump
+            } else {
+                info.parent.ok_or(Error::ChangeNotFound(hash))?
+            };
+            info = self.ancestry(&hash).await?;
+        }
+        Ok(Some(hash))
     }
 
     /// True when `ancestor` is `descendant` or one of its ancestors.
     ///
-    /// Walks from `descendant` towards the roots, never expanding a
-    /// version whose generation is at or below the target's, since nothing
-    /// below it can reach the target.
+    /// Without merges behind `descendant` the history is a tree, and the
+    /// answer is whether its first-parent ancestor at `ancestor`'s depth is
+    /// `ancestor`. Otherwise it walks from `descendant` towards the roots,
+    /// never expanding a version whose generation is at or below the
+    /// target's, since nothing below it can reach the target.
     pub async fn is_ancestor(
         &self,
         ancestor: &ChangeVersionHash,
@@ -79,7 +108,14 @@ impl CommitGraph {
         if ancestor == descendant {
             return Ok(true);
         }
-        let target_gen = self.generation(ancestor).await?;
+        let (a, d) = (
+            self.ancestry(ancestor).await?,
+            self.ancestry(descendant).await?,
+        );
+        if !d.merges {
+            return Ok(self.ancestor_at_depth(descendant, a.depth).await? == Some(*ancestor));
+        }
+        let target_gen = a.generation;
         let mut seen = HashSet::new();
         let mut heap = BinaryHeap::new();
         heap.push((self.generation(descendant).await?, *descendant));
@@ -125,6 +161,14 @@ impl CommitGraph {
         if a == b {
             return Ok(vec![*a]);
         }
+        let (ia, ib) = (self.ancestry(a).await?, self.ancestry(b).await?);
+        if !ia.merges && !ib.merges {
+            return Ok(self
+                .common_ancestor(a, ia, b, ib)
+                .await?
+                .into_iter()
+                .collect());
+        }
         let mut flags: HashMap<ChangeVersionHash, u8> = HashMap::new();
         let mut heap: BinaryHeap<(u64, ChangeVersionHash)> = BinaryHeap::new();
         let mut found: Vec<(u64, ChangeVersionHash)> = Vec::new();
@@ -154,5 +198,40 @@ impl CommitGraph {
         found.sort_by_key(|&(gen, hash)| (Reverse(gen), hash));
         found.dedup();
         Ok(found.into_iter().map(|(_, h)| h).collect())
+    }
+
+    /// The nearest common ancestor of two versions in a merge-free
+    /// history. Jump pointers depend only on depth, so two versions at one
+    /// depth jump to one depth, and the search takes O(log) steps.
+    async fn common_ancestor(
+        &self,
+        a: &ChangeVersionHash,
+        ia: AncestryInfo,
+        b: &ChangeVersionHash,
+        ib: AncestryInfo,
+    ) -> Result<Option<ChangeVersionHash>> {
+        let depth = ia.depth.min(ib.depth);
+        let (Some(mut x), Some(mut y)) = (
+            self.ancestor_at_depth(a, depth).await?,
+            self.ancestor_at_depth(b, depth).await?,
+        ) else {
+            return Ok(None);
+        };
+        while x != y {
+            let (ix, iy) = (self.ancestry(&x).await?, self.ancestry(&y).await?);
+            match (ix.parent, iy.parent) {
+                (Some(px), Some(py)) => {
+                    if ix.jump != iy.jump {
+                        x = ix.jump;
+                        y = iy.jump;
+                    } else {
+                        x = px;
+                        y = py;
+                    }
+                }
+                _ => return Ok(None),
+            }
+        }
+        Ok(Some(x))
     }
 }

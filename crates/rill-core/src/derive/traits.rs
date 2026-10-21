@@ -8,6 +8,18 @@ use serde::Serialize;
 use super::ctx::DeriveCtx;
 use crate::error::Result;
 
+/// When a derived value is computed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Schedule {
+    /// Before a stored version is acknowledged and before it lands:
+    /// landing reads it.
+    LandCritical,
+    /// By the background worker for every trunk version, ahead of reads.
+    Background,
+    /// When first read.
+    OnDemand,
+}
+
 /// A value computable from a change version and the same value of its
 /// parents.
 ///
@@ -24,6 +36,8 @@ pub trait Derivable: Send + Sync + 'static {
     /// Whether `derive` needs the parents' values. When false the manager
     /// skips computing them and passes an empty vector.
     const NEEDS_PARENTS: bool = true;
+    /// When the value is computed.
+    const SCHEDULE: Schedule = Schedule::OnDemand;
     /// The derived value.
     type Value: Serialize + DeserializeOwned + Send + Sync + Clone + 'static;
 

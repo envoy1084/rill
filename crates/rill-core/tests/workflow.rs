@@ -1,6 +1,6 @@
 //! End-to-end: build history, derive trees, merge, rebase, resolve, blame.
 
-use rill_core::derive::{ChangeSummary, Generation, PathHistory, RootTree};
+use rill_core::derive::{Ancestry, ChangeSummary, PathHistory, RootTree};
 use rill_core::merge::state::to_change;
 use rill_core::{
     materialize, merge_changes, parse_materialized, read_content, rebase, ChangeBuilder,
@@ -39,7 +39,7 @@ async fn full_workflow() {
         .await
         .unwrap();
     assert_eq!(listing.len(), 2);
-    assert_eq!(f.derive.get::<Generation>(&root).await.unwrap(), 1);
+    assert_eq!(f.derive.get::<Ancestry>(&root).await.unwrap().generation, 1);
     let summary = f.derive.get::<ChangeSummary>(&root).await.unwrap();
     assert_eq!(summary.files_added, 3);
     assert_eq!(summary.languages.get("rs"), Some(&2));
@@ -99,7 +99,14 @@ async fn full_workflow() {
         BASE.replace("line1", "LEFT1").replace("line8", "RIGHT8")
     );
     assert!(content_at(&f, &merged_hash, "left.txt").await.is_some());
-    assert_eq!(f.derive.get::<Generation>(&merged_hash).await.unwrap(), 3);
+    assert_eq!(
+        f.derive
+            .get::<Ancestry>(&merged_hash)
+            .await
+            .unwrap()
+            .generation,
+        3
+    );
 
     // A third child edits the same line as `left`: a conflict.
     let (clash, _) = ChangeBuilder::new(f.bob.clone())

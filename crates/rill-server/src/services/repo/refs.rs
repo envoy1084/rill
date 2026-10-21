@@ -1,6 +1,5 @@
 //! Repository records, refs, trunk and derived-data RPCs.
 
-use rill_core::{ChangeSummary, Generation, PathHistory, RootTree};
 use rill_policy::{Relation, Subject};
 use rill_proto::convert::{hash_to_proto, ref_name_from_proto};
 use rill_proto::rill::v1 as pb;
@@ -297,22 +296,7 @@ async fn derived(
     compute: bool,
 ) -> Result<Option<bytes::Bytes>> {
     if compute && ctx.repo.has_change_version(hash).await? {
-        let result = match kind {
-            k if k == rill_core::derive::derived_kind_key::<RootTree>() => {
-                ctx.derive.get::<RootTree>(hash).await.map(|_| ())
-            }
-            k if k == rill_core::derive::derived_kind_key::<PathHistory>() => {
-                ctx.derive.get::<PathHistory>(hash).await.map(|_| ())
-            }
-            k if k == rill_core::derive::derived_kind_key::<Generation>() => {
-                ctx.derive.get::<Generation>(hash).await.map(|_| ())
-            }
-            k if k == rill_core::derive::derived_kind_key::<ChangeSummary>() => {
-                ctx.derive.get::<ChangeSummary>(hash).await.map(|_| ())
-            }
-            _ => Ok(()),
-        };
-        result?;
+        ctx.derive.compute_kind(kind, hash).await?;
     }
     Ok(ctx.repo.get_derived(kind, hash).await?)
 }

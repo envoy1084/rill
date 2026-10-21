@@ -111,6 +111,7 @@ impl Lander {
         }
 
         self.set_status(queued.ticket, LandStatus::Landing);
+        self.derive.ensure_land_critical(&hash).await?;
         let expected = head.map(|(_, h)| h);
         match self.repo.land_on_trunk(expected, hash).await {
             Ok(seq) => {

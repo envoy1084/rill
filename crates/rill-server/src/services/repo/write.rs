@@ -356,9 +356,9 @@ pub async fn commit_version(
         .attestor
         .sign(&hash, &rill_types::Principal::service("rill-server"));
     ctx.repo.add_signatures(&hash, &[attestation]).await?;
-    // Materialise the root tree now so a bad change fails the request
-    // rather than a later read.
-    ctx.derive.get::<rill_core::RootTree>(&hash).await?;
+    // Derive what landing needs now, so a bad change fails the request
+    // rather than a later read and the lander never derives it.
+    ctx.derive.ensure_land_critical(&hash).await?;
     match ctx.review().add_version(&cv.change_id, hash).await {
         Ok(_) | Err(ReviewError::ReviewNotFound(_)) => {}
         Err(ReviewError::InvalidStatus { status, .. }) => {

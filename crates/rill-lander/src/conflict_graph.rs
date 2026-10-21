@@ -8,32 +8,20 @@
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
-use rill_core::{diff_trees, DeriveManager, RootTree};
+use rill_core::{ChangedPaths, DeriveManager};
 use rill_types::{ChangeVersionHash, RepoPathBuf};
 
 use crate::error::Result;
 use crate::queue::QueuedRequest;
 
-/// Paths whose state `version` changes relative to its first parent,
-/// plus any paths it records as conflicted.
+/// Paths `version` changes relative to its first parent (including
+/// conflicted paths and subtree roots), from its stored changed-path set.
 pub async fn touched_paths(
     derive: &Arc<DeriveManager>,
     version: &ChangeVersionHash,
 ) -> Result<BTreeSet<RepoPathBuf>> {
-    let cv = derive.change(version).await?;
-    let parent_root = match cv.first_parent() {
-        Some(parent) => Some(derive.get::<RootTree>(&parent).await?),
-        None => None,
-    };
-    let root = derive.get::<RootTree>(version).await?;
-    let mut paths: BTreeSet<RepoPathBuf> = diff_trees(derive.trees(), parent_root, Some(root))
-        .await?
-        .into_iter()
-        .map(|e| e.path)
-        .collect();
-    paths.extend(cv.conflicted_paths().cloned());
-    paths.extend(cv.subtree_changes.keys().cloned());
-    Ok(paths)
+    let changed = derive.get::<ChangedPaths>(version).await?;
+    Ok(changed.paths().iter().cloned().collect())
 }
 
 /// Group `requests` into independent batches (see the module docs).
