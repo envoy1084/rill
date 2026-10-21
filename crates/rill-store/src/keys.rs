@@ -36,8 +36,10 @@ pub mod table {
     pub const TRUNK_HEAD: &str = "thd";
     /// `(land, ns, repo, seq)` → Landing
     pub const LANDING: &str = "land";
-    /// `(lease, ns, repo, role)` → be64 epoch of the role's current holder
+    /// `(lease, ns, repo, role)` → LeaseRecord (holder, expiry)
     pub const LEASE: &str = "lease";
+    /// `(lepoch, ns, repo, role)` → be64 epoch; fenced writes check it
+    pub const LEASE_EPOCH: &str = "lepoch";
     /// `(log, ns, repo, stamp)` → version hash, every stored version
     pub const LOG: &str = "log";
     /// `(trunk, ns, repo, seq)` → version hash
@@ -227,6 +229,10 @@ impl RepoKeys {
 
     pub fn lease(&self, role: &str) -> Bytes {
         self.row(table::LEASE, &role)
+    }
+
+    pub fn lease_epoch(&self, role: &str) -> Bytes {
+        self.row(table::LEASE_EPOCH, &role)
     }
 
     pub fn trunk_table(&self) -> Bytes {

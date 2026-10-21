@@ -171,11 +171,11 @@ pub async fn landing(name: &str, stores: &Stores) {
             review: repo.read_review(&version.change_id).await.unwrap(),
         });
     }
-    let epoch = repo.acquire_lease("lander").await.unwrap();
+    let lease = repo.try_acquire("lander", "a").await.unwrap().unwrap();
     let batch = LandBatch {
         expected: Some(root),
         entries: entries.clone(),
-        fence: Some(("lander".into(), epoch)),
+        fence: Some(lease.clone()),
         actor: None,
     };
     let landed = repo.land(batch.clone()).await.unwrap();
@@ -204,7 +204,8 @@ pub async fn landing(name: &str, stores: &Stores) {
     // A replaced lander is fenced off trunk.
     let next = cv("next", vec![entries[2].version]);
     let next_hash = repo.put_change_version(&next).await.unwrap();
-    repo.acquire_lease("lander").await.unwrap();
+    repo.release(&lease).await.unwrap();
+    repo.try_acquire("lander", "b").await.unwrap().unwrap();
     let stale = LandBatch {
         expected: Some(entries[2].version),
         entries: vec![LandEntry {
@@ -215,7 +216,7 @@ pub async fn landing(name: &str, stores: &Stores) {
             risk: RiskClass::Normal,
             review: None,
         }],
-        fence: Some(("lander".into(), epoch)),
+        fence: Some(lease),
         actor: None,
     };
     assert!(

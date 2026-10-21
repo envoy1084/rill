@@ -3,9 +3,10 @@
 use std::sync::Arc;
 
 use rill_core::{CommitGraph, DeriveManager};
+use rill_store::repo::{Lease, LeaseHolder};
 use rill_store::RepoStore;
 use rill_types::ChangeId;
-use tokio::sync::{broadcast, OnceCell};
+use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
 use super::record::{list_landings, Landing};
@@ -30,8 +31,8 @@ pub struct Lander {
     pub(super) policy: LandPolicy,
     queue: Arc<LandQueue>,
     events: broadcast::Sender<LandEvent>,
-    /// This lander's lease epoch, taken on first use.
-    epoch: OnceCell<u64>,
+    /// The lander lease.
+    lease: LeaseHolder,
 }
 
 /// The lease role landers fence their trunk writes with.
@@ -49,6 +50,7 @@ impl Lander {
     ) -> Arc<Self> {
         let (events, _) = broadcast::channel(EVENT_CAPACITY);
         Arc::new(Lander {
+            lease: LeaseHolder::new(repo.clone(), LANDER_LEASE),
             repo,
             derive,
             graph,
@@ -57,17 +59,23 @@ impl Lander {
             policy,
             queue: Arc::new(LandQueue::new()),
             events,
-            epoch: OnceCell::new(),
         })
     }
 
-    /// This lander's lease epoch. Taking it fences every earlier lander of
-    /// the repository off trunk.
-    pub async fn epoch(&self) -> Result<u64> {
-        Ok(*self
-            .epoch
-            .get_or_try_init(|| self.repo.acquire_lease(LANDER_LEASE))
-            .await?)
+    /// The lander lease, taken or renewed as needed; `None` while another
+    /// lander holds it. Holding it fences every other lander off trunk.
+    pub async fn lease(&self) -> Result<Option<Lease>> {
+        Ok(self.lease.current().await?)
+    }
+
+    /// Drop the lease after it was found lost.
+    pub(super) async fn lost_lease(&self) {
+        self.lease.lost().await;
+    }
+
+    /// Give the lease up so a standby can take over at once.
+    pub async fn release(&self) {
+        self.lease.release().await;
     }
 
     /// The repository this lander lands on.
@@ -148,6 +156,10 @@ impl Lander {
     /// handled concurrently; overlapping ones in arrival order. Returns
     /// the number of requests processed.
     pub async fn run_once(self: &Arc<Self>) -> Result<usize> {
+        // A standby lander leaves requests queued until it holds the lease.
+        if self.lease().await?.is_none() {
+            return Ok(0);
+        }
         let queued = self.queue.drain().await;
         if queued.is_empty() {
             return Ok(0);
@@ -200,6 +212,7 @@ impl Lander {
                 }
             }
         }
+        self.release().await;
         tracing::info!("lander stopped");
     }
 

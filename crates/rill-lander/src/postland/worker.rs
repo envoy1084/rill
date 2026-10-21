@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use rill_core::RootTree;
+use rill_store::repo::LeaseHolder;
 use rill_types::{Timestamp, TrunkSeq};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
@@ -41,12 +42,17 @@ pub struct PostLandVerifier {
     /// One sweep at a time; a second caller waits rather than racing on
     /// the cursor.
     sweep_lock: Mutex<()>,
+    lease: LeaseHolder,
 }
+
+/// The lease role the post-land verifier holds.
+pub const POSTLAND_LEASE: &str = "postland";
 
 impl PostLandVerifier {
     /// A worker over `lander`'s repository and verifier.
     pub fn new(lander: Arc<Lander>, batch_size: u64) -> Arc<Self> {
         Arc::new(PostLandVerifier {
+            lease: LeaseHolder::new(lander.repo().clone(), POSTLAND_LEASE),
             lander,
             batch_size: batch_size.max(1),
             sweep_lock: Mutex::new(()),
@@ -77,6 +83,10 @@ impl PostLandVerifier {
     /// moved.
     pub async fn run_once(self: &Arc<Self>) -> Result<Option<Sweep>> {
         let _guard = self.sweep_lock.lock().await;
+        // A standby verifier does nothing until it holds the lease.
+        let Some(lease) = self.lease.current().await? else {
+            return Ok(None);
+        };
         let repo = self.lander.repo();
         let cursor = load_cursor(repo).await?;
         let Some((head, _)) = repo.trunk_head().await? else {
@@ -140,7 +150,10 @@ impl PostLandVerifier {
             )
             .await?;
         }
-        store_cursor(repo, to).await?;
+        if let Err(e) = store_cursor(repo, to, &lease).await {
+            self.lease.lost().await;
+            return Err(e);
+        }
         Ok(Some(Sweep {
             from: cursor,
             to,

@@ -114,7 +114,9 @@ impl Lander {
 
         self.set_status(queued.ticket, LandStatus::Landing);
         self.derive.ensure_land_critical(&hash).await?;
-        let epoch = self.epoch().await?;
+        let Some(lease) = self.lease().await? else {
+            return Err(Error::Fenced);
+        };
         let request = &queued.request;
         let batch = LandBatch {
             expected: head.map(|(_, h)| h),
@@ -126,7 +128,7 @@ impl Lander {
                 risk: request.risk,
                 review: self.repo.read_review(&cv.change_id).await?,
             }],
-            fence: Some((LANDER_LEASE.to_string(), epoch)),
+            fence: Some(lease.clone()),
             actor: Some(crate::revert::lander_principal()),
         };
         match self.repo.land(batch).await {
@@ -139,7 +141,8 @@ impl Lander {
                 Ok(Attempt::Landed(seq))
             }
             Err(e) if e.is_conflict() => {
-                if self.repo.lease_epoch(LANDER_LEASE).await? != epoch {
+                if self.repo.lease_epoch(LANDER_LEASE).await? != lease.epoch {
+                    self.lost_lease().await;
                     return Err(Error::Fenced);
                 }
                 Ok(Attempt::Retry { tip: hash })

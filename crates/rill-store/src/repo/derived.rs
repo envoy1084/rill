@@ -39,6 +39,20 @@ impl RepoStore {
         self.meta().set(self.keys().misc(name), row).await
     }
 
+    /// [`RepoStore::set_misc`] that fails once `lease` is lost.
+    pub async fn set_misc_fenced(
+        &self,
+        name: &str,
+        value: Bytes,
+        lease: &super::leases::Lease,
+    ) -> Result<()> {
+        let row = self.seal_row(value).await?;
+        let mut tx = crate::meta::Transaction::new().set(self.keys().misc(name), row);
+        tx.conditions.push(lease.fence(self));
+        self.meta().transact(tx).await?;
+        Ok(())
+    }
+
     async fn seal_row(&self, value: Bytes) -> Result<Bytes> {
         if value.len() <= OFFLOAD_BYTES {
             let mut row = Vec::with_capacity(value.len() + 1);

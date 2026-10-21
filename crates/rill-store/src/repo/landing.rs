@@ -13,7 +13,7 @@ use rill_types::{
     RiskClass, Timestamp, TrunkSeq,
 };
 
-use super::codec::{decode_record, encode_record, hash_value, parse_seq};
+use super::codec::{decode_record, encode_record, hash_value};
 use super::quota::metric;
 use super::reviews::ReviewSnapshot;
 use super::store::RepoStore;
@@ -41,8 +41,8 @@ pub struct LandBatch {
     /// The trunk head the batch lands on; `None` for an empty trunk.
     pub expected: Option<ChangeVersionHash>,
     pub entries: Vec<LandEntry>,
-    /// The lease the lander holds, as `(role, epoch)`.
-    pub fence: Option<(String, u64)>,
+    /// The lease the lander holds; the land fails once it is lost.
+    pub fence: Option<super::leases::Lease>,
     /// Who lands the batch, for its events.
     pub actor: Option<Principal>,
 }
@@ -78,11 +78,8 @@ impl RepoStore {
                 head_row(head_seq + batch.entries.len() as u64, &last.version),
             )
             .set(ref_key, hash_value(&last.version));
-        if let Some((role, epoch)) = &batch.fence {
-            tx = tx.expect(
-                keys.lease(role),
-                Some(Bytes::copy_from_slice(&epoch.to_be_bytes())),
-            );
+        if let Some(lease) = &batch.fence {
+            tx.conditions.push(lease.fence(self));
         }
         let stores = self.stores();
         let mut landings = Vec::with_capacity(batch.entries.len());
@@ -203,34 +200,5 @@ impl RepoStore {
                 decode_record(v)
             })
             .collect()
-    }
-
-    /// Take over `role`, returning the new holder's epoch. Every earlier
-    /// holder's fenced writes fail from now on.
-    pub async fn acquire_lease(&self, role: &str) -> Result<u64> {
-        let key = self.keys().lease(role);
-        loop {
-            let current = self.meta().get(&key).await?;
-            let epoch = match &current {
-                Some(bytes) => parse_seq(bytes)? + 1,
-                None => 1,
-            };
-            let tx = Transaction::new()
-                .expect(key.clone(), current)
-                .set(key.clone(), Bytes::copy_from_slice(&epoch.to_be_bytes()));
-            match self.meta().transact(tx).await {
-                Ok(_) => return Ok(epoch),
-                Err(Error::Conflict(_)) => continue,
-                Err(e) => return Err(e),
-            }
-        }
-    }
-
-    /// The epoch of `role`'s current holder; 0 when nobody took it.
-    pub async fn lease_epoch(&self, role: &str) -> Result<u64> {
-        match self.meta().get(&self.keys().lease(role)).await? {
-            Some(bytes) => parse_seq(&bytes),
-            None => Ok(0),
-        }
     }
 }

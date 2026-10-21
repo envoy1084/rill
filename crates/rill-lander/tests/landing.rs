@@ -632,3 +632,29 @@ async fn run_forever_processes_until_shutdown() {
     shutdown.cancel();
     task.await.unwrap();
 }
+
+#[tokio::test]
+async fn a_standby_lander_waits_for_the_lease() {
+    let fx = Fixture::new().await;
+    let active = fx.lander(Arc::new(NoopHooks), Arc::new(AlwaysGreen), fast_policy());
+    let standby = fx.lander(Arc::new(NoopHooks), Arc::new(AlwaysGreen), fast_policy());
+    let (base, _) = fx.commit(None, &[("base", "0")], "base").await;
+    fx.repo.land_on_trunk(None, base).await.unwrap();
+    assert!(active.lease().await.unwrap().is_some());
+
+    let (_, a) = fx.commit(Some(base), &[("a.txt", "a")], "a").await;
+    let ticket = standby.enqueue(request(&a, RiskClass::Trivial)).await;
+    assert_eq!(
+        standby.run_once().await.unwrap(),
+        0,
+        "standby leaves it queued"
+    );
+    assert_eq!(fx.head().await.0, TrunkSeq(1));
+
+    active.release().await;
+    assert_eq!(standby.run_once().await.unwrap(), 1);
+    assert!(matches!(
+        standby.queue().status(ticket).unwrap(),
+        LandStatus::Landed { seq: TrunkSeq(2) }
+    ));
+}
