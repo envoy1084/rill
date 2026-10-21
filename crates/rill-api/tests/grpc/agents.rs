@@ -321,3 +321,66 @@ async fn users_register_only_agents_they_sponsor() {
     assert_eq!(listed.len(), 1);
     server.stop().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tokens_for_others_go_only_to_agents_one_sponsors() {
+    let stores = rill_store::Stores::memory();
+    stores.ensure_default_org().await.unwrap();
+    for name in ["ann", "mallory"] {
+        stores
+            .identity()
+            .create_user(&user(name), &Principal::human("root"))
+            .await
+            .unwrap();
+    }
+    let server = TestServer::start_on(config(), stores.clone()).await;
+    let ann = server.token_for(&Principal::human("ann"));
+    identity(&server, &ann)
+        .await
+        .register_agent(pb::RegisterAgentRequest {
+            operation_id: Bytes::new(),
+            agent: Some(pb::AgentSpec {
+                repos: vec!["*".into()],
+                paths: vec![],
+                ..spec("anns-bot", "user:ann", "https://ci")
+            }),
+        })
+        .await
+        .unwrap();
+    let issue = |owner: String| {
+        let grpc = server.grpc.clone();
+        async move {
+            let mut c = clients_at(&grpc, Some(&owner)).await;
+            let repo = format!("repo-of-{}", &owner[owner.len() - 6..]);
+            c.repo
+                .create_repo(pb::CreateRepoRequest {
+                    operation_id: Bytes::new(),
+                    repo: repo.clone(),
+                    description: None,
+                    windows_safe: false,
+                })
+                .await
+                .unwrap();
+            c.admin
+                .issue_token(pb::IssueTokenRequest {
+                    operation_id: Bytes::new(),
+                    capabilities: vec![pb::Capability {
+                        action: "read".into(),
+                        scope: format!("repo:{repo}"),
+                        expires_at: None,
+                    }],
+                    expires_at: None,
+                    for_principal: Some(pb::Principal::from(&Principal::agent("anns-bot"))),
+                })
+                .await
+        }
+    };
+    // Mallory owns her repository but does not sponsor the agent.
+    let mallory = server.token_for(&Principal::human("mallory"));
+    assert_eq!(
+        issue(mallory).await.unwrap_err().code(),
+        Code::PermissionDenied
+    );
+    assert!(issue(ann).await.is_ok());
+    server.stop().await;
+}

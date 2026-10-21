@@ -224,6 +224,9 @@ impl AdminService for AdminSvc {
                 Some(p) => Principal::try_from(p)?,
                 None => ctx.principal.clone(),
             };
+            if principal.id != ctx.principal.id {
+                may_issue_for(&self.state, &ctx, &principal).await?;
+            }
             let now = Timestamp::now();
             let issuer = self.state.identity.issuer()?;
             let longest = issuer.lifetimes().max_for(principal.kind);
@@ -506,6 +509,38 @@ pub async fn health_components(state: &AppState) -> Vec<pb::ComponentHealth> {
         detail: Some(format!("up {}s", state.started_at.elapsed().as_secs())),
     };
     vec![meta, objects, uptime]
+}
+
+/// A caller may issue tokens for someone else only for a registered agent
+/// it sponsors (itself, or through one of its teams), unless it
+/// administers the instance.
+async fn may_issue_for(
+    state: &AppState,
+    ctx: &rill_policy::AuthContext,
+    principal: &Principal,
+) -> crate::error::Result<()> {
+    if crate::auth::require_instance_admin(state, ctx).is_ok() {
+        return Ok(());
+    }
+    let org = ctx
+        .claims
+        .as_ref()
+        .map_or(rill_store::DEFAULT_ORG, |c| c.org.as_str());
+    let sponsored = match state.identity.agent(org, &principal.name).await? {
+        Some(agent) if agent.principal == *principal => match &agent.sponsor {
+            rill_types::identity::Sponsor::User(name) => *name == ctx.principal.name,
+            rill_types::identity::Sponsor::Team(team) => ctx.teams.contains(team),
+        },
+        _ => false,
+    };
+    if sponsored {
+        Ok(())
+    } else {
+        Err(Error::denied(format!(
+            "{} may issue tokens only for itself and agents it sponsors, not {principal}",
+            ctx.principal
+        )))
+    }
 }
 
 #[cfg(test)]

@@ -149,7 +149,9 @@ mode. The effective right is the capability AND the stored relations.
 * A caller holding a capability must pass `check_narrower_than`, which is the
   only check for that caller; widening is `INVALID_ARGUMENT`. A caller without
   a capability must pass `permit().admin()`.
-* The subject is `for_principal`, or the caller.
+* The subject is `for_principal`, or the caller. Another principal is
+  allowed only for a registered agent the caller sponsors (by name, or
+  through one of its teams), or for an instance administrator.
 
 `WhoAmI` reports the caller's capability as one `pb::Capability` per
 verb and path, with action `repo.<verb>` and scope `repo:<name>/<path>/*`.
@@ -158,8 +160,6 @@ verb and path, with action `repo.<verb>` and scope `repo:<name>/<path>/*`.
 
 * The server never enforces `Capability::workspace` per request.
 * There is no revocation yet. A token is valid until `expires_at`.
-* `IssueToken` does not restrict `for_principal`. Any admin, or any token
-  holder delegating a narrower scope, can mint a token for any principal name.
 * Tokens carry no `identity` or teams.
 * Clients do not call `attenuate`; delegation goes through `IssueToken`.
 
