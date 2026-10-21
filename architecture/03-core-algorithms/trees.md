@@ -19,7 +19,7 @@ flowchart LR
     M --> TB[TreeBuilder<br/>edit trie]
     TB --> ED[edit_dir / check_case]
     ED --> SH[split lists<br/>leaves + inner nodes]
-    SH --> OPS[TreeOps<br/>get_node / put_node<br/>LruCache of nodes]
+    SH --> OPS[TreeOps<br/>get_node / put_node<br/>moka cache of nodes]
     OPS <--> OS[(ObjectStore)]
     OPS --> LK[entry / lookup / list_dir / summary]
     OPS --> WK[walk + SparseProfile]
@@ -74,7 +74,8 @@ written. A directory that drops to 4,096 entries or fewer becomes one
 `TreeOps::new(objects, cache_size)`
 ([ops.rs](../../crates/rill-core/src/tree/ops.rs),
 [shard/dir.rs](../../crates/rill-core/src/tree/shard/dir.rs)) binds an
-object store to an `LruCache<TreeHash, NodeRef>` of decoded nodes. The
+object store to a `moka` cache (`Cache<TreeHash, NodeRef>`, TinyLFU
+eviction) of decoded nodes. The
 server uses `DEFAULT_TREE_CACHE = 4096` nodes per repository. Clones share
 the cache. `nodes_written()` counts nodes actually written, for tests and
 benchmarks.

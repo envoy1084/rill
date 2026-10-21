@@ -27,9 +27,9 @@ flowchart LR
 
 | Method | Source | Cache |
 | --- | --- | --- |
-| `info(hash)` | `RepoStore::get_change_info`; absent is `Error::ChangeNotFound` | `LruCache` of 20,000 versions on trunk; fills `parents` as a side effect |
-| `parents(hash)` | `info` | `LruCache` of 200,000 versions |
-| `ancestry(hash)`, `generation(hash)` | `DeriveManager::get::<Ancestry>` | `LruCache` of 200,000 versions |
+| `info(hash)` | `RepoStore::get_change_info`; absent is `Error::ChangeNotFound` | `moka` cache of 20,000 versions on trunk; fills `parents` as a side effect |
+| `parents(hash)` | `info` | `moka` cache of 200,000 versions |
+| `ancestry(hash)`, `generation(hash)` | `DeriveManager::get::<Ancestry>` | `moka` cache of 200,000 versions |
 | `ancestor_at_depth(from, depth)` | jump pointers | |
 
 `Ancestry` ([derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs))

@@ -43,7 +43,9 @@ at a time. `index_version` derives the version's `RootTree` first.
 * `trigrams()` packs three consecutive bytes into a `u32`. Postings are
   always ASCII-case-folded (`fold_byte`), so one index serves both
   case-sensitive and case-insensitive queries; the regex filters exactly.
-* A `PostingList` is a sorted `Vec<DocId>`, encoded as varint deltas.
+* A `PostingList` is a `roaring::RoaringBitmap` of `DocId`s, persisted in
+  roaring's portable serialization; `evaluate` intersects and unions them
+  with the bitmap operators.
 
 ## Query
 
@@ -144,11 +146,14 @@ and skips refreshing.
 
 ## Symbols
 
-`SymbolIndex::for_root` runs line-anchored regexes over files of a known
-`Language` (Rust, Python, TypeScript, JavaScript, Go) up to 1 MiB, one
-`Symbol { name, kind, line }` per line at most, and offers
-`find_definition` and `list_symbols`. It is library-only: the server never
-constructs one and there is no RPC.
+`SymbolIndex::for_root` extracts definitions with `sem-core` (pinned; the
+same tree-sitter entity extraction weave's structural merge uses) from
+every file sem-core's registry parses as code, up to 1 MiB. Each entity
+becomes a `Symbol { name, kind, line }`, its kind mapped from sem-core's
+entity type. Extraction is cached per `(content hash, path)` and the
+per-root table is stored as derived data (`idx:sym@1`), so a root is
+walked once. It offers `find_definition` and `list_symbols`. It is
+library-only: the server never constructs one and there is no RPC.
 
 ## Limitations
 
@@ -162,15 +167,15 @@ constructs one and there is no RPC.
 * Only trunk heads are indexed ahead of time: one per landing batch, and
   the head at worker start. Intermediate landed roots and roots from other
   refs are indexed lazily on first `Grep`.
-* Symbol extraction is per-line regex: multi-line signatures, nested
-  definitions and macros are missed or misattributed.
+* Symbols cover the languages sem-core parses; definitions produced by
+  macros are not seen.
 
 ## Code
 
-* [lib.rs](../../crates/rill-search/src/lib.rs), [error.rs](../../crates/rill-search/src/error.rs), [trigram/extract.rs](../../crates/rill-search/src/trigram/extract.rs), [trigram/literals.rs](../../crates/rill-search/src/trigram/literals.rs), [trigram/query.rs](../../crates/rill-search/src/trigram/query.rs), [trigram/postings.rs](../../crates/rill-search/src/trigram/postings.rs)
+* [lib.rs](../../crates/rill-search/src/lib.rs), [error.rs](../../crates/rill-search/src/error.rs), [trigram/extract.rs](../../crates/rill-search/src/trigram/extract.rs), [trigram/literals.rs](../../crates/rill-search/src/trigram/literals.rs), [trigram/query.rs](../../crates/rill-search/src/trigram/query.rs)
 * [index/search_index.rs](../../crates/rill-search/src/index/search_index.rs), [index/persist.rs](../../crates/rill-search/src/index/persist.rs), [index/docs.rs](../../crates/rill-search/src/index/docs.rs), [index/manifest.rs](../../crates/rill-search/src/index/manifest.rs), [index/config.rs](../../crates/rill-search/src/index/config.rs)
 * [query/search.rs](../../crates/rill-search/src/query/search.rs), [query/request.rs](../../crates/rill-search/src/query/request.rs), [query/lines.rs](../../crates/rill-search/src/query/lines.rs)
-* [symbols/index.rs](../../crates/rill-search/src/symbols/index.rs), [symbols/extract.rs](../../crates/rill-search/src/symbols/extract.rs), [symbols/lang.rs](../../crates/rill-search/src/symbols/lang.rs)
+* [symbols/index.rs](../../crates/rill-search/src/symbols/index.rs), [symbols/extract.rs](../../crates/rill-search/src/symbols/extract.rs)
 * Server: [workers/indexer.rs](../../crates/rill-api/src/workers/indexer.rs), [services/repo/grep.rs](../../crates/rill-api/src/services/repo/grep.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [repo.proto](../../crates/rill-proto/proto/rill/v1/repo.proto)
 
 ---

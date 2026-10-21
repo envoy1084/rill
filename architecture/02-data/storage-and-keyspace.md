@@ -184,18 +184,16 @@ recreated.
 | Backend | Feature | Storage |
 | --- | --- | --- |
 | `MemoryObjectStore` | always | one `HashMap` keyed by namespace, unframed bytes; reference semantics |
-| `LocalObjectStore` | `local` (default) | `<root>/<namespace>/<kind>/<hh>/<hex>`, each file a codec frame |
-| `ObjectStoreBackend` | `s3` | `<prefix>/<namespace>/<kind>/<hh>/<hex>` on any `object_store` store (`s3://`, `file://`, `memory://` via `from_url`) |
+| `ObjectStoreBackend` | always; `s3://` needs `s3` | `<prefix>/<namespace>/<kind>/<hh>/<hex>`, each object a codec frame, on any `object_store` store: `ObjectStoreBackend::local(dir)` (the filesystem), or `s3://`, `file://`, `memory://` via `from_url` |
 
 `LocalStores::open(dir)` creates `<dir>/objects` and `<dir>/meta.redb`.
 The server's `open_stores` picks objects from `[storage]` and metadata from
 `[metadata]` (beside the objects by default, or FoundationDB). See
 [configuration](../07-runtime/configuration.md).
 
-The local object store runs all file work on `spawn_blocking`. It writes a
-`.tmp-*` file with `create_new`, fsyncs it, re-checks for a concurrent
-winner, renames into place and fsyncs the directory, so readers never see a
-partial object. The `object_store` backend writes with `PutMode::Create` and
+On the filesystem, `object_store`'s `LocalFileSystem` (with `with_fsync`)
+writes a temporary file, fsyncs it and renames it into place, so readers
+never see a partial object. The backend writes with `PutMode::Create` and
 treats `AlreadyExists` as success, since the bytes are identical by
 construction. At start-up `probe` creates one probe object twice: if the
 second create also succeeds, the service ignores conditional puts and the
@@ -239,8 +237,8 @@ version or method.
 ## Code
 
 * [lib.rs](../../crates/rill-store/src/lib.rs), [error.rs](../../crates/rill-store/src/error.rs), [object.rs](../../crates/rill-store/src/object.rs), [meta.rs](../../crates/rill-store/src/meta.rs)
-* [keys.rs](../../crates/rill-store/src/keys.rs), [repo/](../../crates/rill-store/src/repo/mod.rs) ([landing.rs](../../crates/rill-store/src/repo/landing.rs), [reviews.rs](../../crates/rill-store/src/repo/reviews.rs), [idem.rs](../../crates/rill-store/src/repo/idem.rs), [orgs.rs](../../crates/rill-store/src/repo/orgs.rs), [events.rs](../../crates/rill-store/src/repo/events.rs)), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal.rs](../../crates/rill-store/src/seal.rs)
-* [memory.rs](../../crates/rill-store/src/memory.rs), [local/objects.rs](../../crates/rill-store/src/local/objects.rs), [s3.rs](../../crates/rill-store/src/s3.rs)
+* [keys.rs](../../crates/rill-store/src/keys.rs), [repo/](../../crates/rill-store/src/repo/mod.rs) ([landing.rs](../../crates/rill-store/src/repo/landing.rs), [reviews.rs](../../crates/rill-store/src/repo/reviews.rs), [idem.rs](../../crates/rill-store/src/repo/idem.rs), [orgs.rs](../../crates/rill-store/src/repo/orgs.rs), [events.rs](../../crates/rill-store/src/repo/events.rs)), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal/](../../crates/rill-store/src/seal/mod.rs)
+* [memory.rs](../../crates/rill-store/src/memory.rs), [backend.rs](../../crates/rill-store/src/backend.rs), [local/](../../crates/rill-store/src/local/mod.rs)
 * [tests/conformance/](../../crates/rill-store/tests/conformance/main.rs): every scenario on every backend
 * [rill-api state/stores.rs](../../crates/rill-api/src/state/stores.rs): `open_stores`
 

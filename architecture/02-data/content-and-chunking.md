@@ -14,7 +14,7 @@ flowchart TD
     S1 -- yes --> INL["ContentRef::Inline { bytes }<br/>nothing written"]
     S1 -- no --> S2{"len < 1 MiB"}
     S2 -- yes --> BLOB["put_blob: ObjectKind::Blob<br/>ContentRef::Blob { hash, size }"]
-    S2 -- no --> CDC["FastCDC on spawn_blocking<br/>16 / 64 / 256 KiB"]
+    S2 -- no --> CDC["fastcdc crate (v2020) on spawn_blocking<br/>16 / 64 / 256 KiB"]
     CDC --> CH["put each ObjectKind::Chunk"]
     CH --> MAN["put_object BlobManifest<br/>ContentRef::Chunked { hash, size }"]
 ```
@@ -43,7 +43,8 @@ hashed under their own kinds.
 1. At or below `INLINE_THRESHOLD`, return `Inline` without touching the
    store.
 2. Below `CHUNK_THRESHOLD`, `put_blob` and return `Blob { hash, size }`.
-3. Otherwise `chunk_boundaries` runs FastCDC on a blocking thread and
+3. Otherwise `chunk_boundaries` runs the `fastcdc` crate's v2020 chunker on
+   a blocking thread and
    returns `(offset, length)` cuts covering the input. Each chunk is a slice
    of the original `Bytes` (no copy), hashed under `Chunk` and put in turn.
    The manifest is then stored with `put_object` and returned as
@@ -55,11 +56,12 @@ exists is a no-op. An edit in the middle of a large file therefore stores
 only the chunks whose boundaries moved.
 
 `store_content_stream(objects, parts)` does the same for a stream of byte
-parts in bounded memory. It buffers up to `8 × CHUNK_MAX`, runs FastCDC on
-the buffer, and writes every chunk that ends at least `CHUNK_MAX` before the
-buffer's end; such a cut cannot move when more bytes arrive, so the result
-is identical to `store_content` on the whole content (a test checks this).
-The tail is carried into the next round. It hashes the bytes as they pass,
+parts in bounded memory. Content below `CHUNK_THRESHOLD` is buffered and
+stored whole; past it, the parts feed `fastcdc`'s `AsyncStreamCDC` (through
+`tokio_util`'s `StreamReader`) with the same parameters, which cuts exactly
+where the one-shot chunker would, so the result is identical to
+`store_content` on the whole content (a test checks this). It hashes the
+bytes as they pass,
 returns `StoredContent { content, blob_hash, size }`, and fails with
 `Error::Upload` past 5 GiB. Content that ends up under `CHUNK_THRESHOLD`
 falls back to `store_content`. A 1 GiB upload grows resident memory by less

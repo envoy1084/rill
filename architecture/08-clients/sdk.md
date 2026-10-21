@@ -143,8 +143,10 @@ next_page_token}`.
 - `.rill/checkout.toml` holds `CheckoutMeta`: endpoint, repo, workspace,
   base, base_version, working_change and sparse profile.
 - `.rill/manifest.toml` maps each path to a `ManifestEntry` (content hash,
-  local hash, size, mtime, kind, conflict flag). Both files are written
-  atomically.
+  local hash, size, mtime, kind, conflict flag). Both files, and the
+  credential store, are written through `files::write_atomic` (a
+  `tempfile` in the same directory, fsynced, then persisted over the
+  target), so concurrent writers never interleave.
 - `Checkout::create` lists the tree one `ListDir` at a time, never entering
   a directory outside the `SparseProfile`, and writes the files.
 - `status` treats a file as unchanged when size and mtime match the
@@ -166,8 +168,8 @@ next_page_token}`.
 submits each change, then calls `set_stack`. `sync_stack` rebases bottom-up,
 each change onto the previous result, and reports conflicts instead of
 raising them. `land_stack` requests a land for each change and waits for it
-before the next. `await_land` polls land status with `Backoff` (250 ms
-initial, factor 1.6, 5 s max). It returns `Error::LandFailed` on a failed or
+before the next. `await_land` polls land status with `Backoff`, a `backon`
+exponential builder (250 ms initial, factor 1.6, 5 s max, jittered). It returns `Error::LandFailed` on a failed or
 cancelled land and `Error::Timeout` when the deadline passes.
 
 ## Errors
@@ -189,7 +191,8 @@ cancelled land and `Error::Timeout` when the deadline passes.
 - The server always returns `next_page_token: None`, so a page holds the
   whole limit-bounded result.
 - Unary reads and calls carrying an operation id are retried
-  (`retry_idempotent`: `UNAVAILABLE`, up to 20 s); other mutations and
+  (`retry_idempotent`: `UNAVAILABLE`, jittered `backon` backoff from 100 ms
+  to 2 s, up to 20 s in total); other mutations and
   `watch_*` streams are not.
 - `RepoClient::grep` has no fallback; the tree walk lives in [mcp](mcp.md).
 

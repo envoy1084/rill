@@ -170,7 +170,8 @@ and `rill_core::validate_version` adds the checks that need content:
 | Reserved paths | `.rill/checkout.toml`, `.rill/manifest.toml`: not set, copied into or linked to |
 
 Symlink targets are checked whether inline or stored as a blob. Adding a
-name that differs only in case from a sibling is rejected; collisions
+name that differs only in case from a sibling (full Unicode case folding
+via `icu_casemap`, so `Straße` and `STRASSE` collide) is rejected; collisions
 already in the tree do not block unrelated edits. A repository created with
 `windows_safe` also rejects names Windows cannot create (`CON`, `nul.txt`,
 trailing dots or spaces, `:*?"<>|`).

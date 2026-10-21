@@ -91,7 +91,8 @@ away.
   on renewal, so a fenced write fails once the job was taken back, however
   often the claim was renewed.
 * **Fail** and **reap** turn an attempt into a retry, ready again after
-  `base_delay · 2^(attempt-1)` (1 s up to 5 min), or, after `max_attempts`
+  `base_delay · 2^(attempt-1)` (1 s up to 5 min) scaled by a random
+  factor in [0.5, 1] so retries spread out, or, after `max_attempts`
   (5) or a fatal failure, a dead job. `reap` does this for every claim past
   its lease (30 s). `retry_dead` revives a dead job with fresh attempts.
 * `Worker` runs a `Handler` over a queue: N claim loops that wait on the

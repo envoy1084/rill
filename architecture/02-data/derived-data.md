@@ -49,7 +49,7 @@ The server uses `DERIVE_CACHE = 8192` values and a `TreeOps` cache of
 
 `get::<D>(hash)`:
 
-1. Look in the in-process `LruCache` of encoded bytes, then in the `dd` table via
+1. Look in the in-process `moka` cache of encoded bytes, then in the `dd` table via
    `RepoStore::get_derived`.
 2. On a miss, take the `Mutex` for `(kind, hash)` from the `in_flight`
    `DashMap`, then look again, so concurrent requests compute a value once.
@@ -144,7 +144,7 @@ history and blame RPCs, the MCP blame tool and review agent context use
 
 * [derive/mod.rs](../../crates/rill-core/src/derive/mod.rs), [derive/traits.rs](../../crates/rill-core/src/derive/traits.rs), [derive/ctx.rs](../../crates/rill-core/src/derive/ctx.rs), [derive/manager.rs](../../crates/rill-core/src/derive/manager.rs)
 * [derive/root_tree.rs](../../crates/rill-core/src/derive/root_tree.rs), [derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs), [derive/changed_paths.rs](../../crates/rill-core/src/derive/changed_paths.rs), [derive/registry.rs](../../crates/rill-core/src/derive/registry.rs), [derive/summary.rs](../../crates/rill-core/src/derive/summary.rs), [derive/history.rs](../../crates/rill-core/src/derive/history.rs), [derive/blame.rs](../../crates/rill-core/src/derive/blame.rs)
-* [tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs), [util/lru.rs](../../crates/rill-core/src/util/lru.rs)
+* [tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs)
 * [rill-api services/repo/refs.rs](../../crates/rill-api/src/services/repo/refs.rs): `GetDerived` compute dispatch
 * [rill-api services/repo/write.rs](../../crates/rill-api/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/rill-api/src/workers/deriver.rs): derive jobs
 * [rill-api state/registry.rs](../../crates/rill-api/src/state/registry.rs): manager construction
