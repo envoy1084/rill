@@ -5,6 +5,7 @@
 pub mod admin;
 pub mod change;
 pub mod checkout;
+pub mod export;
 pub mod history;
 pub mod import;
 pub mod intent;
@@ -62,6 +63,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Ref(cmd) => refs::run(ctx, cmd).await,
         Command::Admin(cmd) => admin::run(ctx, cmd).await,
         Command::Import(cmd) => import::run(ctx, cmd).await,
+        Command::Export(cmd) => export::run(ctx, cmd).await,
         Command::Watch(cmd) => watch::run(ctx, cmd).await,
         Command::Dev(args) => crate::server::dev(args).await,
         Command::Api(args) => crate::server::api(args).await,

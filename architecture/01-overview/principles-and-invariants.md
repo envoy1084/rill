@@ -126,7 +126,7 @@ flowchart LR
 - [ChangeVersion](../../crates/rill-types/src/objects/change.rs)
 - [Object verification](../../crates/rill-store/src/object.rs)
 - [land_on_trunk](../../crates/rill-store/src/repo/trunk.rs)
-- [Landing record lock](../../crates/rill-lander/src/land/pipeline.rs)
+- [Land transaction](../../crates/rill-store/src/repo/landing.rs)
 - [Lander traits](../../crates/rill-lander/src/traits.rs)
 - [ReviewHooksAdapter](../../crates/rill-api/src/workers/hooks.rs)
 - [Policy hot-swap](../../crates/rill-api/src/state/registry.rs)

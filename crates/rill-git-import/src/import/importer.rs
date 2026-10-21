@@ -3,27 +3,34 @@
 
 use std::collections::{HashMap, HashSet};
 
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
-use rill_core::ChangeBuilder;
-use rill_store::RepoStore;
-use rill_types::{ChangeId, ChangeVersionHash, Principal, Provenance};
+use rill_types::{
+    ChangeId, ChangeVersion, ChangeVersionHash, FileChange, Principal, Provenance, RepoPathBuf,
+};
 use tokio::sync::mpsc;
 
 use super::land::land_first_parent_history;
 use super::map::ImportMap;
 use super::options::{ImportOptions, ImportReport};
+use super::target::ImportTarget;
 use crate::error::{Error, Result};
 use crate::reader::{history, CommitChanges, GitChange, GitCommit, GitSha, GitSource};
 
 /// Key under which the git sha is stored in `ChangeVersion::extra`.
 pub const GIT_SHA_EXTRA: &str = "git_sha";
 
+/// Provenance keys keeping the git author and commit time.
+pub const GIT_AUTHOR_PROVENANCE: &str = "git_author";
+pub const GIT_DATE_PROVENANCE: &str = "git_date";
+
 /// Tool name recorded in provenance.
 const TOOL: &str = "rill-git-import";
 
 /// Imports git history into one repository, incrementally.
-pub struct Importer {
-    repo: RepoStore,
+pub struct Importer<T: ImportTarget> {
+    repo: T,
     map: ImportMap,
 }
 
@@ -34,15 +41,15 @@ enum Item {
     New(GitCommit, CommitChanges),
 }
 
-impl Importer {
+impl<T: ImportTarget> Importer<T> {
     /// An importer whose map is loaded from `repo`.
-    pub async fn open(repo: RepoStore) -> Result<Self> {
-        let map = ImportMap::load(&repo).await?;
+    pub async fn open(repo: T) -> Result<Self> {
+        let map = repo.load_map().await?;
         Ok(Importer { repo, map })
     }
 
     /// An importer with an explicit map.
-    pub fn new(repo: RepoStore, map: ImportMap) -> Self {
+    pub fn new(repo: T, map: ImportMap) -> Self {
         Importer { repo, map }
     }
 
@@ -61,7 +68,7 @@ impl Importer {
         options: ImportOptions,
     ) -> Result<ImportReport> {
         let result = self.run(source, head_ref, &options).await;
-        self.map.save(&self.repo).await?;
+        self.repo.save_map(&self.map).await?;
         result
     }
 
@@ -94,7 +101,7 @@ impl Importer {
                     report.imported += 1;
                     since_save += 1;
                     if since_save >= options.save_every.max(1) {
-                        self.map.save(&self.repo).await?;
+                        self.repo.save_map(&self.map).await?;
                         since_save = 0;
                     }
                     commits.push(commit);
@@ -167,35 +174,56 @@ impl Importer {
             commit.author_name.clone()
         });
         author.identity = Some(commit.author_email.clone());
-        let provenance = Provenance {
+        let mut provenance = Provenance {
             tool: Some(TOOL.to_string()),
             ..Default::default()
         };
-        let mut builder = ChangeBuilder::new(author)
-            .change_id(ChangeId::derived("git", commit.sha.as_str()))
-            .message(commit.message.clone())
-            .created_at(commit.committed_at)
-            .provenance(provenance);
+        // A server stamps the importer as the author; the git author and
+        // date stay with the version.
+        provenance.extra.insert(
+            GIT_AUTHOR_PROVENANCE.to_string(),
+            format!("{} <{}>", commit.author_name, commit.author_email),
+        );
+        provenance.extra.insert(
+            GIT_DATE_PROVENANCE.to_string(),
+            commit.committed_at.millis().to_string(),
+        );
+        let mut parents = Vec::with_capacity(commit.parents.len());
         for parent in &commit.parents {
-            builder = builder.parent(self.mapped(&commit.sha, parent)?);
+            parents.push(self.mapped(&commit.sha, parent)?);
         }
+        let mut file_changes = BTreeMap::new();
         for change in changes.changes {
             let path = change.path().to_string();
-            builder = match change {
-                GitChange::Set { content, kind, .. } => builder.file_kind(&path, content, kind),
-                GitChange::Delete { .. } => builder.delete(&path),
-            }
-            .map_err(|e| match e {
-                rill_core::Error::Types(t) => Error::InvalidPath(path, t),
-                other => Error::Core(other),
-            })?;
+            let repo_path =
+                RepoPathBuf::new(&path).map_err(|e| Error::InvalidPath(path.clone(), e))?;
+            let file_change = match change {
+                GitChange::Set { content, kind, .. } => {
+                    FileChange::set(self.repo.store_content(content).await?, kind)
+                }
+                GitChange::Delete { .. } => FileChange::Delete,
+            };
+            file_changes.insert(repo_path, file_change);
         }
-        let mut cv = builder.build(self.repo.objects().as_ref()).await?;
-        cv.extra.insert(
+        let mut extra = BTreeMap::new();
+        extra.insert(
             GIT_SHA_EXTRA.to_string(),
             Bytes::from(commit.sha.to_bytes()),
         );
-        let hash = self.repo.put_change_version(&cv).await?;
+        let cv = ChangeVersion {
+            change_id: ChangeId::derived("git", commit.sha.as_str()),
+            parents,
+            predecessor: None,
+            subtree_changes: BTreeMap::new(),
+            file_changes,
+            author,
+            provenance,
+            intent: None,
+            message: commit.message.clone(),
+            created_at: commit.committed_at,
+            extra,
+        };
+        let hash = self.repo.store_version(&cv).await?;
         tracing::debug!(sha = %commit.sha, version = %hash, files = cv.file_changes.len(), "imported commit");
         Ok(hash)
     }
@@ -238,7 +266,7 @@ mod tests {
     use super::*;
     use crate::reader::MemorySource;
     use rill_core::{DeriveManager, RootTree, TreeOps};
-    use rill_store::Stores;
+    use rill_store::{RepoStore, Stores};
     use rill_types::{EntryKind, RepoPathBuf, TrunkSeq};
 
     async fn repo() -> RepoStore {

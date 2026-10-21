@@ -38,7 +38,7 @@ The server registers all six services behind `AuthLayer`
 | `ReviewService` | `review.proto` | `services/review/` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand`, `GetLandStatus`, `WatchReview` |
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
-| `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs` |
+| `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, relations, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
 
 `types.proto` holds the shared object model and `events.proto` the event
 log's messages. The streaming RPCs are `GetBlob` (server stream of
@@ -85,7 +85,7 @@ These conventions are stated at the top of `types.proto` and enforced by
 
 ## Retries
 
-Every mutating RPC (34 of them; `PutBlob` is content-addressed and needs
+Every mutating RPC (35 of them; `PutBlob` is content-addressed and needs
 none) runs through `services/idem.rs::once`. A request with a non-empty
 `operation_id` claims `(principal, operation_id)` in the `idem` table
 before it runs:

@@ -16,6 +16,20 @@ service AdminService {
   rpc Health(HealthRequest) returns (HealthResponse);
   rpc CreateOrg(CreateOrgRequest) returns (CreateOrgResponse);
   rpc ListOrgs(ListOrgsRequest) returns (ListOrgsResponse);
+  // Append an imported version to trunk, for importers of existing
+  // history; needs the admin permit.
+  rpc AppendTrunk(AppendTrunkRequest) returns (AppendTrunkResponse);
+}
+
+message AppendTrunkRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  // The trunk head the version goes on; absent for an empty trunk.
+  optional bytes expected = 3;
+  bytes version = 4;
+}
+message AppendTrunkResponse {
+  uint64 seq = 1;
 }
 
 message CreateOrgRequest {

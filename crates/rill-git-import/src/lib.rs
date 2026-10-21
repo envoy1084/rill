@@ -19,5 +19,8 @@ pub mod import;
 pub mod reader;
 
 pub use error::{Error, Result};
-pub use import::{ImportMap, ImportOptions, ImportReport, Importer};
+pub use import::{
+    ImportMap, ImportOptions, ImportReport, ImportTarget, Importer, GIT_AUTHOR_PROVENANCE,
+    GIT_DATE_PROVENANCE, GIT_SHA_EXTRA,
+};
 pub use reader::{GitChange, GitCommit, GitSha, GitSource, GixSource, MemorySource};

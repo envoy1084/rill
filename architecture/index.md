@@ -68,7 +68,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 
 32. [Search](06-services/search.md)
 33. [Exec](06-services/exec.md)
-34. [Git import](06-services/git-import.md)
+34. [Git import and export](06-services/git-import.md)
 
 **07 Runtime**
 

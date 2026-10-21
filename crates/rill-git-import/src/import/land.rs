@@ -1,8 +1,8 @@
 //! Landing an imported mainline onto trunk.
 
-use rill_store::RepoStore;
 use rill_types::{ChangeVersionHash, TrunkSeq};
 
+use super::target::ImportTarget;
 use crate::error::{Error, Result};
 
 /// Land `chain` (oldest first, each the first parent of the next) on
@@ -14,7 +14,7 @@ use crate::error::{Error, Result};
 /// [`Error::TrunkDiverged`]. Returns the number of versions landed and the
 /// resulting trunk head.
 pub async fn land_first_parent_history(
-    repo: &RepoStore,
+    repo: &dyn ImportTarget,
     chain: &[(ChangeVersionHash, Option<ChangeVersionHash>)],
 ) -> Result<(usize, Option<(TrunkSeq, ChangeVersionHash)>)> {
     let mut landed = 0;
@@ -30,7 +30,7 @@ pub async fn land_first_parent_history(
                 next: *version,
             });
         }
-        let seq = repo.land_on_trunk(expected, *version).await?;
+        let seq = repo.append_trunk(expected, *version).await?;
         tracing::debug!(version = %version, %seq, "landed imported version");
         head = Some((seq, *version));
         landed += 1;

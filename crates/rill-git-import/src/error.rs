@@ -6,6 +6,10 @@ use crate::reader::GitSha;
 /// Errors produced while reading git data or importing it.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// The import target (a server) refused or failed.
+    #[error("import target: {0}")]
+    Target(String),
+
     #[error(transparent)]
     Store(#[from] rill_store::Error),
 

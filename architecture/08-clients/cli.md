@@ -44,7 +44,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Intents | `intent create/list/show/update/link/similar` |
 | Workspaces, refs | `ws create/list/show/handoff/ops/delete`, `ref list/show/set/delete` |
 | Admin | `admin whoami`, `admin token issue`, `admin relation add/remove/list`, `admin policy get/set`, `admin health` |
-| Other | `import git`, `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
+| Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
 
 Each group lives in `commands/<group>.rs`. `commands/parse.rs` holds the
 shared positional parsers: `root_arg` (defaults to trunk), `seq_arg` (`7` or
@@ -59,9 +59,10 @@ Behaviours worth knowing:
 - `rill new` and `rill sync` change `working_change` through
   `checkout_meta::set_working_change`. This is the only place the CLI edits
   `.rill/checkout.toml` directly.
-- `rill import git <path> --repo R --storage-dir DIR` opens `LocalStores`
-  directly, not through a server, and rejects `--endpoint`. `--storage-dir`
-  also reads `RILL_STORAGE_DIR`. See [git import](../06-services/git-import.md).
+- `rill import git <path> --repo R` imports through the server the client
+  is configured for; `--storage-dir DIR` (or `RILL_STORAGE_DIR`) opens
+  `LocalStores` directly instead. `rill export git <dir>` mirrors trunk into
+  a git branch. See [git import and export](../06-services/git-import.md).
 - Every change the CLI creates has `Provenance {tool: "rill-cli"}`.
 
 ## Context resolution
@@ -131,7 +132,7 @@ the root `CancellationToken`. See
 ## Code
 
 - [lib.rs](../../crates/rill-cli/src/lib.rs), [cli.rs](../../crates/rill-cli/src/cli.rs), [context.rs](../../crates/rill-cli/src/context.rs), [error.rs](../../crates/rill-cli/src/error.rs), [exit.rs](../../crates/rill-cli/src/exit.rs), [checkout_meta.rs](../../crates/rill-cli/src/checkout_meta.rs)
-- [commands/mod.rs](../../crates/rill-cli/src/commands/mod.rs), [commands/parse.rs](../../crates/rill-cli/src/commands/parse.rs), [commands/change.rs](../../crates/rill-cli/src/commands/change.rs), [commands/import.rs](../../crates/rill-cli/src/commands/import.rs)
+- [commands/mod.rs](../../crates/rill-cli/src/commands/mod.rs), [commands/parse.rs](../../crates/rill-cli/src/commands/parse.rs), [commands/change.rs](../../crates/rill-cli/src/commands/change.rs), [commands/import/](../../crates/rill-cli/src/commands/import/mod.rs), [commands/export.rs](../../crates/rill-cli/src/commands/export.rs)
 - [output/mod.rs](../../crates/rill-cli/src/output/mod.rs), [output/table.rs](../../crates/rill-cli/src/output/table.rs), [output/format.rs](../../crates/rill-cli/src/output/format.rs)
 - [server/mod.rs](../../crates/rill-cli/src/server/mod.rs), [server/template.rs](../../crates/rill-cli/src/server/template.rs)
 - [bin/rill.rs](../../crates/rill-cli/src/bin/rill.rs)

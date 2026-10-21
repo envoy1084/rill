@@ -29,6 +29,13 @@ async fn short_run_completes_without_errors() {
         .sum();
     assert!(reads > 50, "{report:#}");
     let ledger = &report["ledger"];
-    assert!(ledger["acknowledged_versions"].as_u64().unwrap() > 0, "{report:#}");
-    assert_eq!(ledger["lost_versions"].as_array().unwrap().len(), 0, "{report:#}");
+    assert!(
+        ledger["acknowledged_versions"].as_u64().unwrap() > 0,
+        "{report:#}"
+    );
+    assert_eq!(
+        ledger["lost_versions"].as_array().unwrap().len(),
+        0,
+        "{report:#}"
+    );
 }

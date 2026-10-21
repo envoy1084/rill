@@ -70,6 +70,7 @@ idempotent!(
     SetStackRequest,
     AbandonRequest,
     RequestLandRequest,
+    AppendTrunkRequest,
 );
 
 /// The idempotency key of the request being handled, for work that

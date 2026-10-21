@@ -160,6 +160,29 @@ impl AdminClient {
         Ok(timestamp_from_proto(resp.updated_at))
     }
 
+    /// Append an imported `version` to `repo`'s trunk if trunk still ends
+    /// at `expected`; for importers of existing history.
+    pub async fn append_trunk(
+        &self,
+        repo: &str,
+        expected: Option<rill_types::ChangeVersionHash>,
+        version: rill_types::ChangeVersionHash,
+    ) -> Result<rill_types::TrunkSeq> {
+        let request = pb::AppendTrunkRequest {
+            operation_id: id_to_proto(&OperationId::new()),
+            repo: repo.to_string(),
+            expected: expected.map(|h| rill_proto::convert::hash_to_proto(&h)),
+            version: rill_proto::convert::hash_to_proto(&version),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.append_trunk(request).await }
+        })
+        .await?
+        .into_inner();
+        Ok(rill_types::TrunkSeq(resp.seq))
+    }
+
     /// Create an org.
     pub async fn create_org(&self, name: &str, description: Option<&str>) -> Result<OrgInfo> {
         let request = pb::CreateOrgRequest {

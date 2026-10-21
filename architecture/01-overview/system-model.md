@@ -140,7 +140,7 @@ The rules these mechanisms must keep are listed in
 - [Permission checks](../../crates/rill-api/src/auth/permit.rs)
 - [Event log readers](../../crates/rill-events/src/lib.rs)
 - [Trunk CAS](../../crates/rill-store/src/repo/trunk.rs)
-- [Landing pipeline](../../crates/rill-lander/src/land/pipeline.rs)
+- [Landing sequencer](../../crates/rill-lander/src/land/sequence.rs)
 - [Object model](../../crates/rill-types/src/objects/mod.rs)
 
 ---

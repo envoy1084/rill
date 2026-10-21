@@ -70,7 +70,7 @@ The algebra settles most paths before any content is read:
 | --- | --- |
 | `Rebase` RPC ([repo/write.rs](../../crates/rill-api/src/services/repo/write.rs)) | Stored through `commit_version`; `has_conflicts` is true |
 | Workspace rebase ([services/workspace.rs](../../crates/rill-api/src/services/workspace.rs)) | Stored through `commit_version`; the workspace snapshot moves to its root |
-| Lander ([land/pipeline.rs](../../crates/rill-lander/src/land/pipeline.rs)) | Not stored. The request gets `LandStatus::Conflict` and the change goes back to its owner |
+| Lander ([land/sequence.rs](../../crates/rill-lander/src/land/sequence.rs)) | Not stored. The request gets `LandStatus::Conflict` and the change goes back to its owner |
 
 The lander first checks `is_ancestor(tip, head)` and skips the rebase when
 the tip is already on trunk. See [landing](../04-workflow/landing.md).
@@ -98,7 +98,7 @@ the tip is already on trunk. See [landing](../04-workflow/landing.md).
 - [rebase.rs](../../crates/rill-core/src/rebase.rs)
 - [merge/change.rs](../../crates/rill-core/src/merge/change.rs) (`merge_path`, `tip_terms`, `is_same_as`, `root_of`)
 - [merge/state.rs](../../crates/rill-core/src/merge/state.rs)
-- [rill-lander land/pipeline.rs](../../crates/rill-lander/src/land/pipeline.rs)
+- [rill-lander land/sequence.rs](../../crates/rill-lander/src/land/sequence.rs)
 
 ---
 ← Previous: [Merge](merge.md) · [Index](../index.md) · Next: [Trees](trees.md) →

@@ -146,7 +146,7 @@ The lander picks a `VerifyMode` per risk class: `None` skips verification;
 * [sandbox/mod.rs](../../crates/rill-exec/src/sandbox/mod.rs), [sandbox/local.rs](../../crates/rill-exec/src/sandbox/local.rs), [sandbox/firecracker.rs](../../crates/rill-exec/src/sandbox/firecracker.rs)
 * [verify.rs](../../crates/rill-exec/src/verify.rs)
 * Server: [workers/verifier.rs](../../crates/rill-api/src/workers/verifier.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [config/server.rs](../../crates/rill-api/src/config/server.rs)
-* Lander: [config.rs](../../crates/rill-lander/src/config.rs), [land/pipeline.rs](../../crates/rill-lander/src/land/pipeline.rs)
+* Lander: [config.rs](../../crates/rill-lander/src/config.rs), [land/sequence.rs](../../crates/rill-lander/src/land/sequence.rs)
 
 ---
 ← Previous: [Search](search.md) · [Index](../index.md) · Next: [Git import](git-import.md) →

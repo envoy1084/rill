@@ -167,9 +167,13 @@ pub enum Command {
     #[command(subcommand)]
     Admin(admin::AdminCmd),
 
-    /// Import history from another system directly into storage.
+    /// Import history from another system (git).
     #[command(subcommand)]
     Import(import::ImportCmd),
+
+    /// Mirror trunk into another system (git), one way.
+    #[command(subcommand)]
+    Export(crate::commands::export::ExportCmd),
 
     /// Stream trunk, ref or log events.
     #[command(subcommand)]
