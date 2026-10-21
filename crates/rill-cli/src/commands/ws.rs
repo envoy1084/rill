@@ -233,7 +233,7 @@ async fn ops(ctx: &mut Ctx<'_>, args: OpsArgs) -> Result<()> {
                     out.id(&o.id.to_string()),
                     kind,
                     o.actor.to_string(),
-                    short(&o.resulting_base),
+                    short(&o.resulting.base),
                     when(&o.at),
                 ]);
             }

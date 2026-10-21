@@ -416,9 +416,10 @@ message Operation {
   optional bytes parent = 3;
   Principal actor = 4;
   OperationKind kind = 5;
-  bytes resulting_base = 6;
-  optional bytes resulting_snapshot = 7;
+  reserved 6, 7;
   int64 at = 8;
+  // The whole workspace after this operation.
+  Workspace resulting = 9;
 }
 
 // A compare-and-swap request on a ref; absent `expected` means the ref

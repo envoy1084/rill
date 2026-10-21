@@ -67,8 +67,7 @@ pub fn operation(o: &Operation) -> Value {
         "parent": o.parent.map(|p| p.to_string()),
         "actor": principal(&o.actor),
         "op": operation_kind(&o.kind),
-        "resulting_base": hash(&o.resulting_base),
-        "resulting_snapshot": opt(o.resulting_snapshot.as_ref(), hash),
+        "resulting": workspace(&o.resulting),
         "at": timestamp(&o.at),
     })
 }

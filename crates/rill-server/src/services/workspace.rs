@@ -3,8 +3,8 @@
 //!
 //! A workspace's `base` is `ObjectHash::ZERO` while the repository has no
 //! history; every other base is a change version. Each mutating RPC
-//! appends one [`Operation`] whose `resulting_*` fields snapshot the
-//! workspace state afterwards, which is what `Undo` restores.
+//! appends one [`Operation`] holding the whole workspace afterwards, which
+//! is what `Undo` restores; undoing an `Undo` is a redo.
 
 use std::sync::Arc;
 
@@ -59,34 +59,39 @@ impl WorkspaceSvc {
             .ok_or_else(|| Error::not_found(format!("workspace {id}")))
     }
 
-    /// Append `kind` as the next operation and persist the workspace.
+    /// Append `kind` as the next operation and persist the workspace,
+    /// checking it still equals `before` (absent for a new workspace).
     async fn record(
         &self,
         opened: &Opened,
+        before: Option<&Workspace>,
         ws: &mut Workspace,
         op_id: OperationId,
         kind: OperationKind,
     ) -> Result<Operation> {
+        let at = Timestamp::now();
+        ws.head_op = Some(op_id);
+        ws.updated_at = at;
         let op = Operation {
             id: op_id,
             workspace: ws.id,
-            parent: ws.head_op,
+            parent: before.and_then(|b| b.head_op),
             actor: opened.principal().clone(),
             kind,
-            resulting_base: ws.base,
-            resulting_snapshot: ws.snapshot,
-            at: Timestamp::now(),
+            resulting: ws.clone(),
+            at,
         };
-        ws.head_op = Some(op.id);
-        ws.updated_at = op.at;
         opened
             .repo
             .repo
-            .append_operation(ws, &op)
+            .append_operation(before, &op)
             .await
             .map_err(|e| {
                 if e.is_conflict() {
-                    Error::AlreadyExists(format!("operation {} was already applied", op.id))
+                    Error::AlreadyExists(format!(
+                        "operation {} was already applied, or the workspace changed meanwhile",
+                        op.id
+                    ))
                 } else {
                     e.into()
                 }
@@ -144,6 +149,7 @@ impl WorkspaceService for WorkspaceSvc {
             let op = self
                 .record(
                     &opened,
+                    None,
                     &mut ws,
                     operation_id(&req.operation_id)?,
                     OperationKind::Create,
@@ -211,7 +217,8 @@ impl WorkspaceService for WorkspaceSvc {
         let result: crate::error::Result<Response<pb::SetSparseProfileResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let req = request.into_inner();
-            let mut ws = self.load_mut(&opened, &req.workspace).await?;
+            let before = self.load_mut(&opened, &req.workspace).await?;
+            let mut ws = before.clone();
             let profile = match req.sparse {
                 Some(s) => SparseProfile::try_from(s)?,
                 None => SparseProfile::full(),
@@ -220,6 +227,7 @@ impl WorkspaceService for WorkspaceSvc {
             let op = self
                 .record(
                     &opened,
+                    Some(&before),
                     &mut ws,
                     operation_id(&req.operation_id)?,
                     OperationKind::SetSparse { profile },
@@ -242,7 +250,8 @@ impl WorkspaceService for WorkspaceSvc {
         let result: crate::error::Result<Response<pb::SnapshotResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let req = request.into_inner();
-            let mut ws = self.load_mut(&opened, &req.workspace).await?;
+            let before = self.load_mut(&opened, &req.workspace).await?;
+            let mut ws = before.clone();
             let tree = common::hash("tree_hash", &req.tree_hash)?;
             opened.repo.trees.get_tree(&tree).await.map_err(|_| {
                 Error::precondition(format!("snapshot tree {tree} has not been uploaded"))
@@ -251,6 +260,7 @@ impl WorkspaceService for WorkspaceSvc {
             let op = self
                 .record(
                     &opened,
+                    Some(&before),
                     &mut ws,
                     operation_id(&req.operation_id)?,
                     OperationKind::Snapshot { tree },
@@ -274,7 +284,8 @@ impl WorkspaceService for WorkspaceSvc {
         let result: crate::error::Result<Response<pb::NewChangeResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let req = request.into_inner();
-            let mut ws = self.load_mut(&opened, &req.workspace).await?;
+            let before = self.load_mut(&opened, &req.workspace).await?;
+            let mut ws = before.clone();
             let snapshot = ws.snapshot.ok_or_else(|| {
                 Error::precondition("workspace has no snapshot to turn into a change")
             })?;
@@ -313,6 +324,7 @@ impl WorkspaceService for WorkspaceSvc {
             let op = self
                 .record(
                     &opened,
+                    Some(&before),
                     &mut ws,
                     operation_id(&req.operation_id)?,
                     OperationKind::NewChange { change, base },
@@ -338,7 +350,8 @@ impl WorkspaceService for WorkspaceSvc {
         let result: crate::error::Result<Response<pb::UpdateBaseResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let req = request.into_inner();
-            let mut ws = self.load_mut(&opened, &req.workspace).await?;
+            let before = self.load_mut(&opened, &req.workspace).await?;
+            let mut ws = before.clone();
             let new_base = resolve_version(&opened.repo, req.new_base.as_ref())
                 .await?
                 .ok_or_else(|| Error::precondition("the repository has no trunk head yet"))?;
@@ -367,6 +380,7 @@ impl WorkspaceService for WorkspaceSvc {
             let op = self
                 .record(
                     &opened,
+                    Some(&before),
                     &mut ws,
                     operation_id(&req.operation_id)?,
                     OperationKind::Rebase { from, to: new_base },
@@ -391,12 +405,14 @@ impl WorkspaceService for WorkspaceSvc {
         let result: crate::error::Result<Response<pb::HandoffResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let req = request.into_inner();
-            let mut ws = self.load_mut(&opened, &req.workspace).await?;
+            let before = self.load_mut(&opened, &req.workspace).await?;
+            let mut ws = before.clone();
             let to = Principal::try_from(req.to.ok_or_else(|| Error::invalid("to is required"))?)?;
             ws.owner = to.clone();
             let op = self
                 .record(
                     &opened,
+                    Some(&before),
                     &mut ws,
                     operation_id(&req.operation_id)?,
                     OperationKind::Handoff { to },
@@ -418,7 +434,8 @@ impl WorkspaceService for WorkspaceSvc {
         let result: crate::error::Result<Response<pb::UndoResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let req = request.into_inner();
-            let mut ws = self.load_mut(&opened, &req.workspace).await?;
+            let before = self.load_mut(&opened, &req.workspace).await?;
+            let mut ws = before.clone();
             let ops = opened
                 .repo
                 .repo
@@ -440,11 +457,20 @@ impl WorkspaceService for WorkspaceSvc {
             let previous = ops.iter().find(|o| o.id == parent_id).ok_or_else(|| {
                 Error::not_found(format!("operation {parent_id} is beyond the retained log"))
             })?;
-            ws.base = previous.resulting_base;
-            ws.snapshot = previous.resulting_snapshot;
+            // Everything but identity comes back: base, snapshot, working
+            // change, sparse profile and owner.
+            ws = Workspace {
+                id: ws.id,
+                repo: ws.repo,
+                created_at: ws.created_at,
+                head_op: ws.head_op,
+                updated_at: ws.updated_at,
+                ..previous.resulting.clone()
+            };
             let op = self
                 .record(
                     &opened,
+                    Some(&before),
                     &mut ws,
                     operation_id(&req.operation_id)?,
                     OperationKind::Undo { undone: target },

@@ -99,9 +99,9 @@ pub struct Operation {
     pub parent: Option<OperationId>,
     pub actor: Principal,
     pub kind: OperationKind,
-    /// Workspace state after this operation, so undo is a pointer move.
-    pub resulting_base: ChangeVersionHash,
-    pub resulting_snapshot: Option<TreeHash>,
+    /// The whole workspace after this operation, so undoing to it restores
+    /// every field, not only the base and snapshot.
+    pub resulting: Workspace,
     pub at: Timestamp,
 }
 

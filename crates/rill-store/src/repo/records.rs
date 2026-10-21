@@ -34,18 +34,26 @@ impl RepoStore {
         self.list_records(table::WORKSPACE).await
     }
 
-    /// Append an operation and update the workspace in one transaction,
-    /// failing with a conflict if the operation id was already applied.
-    /// Returns the operation's sequence within the workspace log.
-    pub async fn append_operation(&self, ws: &Workspace, op: &Operation) -> Result<u64> {
-        let index = self.keys().operation_index(&op.id);
+    /// Append an operation and write its resulting workspace in one
+    /// transaction, failing with a conflict if the operation id was
+    /// already applied or the workspace changed since `expected` was read
+    /// (`None`: the workspace must not exist yet).
+    pub async fn append_operation(
+        &self,
+        expected: Option<&Workspace>,
+        op: &Operation,
+    ) -> Result<()> {
+        let keys = self.keys();
+        let index = keys.operation_index(&op.id);
+        let ws_key = keys.workspace(&op.workspace);
         let tx = Transaction::new()
             .expect_absent(index.clone())
-            .append_log(self.keys().operations(&ws.id), encode_record(op)?)
-            .set(self.keys().workspace(&ws.id), encode_record(ws)?)
+            .expect(ws_key.clone(), expected.map(encode_record).transpose()?)
+            .append_stamped(keys.operations(&op.workspace), encode_record(op)?)
+            .set(ws_key, encode_record(&op.resulting)?)
             .set(index, Bytes::new());
-        let out = self.meta().transact(tx).await?;
-        Ok(out.appended.first().copied().unwrap_or(0))
+        self.meta().transact(tx).await?;
+        Ok(())
     }
 
     pub async fn has_operation(&self, op: &OperationId) -> Result<bool> {

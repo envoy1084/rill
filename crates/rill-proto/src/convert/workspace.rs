@@ -183,9 +183,8 @@ impl From<&Operation> for pb::Operation {
             parent: op.parent.as_ref().map(id_to_proto),
             actor: Some(pb::Principal::from(&op.actor)),
             kind: Some(pb::OperationKind::from(&op.kind)),
-            resulting_base: hash_to_proto(&op.resulting_base),
-            resulting_snapshot: op.resulting_snapshot.as_ref().map(hash_to_proto),
             at: timestamp_to_proto(op.at),
+            resulting: Some(pb::Workspace::from(&op.resulting)),
         }
     }
 }
@@ -207,11 +206,7 @@ impl TryFrom<pb::Operation> for Operation {
             parent: opt_id_from_proto("operation.parent", op.parent.as_ref())?,
             actor,
             kind: required("operation.kind", op.kind)?.try_into()?,
-            resulting_base: hash_from_proto("operation.resulting_base", &op.resulting_base)?,
-            resulting_snapshot: opt_hash_from_proto(
-                "operation.resulting_snapshot",
-                op.resulting_snapshot.as_ref(),
-            )?,
+            resulting: required("operation.resulting", op.resulting)?.try_into()?,
             at: timestamp_from_proto(op.at),
         })
     }

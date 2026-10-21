@@ -310,16 +310,14 @@ fn label_roundtrip() {
     }
 }
 
-#[test]
-fn workspace_roundtrip() {
-    let ws = Workspace {
+fn workspace_with(snapshot: Option<ObjectHash>) -> Workspace {
+    Workspace {
         id: WorkspaceId::derived("test", "ws"),
         repo: RepoId::derived("test", "repo"),
         owner: Principal::agent("coder"),
         name: "feature-x".into(),
         base: h("base"),
         working_change: ChangeId::derived("test", "wc"),
-        snapshot: Some(ObjectHash::digest(ObjectKind::Tree, b"t")),
         sparse: SparseProfile {
             include: vec![p("src")],
             exclude: vec![p("src/vendor")],
@@ -327,7 +325,13 @@ fn workspace_roundtrip() {
         head_op: Some(OperationId::derived("test", "op")),
         created_at: Timestamp::from_millis(1),
         updated_at: Timestamp::from_millis(2),
-    };
+        snapshot,
+    }
+}
+
+#[test]
+fn workspace_roundtrip() {
+    let ws = workspace_with(Some(ObjectHash::digest(ObjectKind::Tree, b"t")));
     assert_eq!(
         Workspace::try_from(wire(pb::Workspace::from(&ws))).unwrap(),
         ws
@@ -380,8 +384,7 @@ fn operation_roundtrip_every_kind() {
             parent: (i > 0).then(|| OperationId::derived("test", &(i - 1).to_string())),
             actor: Principal::agent("coder"),
             kind,
-            resulting_base: h("base"),
-            resulting_snapshot: (i % 2 == 0).then(|| h("snap")),
+            resulting: workspace_with((i % 2 == 0).then(|| h("snap"))),
             at: Timestamp::from_millis(i as i64),
         };
         assert_eq!(
@@ -398,8 +401,7 @@ fn operation_roundtrip_every_kind() {
             parent: None,
             actor: Principal::human("a"),
             kind: OperationKind::Create,
-            resulting_base: h("b"),
-            resulting_snapshot: None,
+            resulting: workspace_with(None),
             at: Timestamp::from_millis(0),
         })
     };
