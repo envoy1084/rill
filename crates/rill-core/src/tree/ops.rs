@@ -77,6 +77,7 @@ impl TreeOps {
     /// Fetch and decode one node, consulting the cache first.
     pub async fn get_node(&self, hash: &TreeHash) -> Result<NodeRef> {
         if let Some(node) = self.cache.get(hash) {
+            self.objects.refuses(ObjectKind::Tree, hash)?;
             return Ok(node);
         }
         let node: TreeNode = self
@@ -95,6 +96,7 @@ impl TreeOps {
         let bytes = node.encode();
         let hash = ObjectHash::digest(ObjectKind::Tree, &bytes);
         if self.cache.get(&hash).is_some() {
+            self.objects.refuses(ObjectKind::Tree, &hash)?;
             return Ok(hash);
         }
         self.objects

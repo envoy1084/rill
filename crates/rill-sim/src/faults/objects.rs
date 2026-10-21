@@ -58,6 +58,10 @@ impl ObjectStore for FaultyObjectStore {
         ))
     }
 
+    fn refuses(&self, kind: ObjectKind, hash: &ObjectHash) -> rill_store::Result<()> {
+        self.inner.refuses(kind, hash)
+    }
+
     async fn put(&self, kind: ObjectKind, hash: &ObjectHash, bytes: Bytes) -> Result<()> {
         match self.plan.write(("put", kind as u8, hash.as_bytes())) {
             Fault::None => self.inner.put(kind, hash, bytes).await,

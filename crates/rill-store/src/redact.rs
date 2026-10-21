@@ -58,6 +58,11 @@ impl ObjectStore for RedactingObjectStore {
         self.inner.put(kind, hash, bytes).await
     }
 
+    fn refuses(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<()> {
+        self.check(kind, hash)?;
+        self.inner.refuses(kind, hash)
+    }
+
     fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
         Arc::new(RedactingObjectStore::new(
             self.inner.namespaced(namespace),

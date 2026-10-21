@@ -71,6 +71,8 @@ with `Error::Redacted`:
 * re-uploading the same bytes is refused, so the content cannot come back
   under its hash;
 * search and grep treat it as empty rather than failing;
+* caches of decoded objects (tree nodes) ask the store before serving a
+  hit, so a redacted tree is refused even where it was cached;
 * `GET /redactions` publishes the redacted hashes (hashes only). Cache tiers
   poll it, then drop their copies and refuse those hashes.
 
@@ -122,6 +124,9 @@ Sealing is on by default outside dev mode (`[encryption] enabled`,
   volumes.
 * Losing the key service (or its key) loses every object. Back it up as
   carefully as the data.
+* Files of at most 256 bytes are stored inline in their tree, with no hash
+  of their own; redacting them means redacting the trees that hold them.
+  Scanning in block mode keeps credentials from being stored at all.
 * Redaction is by exact hash. Other copies (an edited file, another chunk
   boundary) need their own redactions.
 

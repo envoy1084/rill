@@ -36,6 +36,13 @@ pub trait ObjectStore: Send + Sync + 'static {
     /// so a hash learned in one org fetches nothing in another.
     fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore>;
 
+    /// Refuse an object this store would refuse to read (a redacted one),
+    /// without reading it: for callers that keep decoded objects in their
+    /// own cache.
+    fn refuses(&self, _kind: ObjectKind, _hash: &ObjectHash) -> Result<()> {
+        Ok(())
+    }
+
     /// Default batch implementation; backends with a native batch call
     /// override it.
     async fn has_many(&self, items: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {
@@ -126,6 +133,10 @@ impl<T: ObjectStore + ?Sized> ObjectStore for Arc<T> {
 
     fn namespaced(&self, namespace: &str) -> Arc<dyn ObjectStore> {
         (**self).namespaced(namespace)
+    }
+
+    fn refuses(&self, kind: ObjectKind, hash: &ObjectHash) -> Result<()> {
+        (**self).refuses(kind, hash)
     }
 
     async fn has_many(&self, items: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {

@@ -177,3 +177,71 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
     }
     server.stop().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_redacted_tree_is_refused_even_when_cached() {
+    let server = TestServer::start(admins_config()).await;
+    let mut root = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
+    let mut sec = clients(&server, Some(&server.token_for(&Principal::human("sec")))).await;
+    repo(&mut root, "app").await;
+    let version = apply(
+        &mut root,
+        "app",
+        vec![set_edit("private/names.txt", b"alice\nbob\n")],
+    )
+    .await
+    .unwrap()
+    .hash;
+    let at = pb::RootSpec {
+        root: Some(pb::root_spec::Root::VersionHash(version.clone())),
+    };
+    let list = |c: &mut Clients| {
+        let mut repo = c.repo.clone();
+        let at = at.clone();
+        async move {
+            repo.list_dir(pb::ListDirRequest {
+                repo: "app".into(),
+                root: Some(at),
+                path: "private".into(),
+            })
+            .await
+        }
+    };
+    list(&mut root).await.expect("read once, so it is cached");
+
+    let ctx = server.state.repos.resolve("app").await.unwrap();
+    let version = rill_types::ObjectHash::from_slice(&version).unwrap();
+    let tree = ctx.derive.get::<rill_core::RootTree>(&version).await.unwrap();
+    let dir = ctx
+        .trees
+        .dir_hash(tree, &rill_types::RepoPathBuf::new("private").unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    let id = root
+        .protection
+        .request_redaction(pb::RequestRedactionRequest {
+            operation_id: Bytes::new(),
+            org: "default".into(),
+            kind: pb::ObjectKind::Tree as i32,
+            hash: Bytes::copy_from_slice(dir.as_bytes()),
+            reason: "names".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .redaction
+        .unwrap()
+        .id;
+    sec.protection
+        .approve_redaction(pb::ApproveRedactionRequest {
+            operation_id: Bytes::new(),
+            org: "default".into(),
+            id,
+        })
+        .await
+        .unwrap();
+    let refused = list(&mut root).await.unwrap_err();
+    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
+    server.stop().await;
+}
