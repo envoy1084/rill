@@ -220,6 +220,22 @@ digest of the submit policy that approved the landing and `approvals` the
 votes it saw (both empty for changes without review). `landing_of(version)` goes through the
 reverse index; `list_landings(limit)` scans the newest records.
 
+## Formal model
+
+[`spec/sequencer/Sequencer.tla`](../../spec/sequencer/Sequencer.tla) is a
+TLA+ model of the sequencer, its lease and group commit: landers racing
+for a lease that can lapse mid-batch, speculation as a snapshot of the
+head, the epoch and the approvals of a batch, reviews withdrawing approval
+at any moment, conflicts, ejection, and a commit that checks the head,
+the epoch and every approval. TLC checks that no request lands twice, a
+request is `Landed` exactly when it is on trunk, every landing was
+approved in its own transaction, ejected and conflicted requests never
+land, trunk is append-only, and a lander whose lease was taken over never
+changes trunk. `spec/sequencer/check.sh` runs it (two landers, three
+requests, three epochs: 164,820 states, about a second). Rebases and
+re-parenting are abstracted: a batch is any queue-ordered subsequence of
+the queued requests.
+
 ## Configuration
 
 `LandPolicy`, the `[lander]` section of the server config:

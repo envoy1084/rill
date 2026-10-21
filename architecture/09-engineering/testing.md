@@ -227,6 +227,13 @@ The properties they drive:
 | Materialized conflict markers parse back and re-materialize identically | `rill-core/tests/marker_properties.rs` |
 | A tree diff reports exactly the paths that differ | `rill-core/tests/tree_properties.rs` |
 
+## Formal models
+
+The sequencer, its lease and group commit are model-checked with TLA+
+(see [landing](../04-workflow/landing.md#formal-model));
+`spec/sequencer/check.sh` needs Java 11+ and `tla2tools.jar`. It is run
+locally when the sequencer's commit protocol changes, not in CI.
+
 ## Fuzzing
 
 `fuzz/` is a separate `cargo-fuzz` workspace (it needs nightly and

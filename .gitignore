@@ -5,3 +5,7 @@
 
 # Local research notes and plans (not tracked)
 research/
+
+# TLC output
+spec/**/states/
+spec/**/*_TTrace_*.tla
