@@ -4,13 +4,11 @@
 //! no services to run. [`LocalStores::open`] wires both halves together.
 
 mod meta;
-mod objects;
 
 use std::path::Path;
 use std::sync::Arc;
 
 pub use meta::{RedbBatch, RedbMetaStore};
-pub use objects::{LocalObjectStore, LocalOptions};
 
 use crate::error::Result;
 use crate::repo::Stores;
@@ -27,7 +25,7 @@ impl LocalStores {
     /// Open (creating as needed) `<dir>/objects` and `<dir>/meta.redb`.
     pub async fn open(dir: impl AsRef<Path>) -> Result<Stores> {
         let dir = dir.as_ref();
-        let objects = LocalObjectStore::open(dir.join(Self::OBJECTS_DIR)).await?;
+        let objects = crate::ObjectStoreBackend::local(dir.join(Self::OBJECTS_DIR)).await?;
         let meta = RedbMetaStore::open(dir.join(Self::META_FILE)).await?;
         Ok(Stores::new(Arc::new(objects), Arc::new(meta)))
     }

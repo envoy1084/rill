@@ -4,8 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use rill_store::{
-    LocalObjectStore, LocalOptions, LocalStores, MetaStore, Plaintext, RedbMetaStore, Sealer,
-    Stores,
+    LocalStores, MetaStore, ObjectStoreBackend, Plaintext, RedbMetaStore, Sealer, Stores,
 };
 
 use crate::config::{MetadataConfig, StorageConfig};
@@ -26,14 +25,9 @@ pub async fn open_stores(
             meta.unwrap_or_else(|| Arc::new(rill_store::MemoryMetaStore::new())),
         ),
         StorageConfig::Local { dir } => {
-            let objects = LocalObjectStore::open_with(
-                dir.join(LocalStores::OBJECTS_DIR),
-                LocalOptions {
-                    sealer,
-                    ..LocalOptions::default()
-                },
-            )
-            .await?;
+            let objects = ObjectStoreBackend::local(dir.join(LocalStores::OBJECTS_DIR))
+                .await?
+                .with_sealer(sealer);
             let meta = match meta {
                 Some(meta) => meta,
                 None => open_redb(dir).await?,
@@ -46,7 +40,7 @@ pub async fn open_stores(
             meta_dir,
             allow_unconditional_put,
         } => {
-            let objects = rill_store::ObjectStoreBackend::from_url(url, prefix)?
+            let objects = ObjectStoreBackend::from_url(url, prefix)?
                 .probe(*allow_unconditional_put)
                 .await?
                 .with_sealer(sealer);

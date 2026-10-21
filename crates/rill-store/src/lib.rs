@@ -14,10 +14,10 @@
 //! Backends:
 //!
 //! * [`memory`]: reference semantics, tests and single-process servers.
-//! * [`local`] (feature `local`, default): objects as zstd-framed files,
-//!   metadata in a redb database. One directory, no services.
-//! * [`s3`] (feature `s3`): objects on S3-compatible storage via
-//!   `object_store`.
+//! * [`backend`]: objects through `object_store`, as zstd-framed files on
+//!   the local filesystem or (feature `s3`) on S3-compatible storage.
+//! * [`local`] (feature `local`, default): local objects plus metadata in
+//!   a redb database. One directory, no services.
 //! * [`fdb`] (feature `fdb`): metadata in FoundationDB.
 
 pub mod audit;
@@ -37,24 +37,22 @@ pub mod verified;
 #[cfg(feature = "local")]
 pub mod local;
 
-#[cfg(feature = "s3")]
-pub mod s3;
+pub mod backend;
 
 #[cfg(feature = "fdb")]
 pub mod fdb;
 
+pub use backend::ObjectStoreBackend;
 pub use error::{Error, Result};
 #[cfg(feature = "fdb")]
 pub use fdb::FdbMetaStore;
 pub use keyspace::Keyspace;
 #[cfg(feature = "local")]
-pub use local::{LocalObjectStore, LocalOptions, LocalStores, RedbMetaStore};
+pub use local::{LocalStores, RedbMetaStore};
 pub use memory::{MemoryMetaStore, MemoryObjectStore};
 pub use meta::{Condition, KeyRange, MetaStore, Mutation, Transaction, TxOutcome};
 pub use object::{ObjectStore, ObjectStoreExt, StoredObject};
 pub use repo::{OrgConfig, RepoSettings, RepoStore, Stores, DEFAULT_ORG, STORE_FORMAT};
-#[cfg(feature = "s3")]
-pub use s3::ObjectStoreBackend;
 pub use seal::{
     DataKey, DataKeySource, ObjectAt, OrgSealer, Plaintext, Sealer, DEFAULT_NAMESPACE, KEY_REFRESH,
 };

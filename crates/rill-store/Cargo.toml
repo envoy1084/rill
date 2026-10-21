@@ -11,11 +11,10 @@ repository.workspace = true
 default = ["local"]
 # Filesystem object store and redb metadata store.
 local = ["dep:redb"]
-# `object_store`-backed object store (S3 and compatible services, plus the
-# local and in-memory stores the crate ships for tests).
-s3 = ["dep:object_store", "dep:url", "dep:futures"]
+# S3 and S3-compatible object storage.
+s3 = ["object_store/aws"]
 # FoundationDB metadata store. Needs the FoundationDB client library.
-fdb = ["dep:foundationdb", "dep:futures"]
+fdb = ["dep:foundationdb"]
 # Hooks for crash and recovery tests.
 testing = []
 
@@ -37,9 +36,9 @@ zstd = { workspace = true }
 redb = { workspace = true, optional = true }
 foundationdb = { workspace = true, optional = true }
 foundationdb-tuple = { workspace = true }
-object_store = { workspace = true, optional = true, features = ["aws"] }
-url = { workspace = true, optional = true }
-futures = { workspace = true, optional = true }
+object_store = { workspace = true }
+url = { workspace = true }
+futures = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

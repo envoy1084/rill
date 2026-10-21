@@ -6,7 +6,7 @@ use std::path::Path;
 use rill_api::config::IdentityConfig;
 use rill_api::StorageConfig;
 use rill_identity::keys::{DataKeyManager, KeyServiceConfig, LocalKeyService};
-use rill_store::{LocalObjectStore, LocalOptions, LocalStores, ObjectStore, OrgSealer};
+use rill_store::{LocalStores, ObjectStore, ObjectStoreBackend, OrgSealer};
 use rill_types::Principal;
 
 use super::*;
@@ -31,22 +31,17 @@ fn sealed_config(dir: &Path) -> ServerConfig {
 }
 
 /// The objects directory as another server would open it, with `master`.
-async fn reopened(dir: &Path, stores: &rill_store::Stores, master: [u8; 32]) -> LocalObjectStore {
+async fn reopened(dir: &Path, stores: &rill_store::Stores, master: [u8; 32]) -> ObjectStoreBackend {
     let sealer = Arc::new(OrgSealer::new());
     sealer.set_source(Arc::new(DataKeyManager::new(
         stores.identity(),
         Arc::new(LocalKeyService::new(&master).unwrap()),
         Principal::service("test"),
     )));
-    LocalObjectStore::open_with(
-        dir.join(LocalStores::OBJECTS_DIR),
-        LocalOptions {
-            sealer,
-            ..LocalOptions::default()
-        },
-    )
-    .await
-    .unwrap()
+    ObjectStoreBackend::local(dir.join(LocalStores::OBJECTS_DIR))
+        .await
+        .unwrap()
+        .with_sealer(sealer)
 }
 
 fn files(dir: &Path) -> Vec<std::path::PathBuf> {
