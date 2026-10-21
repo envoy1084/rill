@@ -1,9 +1,7 @@
-//! Review states, workspaces, operations and intents.
+//! Workspaces, operations and intents.
 
 use bytes::Bytes;
-use rill_types::{
-    ChangeId, Intent, IntentId, Operation, OperationId, ReviewState, Workspace, WorkspaceId,
-};
+use rill_types::{Intent, IntentId, Operation, OperationId, Workspace, WorkspaceId};
 
 use super::codec::{decode_record, encode_record};
 use super::store::RepoStore;
@@ -12,34 +10,6 @@ use crate::keys::table;
 use crate::meta::{KeyRange, Transaction};
 
 impl RepoStore {
-    pub async fn get_review(&self, id: &ChangeId) -> Result<Option<ReviewState>> {
-        match self.meta().get(&self.keys().change(id)).await? {
-            Some(bytes) => Ok(Some(decode_record(&bytes)?)),
-            None => Ok(None),
-        }
-    }
-
-    /// Write a review state. When `expected` is given, the write succeeds
-    /// only if the stored record still equals it (optimistic concurrency).
-    pub async fn put_review(
-        &self,
-        state: &ReviewState,
-        expected: Option<&ReviewState>,
-    ) -> Result<()> {
-        let key = self.keys().change(&state.change_id);
-        let mut tx = Transaction::new();
-        if let Some(prev) = expected {
-            tx = tx.expect(key.clone(), Some(encode_record(prev)?));
-        }
-        tx = tx.set(key, encode_record(state)?);
-        self.meta().transact(tx).await?;
-        Ok(())
-    }
-
-    pub async fn list_reviews(&self) -> Result<Vec<ReviewState>> {
-        self.list_records(table::CHANGE).await
-    }
-
     pub async fn get_workspace(&self, id: &WorkspaceId) -> Result<Option<Workspace>> {
         match self.meta().get(&self.keys().workspace(id)).await? {
             Some(bytes) => Ok(Some(decode_record(&bytes)?)),
@@ -121,7 +91,7 @@ impl RepoStore {
         self.list_records(table::INTENT).await
     }
 
-    async fn list_records<T: rill_types::Record>(&self, table: &str) -> Result<Vec<T>> {
+    pub(super) async fn list_records<T: rill_types::Record>(&self, table: &str) -> Result<Vec<T>> {
         let rows = self
             .meta()
             .scan(KeyRange::prefix(self.keys().table(table)))

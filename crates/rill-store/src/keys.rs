@@ -20,8 +20,16 @@ pub mod table {
     pub const CHANGE_INFO: &str = "ci";
     /// `(sig, ns, repo, hash)` → signatures
     pub const SIGNATURES: &str = "sig";
-    /// `(ch, ns, repo, change)` → ReviewState
+    /// `(ch, ns, repo, change)` → ChangeRecord
     pub const CHANGE: &str = "ch";
+    /// `(vote, ns, repo, change, label, voter, version)` → LabelVote
+    pub const VOTE: &str = "vote";
+    /// `(vep, ns, repo, change)` → changes whenever a vote is written
+    pub const VOTE_EPOCH: &str = "vep";
+    /// `(thr, ns, repo, change, thread)` → ThreadHeader
+    pub const THREAD: &str = "thr";
+    /// `(cmt, ns, repo, change, thread, stamp)` → Comment
+    pub const COMMENT: &str = "cmt";
     /// `(log, ns, repo, stamp)` → version hash, every stored version
     pub const LOG: &str = "log";
     /// `(trunk, ns, repo, seq)` → version hash
@@ -141,6 +149,38 @@ impl RepoKeys {
 
     pub fn change(&self, id: &ChangeId) -> Bytes {
         self.row(table::CHANGE, &id.as_bytes().as_slice())
+    }
+
+    pub fn votes(&self, id: &ChangeId) -> Bytes {
+        self.row(table::VOTE, &id.as_bytes().as_slice())
+    }
+
+    pub fn vote(&self, id: &ChangeId, label: &str, voter: &str, version: &ObjectHash) -> Bytes {
+        self.row(
+            table::VOTE,
+            &(
+                id.as_bytes().as_slice(),
+                label,
+                voter,
+                version.as_bytes().as_slice(),
+            ),
+        )
+    }
+
+    pub fn vote_epoch(&self, id: &ChangeId) -> Bytes {
+        self.row(table::VOTE_EPOCH, &id.as_bytes().as_slice())
+    }
+
+    pub fn threads(&self, id: &ChangeId) -> Bytes {
+        self.row(table::THREAD, &id.as_bytes().as_slice())
+    }
+
+    pub fn thread(&self, id: &ChangeId, thread: &str) -> Bytes {
+        self.row(table::THREAD, &(id.as_bytes().as_slice(), thread))
+    }
+
+    pub fn comments(&self, id: &ChangeId, thread: &str) -> Bytes {
+        self.row(table::COMMENT, &(id.as_bytes().as_slice(), thread))
     }
 
     pub fn change_versions(&self, id: &ChangeId) -> Bytes {

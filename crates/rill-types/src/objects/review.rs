@@ -182,6 +182,109 @@ impl ReviewState {
     }
 }
 
-impl crate::Record for ReviewState {
-    const TAG: &'static str = "review";
+impl ReviewState {
+    /// The change record: everything but votes and threads.
+    pub fn record(&self) -> ChangeRecord {
+        ChangeRecord {
+            change_id: self.change_id,
+            versions: self.versions.clone(),
+            status: self.status,
+            intent: self.intent,
+            owner: self.owner.clone(),
+            risk: self.risk,
+            risk_reasons: self.risk_reasons.clone(),
+            stack: self.stack.clone(),
+            landed_seq: self.landed_seq,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            extra: self.extra.clone(),
+        }
+    }
+
+    /// The review of a change from its stored parts.
+    pub fn assemble(record: ChangeRecord, votes: Vec<LabelVote>, threads: Vec<Thread>) -> Self {
+        ReviewState {
+            change_id: record.change_id,
+            versions: record.versions,
+            status: record.status,
+            intent: record.intent,
+            owner: record.owner,
+            votes,
+            threads,
+            risk: record.risk,
+            risk_reasons: record.risk_reasons,
+            stack: record.stack,
+            landed_seq: record.landed_seq,
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+            extra: record.extra,
+        }
+    }
+}
+
+/// The per-change part of a review that is not votes or threads, stored
+/// as one small record so votes and comments never rewrite it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChangeRecord {
+    pub change_id: ChangeId,
+    /// All versions in creation order; the last one is current.
+    pub versions: Vec<ChangeVersionHash>,
+    pub status: ReviewStatus,
+    pub intent: Option<IntentId>,
+    pub owner: Principal,
+    pub risk: RiskClass,
+    pub risk_reasons: Vec<String>,
+    pub stack: Vec<ChangeId>,
+    pub landed_seq: Option<TrunkSeq>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub extra: BTreeMap<String, String>,
+}
+
+impl crate::Record for ChangeRecord {
+    const TAG: &'static str = "change";
+}
+
+/// A thread without its comments, which are stored one per row.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThreadHeader {
+    pub id: String,
+    pub anchor: ThreadAnchor,
+    pub resolved: bool,
+    pub to: Option<Principal>,
+}
+
+impl crate::Record for ThreadHeader {
+    const TAG: &'static str = "thread";
+}
+
+impl Thread {
+    /// The thread without its comments.
+    pub fn header(&self) -> ThreadHeader {
+        ThreadHeader {
+            id: self.id.clone(),
+            anchor: self.anchor.clone(),
+            resolved: self.resolved,
+            to: self.to.clone(),
+        }
+    }
+
+    /// A thread from its header and comments.
+    pub fn assemble(header: ThreadHeader, comments: Vec<Comment>) -> Self {
+        Thread {
+            id: header.id,
+            anchor: header.anchor,
+            comments,
+            resolved: header.resolved,
+            to: header.to,
+        }
+    }
+}
+
+impl crate::Record for LabelVote {
+    const TAG: &'static str = "vote";
+}
+
+impl crate::Record for Comment {
+    const TAG: &'static str = "comment";
 }

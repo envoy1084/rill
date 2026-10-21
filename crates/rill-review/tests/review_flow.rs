@@ -1,104 +1,13 @@
 //! End-to-end review flow over in-memory stores.
 
-use std::sync::Arc;
+mod common;
 
-use rill_core::{ChangeBuilder, CommitGraph, DeriveManager, TreeOps};
-use rill_policy::{RiskConfig, SubmitPolicy};
 use rill_review::agents::{HeuristicReviewer, PoolConfig, ReviewerPool};
-use rill_review::{Error, LabelSet, ReviewEvent, ReviewService};
-use rill_store::{RepoStore, Stores};
+use rill_review::{Error, ReviewEvent};
 use rill_types::objects::review::CommentCategory;
-use rill_types::{
-    ChangeId, ChangeVersionHash, Principal, RepoPathBuf, ReviewStatus, RiskClass, ThreadAnchor,
-};
+use rill_types::{RepoPathBuf, ReviewStatus, RiskClass, ThreadAnchor};
 
-struct Harness {
-    repo: RepoStore,
-    service: ReviewService,
-    alice: Principal,
-    bob: Principal,
-    agent_a: Principal,
-    agent_b: Principal,
-}
-
-async fn harness() -> Harness {
-    let stores = Stores::memory();
-    let config = stores.create_repo("flow", "").await.unwrap();
-    let repo = stores.repo(config.id);
-    let trees = TreeOps::new(repo.objects().clone(), 64);
-    let derive = DeriveManager::new(repo.clone(), trees, 64);
-    let graph = Arc::new(CommitGraph::new(repo.clone(), derive.clone()));
-    let service = ReviewService::new(
-        repo.clone(),
-        derive,
-        graph,
-        Arc::new(SubmitPolicy::default_rules()),
-        Arc::new(RiskConfig::default().compile().unwrap()),
-        Arc::new(LabelSet::default()),
-    );
-    Harness {
-        repo,
-        service,
-        alice: Principal::human("alice"),
-        bob: Principal::human("bob"),
-        agent_a: Principal::agent("reviewer-a"),
-        agent_b: Principal::agent("reviewer-b"),
-    }
-}
-
-const LIB_V0: &str = "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n";
-const LIB_V1: &str =
-    "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n\npub fn sub(a: i32, b: i32) -> i32 {\n    a - b\n}\n";
-
-impl Harness {
-    async fn root(&self) -> ChangeVersionHash {
-        ChangeBuilder::new(self.alice.clone())
-            .message("root")
-            .file("src/lib.rs", LIB_V0)
-            .unwrap()
-            .file("README.md", "# demo\n")
-            .unwrap()
-            .commit(&self.repo)
-            .await
-            .unwrap()
-            .0
-    }
-
-    async fn child(
-        &self,
-        author: &Principal,
-        parent: ChangeVersionHash,
-        files: &[(&str, &str)],
-    ) -> (ChangeId, ChangeVersionHash) {
-        let mut b = ChangeBuilder::new(author.clone())
-            .parent(parent)
-            .message("child");
-        for (p, c) in files {
-            b = b.file(p, c.to_string()).unwrap();
-        }
-        let (h, cv) = b.commit(&self.repo).await.unwrap();
-        (cv.change_id, h)
-    }
-
-    async fn amend(
-        &self,
-        change_id: ChangeId,
-        predecessor: ChangeVersionHash,
-        parent: ChangeVersionHash,
-        files: &[(&str, &str)],
-        message: &str,
-    ) -> ChangeVersionHash {
-        let mut b = ChangeBuilder::new(self.alice.clone())
-            .change_id(change_id)
-            .parent(parent)
-            .predecessor(predecessor)
-            .message(message);
-        for (p, c) in files {
-            b = b.file(p, c.to_string()).unwrap();
-        }
-        b.commit(&self.repo).await.unwrap().0
-    }
-}
+use common::{harness, LIB_V0, LIB_V1};
 
 #[tokio::test]
 async fn normal_change_needs_human_plus_two_or_agents_plus_owner() {
@@ -209,8 +118,9 @@ async fn trivial_rebase_copies_votes_and_edit_drops_them() {
         .await;
     let state = h.service.add_version(&cid, v2).await.unwrap();
     assert_eq!(state.versions, vec![v1, v2]);
-    let labels: Vec<_> = state.current_votes().map(|v| v.label.as_str()).collect();
-    assert_eq!(labels, vec!["Review", "Owner"]);
+    let mut labels: Vec<_> = state.current_votes().map(|v| v.label.as_str()).collect();
+    labels.sort_unstable();
+    assert_eq!(labels, vec!["Owner", "Review"]);
     assert_eq!(state.status, ReviewStatus::Landable);
 
     // Trivial rebase onto a trunk that moved elsewhere: still copied.

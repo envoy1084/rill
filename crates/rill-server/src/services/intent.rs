@@ -203,12 +203,12 @@ impl IntentService for IntentSvc {
                 }
                 opened.repo.repo.put_intent(&intent).await?;
             }
-            if let Some(prev) = opened.repo.repo.get_review(&change_id).await? {
-                if prev.intent != Some(intent.id) {
-                    let mut next = prev.clone();
+            if let Some(prev) = opened.repo.repo.read_review(&change_id).await? {
+                if prev.state.intent != Some(intent.id) {
+                    let mut next = prev.state.clone();
                     next.intent = Some(intent.id);
                     next.updated_at = Timestamp::now();
-                    opened.repo.repo.put_review(&next, Some(&prev)).await?;
+                    opened.repo.repo.write_review(&prev, &next).await?;
                 }
             }
             Ok(Response::new(pb::LinkChangeResponse {

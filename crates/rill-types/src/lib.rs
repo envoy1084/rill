@@ -39,7 +39,8 @@ pub use objects::change::{
 pub use objects::intent::{Intent, IntentKind, IntentStatus, RiskClass};
 pub use objects::refs::{RefName, RefUpdate, TrunkSeq};
 pub use objects::review::{
-    Comment, Label, LabelRange, LabelVote, ReviewState, ReviewStatus, Thread, ThreadAnchor,
+    ChangeRecord, Comment, Label, LabelRange, LabelVote, ReviewState, ReviewStatus, Thread,
+    ThreadAnchor, ThreadHeader,
 };
 pub use objects::tree::{
     DirSummary, EntryKind, Tree, TreeChild, TreeEntry, TreeHash, TreeNode, SHARD_ENTRIES,

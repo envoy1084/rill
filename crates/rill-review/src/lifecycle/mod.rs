@@ -8,3 +8,4 @@ mod versions;
 
 pub use interdiff::VersionRelation;
 pub use retry::MAX_WRITE_ATTEMPTS;
+pub use versions::PreparedVersion;

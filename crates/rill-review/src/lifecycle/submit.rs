@@ -43,7 +43,13 @@ impl ReviewService {
         let facts = self.change_facts(&state).await?;
         self.apply_risk(&mut state, &facts);
         let transition = self.refresh_status(&mut state, &facts)?;
-        self.repo.put_review(&state, None).await?;
+        self.repo.create_review(&state).await.map_err(|e| {
+            if e.is_conflict() {
+                Error::AlreadySubmitted(*change_id)
+            } else {
+                e.into()
+            }
+        })?;
         tracing::info!(change = %change_id, risk = %state.risk, "change submitted for review");
         self.emit(ReviewEvent::Submitted {
             change_id: *change_id,

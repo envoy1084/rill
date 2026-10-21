@@ -49,6 +49,16 @@ impl ReviewService {
                 Ok((vote, transition))
             })
             .await?;
+        // Votes are written without touching the record, so a vote racing
+        // this one may have been unseen when the status was computed.
+        // Whoever writes last re-checks with every vote in view.
+        let (state, transition) = match transition {
+            Some(t) => (state, Some(t)),
+            None => {
+                self.update(change_id, |s| self.refresh_status(s, &facts))
+                    .await?
+            }
+        };
         tracing::info!(change = %change_id, voter = %voter, label, value, "vote cast");
         self.emit(ReviewEvent::Voted {
             change_id: *change_id,
