@@ -261,10 +261,11 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
         .await
         .unwrap();
 
+    // The list is updated before the copy is dropped; wait for both.
     let mut status = 0;
-    for _ in 0..100 {
+    for _ in 0..250 {
         status = fetch().await;
-        if status == 451 {
+        if status == 451 && cache.disk().len() == 0 {
             break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
