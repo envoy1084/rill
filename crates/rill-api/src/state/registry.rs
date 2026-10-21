@@ -335,10 +335,19 @@ impl RepoRegistry {
             Some(runner) => Arc::new(workers::ExecVerifier::new(runner.clone())),
             None => Arc::new(AlwaysGreen),
         };
-        let hooks = Arc::new(
-            workers::ReviewHooksAdapter::new(review.clone())
-                .with_standing(config.org.clone(), self.identity.clone()),
-        );
+        let authorizer = Arc::new(Authorizer::new(repo.clone()));
+        let mut hooks = workers::ReviewHooksAdapter::new(review.clone())
+            .with_standing(config.org.clone(), self.identity.clone());
+        if !self.config.dev_mode {
+            hooks = hooks.with_write_rights(workers::rights::WriteRights {
+                org: config.org.clone(),
+                authorizer: authorizer.clone(),
+                identity: self.identity.clone(),
+                trees: trees.clone(),
+                derive: derive.clone(),
+            });
+        }
+        let hooks = Arc::new(hooks);
         let lander = Lander::new(
             repo.clone(),
             derive.clone(),
@@ -354,7 +363,6 @@ impl RepoRegistry {
             .then(|| PostLandVerifier::new(lander.clone(), self.config.postland.batch_size));
         let search =
             SearchIndex::open(repo.clone(), derive.clone(), IndexConfig::default()).await?;
-        let authorizer = Arc::new(Authorizer::new(repo.clone()));
 
         Ok(RepoContext {
             config,

@@ -95,7 +95,10 @@ The server evaluates the submit policy for the requester before queueing
    submit policy must still allow the requester, and the version's author
    and the requester must still be allowed to act (`AuthorStanding`: a
    suspended user, a killed or lapsed agent, a blocked model or a revoked
-   session that wrote it refuses). A refusal sets `Ejected
+   session that wrote it refuses). Outside dev mode the author must also
+   still hold write on every path the version writes (`WriteRights`, in
+   `workers/rights.rs`), so a revoke between commit and land keeps the
+   change off trunk. A refusal sets `Ejected
    { reason }` and returns the change to its owner. An approval carries the
    review snapshot, the policy's digest (BLAKE3 of its text) and the votes
    it saw. Status `Landing`.

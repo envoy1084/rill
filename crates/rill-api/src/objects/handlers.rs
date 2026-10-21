@@ -7,7 +7,7 @@ use axum::extract::{Extension, Path, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use rill_policy::AuthContext;
-use rill_types::{ObjectHash, ObjectKind, RepoPathBuf};
+use rill_types::{ObjectHash, ObjectKind};
 
 use super::authorize::{self, grant_of, FetchQuery};
 use super::{error_response, ObjectError};
@@ -118,7 +118,8 @@ pub async fn put_object(
         let (kind, hash) = parse_ref(&kind, &hash)?;
         let repo = state.repos.resolve(&repo).await?;
         let opened = opened(&state, ctx, repo);
-        opened.permit().write(&RepoPathBuf::root()).await?;
+        // The commit naming this object checks its path.
+        opened.permit().write_any().await?;
         rill_store::object::verify(kind, &hash, &body)
             .map_err(|e| ObjectError::bad_request(e.to_string()))?;
         let existed = opened.repo.repo.objects().has(kind, &hash).await?;

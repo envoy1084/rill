@@ -169,11 +169,33 @@ a verb, a relation and a path:
 | Method | Verb | Relation | Typical callers |
 | --- | --- | --- | --- |
 | `read(path)` | `Read` | `Reader` | every read RPC, `GetPolicy`, `EvaluateSubmit`, object `GET`/`HEAD` |
-| `write(path)` | `Write` | `Writer` | `CreateChangeVersion` per file and subtree path (copy sources need `read`), `ApplyEdits`, workspace snapshot per entry |
-| `write(root)` | `Write` | `Writer` | `Rebase`, `Merge`, workspace and intent changes, `SubmitForReview`, `SetStack`, `Abandon`, object `PUT` |
+| `write(path)` | `Write` | `Writer` (`Owner` under `.rill/`) | every path a stored version writes, inside its commit (below) |
+| `write_any()` | `Write` | `Writer` somewhere | `Rebase`, `Merge`, `SubmitForReview`, `SetStack`, `Abandon`, `PutBlob`, object `PUT`, `HasObjects` |
+| `write(root)` | `Write` | `Writer` | workspace and intent changes, `MoveRef` |
 | `review()` | `Review` | `Reviewer` | `Vote`, `Comment`, thread reply and resolve |
 | `land()` | `Land` | `Writer` | `RequestLand`, `ReportVerification`, `RevertSeq`, `Bisect` |
 | `admin()` | `Admin` | `Owner` | relation changes and listing, `Expand`, checks about others, `SetPolicy`, `IssueToken` without a token |
+
+### Writes
+
+Every stored version passes one check inside its commit
+([`services/repo/authorize.rs`](../../crates/rill-api/src/services/repo/authorize.rs)),
+whichever RPC made it. `write_set` lists what the version writes:
+
+* every file and subtree change;
+* for a merge, only the paths it leaves differently from every other
+  parent, since what it takes from the other side is brought in, not
+  written.
+
+The committer needs `writer` on each of those paths (`owner` under `.rill/`)
+and `reader` on each copy source. The commit transaction asserts the
+relation version the decision used, so a relation change racing the commit
+makes it conflict and decide again. Handlers may refuse earlier, but the
+commit decides.
+
+Landing checks again. The lander's approval hook (`WriteRights`) refuses a
+version whose author no longer holds those relations. The author's teams,
+agent scope and org-admin role count here; their token does not.
 
 A check passes the token's capability, then the agent's scope, then either
 the tuples or org administration. Instance administrators, and users with the

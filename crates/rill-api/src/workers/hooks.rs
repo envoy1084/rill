@@ -17,6 +17,8 @@ pub struct ReviewHooksAdapter {
     review: Arc<ArcSwap<ReviewService>>,
     /// The repository's org and who judges its authors' standing.
     standing: Option<(String, Arc<dyn AuthorStanding>)>,
+    /// Whether authors may still write what their versions change.
+    rights: Option<super::rights::WriteRights>,
 }
 
 impl ReviewHooksAdapter {
@@ -25,6 +27,7 @@ impl ReviewHooksAdapter {
         ReviewHooksAdapter {
             review,
             standing: None,
+            rights: None,
         }
     }
 
@@ -36,6 +39,13 @@ impl ReviewHooksAdapter {
         standing: Arc<dyn AuthorStanding>,
     ) -> Self {
         self.standing = Some((org.into(), standing));
+        self
+    }
+
+    /// Also refuse landings whose author may no longer write what the
+    /// version changes.
+    pub fn with_write_rights(mut self, rights: super::rights::WriteRights) -> Self {
+        self.rights = Some(rights);
         self
     }
 
@@ -156,6 +166,13 @@ impl ReviewHooks for ReviewHooksAdapter {
                     None => Some(format!("version {version} is missing")),
                 }
             }
+            (refusal, _) => refusal,
+        };
+        let refusal = match (refusal, &self.rights) {
+            (None, Some(rights)) => match service.repo().get_change_version(&version).await? {
+                Some(cv) => rights.refusal(&cv).await,
+                None => Some(format!("version {version} is missing")),
+            },
             (refusal, _) => refusal,
         };
         let votes = state

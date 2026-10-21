@@ -54,6 +54,15 @@ the range (`VoteOutOfRange`), and the maximum value from a non-human on a
 `max_requires_human` label (`MaxRequiresHuman`). An agent may vote
 `Owner -1` but not `Owner +1`.
 
+A positive `Owner` vote must come from an owner of every path the change's
+current version writes
+([`services/review/owners.rs`](../../crates/rill-api/src/services/review/owners.rs)).
+Ownership comes from `.rill/owners.toml` on trunk, where each `[[rule]]`
+names a `path` and its `owners` (`user:`, `agent:` or `team:`). The rule with
+the longest covering path decides; rules do not add up. A path no rule
+covers falls back to the `owner` relation on its directory. Changing
+anything under `.rill/` takes `owner` ([permissions](../05-policy/permissions.md)).
+
 `vote` needs status `Open` or `Landable`. It replaces any earlier vote by
 the same principal on the same label and version, appends a `LabelVote`
 bound to the current version, and refreshes the status in the same write.

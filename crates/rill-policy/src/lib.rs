@@ -13,6 +13,7 @@
 pub mod error;
 pub mod grants;
 pub mod identity;
+pub mod owners;
 pub mod rebac;
 pub mod risk;
 pub mod signing;

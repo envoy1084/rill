@@ -184,7 +184,8 @@ impl RepoSvc {
         };
         let repo = self.state.repos.resolve(&header.repo).await?;
         let opened = crate::services::common::opened(&self.state, ctx, repo);
-        opened.permit().write(&RepoPathBuf::root()).await?;
+        // The commit naming this content checks its path.
+        opened.permit().write_any().await?;
 
         let parts = futures::stream::unfold(stream, |mut stream| async move {
             match stream.message().await {

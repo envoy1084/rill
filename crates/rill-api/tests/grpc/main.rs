@@ -205,6 +205,16 @@ fn dev_config() -> ServerConfig {
 }
 
 async fn land(clients: &mut Clients, repo: &str, change_id: Bytes) -> u64 {
+    land_with(clients, repo, change_id, &[]).await
+}
+
+/// [`land`] with further votes, such as an `Owner` approval.
+async fn land_with(
+    clients: &mut Clients,
+    repo: &str,
+    change_id: Bytes,
+    extra_votes: &[(&str, i32)],
+) -> u64 {
     clients
         .review
         .submit_for_review(pb::SubmitForReviewRequest {
@@ -214,7 +224,7 @@ async fn land(clients: &mut Clients, repo: &str, change_id: Bytes) -> u64 {
         })
         .await
         .unwrap();
-    for (label, value) in [("Verified", 1), ("Review", 2)] {
+    for &(label, value) in [("Verified", 1), ("Review", 2)].iter().chain(extra_votes) {
         clients
             .review
             .vote(pb::VoteRequest {

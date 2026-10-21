@@ -2,6 +2,7 @@
 //! watches. The trait impl only dispatches; each group of RPCs lives in
 //! its own file.
 
+pub(crate) mod authorize;
 mod commit;
 mod grep;
 mod history;

@@ -9,6 +9,7 @@ mod indexer;
 pub use indexer::SEARCH_LEASE;
 mod leader;
 mod reverter;
+pub(crate) mod rights;
 mod verifier;
 
 use std::sync::Arc;

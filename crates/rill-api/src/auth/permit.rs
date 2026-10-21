@@ -212,6 +212,15 @@ impl<'a> Permit<'a> {
         })
     }
 
+    /// The relation version checks reflect; 0 in dev mode, where they are
+    /// skipped.
+    pub async fn relations_version(&self) -> Result<i64> {
+        if self.dev_mode {
+            return Ok(0);
+        }
+        Ok(self.snapshot().await?.version())
+    }
+
     /// The caller's kind as the `resolved_by` provenance value.
     pub fn resolved_by(&self) -> &'static str {
         match self.ctx.principal.kind {

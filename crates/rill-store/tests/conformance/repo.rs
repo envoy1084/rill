@@ -127,6 +127,22 @@ pub async fn scenario(name: &str, stores: &Stores) {
         .await
         .unwrap();
     assert_eq!(after, before + 2, "{name}: every change bumps the version");
+    // A write authorized at an older relation version does not commit.
+    let stale = repo.expect_relations_version(
+        rill_store::meta::Transaction::new()
+            .set(bytes::Bytes::from_static(b"probe"), bytes::Bytes::new()),
+        before,
+    );
+    assert!(
+        repo.meta().transact(stale).await.unwrap_err().is_conflict(),
+        "{name}"
+    );
+    let current = repo.expect_relations_version(
+        rill_store::meta::Transaction::new()
+            .set(bytes::Bytes::from_static(b"probe"), bytes::Bytes::new()),
+        after,
+    );
+    repo.meta().transact(current).await.unwrap();
     assert_eq!(
         repo.relations_of("doc").await.unwrap(),
         vec![

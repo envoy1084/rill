@@ -9,7 +9,7 @@ use rill_proto::convert::{hash_to_proto, id_from_proto, opt_id_from_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{
     ChangeId, ChangeVersion, ChangeVersionHash, ContentRef, FileChange, FileKind, IntentId,
-    Provenance, RepoPathBuf, Signature, SubtreeChange, Timestamp, TreeHash,
+    Provenance, RepoPathBuf, Signature, Timestamp, TreeHash,
 };
 
 use super::commit::commit_version;
@@ -34,25 +34,6 @@ impl RepoSvc {
         cv.author = opened.principal().clone();
         cv.created_at = Timestamp::now();
         common::clear_server_fields(&mut cv.provenance);
-        for (path, change) in &cv.file_changes {
-            opened.permit().write(path).await?;
-            if let FileChange::Set {
-                copy_from: Some(source),
-                ..
-            } = change
-            {
-                opened.permit().read(&source.path).await?;
-            }
-        }
-        for (path, change) in &cv.subtree_changes {
-            opened.permit().write(path).await?;
-            if let SubtreeChange::Copy { from_path, .. } = change {
-                opened.permit().read(from_path).await?;
-            }
-        }
-        if cv.file_changes.is_empty() && cv.subtree_changes.is_empty() {
-            opened.permit().write(&RepoPathBuf::root()).await?;
-        }
         let signatures = req
             .signatures
             .into_iter()
@@ -129,9 +110,6 @@ impl RepoSvc {
             builder = builder.change(path.as_str(), change)?;
         }
         let cv = builder.build(objects.as_ref()).await?;
-        if cv.file_changes.is_empty() {
-            opened.permit().write(&RepoPathBuf::root()).await?;
-        }
         let (hash, cv) = commit_version(&opened, cv).await?;
         Ok(pb::ApplyEditsResponse {
             hash: hash_to_proto(&hash),
@@ -145,7 +123,7 @@ impl RepoSvc {
     ) -> Result<pb::RebaseResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.get_ref();
-        opened.permit().write(&RepoPathBuf::root()).await?;
+        opened.permit().write_any().await?;
         let version = hash("hash", &req.hash)?;
         let new_parent = hash("new_parent", &req.new_parent)?;
         let rebased = rebase(&opened.repo.derive, &version, &new_parent, Timestamp::now()).await?;
@@ -162,7 +140,7 @@ impl RepoSvc {
     ) -> Result<pb::MergeResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
-        opened.permit().write(&RepoPathBuf::root()).await?;
+        opened.permit().write_any().await?;
         let left = hash("left", &req.left)?;
         let right = hash("right", &req.right)?;
         let mut options = MergeChangeOptions::new(opened.principal().clone(), req.message);

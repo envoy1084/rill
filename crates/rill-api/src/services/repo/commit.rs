@@ -72,6 +72,7 @@ pub async fn commit_version_with(
     let stores = ctx.repo.stores();
 
     for _ in 0..COMMIT_ATTEMPTS {
+        let relations = super::authorize::version(opened, &cv).await?;
         let prepared = match ctx.review().prepare_version(&cv.change_id, hash).await {
             Ok(prepared) => prepared,
             Err(ReviewError::ReviewNotFound(_)) => None,
@@ -88,6 +89,9 @@ pub async fn commit_version_with(
             at: now,
         };
         let mut tx = staged.clone().merge(extras.tx.clone());
+        if !opened.dev_mode() {
+            tx = ctx.repo.expect_relations_version(tx, relations);
+        }
         if let Some(spend) =
             crate::services::budget::spend(opened, crate::services::budget::VERSIONS).await?
         {
@@ -129,6 +133,8 @@ pub async fn commit_version_with(
                     // update and extras.
                     return Ok((hash, cv));
                 }
+                // The relations may have changed under the decision.
+                ctx.authorizer.invalidate();
                 tracing::debug!(change = %cv.change_id, "commit conflict; retrying");
             }
             Err(e) => return Err(e.into()),

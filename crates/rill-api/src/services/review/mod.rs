@@ -1,6 +1,7 @@
 //! `rill.v1.ReviewService`: a thin mapping onto `rill_review::ReviewService`
 //! plus the hand-off to the lander.
 
+mod owners;
 mod watch;
 
 use std::sync::Arc;
@@ -117,7 +118,7 @@ impl ReviewService for ReviewSvc {
         let result: crate::error::Result<Response<pb::SubmitForReviewResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-                opened.permit().write(&RepoPathBuf::root()).await?;
+                opened.permit().write_any().await?;
                 let id = change_id(&request.get_ref().change_id)?;
                 let state = opened.repo.review().submit(&id, opened.principal()).await?;
                 Ok(Response::new(pb::SubmitForReviewResponse {
@@ -138,6 +139,9 @@ impl ReviewService for ReviewSvc {
                 let value = i8::try_from(req.value).map_err(|_| {
                     Error::invalid(format!("vote value {} out of range", req.value))
                 })?;
+                if req.label == owners::OWNER_LABEL && value > 0 {
+                    owners::check_approval(&opened, &id).await?;
+                }
                 if let Some(version) = common::opt_hash("version", req.version.as_ref())? {
                     let current = opened.repo.review().get(&id).await?.current_version();
                     if current != Some(version) {
@@ -279,7 +283,7 @@ impl ReviewService for ReviewSvc {
         let result: crate::error::Result<Response<pb::SetStackResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-                opened.permit().write(&RepoPathBuf::root()).await?;
+                opened.permit().write_any().await?;
                 let ids: Vec<ChangeId> =
                     ids_from_proto("change_ids", &request.get_ref().change_ids)?;
                 let states = opened.repo.review().set_stack(&ids).await?;
@@ -323,7 +327,7 @@ impl ReviewService for ReviewSvc {
         let result: crate::error::Result<Response<pb::AbandonResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-                opened.permit().write(&RepoPathBuf::root()).await?;
+                opened.permit().write_any().await?;
                 let req = request.get_ref();
                 let id = change_id(&req.change_id)?;
                 let review = opened.repo.review();
