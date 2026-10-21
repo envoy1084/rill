@@ -73,8 +73,12 @@ own credentials, because the failure may have been the leader's token.
 
 ```sh
 rill cache --origin https://rill.internal:7421 --dir /var/cache/rill \
-  --max-bytes 500G --listen 0.0.0.0:7422
+  --max-bytes 500G --listen 0.0.0.0:7422 --origin-token "$CACHE_TOKEN"
 ```
+
+The origin token is a service token (`rill admin token issue` for a
+`service:` principal); the origin gives its redaction list only to service
+principals and instance administrators.
 
 | Flag | Environment | Default |
 | --- | --- | --- |
@@ -83,6 +87,7 @@ rill cache --origin https://rill.internal:7421 --dir /var/cache/rill \
 | `--max-bytes` | `RILL_CACHE_MAX_BYTES` | `10G` (`K`, `M`, `G`, `T` are powers of 1024) |
 | `--listen` | `RILL_CACHE_LISTEN` | `0.0.0.0:7422` |
 | `--redaction-poll` | `RILL_CACHE_REDACTION_POLL` | `10` (seconds) |
+| `--origin-token` | `RILL_CACHE_ORIGIN_TOKEN` | none; needed to read redactions |
 
 ## Limitations
 
@@ -94,7 +99,9 @@ rill cache --origin https://rill.internal:7421 --dir /var/cache/rill \
   expires.
 * Redactions reach it by polling the origin's `GET /redactions` every
   `--redaction-poll` (10 s): newly redacted hashes are dropped from disk and
-  refused with 451, so one is served for at most one poll interval.
+  refused with 451, so one is served for at most one poll interval. When
+  the list has not been reread for six intervals (at least a minute), the
+  cache answers every object request with 503 until it is.
 
 ## Code
 

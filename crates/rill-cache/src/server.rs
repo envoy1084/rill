@@ -42,6 +42,7 @@ pub struct Cache {
     disk: Arc<DiskCache>,
     keys: Arc<OriginKeys>,
     redactions: Arc<crate::redactions::Redactions>,
+    redaction_max_age: std::time::Duration,
     origin: Origin,
     inflight: Coalescer<(ObjectKind, ObjectHash), Bytes>,
     stats: CacheStats,
@@ -60,6 +61,7 @@ impl Cache {
         let redactions = Arc::new(crate::redactions::Redactions::new(
             &config.origin,
             client.clone(),
+            config.origin_token.clone(),
         ));
         for hash in redactions.refresh().await? {
             disk.remove(&hash).await?;
@@ -68,6 +70,7 @@ impl Cache {
             disk,
             keys,
             redactions,
+            redaction_max_age: config.redaction_max_age,
             origin: Origin::new(&config.origin, client),
             inflight: Coalescer::new(),
             stats: CacheStats::default(),
@@ -93,6 +96,12 @@ impl Cache {
         hash: &ObjectHash,
         via: Option<&ObjectHash>,
     ) -> Result<Bytes> {
+        if !self.redactions.fresh(self.redaction_max_age) {
+            return Err(Error::Unavailable(
+                "the origin's redactions could not be reread; serving nothing until they are"
+                    .into(),
+            ));
+        }
         if self.redactions.contains(hash) {
             return Err(Error::Redacted(format!("{kind} {hash}")));
         }
@@ -194,6 +203,10 @@ fn error_response(cache: &Cache, e: Error) -> Response {
             format!("{m} was redacted"),
         ),
         Error::BadRequest(m) => refusal(StatusCode::BAD_REQUEST, m),
+        Error::Unavailable(m) => {
+            tracing::warn!(reason = %m, "request refused");
+            refusal(StatusCode::SERVICE_UNAVAILABLE, m)
+        }
         Error::Origin(m) | Error::Corrupt(m) => {
             tracing::warn!(error = %m, "origin fetch failed");
             refusal(StatusCode::BAD_GATEWAY, m)

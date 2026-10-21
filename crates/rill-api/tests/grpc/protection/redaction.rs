@@ -144,12 +144,23 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         .into_inner()
         .hits;
     assert!(hits.is_empty(), "{hits:?}");
-    let published: serde_json::Value = reqwest::get(format!("http://{}/redactions", server.http))
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+    // The list goes to cache tiers (service principals) and instance
+    // administrators only: a small file's hash confirms a guess at it.
+    let redactions = |token: Option<String>| {
+        let url = format!("http://{}/redactions", server.http);
+        async move {
+            let mut request = reqwest::Client::new().get(url);
+            if let Some(token) = token {
+                request = request.bearer_auth(token);
+            }
+            request.send().await.unwrap()
+        }
+    };
+    assert_eq!(redactions(None).await.status().as_u16(), 401);
+    let reader = server.token_for(&Principal::human("ann"));
+    assert_eq!(redactions(Some(reader)).await.status().as_u16(), 403);
+    let cache = server.token_for(&Principal::service("cache"));
+    let published: serde_json::Value = redactions(Some(cache)).await.json().await.unwrap();
     assert_eq!(published["hashes"][0], hash.to_hex());
 
     rill_api::audit::worker::catch_up(&server.state)
@@ -211,7 +222,11 @@ async fn a_redacted_tree_is_refused_even_when_cached() {
 
     let ctx = server.state.repos.resolve("app").await.unwrap();
     let version = rill_types::ObjectHash::from_slice(&version).unwrap();
-    let tree = ctx.derive.get::<rill_core::RootTree>(&version).await.unwrap();
+    let tree = ctx
+        .derive
+        .get::<rill_core::RootTree>(&version)
+        .await
+        .unwrap();
     let dir = ctx
         .trees
         .dir_hash(tree, &rill_types::RepoPathBuf::new("private").unwrap())

@@ -19,6 +19,11 @@ pub struct CacheConfig {
     pub key_refresh: Duration,
     /// How often the origin's redactions are reread.
     pub redaction_poll: Duration,
+    /// Serve nothing once the redactions have not been reread for this
+    /// long, rather than risk serving a redacted object.
+    pub redaction_max_age: Duration,
+    /// A service token for the origin's redaction list.
+    pub origin_token: Option<String>,
 }
 
 impl CacheConfig {
@@ -31,6 +36,8 @@ impl CacheConfig {
             max_bytes,
             key_refresh: Duration::from_secs(60),
             redaction_poll: Duration::from_secs(10),
+            redaction_max_age: Duration::from_secs(60),
+            origin_token: None,
         }
     }
 }

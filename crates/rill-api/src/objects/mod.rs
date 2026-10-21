@@ -13,6 +13,7 @@
 //! * `GET|HEAD /o/{repo}/{kind}/{hash}`: one object;
 //! * `PUT /o/{repo}/{kind}/{hash}`: store one object (400 on hash mismatch);
 //! * `POST /o/{repo}/batch`: many objects, length-prefixed (see [`batch`]);
+//! * `GET /redactions`: redacted hashes, for cache tiers;
 //! * `GET /healthz`, `GET /readyz`: liveness and readiness, no auth.
 
 pub mod authorize;
@@ -105,14 +106,14 @@ pub fn router(state: Arc<AppState>, serve_objects: bool) -> Router {
                 .put(handlers::put_object),
         )
         .route("/o/{repo}/batch", post(batch::batch))
+        .route("/redactions", get(redactions))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .layer(axum::extract::DefaultBodyLimit::max(MAX_PUT_BYTES));
     let health = Router::new()
         .route("/livez", get(livez))
         .route("/readyz", get(readyz))
         .route("/metrics", get(metrics))
-        .route("/public-keys", get(public_keys))
-        .route("/redactions", get(redactions));
+        .route("/public-keys", get(public_keys));
     let router = if serve_objects {
         health
             .merge(objects)
@@ -154,9 +155,21 @@ async fn public_keys(axum::extract::State(state): axum::extract::State<Arc<AppSt
     axum::Json(serde_json::json!({ "keys": keys })).into_response()
 }
 
-/// The hashes of every redacted object, for cache tiers to drop and
-/// refuse. Hashes only: they reveal nothing of the content.
-async fn redactions(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
+/// The hashes of every redacted object, for cache tiers (service
+/// principals) to drop and refuse, and for instance administrators. Kept
+/// from everyone else: a small file's hash confirms a guess at it.
+async fn redactions(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+    axum::extract::Extension(ctx): axum::extract::Extension<rill_policy::AuthContext>,
+) -> Response {
+    let service =
+        ctx.principal.kind == rill_types::PrincipalKind::Service && ctx.capability.is_none();
+    if !service && crate::auth::require_instance_admin(&state, &ctx).is_err() {
+        return error_response(ObjectError {
+            status: StatusCode::FORBIDDEN,
+            message: "the redaction list is for cache tiers and instance administrators".into(),
+        });
+    }
     let mut hashes: Vec<String> = state
         .identity
         .redacted_objects()

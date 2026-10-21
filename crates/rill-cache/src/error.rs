@@ -18,6 +18,10 @@ pub enum Error {
     #[error("bad request: {0}")]
     BadRequest(String),
 
+    /// The cache cannot serve safely right now.
+    #[error("unavailable: {0}")]
+    Unavailable(String),
+
     /// The origin failed or could not be reached.
     #[error("origin: {0}")]
     Origin(String),

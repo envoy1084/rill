@@ -153,7 +153,7 @@ itself ([read grants](../05-policy/permissions.md#read-grants)).
 | `PUT /o/{repo}/{kind}/{hash}` | write on root | `rill_store::object::verify` checks the body hashes to `{hash}` (400 otherwise); 201 when new, 200 when it existed; body limit `MAX_PUT_BYTES` (256 MiB) |
 | `POST /o/{repo}/batch` | read on something, and a grant in `x-rill-grant` | JSON `[{"kind","hash","via"?}]`, at most `MAX_BATCH` (10 000), streamed back as `application/vnd.rill.objects`; objects the grant does not name come back missing |
 | `GET /public-keys` | none | the keys derived from each token key, as JSON `{"keys":[{"id","grant_public_key","audit_public_key","not_after"}]}`: grants verify with the first, audit roots with the second |
-| `GET /redactions` | none | `{"hashes":[…]}`: every redacted object, for cache tiers |
+| `GET /redactions` | a service principal's unnarrowed token, or an instance administrator | `{"hashes":[…]}`: every redacted object, for cache tiers; 403 to anyone else, since a small file's hash confirms a guess at it |
 | `GET /healthz` | none | `ok` |
 | `GET /readyz` | none | 200 when every `health_components` entry is ok, else 503 listing the failures |
 

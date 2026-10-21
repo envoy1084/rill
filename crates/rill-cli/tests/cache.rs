@@ -75,6 +75,7 @@ async fn the_cache_serves_what_grants_name_and_fetches_each_object_once() {
     let dir = tempfile::tempdir().unwrap();
     let mut config = CacheConfig::new(format!("http://{}", server.http), dir.path(), 1 << 20);
     config.listen = "127.0.0.1:0".parse().unwrap();
+    config.origin_token = Some(server.token(&Principal::service("cache")));
     let cache = Cache::start(&config).await.unwrap();
     let listener = tokio::net::TcpListener::bind(config.listen).await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -206,6 +207,7 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
     let mut config = CacheConfig::new(format!("http://{}", server.http), dir.path(), 1 << 20);
     config.listen = "127.0.0.1:0".parse().unwrap();
     config.redaction_poll = std::time::Duration::from_millis(50);
+    config.origin_token = Some(server.token(&Principal::service("cache")));
     let cache = Cache::start(&config).await.unwrap();
     let listener = tokio::net::TcpListener::bind(config.listen).await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -271,4 +273,89 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
     assert_eq!(cache.disk().len(), 0, "and drops its copy");
     stop.cancel();
     server.stop();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cache_that_cannot_reread_redactions_stops_serving() {
+    let server = SecureServer::start().await;
+    let ann = Principal::human("ann");
+    let owner = server.client(&ann).await;
+    owner.create_repo("app", None).await.unwrap();
+    let content = "kept on the cache's disk\n".repeat(40);
+    let version = owner
+        .repo_svc()
+        .apply_edits(pb::ApplyEditsRequest {
+            operation_id: Default::default(),
+            repo: "app".into(),
+            base: None,
+            edits: vec![pb::Edit {
+                path: "a.txt".into(),
+                op: Some(pb::edit::Op::SetContent(pb::SetContent {
+                    content: Some(pb::ContentRef {
+                        r#ref: Some(pb::content_ref::Ref::Inline(content.clone().into())),
+                    }),
+                    kind: pb::FileKind::Regular as i32,
+                    copy_from: None,
+                })),
+            }],
+            message: "a".into(),
+            intent: None,
+            provenance: None,
+            change_id: None,
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .hash;
+    let grant = owner
+        .repo_svc()
+        .list_dir(pb::ListDirRequest {
+            repo: "app".into(),
+            root: Some(Root::Version(ObjectHash::from_slice(&version).unwrap()).to_proto()),
+            path: String::new(),
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .read_grant;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = CacheConfig::new(format!("http://{}", server.http), dir.path(), 1 << 20);
+    config.listen = "127.0.0.1:0".parse().unwrap();
+    config.origin_token = Some(server.token(&Principal::service("cache")));
+    config.redaction_poll = std::time::Duration::from_millis(50);
+    config.redaction_max_age = std::time::Duration::from_millis(400);
+    let cache = Cache::start(&config).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(config.listen).await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let stop = CancellationToken::new();
+    tokio::spawn({
+        let (cache, config, stop) = (cache.clone(), config.clone(), stop.clone());
+        async move { rill_cache::serve_on(cache, listener, &config, stop).await }
+    });
+    let hash = ObjectHash::digest(ObjectKind::Blob, content.as_bytes());
+    let token = server.token(&ann);
+    let fetch = || {
+        let (token, grant) = (token.clone(), grant.clone());
+        async move {
+            reqwest::Client::new()
+                .get(format!("http://{addr}/o/app/blob/{}", hash.to_hex()))
+                .bearer_auth(token)
+                .header("x-rill-grant", grant)
+                .send()
+                .await
+                .unwrap()
+                .status()
+                .as_u16()
+        }
+    };
+    assert_eq!(fetch().await, 200);
+    server.stop();
+    tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+    assert_eq!(
+        fetch().await,
+        503,
+        "a cache that may have missed a redaction serves nothing"
+    );
+    stop.cancel();
 }

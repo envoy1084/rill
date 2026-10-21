@@ -73,8 +73,10 @@ with `Error::Redacted`:
 * search and grep treat it as empty rather than failing;
 * caches of decoded objects (tree nodes) ask the store before serving a
   hit, so a redacted tree is refused even where it was cached;
-* `GET /redactions` publishes the redacted hashes (hashes only). Cache tiers
-  poll it, then drop their copies and refuse those hashes.
+* `GET /redactions` gives the redacted hashes to service principals (cache
+  tiers) and instance administrators. Caches poll it, drop their copies and
+  refuse those hashes, and serve nothing while their copy of the list is
+  more than a minute stale.
 
 The bytes stay in the object store, unreachable through Rill. Physically
 deleting them is the backing store's lifecycle job.
@@ -119,7 +121,7 @@ Sealing is on by default outside dev mode (`[encryption] enabled`,
 * Rules come from trunk, so a change cannot loosen the rules it is checked
   under. Changing them takes an owner-approved land.
 * A cache tier serves a redacted object until its next poll
-  (`--redaction-poll`, 10 s by default).
+  (`--redaction-poll`, 10 s by default), and needs a service token to poll.
 * Cache tiers keep plaintext objects on their own disks; encrypt those
   volumes.
 * Losing the key service (or its key) loses every object. Back it up as

@@ -28,6 +28,9 @@ pub struct CacheArgs {
     /// Seconds between checks of the origin's redactions.
     #[arg(long, env = "RILL_CACHE_REDACTION_POLL", default_value_t = 10)]
     pub redaction_poll: u64,
+    /// A service token the origin accepts for its redaction list.
+    #[arg(long, env = "RILL_CACHE_ORIGIN_TOKEN", hide_env_values = true)]
+    pub origin_token: Option<String>,
 }
 
 /// `500G`, `64M`, `1T`, `4096`.
@@ -57,6 +60,8 @@ pub async fn run(args: CacheArgs) -> Result<()> {
     let mut config = CacheConfig::new(args.origin, args.dir, parse_size(&args.max_bytes)?);
     config.listen = args.listen;
     config.redaction_poll = std::time::Duration::from_secs(args.redaction_poll.max(1));
+    config.redaction_max_age = (config.redaction_poll * 6).max(std::time::Duration::from_secs(60));
+    config.origin_token = args.origin_token;
     let shutdown = CancellationToken::new();
     let signal = shutdown.clone();
     tokio::spawn(async move {

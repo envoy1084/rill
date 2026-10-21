@@ -17,7 +17,7 @@ execution of verification steps (phase 15), and the release pipeline
 
 | Boundary | Crossed by | Checked by |
 | --- | --- | --- |
-| Network → server | gRPC, object HTTP, SCIM, sign-in | TLS (optionally mutual); every route authenticates except health, sign-in, `/public-keys` and `/redactions` |
+| Network → server | gRPC, object HTTP, SCIM, sign-in | TLS (optionally mutual); every route authenticates except health, sign-in and `/public-keys` |
 | Caller → repository | every repository RPC | `Permit`: token capability ∩ relations (ReBAC) ∩ agent scope; the [permission matrix](permissions.md) test covers every RPC |
 | Caller → object bytes | `GetBlob`, `GetTree`, `/o`, batch | signed read grants naming exact hashes, checked by the server and the cache |
 | Writer → trunk | landing, `AppendTrunk` | write sets authorized at commit and at land; submit policy; quarantine |

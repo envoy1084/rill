@@ -108,7 +108,11 @@ pub async fn scenario(name: &str, stores: &Stores) {
         ..root.clone()
     };
     assert!(
-        audit.put_root(&overlapping).await.unwrap_err().is_conflict(),
+        audit
+            .put_root(&overlapping)
+            .await
+            .unwrap_err()
+            .is_conflict(),
         "{name}: a racing sealer that read no root cannot reseal sealed entries"
     );
     assert_eq!(
