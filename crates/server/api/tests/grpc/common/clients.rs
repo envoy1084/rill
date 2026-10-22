@@ -8,6 +8,7 @@ use rill_proto::rill::v1::audit_service_client::AuditServiceClient;
 use rill_proto::rill::v1::protection_service_client::ProtectionServiceClient;
 use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
 use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
+use rill_proto::rill::v1::secret_service_client::SecretServiceClient;
 use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
 use tonic::metadata::MetadataValue;
 use tonic::service::interceptor::InterceptedService;
@@ -40,6 +41,7 @@ pub(crate) struct Clients {
     pub(crate) workspace: WorkspaceServiceClient<Svc>,
     pub(crate) review: ReviewServiceClient<Svc>,
     pub(crate) admin: AdminServiceClient<Svc>,
+    pub(crate) secrets: SecretServiceClient<Svc>,
 }
 
 pub(crate) async fn clients(server: &TestServer, token: Option<&str>) -> Clients {
@@ -75,6 +77,7 @@ pub(crate) async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
         protection: ProtectionServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         workspace: WorkspaceServiceClient::with_interceptor(channel.clone(), bearer.clone()),
         review: ReviewServiceClient::with_interceptor(channel.clone(), bearer.clone()),
-        admin: AdminServiceClient::with_interceptor(channel, bearer),
+        admin: AdminServiceClient::with_interceptor(channel.clone(), bearer.clone()),
+        secrets: SecretServiceClient::with_interceptor(channel, bearer),
     }
 }

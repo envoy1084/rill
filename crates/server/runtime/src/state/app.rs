@@ -88,6 +88,10 @@ impl AppState {
         tokio::task::spawn_blocking(|| {
             std::sync::LazyLock::force(&rill_policy::secrets::CATALOG);
         });
+        let secret_sealer: Arc<dyn rill_store::Sealer> = match &sealer {
+            Some(sealer) => sealer.clone(),
+            None => Arc::new(rill_store::Plaintext),
+        };
         let data_keys = sealer.map(|sealer| {
             let keys = Arc::new(rill_identity::keys::DataKeyManager::new(
                 stores.identity(),
@@ -100,10 +104,13 @@ impl AppState {
         });
         let attestor = Arc::new(load_attestor(&config)?);
         let lifecycle = Arc::new(super::Lifecycle::new(shutdown.clone()));
-        let exec = Arc::new(rill_exec::remote::Scheduler::new(
-            stores.clone(),
-            crate::exec::scheduler_config(&config.exec),
-        ));
+        let exec = Arc::new(
+            rill_exec::remote::Scheduler::new(
+                stores.clone(),
+                crate::exec::scheduler_config(&config.exec),
+            )
+            .with_sealer(secret_sealer),
+        );
         let repos = RepoRegistry::new(
             stores.clone(),
             config.clone(),

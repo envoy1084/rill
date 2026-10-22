@@ -13,6 +13,7 @@
 //! shards = 4
 //! risk = ["normal", "sensitive", "critical"]
 //! targets = "affected"               # needs [graph]; see graph/
+//! secrets = ["NPM_TOKEN"]             # org secrets, as environment variables
 //! ```
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -58,6 +59,9 @@ pub struct Step {
     /// The step is given the build targets the change affects, in the
     /// file `RILL_AFFECTED_TARGETS` names, and skipped when there are none.
     pub affected_targets: bool,
+    /// Org secrets the command gets as environment variables. Their values
+    /// never enter the action, and the step is never cached.
+    pub secrets: Vec<String>,
 }
 
 /// The steps that verify a tree.
@@ -114,6 +118,18 @@ impl Plan {
                     )))
                 }
             };
+            let mut secrets = step.secrets;
+            secrets.sort_unstable();
+            secrets.dedup();
+            for secret in &secrets {
+                crate::remote::secrets::validate_secret_name(secret)
+                    .map_err(|e| invalid(format!("step {name:?}: {e}")))?;
+                if step.env.contains_key(secret) {
+                    return Err(invalid(format!(
+                        "step {name:?} sets {secret} in env and as a secret"
+                    )));
+                }
+            }
             let risk = match step.risk {
                 None => None,
                 Some(classes) => Some(
@@ -138,6 +154,7 @@ impl Plan {
                 shards,
                 risk,
                 affected_targets,
+                secrets,
                 name,
             });
         }
@@ -179,6 +196,8 @@ struct StepFile {
     shards: Option<u32>,
     risk: Option<Vec<String>>,
     targets: Option<String>,
+    #[serde(default)]
+    secrets: Vec<String>,
 }
 
 /// The plan at [`PLAN_PATH`] in `root`, or `None` when the tree has none.
@@ -244,6 +263,8 @@ command = ["true"]
             "[[step]]\ncommand = [\"x\"]\ntargets = \"affected\"\n",
             "[graph]\ntool = \"make\"\n",
             "[graph]\noutput = \"h.json\"\n",
+            "[[step]]\ncommand = [\"x\"]\nsecrets = [\"not-a-name\"]\n",
+            "[[step]]\ncommand = [\"x\"]\nsecrets = [\"T\"]\nenv = { T = \"1\" }\n",
         ] {
             assert!(Plan::parse(text).is_err(), "{text}");
         }

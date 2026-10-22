@@ -16,6 +16,7 @@ pub mod orgs;
 pub mod protection;
 pub mod repo;
 pub mod review;
+mod secrets;
 pub mod session;
 pub mod workspace;
 
@@ -29,5 +30,6 @@ pub use lander::LanderSvc;
 pub use protection::ProtectionSvc;
 pub use repo::RepoSvc;
 pub use review::ReviewSvc;
+pub use secrets::SecretSvc;
 pub use session::SessionSvc;
 pub use workspace::WorkspaceSvc;

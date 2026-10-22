@@ -32,10 +32,10 @@ Every org has an execution space (`remote/space.rs`):
   rehashing: raw content is plain BLAKE3, the digest REAPI clients compute
   ([ADR 016](../10-decisions/016-plain-blake3-for-content.md)). The sealer
   encrypts it with the org's data keys, bound to the `.exec` namespace.
-* **Records** (action results, operations, queues) live under a
-  `RepoStore` whose id no repository uses, in the `xop`, `xopn`, `xif`,
-  `xpl` tables; worker sessions and the idle wake counter are instance-wide
-  (`xwk`, `xwake`).
+* **Records** (action results, operations, queues, org secrets) live
+  under a `RepoStore` whose id no repository uses, in the `xop`, `xopn`,
+  `xif`, `xpl`, `xsec` and `xscmd` tables; worker sessions and the idle
+  wake counter are instance-wide (`xwk`, `xwake`).
 
 The REAPI instance name is the org: `""` is the default org, `acme` is
 `acme`. Only the BLAKE3 digest function is accepted.
@@ -95,6 +95,9 @@ answers any request:
   Buildbarn). A completion records the result, finishes the operation and
   the job in one commit, and offers the next action. Actions with no
   timeout get `default_timeout_secs`, capped at `max_timeout_secs`.
+* **Secrets:** an operation from a verify plan may name org secrets; the
+  scheduler injects and masks them ([exec](exec.md#secrets)). Such
+  operations neither merge nor are cached.
 * **Lost workers:** a claim not renewed within `lease_secs` is taken back
   by the reaper (every 10 s on workers servers) and runs elsewhere; after
   `max_attempts` losses the operation fails with `UNAVAILABLE`.

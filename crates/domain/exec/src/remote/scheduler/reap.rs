@@ -52,7 +52,11 @@ impl Scheduler {
                         .into(),
                     );
                     let keys = space.records.keys();
-                    let tx = rill_store::Transaction::new()
+                    let mut tx = rill_store::Transaction::new();
+                    if let Some(command) = op.secret_command.take() {
+                        tx = tx.delete(keys.exec_secret_command(&command));
+                    }
+                    let tx = tx
                         .set(
                             keys.exec_operation(&id),
                             rill_store::repo::encode_record(&op)?,

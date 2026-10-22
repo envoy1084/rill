@@ -115,6 +115,16 @@ pub fn identity(event: &IdentityEvent) -> AuditRecord {
         IdentityChange::DataKeysChanged { org } => {
             mine(org, "datakey.change", format!("org:{org}"), &[])
         }
+        IdentityChange::SecretChanged { org, name, deleted } => mine(
+            org,
+            if *deleted {
+                "secret.delete"
+            } else {
+                "secret.set"
+            },
+            format!("secret:{name}"),
+            &[],
+        ),
         IdentityChange::QuarantineCleared { org, repo, version } => mine(
             org,
             "quarantine.clear",

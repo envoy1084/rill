@@ -20,6 +20,7 @@ const PROTOS: &[&str] = &[
     "rill/v1/access.proto",
     "rill/v1/audit.proto",
     "rill/v1/protection.proto",
+    "rill/v1/secrets.proto",
     "rill/v1/identity.proto",
 ];
 

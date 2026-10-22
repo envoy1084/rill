@@ -18,6 +18,7 @@ pub mod protection;
 pub mod refs;
 pub mod repo;
 pub mod review;
+pub mod secrets;
 pub mod session;
 pub mod stack;
 pub mod status;

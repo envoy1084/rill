@@ -97,6 +97,11 @@ pub const EXEC_PLATFORM: &str = "xpl";
 /// `(xwake, ns, space)` → counter moved by every queued action; idle
 /// workers watch it
 pub const EXEC_WAKE: &str = "xwake";
+/// `(xsec, ns, space, name)` → an org secret, its value sealed
+pub const EXEC_SECRET: &str = "xsec";
+/// `(xscmd, ns, space, digest)` → a command with secret values, sealed,
+/// readable only by workers while its action runs
+pub const EXEC_SECRET_COMMAND: &str = "xscmd";
 /// `(meta, "format")` → store format
 pub const META: &str = "meta";
 /// `(org, name)` → OrgConfig

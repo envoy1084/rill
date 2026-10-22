@@ -34,6 +34,9 @@ pub struct Target {
     /// The change's risk class; `None` runs every step whatever it gates.
     pub risk: Option<RiskClass>,
     pub priority: Priority,
+    /// The tree is trunk, verified after landing; secrets limited to
+    /// trunk are given only then.
+    pub trunk: bool,
 }
 
 /// Runs a repository's plans in its org's execution space.
@@ -42,25 +45,27 @@ pub struct PlanRunner {
     pub(crate) space: ExecSpace,
     pub(crate) trees: TreeOps,
     pub(crate) platform: BTreeMap<String, String>,
+    pub(crate) repo: String,
     pub(crate) requester: String,
 }
 
 impl PlanRunner {
-    /// A runner for trees read through `trees`, submitting for `org` as
-    /// `requester` with `platform` as every step's base properties.
+    /// A runner for `repo`'s trees, read through `trees`, submitting in
+    /// `org`'s space with `platform` as every step's base properties.
     pub fn new(
         scheduler: Arc<Scheduler>,
         org: &str,
+        repo: &str,
         trees: TreeOps,
         platform: BTreeMap<String, String>,
-        requester: impl Into<String>,
     ) -> Self {
         PlanRunner {
             space: scheduler.space(org),
             scheduler,
             trees,
             platform,
-            requester: requester.into(),
+            repo: repo.to_string(),
+            requester: format!("verify:{repo}"),
         }
     }
 
@@ -94,6 +99,20 @@ impl PlanRunner {
                 Selection::NotGating => {
                     steps.push(StepResult::skipped(&step.name, StepStatus::NotGating))
                 }
+            }
+        }
+
+        for step in &selected {
+            if step.secrets.is_empty() {
+                continue;
+            }
+            let refusal = self
+                .scheduler
+                .secret_refusal(&self.space.org, &step.secrets, &self.repo, target.trunk)
+                .await?;
+            if let Some(reason) = refusal {
+                steps.push(StepResult::skipped(&step.name, StepStatus::Error(reason)));
+                return self.finish(false, steps).await;
             }
         }
 

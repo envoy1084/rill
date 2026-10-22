@@ -16,6 +16,7 @@ use tokio::task::JoinHandle;
 pub struct Fixture {
     pub trees: TreeOps,
     pub runner: PlanRunner,
+    pub scheduler: Arc<Scheduler>,
     worker: JoinHandle<()>,
 }
 
@@ -27,17 +28,25 @@ impl Drop for Fixture {
 
 impl Fixture {
     pub async fn new() -> Self {
+        Self::sealed_by(Arc::new(rill_store::Plaintext)).await
+    }
+
+    /// A fixture whose scheduler seals secrets with `sealer`.
+    pub async fn sealed_by(sealer: Arc<dyn rill_store::Sealer>) -> Self {
         let stores = Stores::memory();
         let repo = stores.repo(stores.create_repo("app", "").await.unwrap().id);
         let trees = TreeOps::new(repo.objects().clone(), 256);
-        let scheduler = Arc::new(Scheduler::new(
-            stores,
-            SchedulerConfig {
-                idle_wait: Duration::from_millis(200),
-                report_every: Duration::from_millis(500),
-                ..SchedulerConfig::default()
-            },
-        ));
+        let scheduler = Arc::new(
+            Scheduler::new(
+                stores.clone(),
+                SchedulerConfig {
+                    idle_wait: Duration::from_millis(200),
+                    report_every: Duration::from_millis(500),
+                    ..SchedulerConfig::default()
+                },
+            )
+            .with_sealer(sealer),
+        );
         let worker = LocalWorker::new(
             scheduler.clone(),
             Arc::new(LocalSandbox::new(false)),
@@ -46,15 +55,16 @@ impl Fixture {
         );
         let worker = tokio::spawn(worker.run(std::future::pending()));
         let runner = PlanRunner::new(
-            scheduler,
+            scheduler.clone(),
             rill_store::DEFAULT_ORG,
+            "app",
             trees.clone(),
             Default::default(),
-            "test",
         );
         Fixture {
             trees,
             runner,
+            scheduler,
             worker,
         }
     }
@@ -79,11 +89,22 @@ impl Fixture {
     }
 
     pub async fn verify(&self, root: TreeHash, base: Option<TreeHash>) -> VerificationOutcome {
+        self.verify_at(root, base, false).await
+    }
+
+    /// [`Fixture::verify`] as trunk (after landing) or not.
+    pub async fn verify_at(
+        &self,
+        root: TreeHash,
+        base: Option<TreeHash>,
+        trunk: bool,
+    ) -> VerificationOutcome {
         let target = Target {
             root,
             base,
             risk: None,
             priority: Priority::Normal,
+            trunk,
         };
         tokio::time::timeout(Duration::from_secs(60), self.runner.verify(&target))
             .await

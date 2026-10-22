@@ -91,6 +91,12 @@ pub enum IdentityChange {
         repo: String,
         version: crate::hash::ObjectHash,
     },
+    /// An org secret was set or deleted; the log holds only its name.
+    SecretChanged {
+        org: String,
+        name: String,
+        deleted: bool,
+    },
 }
 
 /// One entry of the identity change log.

@@ -103,6 +103,7 @@ impl LocalWorker {
         };
         let space = self.scheduler.space(&task.instance_name_suffix);
         let run = execute(
+            &self.scheduler,
             &space,
             self.sandbox.as_ref(),
             &self.name,

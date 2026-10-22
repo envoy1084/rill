@@ -77,9 +77,9 @@ impl RepoRegistry {
             true => Arc::new(workers::ExecVerifier::new(PlanRunner::new(
                 self.exec.clone(),
                 &config.org,
+                &config.name,
                 trees.clone(),
                 self.config.verify.platform.clone(),
-                format!("verify:{}", config.name),
             ))),
             false => Arc::new(AlwaysGreen),
         };

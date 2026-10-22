@@ -200,6 +200,22 @@ impl RepoKeys {
         self.table(table::EXEC_WAKE)
     }
 
+    pub fn exec_secret(&self, name: &str) -> Bytes {
+        self.row(table::EXEC_SECRET, &name)
+    }
+
+    pub fn exec_secrets(&self) -> Bytes {
+        self.table(table::EXEC_SECRET)
+    }
+
+    pub fn exec_secret_command(&self, digest: &ObjectHash) -> Bytes {
+        self.row(table::EXEC_SECRET_COMMAND, &digest.as_bytes().as_slice())
+    }
+
+    pub fn exec_secret_commands(&self) -> Bytes {
+        self.table(table::EXEC_SECRET_COMMAND)
+    }
+
     pub fn land_request(&self, ticket: u64) -> Bytes {
         self.row(table::LAND_REQUEST, &(ticket as i64))
     }

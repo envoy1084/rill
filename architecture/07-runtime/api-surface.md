@@ -44,6 +44,7 @@ in, without it. It also registers `tonic-reflection` and
 | `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser`, agents (`RegisterAgent`, `UpdateAgent`, `ListAgents`), workload issuers (`Put`/`List`/`DeleteWorkloadIssuer`), `KillSwitch`, SCIM credentials ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
 | `AuditService` | `audit.proto` | `services/audit.rs` | `ListAuditEntries`, `ListAuditRoots`, `SealAudit`, `ListAuditKeys`, `WatchAudit` ([audit log](../05-policy/audit.md)) |
 | `ProtectionService` | `protection.proto` | `services/protection.rs` | `RequestRedaction`, `ApproveRedaction`, `ListRedactions`, `ClearQuarantine`, `RotateDataKeys` ([data protection](../05-policy/data-protection.md)) |
+| `SecretService` | `secrets.proto` | `services/secrets.rs` | `PutSecret`, `DeleteSecret`, `ListSecrets` (org administrators; values are write-only) ([exec](../06-services/exec.md#secrets)) |
 | REAPI `Execution`, `ActionCache`, `ContentAddressableStorage`, `Capabilities`; `google.bytestream.ByteStream`; Buildbarn `OperationQueue` | `rill-reapi-proto` (vendored) | `services/exec/` | remote execution and the worker protocol ([remote execution](../06-services/remote-execution.md)) |
 | `SessionService` | `identity.proto` | `services/session.rs` | `ListSignInProviders`, `ExchangeToken`, `RefreshSession`; no auth layer ([sign-in](../05-policy/identity-and-auth.md#sign-in)) |
 

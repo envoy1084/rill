@@ -12,6 +12,7 @@ use rill_proto::rill::v1::lander_service_server::LanderServiceServer;
 use rill_proto::rill::v1::protection_service_server::ProtectionServiceServer;
 use rill_proto::rill::v1::repo_service_server::RepoServiceServer;
 use rill_proto::rill::v1::review_service_server::ReviewServiceServer;
+use rill_proto::rill::v1::secret_service_server::SecretServiceServer;
 use rill_proto::rill::v1::session_service_server::SessionServiceServer;
 use rill_proto::rill::v1::workspace_service_server::WorkspaceServiceServer;
 use tokio::net::TcpListener;
@@ -31,7 +32,7 @@ use rill_reapi_proto::remoteworker::operation_queue_server::OperationQueueServer
 
 use crate::services::{
     AccessSvc, AdminSvc, AuditSvc, ExecSvc, IdentitySvc, IntentSvc, LanderSvc, ProtectionSvc,
-    RepoSvc, ReviewSvc, SessionSvc, WorkspaceSvc,
+    RepoSvc, ReviewSvc, SecretSvc, SessionSvc, WorkspaceSvc,
 };
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
@@ -243,6 +244,9 @@ async fn serve_grpc(
                 state.clone()
             )))),
         )
+        .add_service(auth.layer(limits!(SecretServiceServer::new(SecretSvc::new(
+            state.clone()
+        )))))
         .add_service(auth.layer(limits!(ExecutionServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(ActionCacheServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(ContentAddressableStorageServer::new(exec.clone()))))
@@ -316,6 +320,7 @@ async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bo
         <AccessServiceServer<AccessSvc> as tonic::server::NamedService>::NAME,
         <AuditServiceServer<AuditSvc> as tonic::server::NamedService>::NAME,
         <ProtectionServiceServer<ProtectionSvc> as tonic::server::NamedService>::NAME,
+        <SecretServiceServer<SecretSvc> as tonic::server::NamedService>::NAME,
         <IdentityServiceServer<IdentitySvc> as tonic::server::NamedService>::NAME,
         <SessionServiceServer<SessionSvc> as tonic::server::NamedService>::NAME,
     ] {

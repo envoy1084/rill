@@ -131,6 +131,51 @@ Only successful results enter the action cache.
 
 Pre-land requests run at `High` priority, post-land at `Normal`.
 
+## Secrets
+
+A step names org secrets it needs; the command gets them as environment
+variables:
+
+```toml
+[[step]]
+name = "publish"
+command = ["./scripts/publish.sh"]
+secrets = ["NPM_TOKEN"]
+```
+
+Org administrators set them with `SecretService` (`rill admin secret set
+NAME --allow-repo app --trunk-only < value`). No call returns a value.
+`remote/secrets/`:
+
+* **Storage.** A secret is a record in the org's execution space (`xsec`)
+  whose value is sealed with the org's data keys (AES-256-GCM, namespace
+  `<org>.secrets`, bound to the name) where objects are sealed, and stored
+  as is otherwise. Names are environment variable names; values are 6
+  bytes to 64 KiB, so a short value cannot mask ordinary output. A set or
+  delete writes a `SecretChanged` identity event in the same commit,
+  audited as `secret.set` / `secret.delete`. Setting skips the
+  idempotency table, which would keep a hash of the request.
+* **Scope.** `repos` limits which repositories' plans may use it;
+  `trunk_only` gives it only to post-land verification, never to a change
+  before it lands. A step whose secret is unset or out of scope is an
+  `Error` and the tree is red.
+* **No value in the action.** The stored `Command` lists only the step's
+  own environment. The action is `do_not_cache`, is never looked up in or
+  written to the action cache, and is not merged with an identical action
+  in flight. Only `PlanRunner` submissions carry secret names: a client's
+  `Execute` never does.
+* **Injection.** When a worker takes the action, the scheduler opens the
+  values, writes a copy of the command with them, sealed, under its
+  digest (`xscmd`), and gives the worker an action pointing at it.
+  `Scheduler::worker_read` (and the CAS and ByteStream services, for
+  callers that are workers) serves that digest; nobody else can read it.
+  It is deleted when the operation finishes, fails or is reaped.
+* **Masking.** On completion the scheduler replaces every value in standard
+  output and error with `[secret NAME]` (`Redactor`, Aho-Corasick,
+  longest match), stores the masked copies, and records those in the
+  operation, so the excerpt and anything that reads the result see masked
+  text.
+
 ## Local workers
 
 `LocalWorker` (`worker/`) runs actions inside the server for development
@@ -201,6 +246,12 @@ Multi-tenant deployments run Buildbarn workers under gVisor instead
   domains are still paths and declared groups, not targets.
 * The base's and the change's queries each parse their whole hash file;
   nothing keeps parsed graphs in memory.
+* Secrets: output files are not masked, only standard output and error;
+  a command can still leak a value it was given (encoded, or over the
+  network if its platform has one), so scope secrets to the repositories
+  and stage that need them. Values must be UTF-8. The unmasked logs a
+  Buildbarn worker uploaded stay in the CAS under digests nothing
+  records.
 * Platform properties are the only toolchain identity: a worker image
   upgrade under the same properties keeps old cached results.
 
@@ -208,6 +259,7 @@ Multi-tenant deployments run Buildbarn workers under gVisor instead
 
 * [verify/](../../crates/domain/exec/src/verify/mod.rs): [plan.rs](../../crates/domain/exec/src/verify/plan.rs), [select.rs](../../crates/domain/exec/src/verify/select.rs), [compile.rs](../../crates/domain/exec/src/verify/compile.rs), [run.rs](../../crates/domain/exec/src/verify/run.rs), [submit.rs](../../crates/domain/exec/src/verify/submit.rs), [outcome.rs](../../crates/domain/exec/src/verify/outcome.rs)
 * [verify/graph/](../../crates/domain/exec/src/verify/graph/mod.rs): [spec.rs](../../crates/domain/exec/src/verify/graph/spec.rs), [query.rs](../../crates/domain/exec/src/verify/graph/query.rs), [hashes.rs](../../crates/domain/exec/src/verify/graph/hashes.rs), [affected.rs](../../crates/domain/exec/src/verify/graph/affected.rs)
+* [remote/secrets/](../../crates/domain/exec/src/remote/secrets/mod.rs): [store.rs](../../crates/domain/exec/src/remote/secrets/store.rs), [inject.rs](../../crates/domain/exec/src/remote/secrets/inject.rs), [redact.rs](../../crates/domain/exec/src/remote/secrets/redact.rs); service [secrets.rs](../../crates/server/api/src/services/secrets.rs)
 * [remote/inputs/](../../crates/domain/exec/src/remote/inputs/mod.rs): [filter.rs](../../crates/domain/exec/src/remote/inputs/filter.rs), [upload.rs](../../crates/domain/exec/src/remote/inputs/upload.rs), [graft.rs](../../crates/domain/exec/src/remote/inputs/graft.rs)
 * [worker/](../../crates/domain/exec/src/worker/mod.rs): [local.rs](../../crates/domain/exec/src/worker/local.rs), [execute.rs](../../crates/domain/exec/src/worker/execute.rs), [stage.rs](../../crates/domain/exec/src/worker/stage.rs)
 * [sandbox/](../../crates/domain/exec/src/sandbox/mod.rs): [local.rs](../../crates/domain/exec/src/sandbox/local.rs), [confine.rs](../../crates/domain/exec/src/sandbox/confine.rs)

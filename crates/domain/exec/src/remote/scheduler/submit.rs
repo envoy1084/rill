@@ -30,6 +30,9 @@ pub struct Submission {
     pub priority: Priority,
     pub requester: String,
     pub do_not_cache: bool,
+    /// Org secrets to give the command. Only Rill's own submissions (verify
+    /// plans) carry them, never a client's `Execute`.
+    pub secrets: Vec<String>,
 }
 
 /// What submitting did.
@@ -51,14 +54,20 @@ pub fn priority_of(reapi_priority: i32) -> Priority {
 
 impl Scheduler {
     /// Queue `submission`, unless the same action is already queued or
-    /// running, in which case the caller shares that operation.
+    /// running, in which case the caller shares that operation. An action
+    /// with secrets neither joins nor is joined.
     pub async fn submit(&self, space: &ExecSpace, submission: Submission) -> Result<Submitted> {
+        let merges = submission.secrets.is_empty();
         let keys = space.records.keys();
         let in_flight = keys.exec_in_flight(&submission.action.hash);
         let platform = platform_key(submission.platform.as_ref());
         let queue = self.platform_queue(space, &platform);
         for _ in 0..ATTEMPTS {
-            if let Some(id) = space.records.meta().get(&in_flight).await? {
+            let running = match merges {
+                true => space.records.meta().get(&in_flight).await?,
+                false => None,
+            };
+            if let Some(id) = running {
                 let id = String::from_utf8_lossy(&id).into_owned();
                 if let Some(op) = self.operation(space, &id).await? {
                     if op.stage != Stage::Completed {
@@ -80,6 +89,8 @@ impl Scheduler {
                 queued_at: Timestamp::now(),
                 worker: None,
                 response: None,
+                secrets: submission.secrets.clone(),
+                secret_command: None,
             };
             let job = JobSpec::new(
                 EXECUTE_JOB,
@@ -87,10 +98,14 @@ impl Scheduler {
                 op.id.clone().into_bytes(),
             )
             .priority(submission.priority);
-            let current = space.records.meta().get(&in_flight).await?;
-            let mut tx = Transaction::new()
-                .expect(in_flight.clone(), current)
-                .set(in_flight.clone(), Bytes::from(op.id.clone()))
+            let mut tx = Transaction::new();
+            if merges {
+                let current = space.records.meta().get(&in_flight).await?;
+                tx = tx
+                    .expect(in_flight.clone(), current)
+                    .set(in_flight.clone(), Bytes::from(op.id.clone()));
+            }
+            let mut tx = tx
                 .set(keys.exec_operation(&op.id), encode_record(&op)?)
                 .add(keys.exec_operation_count(&op.id), 1)
                 .set(

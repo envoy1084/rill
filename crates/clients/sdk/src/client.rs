@@ -13,6 +13,7 @@ use rill_proto::rill::v1::lander_service_client::LanderServiceClient;
 use rill_proto::rill::v1::protection_service_client::ProtectionServiceClient;
 use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
 use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
+use rill_proto::rill::v1::secret_service_client::SecretServiceClient;
 use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
 use tonic::metadata::MetadataValue;
 use tonic::service::interceptor::InterceptedService;
@@ -141,6 +142,8 @@ pub type AdminSvc = AdminServiceClient<Svc>;
 pub type AuditSvc = AuditServiceClient<Svc>;
 /// Generated protection client over the SDK transport.
 pub type ProtectionSvc = ProtectionServiceClient<Svc>;
+/// Generated secret client over the SDK transport.
+pub type SecretSvc = SecretServiceClient<Svc>;
 /// Generated access client over the SDK transport.
 pub type AccessSvc = AccessServiceClient<Svc>;
 /// Generated identity client over the SDK transport.
@@ -339,6 +342,11 @@ impl Client {
     /// A fresh generated protection client.
     pub fn protection_svc(&self) -> ProtectionSvc {
         ProtectionServiceClient::new(self.svc())
+    }
+
+    /// A fresh generated secret client.
+    pub fn secret_svc(&self) -> SecretSvc {
+        SecretServiceClient::new(self.svc())
     }
 
     /// A fresh generated access client.

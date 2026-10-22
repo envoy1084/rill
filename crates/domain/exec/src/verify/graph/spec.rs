@@ -100,6 +100,7 @@ impl GraphFile {
                 shards: 1,
                 risk: None,
                 affected_targets: false,
+                secrets: Vec::new(),
             },
             output,
         })

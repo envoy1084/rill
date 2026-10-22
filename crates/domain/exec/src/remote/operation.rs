@@ -30,6 +30,10 @@ pub struct OperationRecord {
     pub worker: Option<String>,
     /// The encoded `ExecuteResponse`, once completed.
     pub response: Option<Bytes>,
+    /// Org secrets the command gets, by name.
+    pub secrets: Vec<String>,
+    /// The sealed command carrying their values while a worker runs it.
+    pub secret_command: Option<ObjectHash>,
 }
 
 impl Record for OperationRecord {

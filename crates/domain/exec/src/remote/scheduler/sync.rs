@@ -121,6 +121,26 @@ impl Scheduler {
                         .await?;
                     continue;
                 };
+                let action_bytes = if op.secrets.is_empty() {
+                    action_bytes
+                } else {
+                    match self.with_secrets(&space, &op, action_bytes).await {
+                        Ok((bytes, command)) => {
+                            op.secret_command = Some(command);
+                            bytes
+                        }
+                        Err(e) => {
+                            let failed = failure(rill_reapi_proto::rpc::Status {
+                                code: tonic::Code::FailedPrecondition as i32,
+                                message: format!("giving the action its secrets: {e}"),
+                                details: vec![],
+                            });
+                            self.finish(&space, &queue, &claim, &mut op, failed, None)
+                                .await?;
+                            continue;
+                        }
+                    }
+                };
                 op.stage = Stage::Executing;
                 op.worker = Some(worker.to_string());
                 let session = WorkerSession {
@@ -199,7 +219,12 @@ impl Scheduler {
             return self.abandon(worker, session).await;
         };
         let digest = op.action_digest();
-        let cacheable = !op.do_not_cache
+        let mut response = response;
+        if !op.secrets.is_empty() {
+            self.redact_response(&space, &op, &mut response).await?;
+        }
+        let cacheable = op.secrets.is_empty()
+            && !op.do_not_cache
             && response.status.as_ref().is_none_or(|s| s.code == 0)
             && response.result.as_ref().is_some_and(|r| r.exit_code == 0)
             && !Action::decode(session.action_bytes.clone()).is_ok_and(|a| a.do_not_cache);
@@ -236,6 +261,7 @@ impl Scheduler {
     ) -> Result<()> {
         op.stage = Stage::Completed;
         op.response = Some(Bytes::from(response.encode_to_vec()));
+        let secret_command = op.secret_command.take();
         let keys = space.records.keys();
         let in_flight = keys.exec_in_flight(&op.action);
         let current = space.records.meta().get(&in_flight).await?;
@@ -248,6 +274,9 @@ impl Scheduler {
         }
         if let Some(worker) = worker {
             tx = tx.delete(self.instance.keys().exec_worker(worker));
+        }
+        if let Some(command) = secret_command {
+            tx = tx.delete(keys.exec_secret_command(&command));
         }
         match space.records.meta().transact(tx).await {
             Ok(_) => Ok(()),

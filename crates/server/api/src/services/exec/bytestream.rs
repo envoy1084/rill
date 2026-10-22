@@ -46,7 +46,20 @@ impl ByteStream for ExecSvc {
             .map_err(Error::from)?
             .contains(&digest)
         {
-            return Err(Status::not_found(format!("blob {digest}")));
+            // Not stored: for a worker, perhaps a command carrying secrets,
+            // which is small and served whole.
+            let held = match caller.worker {
+                true => super::cas::read_as(&self.state, &caller, &digest)
+                    .await
+                    .map_err(Error::from)?,
+                false => None,
+            };
+            let Some(bytes) = held else {
+                return Err(Status::not_found(format!("blob {digest}")));
+            };
+            let data = bytes.slice(offset as usize..(offset + limit) as usize);
+            let once = futures::stream::once(async move { Ok(ReadResponse { data }) });
+            return Ok(Response::new(Box::pin(once)));
         }
         let space = caller.space;
         let end = offset + limit;

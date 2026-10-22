@@ -6,7 +6,9 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use rill_jobs::{Queue, RetryPolicy};
-use rill_store::{RepoStore, Stores};
+use std::sync::Arc;
+
+use rill_store::{Plaintext, RepoStore, Sealer, Stores};
 
 use crate::error::Result;
 use crate::remote::platform::queue_name;
@@ -52,6 +54,8 @@ pub struct Scheduler {
     pub(super) stores: Stores,
     pub(super) instance: RepoStore,
     pub(super) config: SchedulerConfig,
+    /// Seals secrets and the commands that carry them.
+    pub(crate) sealer: Arc<dyn Sealer>,
     orgs: Mutex<Option<(Instant, Vec<String>)>>,
     turn: AtomicUsize,
 }
@@ -62,9 +66,17 @@ impl Scheduler {
             instance: instance_records(&stores),
             stores,
             config,
+            sealer: Arc::new(Plaintext),
             orgs: Mutex::new(None),
             turn: AtomicUsize::new(0),
         }
+    }
+
+    /// Seal secrets with `sealer` (the org data keys) rather than storing
+    /// them as they are.
+    pub fn with_sealer(mut self, sealer: Arc<dyn Sealer>) -> Self {
+        self.sealer = sealer;
+        self
     }
 
     pub fn config(&self) -> &SchedulerConfig {

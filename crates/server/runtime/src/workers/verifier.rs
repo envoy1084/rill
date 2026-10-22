@@ -29,6 +29,7 @@ impl Verifier for ExecVerifier {
                 VerifyStage::PreLand => Priority::High,
                 VerifyStage::PostLand => Priority::Normal,
             },
+            trunk: request.stage == VerifyStage::PostLand,
         };
         let outcome = match self.runner.verify(&target).await {
             Ok(outcome) => outcome,

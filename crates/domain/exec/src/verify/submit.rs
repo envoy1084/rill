@@ -31,7 +31,11 @@ impl PlanRunner {
             shard: compiled.shard,
             ..StepResult::skipped(&compiled.step, StepStatus::Passed)
         };
-        if let Some(cached) = self.space.result(&compiled.action).await? {
+        let cached = match compiled.secrets.is_empty() {
+            true => self.space.result(&compiled.action).await?,
+            false => None,
+        };
+        if let Some(cached) = cached {
             fill(&mut result, &cached);
             result.cached = true;
             return Ok((result, Some(cached)));
@@ -45,7 +49,8 @@ impl PlanRunner {
                     platform: Some(compiled.platform),
                     priority,
                     requester: self.requester.clone(),
-                    do_not_cache: false,
+                    do_not_cache: !compiled.secrets.is_empty(),
+                    secrets: compiled.secrets,
                 },
             )
             .await?;

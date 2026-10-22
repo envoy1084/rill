@@ -21,6 +21,8 @@ pub struct CompiledAction {
     pub shard: Option<(u32, u32)>,
     pub action: BlobDigest,
     pub platform: Platform,
+    /// Org secrets the action gets when it runs.
+    pub secrets: Vec<String>,
 }
 
 /// A file Rill adds to a step's input root, relative to its working
@@ -89,6 +91,7 @@ pub async fn compile(
                 nanos: step.timeout.subsec_nanos() as i32,
             }),
             platform: Some(platform.clone()),
+            do_not_cache: !step.secrets.is_empty(),
             ..Default::default()
         };
         actions.push(CompiledAction {
@@ -96,6 +99,7 @@ pub async fn compile(
             shard,
             action: space.put(Bytes::from(action.encode_to_vec())).await?,
             platform: platform.clone(),
+            secrets: step.secrets.clone(),
         });
     }
     Ok(actions)

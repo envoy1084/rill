@@ -15,7 +15,7 @@ use rill_types::RepoPathBuf;
 use super::stage::stage;
 use crate::error::{Error, Result};
 use crate::remote::timestamps::proto_now as now;
-use crate::remote::{BlobDigest, ExecSpace};
+use crate::remote::{BlobDigest, ExecSpace, Scheduler};
 use crate::sandbox::{local_path, Invocation, Sandbox};
 
 /// Timeout of an action that sets none; the scheduler normally sets one.
@@ -24,6 +24,7 @@ const FALLBACK_TIMEOUT: Duration = Duration::from_secs(600);
 /// Run `action` and describe the outcome; failures to run become a
 /// status rather than an error, as REAPI reports them.
 pub(crate) async fn execute(
+    scheduler: &Scheduler,
     space: &ExecSpace,
     sandbox: &dyn Sandbox,
     worker: &str,
@@ -36,7 +37,7 @@ pub(crate) async fn execute(
         worker_start_timestamp: Some(now()),
         ..Default::default()
     };
-    match run(space, sandbox, action, &mut metadata).await {
+    match run(scheduler, space, sandbox, action, &mut metadata).await {
         Ok((mut result, timed_out)) => {
             metadata.worker_completed_timestamp = Some(now());
             result.execution_metadata = Some(metadata);
@@ -72,14 +73,15 @@ pub(crate) async fn execute(
 }
 
 async fn run(
+    scheduler: &Scheduler,
     space: &ExecSpace,
     sandbox: &dyn Sandbox,
     action: &Action,
     metadata: &mut ExecutedActionMetadata,
 ) -> Result<(ActionResult, bool)> {
     let command_digest = required(action.command_digest.as_ref(), "command")?;
-    let command = space
-        .read(&command_digest)
+    let command = scheduler
+        .worker_read(space, &command_digest)
         .await?
         .ok_or_else(|| Error::MissingBlob(command_digest.to_string()))?;
     let command = Command::decode(command)

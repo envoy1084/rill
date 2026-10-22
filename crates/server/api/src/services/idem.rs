@@ -78,6 +78,7 @@ idempotent!(
     RevokeSessionRequest,
     RotateTokenKeysRequest,
     RotateDataKeysRequest,
+    DeleteSecretRequest,
     PutIdentityProviderRequest,
     DeleteIdentityProviderRequest,
     UpdateUserRequest,

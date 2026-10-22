@@ -76,6 +76,7 @@ impl Execution for ExecSvc {
                     priority: priority_of(request.execution_policy.map_or(0, |p| p.priority)),
                     requester: caller.ctx.principal.to_string(),
                     do_not_cache: action.do_not_cache,
+                    secrets: Vec::new(),
                 },
             )
             .await

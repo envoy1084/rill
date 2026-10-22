@@ -102,7 +102,7 @@ impl ContentAddressableStorage for ExecSvc {
                     Default::default(),
                     rpc_status(Code::ResourceExhausted, "batch too large; use ByteStream"),
                 ),
-                Ok(d) => match caller.space.read(&d).await {
+                Ok(d) => match read_as(&self.state, &caller, &d).await {
                     Ok(Some(data)) => {
                         total += data.len() as i64;
                         (data, ok())
@@ -163,5 +163,18 @@ impl ContentAddressableStorage for ExecSvc {
         _request: Request<SpliceBlobRequest>,
     ) -> Result<Response<SpliceBlobResponse>, Status> {
         Err(Status::unimplemented("blob splicing is not supported"))
+    }
+}
+
+/// `digest`'s content as `caller` may read it: workers also read the
+/// commands that carry their actions' secrets.
+pub(super) async fn read_as(
+    state: &rill_runtime::state::AppState,
+    caller: &super::access::ExecCaller,
+    digest: &BlobDigest,
+) -> rill_exec::Result<Option<bytes::Bytes>> {
+    match caller.worker {
+        true => state.exec.worker_read(&caller.space, digest).await,
+        false => caller.space.read(digest).await,
     }
 }

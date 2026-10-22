@@ -9,6 +9,7 @@ pub mod operation;
 pub mod platform;
 pub mod results;
 pub mod scheduler;
+pub mod secrets;
 pub mod space;
 pub(crate) mod timestamps;
 

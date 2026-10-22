@@ -106,6 +106,9 @@ Sealing is on by default outside dev mode (`[encryption] enabled`,
   `DataKeyRecord`s in identity metadata (`(dk, org, id)`). An org gets its
   first key, active at once, when its first object is sealed. Servers
   unwrap each key once and keep it in memory.
+* **Secrets.** Org secrets for verify plans are sealed with the same
+  data keys, under the namespace `<org>.secrets` and bound to their name
+  ([exec](../06-services/exec.md#secrets)).
 * **Frames.** A sealed object is `RXE1 ‖ key id ‖ nonce ‖ ciphertext ‖ tag`
   around the compressed frame. Every object is encrypted under its own key,
   derived (keyed BLAKE3) from the data key, kind and hash, with a random

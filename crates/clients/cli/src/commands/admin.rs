@@ -53,6 +53,9 @@ pub enum AdminCmd {
     /// Redact objects (two administrators) and release quarantined versions.
     #[command(subcommand)]
     Protect(super::protection::ProtectCmd),
+    /// Org secrets verify plans give their steps (values are write-only).
+    #[command(subcommand)]
+    Secret(super::secrets::SecretCmd),
     /// Credentials for the org's provisioning system (SCIM).
     #[command(subcommand)]
     Scim(super::identity::ScimCmd),
@@ -148,6 +151,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: AdminCmd) -> Result<()> {
         AdminCmd::Scim(cmd) => super::identity::scim::run(ctx, cmd).await,
         AdminCmd::Audit(cmd) => super::audit::run(ctx, cmd).await,
         AdminCmd::Protect(cmd) => super::protection::run(ctx, cmd).await,
+        AdminCmd::Secret(cmd) => super::secrets::run(ctx, cmd).await,
         AdminCmd::Token(TokenCmd::Issue(args)) => issue(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Get(args)) => policy_get(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Set(args)) => policy_set(ctx, args).await,

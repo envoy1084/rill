@@ -254,6 +254,7 @@ impl IdentityView {
             | IdentityChange::ScimCredentialChanged { .. }
             | IdentityChange::RedactionRequested { .. }
             | IdentityChange::QuarantineCleared { .. }
+            | IdentityChange::SecretChanged { .. }
             | IdentityChange::DataKeysChanged { .. } => false,
             IdentityChange::RedactionApplied { org, hash, .. } => {
                 self.redacted.insert((org.clone(), *hash));
