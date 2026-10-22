@@ -24,6 +24,8 @@ impl EmbeddedServer {
             storage: StorageConfig::Memory,
             ..ServerConfig::default()
         };
+        // The harness is one principal doing every agent's work.
+        config.rate_limit.per_principal_per_sec = 0;
         if exec_workers > 0 {
             config.verify.enabled = true;
             config.exec.local.workers = exec_workers;
