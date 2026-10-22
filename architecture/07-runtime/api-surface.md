@@ -29,6 +29,12 @@ an optional sub-message is a `MessageField` and an enum an `EnumValue`
 (`rill_proto::convert::known` reads one). Each message's oneofs are under
 its name (`pb::event::Kind`). Unknown fields are dropped.
 
+`rill-proto`'s `buf.yaml` holds the lint rules (buf's `STANDARD` set plus
+a comment on every service and RPC); `buf.gen.yaml` and `reference.tmpl`
+generate the [API reference](api-reference.md) from the
+protos' comments with `protoc-gen-doc`; CI runs both and fails when the
+committed reference differs.
+
 ## Services
 
 One axum router serves the API listener. The Rill services sit in a
@@ -295,4 +301,4 @@ size refilled over a minute ([identity](../05-policy/identity-and-auth.md)).
 * [objects/mod.rs](../../crates/server/api/src/objects/mod.rs), [objects/handlers.rs](../../crates/server/api/src/objects/handlers.rs), [objects/batch.rs](../../crates/server/api/src/objects/batch.rs), [auth/http.rs](../../crates/server/api/src/auth/http.rs)
 
 ---
-← Previous: [Server](server.md) · [Index](../index.md) · Next: [Events and workers](events-and-workers.md) →
+← Previous: [Server](server.md) · [Index](../index.md) · Next: [API reference](api-reference.md) →

@@ -122,6 +122,9 @@ Tiered, so a phase spends its time on work rather than rebuilds:
   `cargo nextest run -p <touched crates>` (or the touched test binary,
   e.g. `-p rill-api --test grpc access`) and
   `cargo clippy -p <touched crates> --all-targets -- -D warnings`.
+* **When a `.proto` changes:** in `crates/foundation/proto`, `buf lint` and
+  `buf generate --exclude-path proto/google` (regenerates the API
+  reference; needs `buf` and `protoc-gen-doc` on the path).
 * **End of a work item:** `cargo clippy --workspace --all-targets -- -D warnings`.
 * **End of a phase (the full sweep):** `cargo fmt --check`,
   `cargo nextest run --workspace`, `cargo test --workspace --doc`, clippy
@@ -136,7 +139,9 @@ Tiered, so a phase spends its time on work rather than rebuilds:
 
 `.github/workflows/ci.yml` has two jobs. `check` runs `cargo fmt --check`,
 `cargo deny check` (licences, advisories, sources per `deny.toml`),
-`cargo clippy -D warnings` and `cargo test --workspace`. `foundationdb`
+`cargo clippy -D warnings`, `cargo test --workspace`, `buf lint` on the
+protos, and regenerates the API reference (`buf generate` with
+`protoc-gen-doc`), failing on any diff. `foundationdb`
 installs a pinned FoundationDB (version and package checksums in the job's
 env) and runs the store conformance suite and the end-to-end server test
 with the `fdb` feature. Keep it that small; anything else is run locally or

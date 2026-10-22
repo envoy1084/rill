@@ -1,0 +1,6 @@
+version: v2
+plugins:
+  - local: protoc-gen-doc
+    out: ../../../architecture/07-runtime
+    opt: reference.tmpl,api-reference.md
+    strategy: all

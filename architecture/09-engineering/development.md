@@ -36,10 +36,14 @@ No `protoc` is needed. `rill-proto/build.rs` compiles the protobufs with
 `protox` and writes a descriptor set that the server serves for reflection
 ([api surface](../07-runtime/api-surface.md)).
 
-`crates/foundation/proto/buf.yaml` holds the lint and breaking-change rules for
-`rill.v2` (buf's `STANDARD` lint set and `FILE` breaking rules); `rill.v1`
-is exempt. Run `buf lint` from `crates/foundation/proto` (`npx @bufbuild/buf lint`
-works without installing buf). It is not part of CI.
+`crates/foundation/proto/buf.yaml` holds the lint rules (buf's `STANDARD`
+set plus a comment on every service and RPC) and the `FILE`
+breaking-change rules, which are not enforced while Rill is pre-release.
+From `crates/foundation/proto`, `buf lint` checks the protos and
+`buf generate --exclude-path proto/google` regenerates the
+[API reference](../07-runtime/api-reference.md) with `protoc-gen-doc`
+(`go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v1.5.1`).
+CI runs both and fails when the committed reference differs.
 
 ## Build profiles
 

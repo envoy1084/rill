@@ -80,27 +80,28 @@ Read in this order the first time; each page ends with Previous / Next links.
 
 41. [Server](07-runtime/server.md)
 42. [API surface](07-runtime/api-surface.md)
-43. [Events and workers](07-runtime/events-and-workers.md)
-44. [Configuration](07-runtime/configuration.md)
-45. [Observability](07-runtime/observability.md)
-46. [Cache tier](07-runtime/cache.md)
+43. [API reference](07-runtime/api-reference.md)
+44. [Events and workers](07-runtime/events-and-workers.md)
+45. [Configuration](07-runtime/configuration.md)
+46. [Observability](07-runtime/observability.md)
+47. [Cache tier](07-runtime/cache.md)
 
 **08 Clients**
 
-47. [SDK](08-clients/sdk.md)
-48. [CLI](08-clients/cli.md)
-49. [MCP server](08-clients/mcp.md)
+48. [SDK](08-clients/sdk.md)
+49. [CLI](08-clients/cli.md)
+50. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-50. [Development](09-engineering/development.md)
-51. [Testing](09-engineering/testing.md)
-52. [Simulation](09-engineering/simulation.md)
-53. [Performance](09-engineering/performance.md)
+51. [Development](09-engineering/development.md)
+52. [Testing](09-engineering/testing.md)
+53. [Simulation](09-engineering/simulation.md)
+54. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-54. [Architecture decisions](10-decisions/README.md): the seventeen ADRs that
+55. [Architecture decisions](10-decisions/README.md): the seventeen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -134,7 +135,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | REAPI, Bazel builds, workers and sandboxes | [Remote execution](06-services/remote-execution.md) |
 | Test history, flaky tests | [Checks](06-services/checks.md) |
 | How the server is assembled and a request is handled | [Server](07-runtime/server.md) |
-| Which RPCs exist | [API surface](07-runtime/api-surface.md) |
+| Which RPCs exist | [API surface](07-runtime/api-surface.md), [API reference](07-runtime/api-reference.md) |
 | Events, background workers | [Events and workers](07-runtime/events-and-workers.md) |
 | Server flags, config file, dev mode | [Configuration](07-runtime/configuration.md) |
 | Metrics, logs, traces, health endpoints, dashboards | [Observability](07-runtime/observability.md) |

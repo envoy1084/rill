@@ -165,4 +165,4 @@ time, not tasks.
 * [services/repo/watch/](../../crates/server/api/src/services/repo/watch/mod.rs), [services/review/watch.rs](../../crates/server/api/src/services/review/watch.rs)
 
 ---
-← Previous: [API surface](api-surface.md) · [Index](../index.md) · Next: [Configuration](configuration.md) →
+← Previous: [API reference](api-reference.md) · [Index](../index.md) · Next: [Configuration](configuration.md) →

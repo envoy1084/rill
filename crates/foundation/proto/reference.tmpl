@@ -1,0 +1,62 @@
+# API reference
+
+Generated from the `rill.v1` protos by `buf generate` with
+`protoc-gen-doc`; do not edit by hand. Conventions (resource names,
+revisions, pages, filters, etags, request ids, errors) are in
+[API surface](api-surface.md).
+
+{{range .Files}}{{if .Services}}{{range .Services}}- [{{.Name}}](#{{.FullName | anchor}})
+{{end}}{{end}}{{end}}
+{{range .Files}}{{$file := .}}
+## {{.Name}}
+
+{{.Description}}
+{{range .Services}}
+<a name="{{.FullName | anchor}}"></a>
+
+### {{.Name}}
+
+{{.Description}}
+
+| Method | Request | Response | Description |
+| --- | --- | --- | --- |
+{{range .Methods -}}
+| `{{.Name}}` | [{{.RequestLongType}}](#{{.RequestFullType | anchor}}){{if .RequestStreaming}} stream{{end}} | [{{.ResponseLongType}}](#{{.ResponseFullType | anchor}}){{if .ResponseStreaming}} stream{{end}} | {{nobr .Description}} |
+{{end}}
+{{end}}
+{{range .Messages}}
+<a name="{{.FullName | anchor}}"></a>
+
+### {{.LongName}}
+
+{{.Description}}
+{{if .HasFields}}
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+{{range .Fields -}}
+| `{{.Name}}` | [{{.LongType}}](#{{.FullType | anchor}}) | {{.Label}} | {{nobr .Description}} |
+{{end}}{{end}}
+{{end}}
+{{range .Enums}}
+<a name="{{.FullName | anchor}}"></a>
+
+### {{.LongName}}
+
+{{.Description}}
+
+| Name | Number | Description |
+| --- | --- | --- |
+{{range .Values -}}
+| `{{.Name}}` | {{.Number}} | {{nobr .Description}} |
+{{end}}
+{{end}}
+{{end}}
+## Scalar value types
+
+| Proto | Notes |
+| --- | --- |
+{{range .Scalars -}}
+| <a name="{{.ProtoType | anchor}}"></a> `{{.ProtoType}}` | {{.Notes}} |
+{{end}}
+---
+← Previous: [API surface](api-surface.md) · [Index](../index.md) · Next: [Events and workers](events-and-workers.md) →

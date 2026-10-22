@@ -23,6 +23,25 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
       - run: cargo clippy --workspace --all-targets
       - run: cargo test --workspace
+      # The API protos follow buf's lint rules, and the generated API
+      # reference matches them.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: false
+      - name: Install buf and protoc-gen-doc
+        env:
+          BUF_VERSION: 1.75.0
+          BUF_SHA256: fad1e38d6909bbb583a4da81d8c02a01046e2cd663bde7e337dd24277393764b
+        run: |
+          curl -fsSL -o buf "https://github.com/bufbuild/buf/releases/download/v$BUF_VERSION/buf-Linux-x86_64"
+          echo "$BUF_SHA256  buf" | sha256sum -c
+          sudo install buf /usr/local/bin/buf
+          go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v1.5.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - run: buf lint && buf generate --exclude-path proto/google
+        working-directory: crates/foundation/proto
+      - run: git diff --exit-code
 
   # The metadata store conformance suite and the end-to-end server test
   # against a real single-node FoundationDB.
