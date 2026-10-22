@@ -148,22 +148,7 @@ impl PostLandVerifier {
         } else if let Some(previous) = base_culprit {
             // Still red since an earlier culprit; a step failing that its
             // incidents do not explain is a new break, searched for alone.
-            let health = repo.trunk_health().await?;
-            let new_steps: BTreeSet<String> = tip
-                .failures
-                .iter()
-                .map(|f| f.step.clone())
-                .filter(|step| !health.failing_steps.contains(step))
-                .collect();
-            if !new_steps.is_empty() {
-                let search = Search {
-                    full,
-                    focus: Some(&new_steps),
-                    failures: &tip.failures,
-                    details: &tip.details,
-                };
-                culprit = Some(self.bisect_with(cursor, to, &search).await?);
-            }
+            culprit = self.attribute_unexplained(cursor, to, &tip, full).await?;
             self.fill(
                 cursor,
                 to,
@@ -185,6 +170,8 @@ impl PostLandVerifier {
             };
             let found = self.bisect_with(from, to, &search).await?;
             culprit = Some(found);
+            // A second break in the same batch fails other steps.
+            self.attribute_unexplained(found, to, &tip, full).await?;
             self.set_culprit(to, found).await?;
             self.fill(
                 from,
@@ -233,6 +220,47 @@ impl PostLandVerifier {
             full,
             behind: head > to,
         }))
+    }
+
+    /// Find the culprits of the steps failing at `tip` that no open
+    /// incident explains, searching `(from, to]` for one at a time, each
+    /// after the last found. The last culprit found, if any.
+    async fn attribute_unexplained(
+        self: &Arc<Self>,
+        mut from: TrunkSeq,
+        to: TrunkSeq,
+        tip: &VerificationRecord,
+        full: bool,
+    ) -> Result<Option<TrunkSeq>> {
+        let mut last = None;
+        while from < to {
+            let explained: BTreeSet<String> = self
+                .lander
+                .open_incidents()
+                .await?
+                .into_iter()
+                .flat_map(|i| i.steps)
+                .collect();
+            let unexplained: BTreeSet<String> = tip
+                .failures
+                .iter()
+                .map(|f| f.step.clone())
+                .filter(|step| !explained.contains(step))
+                .collect();
+            if unexplained.is_empty() {
+                break;
+            }
+            let search = Search {
+                full,
+                focus: Some(&unexplained),
+                failures: &tip.failures,
+                details: &tip.details,
+            };
+            let found = self.bisect_with(from, to, &search).await?;
+            last = Some(found);
+            from = found;
+        }
+        Ok(last)
     }
 
     /// Whether the next tip should run the whole plan.

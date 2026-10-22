@@ -79,7 +79,11 @@ A sweep on a trunk that is already red still looks for new breaks: steps
 failing at the tip that trunk's open incidents do not explain are searched
 for alone (`Search.focus`): a probe is red only if one of those steps
 fails. That finds a second, overlapping culprit instead of blaming the
-first.
+first. The same search follows every culprit a sweep finds, over the rest
+of its batch, until the open incidents explain every step failing at the
+tip: two breaks landing in one batch each get their own incident, rather
+than the second being searched for later, outside the batch, where it
+would blame whatever landed last.
 
 The culprit's own record gets `culprit = itself`, red records after it get
 `culprit = it`, `LandEvent::Culprit` is published, an incident is opened

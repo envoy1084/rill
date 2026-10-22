@@ -166,6 +166,43 @@ async fn a_second_break_on_a_red_trunk_is_found_and_gets_its_own_incident() {
 }
 
 #[tokio::test]
+async fn two_breaks_in_one_batch_are_each_blamed_for_their_own_steps() {
+    let fx = Fixture::new().await;
+    let lander = fx.lander(
+        Arc::new(RecordingHooks::default()),
+        steps(&fx),
+        no_auto_revert(),
+    );
+    let worker = PostLandVerifier::new(lander.clone(), 8);
+    land(
+        &fx,
+        &lander,
+        &[("bad_a", "!"), ("x", "1"), ("bad_b", "!"), ("y", "2")],
+    )
+    .await;
+    catch_up(&worker).await;
+    land(&fx, &lander, &[("z", "3")]).await;
+    catch_up(&worker).await;
+
+    let mut open: Vec<_> = lander
+        .open_incidents()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|i| (i.culprit, i.steps))
+        .collect();
+    open.sort();
+    assert_eq!(
+        open,
+        vec![
+            (TrunkSeq(1), vec!["a".to_string()]),
+            (TrunkSeq(3), vec!["b".to_string()])
+        ],
+        "nothing after the breaks is blamed"
+    );
+}
+
+#[tokio::test]
 async fn only_landings_that_could_affect_the_failing_steps_are_searched() {
     let fx = Fixture::new().await;
     let verifier = steps(&fx);
