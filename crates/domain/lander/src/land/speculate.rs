@@ -12,10 +12,8 @@ use rill_types::{ChangeVersion, ChangeVersionHash, GroupMode, LandGroup, LandTic
 use super::head_config::HeadRules;
 use super::lander::Lander;
 use super::prepare::{Candidate, Prepared};
-use crate::error::Result;
 use crate::queue::QueuedRequest;
 use crate::schedule::{group_failure, group_of, Footprint, Plan, Slot};
-use rill_core::RootTree;
 
 impl Lander {
     /// Prepare `batch` (in commit order) as a chain on `head`. Returns the
@@ -136,11 +134,10 @@ impl Lander {
         (chain, held)
     }
 
-    /// Store the re-parented versions at `unstored` places of `chain`
-    /// with their land-critical values: the versions all at once, root
-    /// trees in chain order (each builds on its parent's), then the rest
-    /// all at once. A failure fails that request and takes everything
-    /// lined up after it off the chain, to be served again.
+    /// Store the re-parented versions at `unstored` places of `chain`,
+    /// each with its land-critical values in one transaction. A failure
+    /// fails that request and takes everything lined up after it off the
+    /// chain, to be served again.
     async fn store_lined(
         &self,
         chain: &mut Vec<Candidate>,
@@ -151,36 +148,13 @@ impl Lander {
         if places.is_empty() {
             return;
         }
-        let first_error = |results: Vec<Result<()>>| {
-            results
-                .into_iter()
-                .zip(&places)
-                .find_map(|(r, at)| r.err().map(|e| (*at, e.to_string())))
-        };
-        let lined: &Vec<Candidate> = chain;
-        let mut failed = first_error(
-            join_all(places.iter().map(|&at| async move {
-                self.repo.put_change_version(&lined[at].cv).await?;
-                Ok(())
-            }))
-            .await,
-        );
-        if failed.is_none() {
-            for &at in &places {
-                if let Err(e) = self.derive.get::<RootTree>(&lined[at].version).await {
-                    failed = Some((at, e.to_string()));
-                    break;
-                }
+        // In chain order: each version's values build on its parent's.
+        let mut failed = None;
+        for &at in &places {
+            if let Err(e) = self.derive.store_version(&chain[at].cv).await {
+                failed = Some((at, e.to_string()));
+                break;
             }
-        }
-        if failed.is_none() {
-            failed = first_error(
-                join_all(places.iter().map(|&at| async move {
-                    self.derive.ensure_land_critical(&lined[at].version).await?;
-                    Ok(())
-                }))
-                .await,
-            );
         }
         let Some((at, reason)) = failed else {
             return;

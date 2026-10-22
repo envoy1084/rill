@@ -152,7 +152,16 @@ impl DeriveManager {
         self.store(kind, key, value).await
     }
 
-    async fn load<D: Derivable>(&self, kind: &str, hash: &ObjectHash) -> Result<Option<D::Value>> {
+    /// Cache a value whose row has been committed.
+    pub(super) fn remember(&self, kind: &str, hash: &ObjectHash, bytes: Bytes) {
+        self.cache.insert((kind.to_string(), *hash), bytes);
+    }
+
+    pub(super) async fn load<D: Derivable>(
+        &self,
+        kind: &str,
+        hash: &ObjectHash,
+    ) -> Result<Option<D::Value>> {
         self.load_raw(kind, hash).await
     }
 

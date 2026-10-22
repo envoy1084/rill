@@ -1,10 +1,12 @@
 //! Tree node reads and writes over an object store with a decoded-node
 //! cache.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use bytes::Bytes;
+use futures::{StreamExt, TryStreamExt};
 use rill_store::{ObjectStore, ObjectStoreExt};
 use rill_types::{
     Encodable, EntryKind, ObjectHash, ObjectKind, RepoPath, Tree, TreeChild, TreeHash, TreeNode,
@@ -46,12 +48,21 @@ impl From<TreeNode> for NodeRef {
     }
 }
 
+/// Nodes a build wrote but has not stored yet, by hash.
+type Pending = Arc<parking_lot::Mutex<HashMap<TreeHash, (Bytes, NodeRef)>>>;
+
+/// Node writes a build keeps in flight at once when it stores them.
+const WRITE_CONCURRENCY: usize = 16;
+
 /// Tree operations bound to an object store.
 #[derive(Clone)]
 pub struct TreeOps {
     objects: Arc<dyn ObjectStore>,
     cache: Arc<Cache<TreeHash, NodeRef>>,
     written: Arc<AtomicU64>,
+    /// While set, new nodes wait here and are stored together by
+    /// [`TreeOps::flush`].
+    pending: Option<Pending>,
 }
 
 impl TreeOps {
@@ -61,7 +72,39 @@ impl TreeOps {
             objects,
             cache: Arc::new(Cache::new(cache_size as u64)),
             written: Arc::new(AtomicU64::new(0)),
+            pending: None,
         }
+    }
+
+    /// The same operations, holding new nodes back until
+    /// [`TreeOps::flush`]: a build's nodes are then written concurrently
+    /// instead of one after another, children before parents. Reads see
+    /// the held nodes.
+    pub(crate) fn deferring(&self) -> TreeOps {
+        TreeOps {
+            pending: Some(Default::default()),
+            ..self.clone()
+        }
+    }
+
+    /// Store the nodes held back since [`TreeOps::deferring`].
+    pub(crate) async fn flush(&self) -> Result<()> {
+        let Some(pending) = &self.pending else {
+            return Ok(());
+        };
+        let nodes: Vec<(TreeHash, (Bytes, NodeRef))> = pending.lock().drain().collect();
+        let stored = nodes.len() as u64;
+        futures::stream::iter(nodes)
+            .map(|(hash, (bytes, node))| async move {
+                self.objects.put(ObjectKind::Tree, &hash, bytes).await?;
+                self.cache.insert(hash, node);
+                Ok::<_, Error>(())
+            })
+            .buffer_unordered(WRITE_CONCURRENCY)
+            .try_collect::<Vec<()>>()
+            .await?;
+        self.written.fetch_add(stored, Ordering::Relaxed);
+        Ok(())
     }
 
     /// The underlying object store.
@@ -76,6 +119,13 @@ impl TreeOps {
 
     /// Fetch and decode one node, consulting the cache first.
     pub async fn get_node(&self, hash: &TreeHash) -> Result<NodeRef> {
+        if let Some((_, node)) = self
+            .pending
+            .as_ref()
+            .and_then(|p| p.lock().get(hash).cloned())
+        {
+            return Ok(node);
+        }
         if let Some(node) = self.cache.get(hash) {
             self.objects.refuses(ObjectKind::Tree, hash)?;
             return Ok(node);
@@ -97,6 +147,12 @@ impl TreeOps {
         let hash = ObjectHash::digest(ObjectKind::Tree, &bytes);
         if self.cache.get(&hash).is_some() {
             self.objects.refuses(ObjectKind::Tree, &hash)?;
+            return Ok(hash);
+        }
+        if let Some(pending) = &self.pending {
+            pending
+                .lock()
+                .insert(hash, (Bytes::from(bytes), NodeRef::from(node)));
             return Ok(hash);
         }
         self.objects

@@ -63,7 +63,7 @@ impl Lander {
                     .await?
                 {
                     Some(rebased) => {
-                        let hash = self.repo.put_change_version(&rebased).await?;
+                        let hash = self.derive.store_version(&rebased).await?;
                         (hash, rebased)
                     }
                     None => return Ok(Prepared::Conflicted),

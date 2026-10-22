@@ -68,7 +68,9 @@ impl TreeBuilder {
                 None => ops.put_tree(&Tree::empty()).await,
             };
         }
-        let (hash, _) = build_dir(ops, base, self.root).await?;
+        let ops = ops.deferring();
+        let (hash, _) = build_dir(&ops, base, self.root).await?;
+        ops.flush().await?;
         Ok(hash)
     }
 }

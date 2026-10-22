@@ -24,6 +24,19 @@ impl RepoStore {
         self.open_row(row).await
     }
 
+    /// The write storing a derived value, for a larger transaction.
+    pub async fn derived_mutation(
+        &self,
+        kind: &str,
+        hash: &ObjectHash,
+        value: Bytes,
+    ) -> Result<crate::meta::Mutation> {
+        Ok(crate::meta::Mutation::Set {
+            key: self.keys().derived(kind, hash),
+            value: self.seal_row(value).await?,
+        })
+    }
+
     pub async fn put_derived(&self, kind: &str, hash: &ObjectHash, value: Bytes) -> Result<()> {
         let row = self.seal_row(value).await?;
         self.meta().set(self.keys().derived(kind, hash), row).await

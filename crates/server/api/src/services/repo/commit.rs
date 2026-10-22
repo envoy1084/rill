@@ -65,10 +65,13 @@ pub async fn commit_version_with(
     // the author's rights are checked first.
     super::authorize::version(opened, &cv).await?;
     let found = secret_findings(opened, &cv, &hash).await?;
-    let staged = ctx.repo.stage_version(&cv).await?;
     // Derive what landing needs now, so a bad change fails the request and
-    // the lander never derives it.
-    ctx.derive.ensure_land_critical(&hash).await?;
+    // the lander never derives it; the version's object is written
+    // meanwhile.
+    let (staged, derived) = futures::try_join!(
+        async { Ok::<_, Error>(ctx.repo.stage_version(&cv).await?) },
+        async { Ok::<_, Error>(ctx.derive.land_critical_writes(&cv).await?) }
+    )?;
     let mut signatures = vec![ctx
         .attestor
         .sign(&hash, &rill_types::Principal::service("rill-server"))];
@@ -93,6 +96,7 @@ pub async fn commit_version_with(
             at: now,
         };
         let mut tx = staged.clone().merge(extras.tx.clone());
+        tx.mutations.extend(derived.mutations.iter().cloned());
         tx.mutations.extend(found.clone());
         if !opened.dev_mode() {
             tx = ctx.repo.expect_relations_version(tx, relations);
@@ -127,6 +131,7 @@ pub async fn commit_version_with(
         }
         match ctx.repo.meta().transact(tx).await {
             Ok(_) => {
+                ctx.derive.committed(derived);
                 if let Some(p) = prepared {
                     ctx.review().version_written(p);
                 }

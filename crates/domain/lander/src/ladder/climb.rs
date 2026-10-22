@@ -111,7 +111,7 @@ impl Lander {
         }
 
         if !regenerate.is_empty() {
-            let staged = self.repo().put_change_version(&cv).await?;
+            let staged = self.derive().store_version(&cv).await?;
             let root = self.derive().get::<RootTree>(&staged).await?;
             for (name, (regeneration, outputs)) in regenerate {
                 let request = RegenerateRequest {
