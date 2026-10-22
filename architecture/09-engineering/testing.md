@@ -24,12 +24,12 @@ flowchart TD
 | Crate integration | a crate's public API over memory stores | `tests/` in `rill-store`, `rill-core`, `rill-review`, `rill-lander`, `rill-search` |
 | Mock server | SDK and MCP against hand-written tonic services | `rill-sdk/tests`, `rill-mcp/tests` |
 | gRPC end to end | the real server through generated clients and raw HTTP | `rill-api/tests/grpc/` |
-| CLI | the real server driven through the CLI library; clap parsing alone | `rill-cli/tests/cli_e2e.rs`, `rill-cli/tests/landing.rs`, `rill-cli/tests/parse.rs` |
+| CLI | the real server driven through the CLI library; clap parsing alone | `rill-cli/tests/cli_e2e.rs`, `rill-cli/tests/landing.rs`, `rill-cli/tests/parse/main.rs` |
 | External | import from a repository built with `git` | `rill-git-import/tests/real_git.rs` |
 
 `rill-exec`, `rill-policy` and `rill-proto` have no `tests/` directory;
 `rill-types/tests/merge_laws.rs` property-tests the `Merge` algebra. `rill-proto` keeps its conversion
-round trips in `src/convert/roundtrip_tests.rs`.
+round trips in `src/convert/roundtrip_tests/`.
 
 ## Fixtures
 
@@ -66,7 +66,7 @@ round trips in `src/convert/roundtrip_tests.rs`.
   on port 0, then `build_state` and `serve_with_state`
   ([server](../07-runtime/server.md)). `rill-cli/tests/common/mod.rs`
   embeds a dev-mode memory server the same way for every CLI test, on a
-  multi-threaded tokio runtime. `rill-core/tests/common/mod.rs` holds the
+  multi-threaded tokio runtime. `rill-core/tests/common/` holds the
   core history fixture.
 
 ## What is covered
@@ -136,7 +136,7 @@ round trips in `src/convert/roundtrip_tests.rs`.
   and age, back off and dead-letter failures, rerun the job of a worker
   that died and refuse its late writes, and enqueue only with the
   transaction that needs them (`rill-jobs/tests/`); each landing queues its
-  derive and index jobs (`rill-lander/tests/landing.rs`). Every store
+  derive and index jobs (`rill-lander/tests/landing/pipeline.rs`). Every store
   write records one event, and tails resume after a cursor and wake on new
   events on every backend (`rill-store/tests/conformance/events.rs`,
   `rill-events`); `WatchEvents` delivers each change once over gRPC
@@ -282,11 +282,11 @@ crash when added; the rest ran one minute each (Phase 12). Corpora under
 ## Code
 
 - [rill-store/tests/conformance/](../../crates/foundation/store/tests/conformance/main.rs), [rill-core/tests/workflow.rs](../../crates/engine/core/tests/workflow.rs), [rill-review/tests/review_flow.rs](../../crates/domain/review/tests/review_flow.rs), [rill-review/src/testing.rs](../../crates/domain/review/src/testing.rs)
-- [rill-lander/tests/landing.rs](../../crates/domain/lander/tests/landing.rs), [rill-search/tests/end_to_end.rs](../../crates/domain/search/tests/end_to_end.rs)
+- [rill-lander/tests/landing/](../../crates/domain/lander/tests/landing/main.rs), [rill-search/tests/end_to_end.rs](../../crates/domain/search/tests/end_to_end.rs)
 - [rill-sdk/tests/common/mod.rs](../../crates/clients/sdk/tests/common/mod.rs), [rill-sdk/tests/repo_rpc.rs](../../crates/clients/sdk/tests/repo_rpc.rs), [rill-sdk/tests/stack.rs](../../crates/clients/sdk/tests/stack.rs), [rill-sdk/tests/checkout.rs](../../crates/clients/sdk/tests/checkout.rs)
 - [rill-mcp/tests/common/mod.rs](../../crates/clients/mcp/tests/common/mod.rs), [rill-mcp/tests/protocol.rs](../../crates/clients/mcp/tests/protocol.rs)
-- [rill-api/tests/grpc/](../../crates/server/api/tests/grpc/main.rs), [rill-cli/tests/cli_e2e.rs](../../crates/clients/cli/tests/cli_e2e.rs), [rill-cli/tests/parse.rs](../../crates/clients/cli/tests/parse.rs)
-- [rill-git-import/tests/real_git.rs](../../crates/domain/git-import/tests/real_git.rs), [rill-proto/src/convert/roundtrip_tests.rs](../../crates/foundation/proto/src/convert/roundtrip_tests.rs)
+- [rill-api/tests/grpc/](../../crates/server/api/tests/grpc/main.rs), [rill-cli/tests/cli_e2e.rs](../../crates/clients/cli/tests/cli_e2e.rs), [rill-cli/tests/parse/main.rs](../../crates/clients/cli/tests/parse/main.rs)
+- [rill-git-import/tests/real_git.rs](../../crates/domain/git-import/tests/real_git.rs), [rill-proto/src/convert/roundtrip_tests/](../../crates/foundation/proto/src/convert/roundtrip_tests/mod.rs)
 
 ---
 ← Previous: [Development](development.md) · [Index](../index.md) · Next: [Simulation](simulation.md) →

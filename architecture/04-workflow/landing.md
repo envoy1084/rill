@@ -83,7 +83,7 @@ The server evaluates the submit policy for the requester before queueing
 ## Sequencing
 
 The pure decisions live in `rill-lander/src/schedule/`; the sequencer
-(`land/sequence.rs`, `land/speculate.rs`) does the I/O.
+(`land/sequence.rs`, `land/prepare.rs`, `land/speculate.rs`, `land/commit.rs`) does the I/O.
 
 **Order.** `run_once` reads up to 256 pending requests and `serve_order`
 puts them in lane order (`emergency`, `human`, `agent`, `bulk`), and
@@ -279,12 +279,12 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 
 ## Code
 
-* [rill-lander/src/land/lander.rs](../../crates/domain/lander/src/land/lander.rs), [sequence.rs](../../crates/domain/lander/src/land/sequence.rs), [speculate.rs](../../crates/domain/lander/src/land/speculate.rs), [domains.rs](../../crates/domain/lander/src/land/domains.rs), [record.rs](../../crates/domain/lander/src/land/record.rs)
+* [rill-lander/src/land/lander.rs](../../crates/domain/lander/src/land/lander.rs), [sequence.rs](../../crates/domain/lander/src/land/sequence.rs), [prepare.rs](../../crates/domain/lander/src/land/prepare.rs), [commit.rs](../../crates/domain/lander/src/land/commit.rs), [speculate.rs](../../crates/domain/lander/src/land/speculate.rs), [domains.rs](../../crates/domain/lander/src/land/domains.rs), [record.rs](../../crates/domain/lander/src/land/record.rs)
 * [rill-lander/src/schedule/](../../crates/domain/lander/src/schedule/) (footprints, landing rules, fair order, plan, thrash, ETAs)
 * [rill-lander/src/queue.rs](../../crates/domain/lander/src/queue.rs), [config.rs](../../crates/domain/lander/src/config.rs), [events.rs](../../crates/domain/lander/src/events.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)
 * [rill-lander/src/land/followups.rs](../../crates/domain/lander/src/land/followups.rs) (jobs a landing enqueues)
 * [rill-store/src/repo/landing.rs](../../crates/foundation/store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records), [repo/leases.rs](../../crates/foundation/store/src/repo/leases.rs), [repo/trunk.rs](../../crates/foundation/store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)
-* [rill-api/src/services/review/mod.rs](../../crates/server/api/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/server/api/src/services/common.rs) (`ticket_status`), [repo/land_queue.rs](../../crates/foundation/store/src/repo/land_queue.rs), [state/registry.rs](../../crates/server/runtime/src/state/registry.rs), [workers/mod.rs](../../crates/server/runtime/src/workers/mod.rs)
+* [rill-api/src/services/review/mod.rs](../../crates/server/api/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/server/api/src/services/common.rs) (`ticket_status`), [repo/land_queue.rs](../../crates/foundation/store/src/repo/land_queue.rs), [state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs), [workers/repo_tasks.rs](../../crates/server/runtime/src/workers/repo_tasks.rs)
 
 ---
 ← Previous: [Review agents](review-agents.md) · [Index](../index.md) · Next: [Post-land verification](post-land-verification.md) →

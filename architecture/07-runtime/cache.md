@@ -105,7 +105,7 @@ principals and instance administrators.
 
 ## Code
 
-* [`server.rs`](../../crates/server/cache/src/server.rs): routes, `Cache`, `CacheStats`.
+* [`server/`](../../crates/server/cache/src/server/mod.rs): `Cache` and `CacheStats` (`cache.rs`), object routes (`objects.rs`), metrics (`metrics.rs`), the router and serving (`serve.rs`).
 * [`keys.rs`](../../crates/server/cache/src/keys.rs), [`origin.rs`](../../crates/server/cache/src/origin.rs), [`coalesce.rs`](../../crates/server/cache/src/coalesce.rs), [`disk.rs`](../../crates/server/cache/src/disk.rs).
 * CLI: [`server/cache.rs`](../../crates/clients/cli/src/server/cache.rs). Test: `rill-cli/tests/cache.rs`.
 

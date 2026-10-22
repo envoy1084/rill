@@ -137,7 +137,7 @@ Rust rather than through Datalog, and before the relation check, even in dev
 mode. The effective right is the capability AND the stored relations.
 
 `AdminService.IssueToken`
-([admin.rs](../../crates/server/api/src/services/admin.rs)) mints tokens:
+([admin/tokens.rs](../../crates/server/api/src/services/admin/tokens.rs)) mints tokens:
 
 * Each `pb::Capability.scope` is `repo:<name>[/<dir>][/*]`. All scopes must
   name one repository.
@@ -171,8 +171,8 @@ verb and path, with action `repo.<verb>` and scope `repo:<name>/<path>/*`.
 * [`tokens/datalog.rs`](../../crates/domain/policy/src/tokens/datalog.rs): `capability_block`, `authority_block`, `effective_scope`.
 * [`tokens/issuer.rs`](../../crates/domain/policy/src/tokens/issuer.rs): `Issuer`, `attenuate`, `inspect`.
 * [`tokens/verifier.rs`](../../crates/domain/policy/src/tokens/verifier.rs): `TokenRequest`, `Verified`, `Verifier`.
-* [`tokens/tests.rs`](../../crates/domain/policy/src/tokens/tests.rs): issue, attenuate and reject cases.
-* [`services/admin.rs`](../../crates/server/api/src/services/admin.rs): `IssueToken`, `WhoAmI`, `parse_scope`, `parse_action`.
+* [`tokens/tests/`](../../crates/domain/policy/src/tokens/tests/mod.rs): issue, attenuate and reject cases.
+* [`services/admin/mod.rs`](../../crates/server/api/src/services/admin/mod.rs): `IssueToken`, `WhoAmI`, `parse_scope`, `parse_action`.
 
 ---
 ← Previous: [Identity and authentication](identity-and-auth.md) · [Index](../index.md) · Next: [Token keys](token-keys.md) →

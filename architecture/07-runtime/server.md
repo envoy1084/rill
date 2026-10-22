@@ -163,7 +163,7 @@ Linux. Shutdown follows `[shutdown]`
 ## Code
 
 * [lib.rs](../../crates/server/api/src/lib.rs), [serve.rs](../../crates/server/api/src/serve.rs), [error.rs](../../crates/server/runtime/src/error.rs)
-* [state/app.rs](../../crates/server/runtime/src/state/app.rs), [state/registry.rs](../../crates/server/runtime/src/state/registry.rs), [state/policy.rs](../../crates/server/runtime/src/state/policy.rs)
+* [state/app.rs](../../crates/server/runtime/src/state/app.rs), [state/registry.rs](../../crates/server/runtime/src/state/registry.rs), [state/repo_context.rs](../../crates/server/runtime/src/state/repo_context.rs), [state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs), [state/policy.rs](../../crates/server/runtime/src/state/policy.rs)
 * [auth/layer.rs](../../crates/server/api/src/auth/layer.rs), [auth/authenticator.rs](../../crates/server/api/src/auth/authenticator.rs), [auth/permit.rs](../../crates/server/api/src/auth/permit.rs), [auth/context.rs](../../crates/server/api/src/auth/context.rs)
 * [services/common.rs](../../crates/server/api/src/services/common.rs), [services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs)
 

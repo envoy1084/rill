@@ -119,7 +119,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::pseudo_random;
+    use super::super::testing::pseudo_random;
     use super::*;
     use rill_store::MemoryObjectStore;
 

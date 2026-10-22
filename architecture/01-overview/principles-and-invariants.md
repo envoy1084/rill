@@ -129,8 +129,8 @@ flowchart LR
 - [Land transaction](../../crates/foundation/store/src/repo/landing.rs)
 - [Lander traits](../../crates/domain/lander/src/traits.rs)
 - [ReviewHooksAdapter](../../crates/server/runtime/src/workers/hooks.rs)
-- [Policy hot-swap](../../crates/server/runtime/src/state/registry.rs)
-- [SetPolicy handler](../../crates/server/api/src/services/admin.rs)
+- [Policy hot-swap](../../crates/server/runtime/src/state/repo_context.rs)
+- [SetPolicy handler](../../crates/server/api/src/services/admin/mod.rs)
 - [Rebase](../../crates/engine/core/src/rebase.rs)
 - [Search index](../../crates/domain/search/src/index/search_index.rs)
 

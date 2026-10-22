@@ -237,8 +237,8 @@ version or method.
 ## Code
 
 * [lib.rs](../../crates/foundation/store/src/lib.rs), [error.rs](../../crates/foundation/store/src/error.rs), [object.rs](../../crates/foundation/store/src/object.rs), [meta.rs](../../crates/foundation/store/src/meta.rs)
-* [keys.rs](../../crates/foundation/store/src/keys.rs), [repo/](../../crates/foundation/store/src/repo/mod.rs) ([landing.rs](../../crates/foundation/store/src/repo/landing.rs), [reviews.rs](../../crates/foundation/store/src/repo/reviews.rs), [idem.rs](../../crates/foundation/store/src/repo/idem.rs), [orgs.rs](../../crates/foundation/store/src/repo/orgs.rs), [events.rs](../../crates/foundation/store/src/repo/events.rs)), [codec.rs](../../crates/foundation/store/src/codec.rs), [verified.rs](../../crates/foundation/store/src/verified.rs), [seal/](../../crates/foundation/store/src/seal/mod.rs)
-* [memory.rs](../../crates/foundation/store/src/memory.rs), [backend.rs](../../crates/foundation/store/src/backend.rs), [local/](../../crates/foundation/store/src/local/mod.rs)
+* [keys/](../../crates/foundation/store/src/keys/mod.rs), [repo/](../../crates/foundation/store/src/repo/mod.rs) ([landing.rs](../../crates/foundation/store/src/repo/landing.rs), [reviews.rs](../../crates/foundation/store/src/repo/reviews.rs), [idem.rs](../../crates/foundation/store/src/repo/idem.rs), [orgs.rs](../../crates/foundation/store/src/repo/orgs.rs), [events.rs](../../crates/foundation/store/src/repo/events.rs)), [codec.rs](../../crates/foundation/store/src/codec.rs), [verified.rs](../../crates/foundation/store/src/verified.rs), [seal/](../../crates/foundation/store/src/seal/mod.rs)
+* [memory.rs](../../crates/foundation/store/src/memory.rs), [backend/](../../crates/foundation/store/src/backend/mod.rs), [local/](../../crates/foundation/store/src/local/mod.rs)
 * [tests/conformance/](../../crates/foundation/store/tests/conformance/main.rs): every scenario on every backend
 * [rill-runtime state/stores.rs](../../crates/server/runtime/src/state/stores.rs): `open_stores`
 

@@ -1,44 +1,22 @@
 //! The [`Importer`]: drives a [`GitSource`] from a blocking thread and
 //! writes change versions as commits arrive.
-
 use std::collections::{HashMap, HashSet};
 
-use std::collections::BTreeMap;
-
-use bytes::Bytes;
-use rill_types::{
-    ChangeId, ChangeVersion, ChangeVersionHash, FileChange, Principal, Provenance, RepoPathBuf,
-};
+use rill_types::ChangeVersionHash;
 use tokio::sync::mpsc;
 
 use super::land::land_first_parent_history;
 use super::map::ImportMap;
 use super::options::{ImportOptions, ImportReport};
+use super::reader_thread::{read_loop, Item};
 use super::target::ImportTarget;
 use crate::error::{Error, Result};
-use crate::reader::{history, CommitChanges, GitChange, GitCommit, GitSha, GitSource};
-
-/// Key under which the git sha is stored in `ChangeVersion::extra`.
-pub const GIT_SHA_EXTRA: &str = "git_sha";
-
-/// Provenance keys keeping the git author and commit time.
-pub const GIT_AUTHOR_PROVENANCE: &str = "git_author";
-pub const GIT_DATE_PROVENANCE: &str = "git_date";
-
-/// Tool name recorded in provenance.
-const TOOL: &str = "rill-git-import";
+use crate::reader::{GitCommit, GitSha, GitSource};
 
 /// Imports git history into one repository, incrementally.
 pub struct Importer<T: ImportTarget> {
-    repo: T,
-    map: ImportMap,
-}
-
-/// What the reader thread hands to the writer.
-enum Item {
-    Head(GitSha),
-    Known(GitCommit),
-    New(GitCommit, CommitChanges),
+    pub(super) repo: T,
+    pub(super) map: ImportMap,
 }
 
 impl<T: ImportTarget> Importer<T> {
@@ -156,118 +134,25 @@ impl<T: ImportTarget> Importer<T> {
         Ok(chain)
     }
 
-    fn mapped(&self, commit: &GitSha, sha: &GitSha) -> Result<ChangeVersionHash> {
+    pub(super) fn mapped(&self, commit: &GitSha, sha: &GitSha) -> Result<ChangeVersionHash> {
         self.map.get(sha).ok_or_else(|| Error::MissingParent {
             commit: commit.clone(),
             parent: sha.clone(),
         })
     }
-
-    async fn import_commit(
-        &self,
-        commit: &GitCommit,
-        changes: CommitChanges,
-    ) -> Result<ChangeVersionHash> {
-        let mut author = Principal::human(if commit.author_name.is_empty() {
-            commit.author_email.clone()
-        } else {
-            commit.author_name.clone()
-        });
-        author.identity = Some(commit.author_email.clone());
-        let mut provenance = Provenance {
-            tool: Some(TOOL.to_string()),
-            ..Default::default()
-        };
-        // A server stamps the importer as the author; the git author and
-        // date stay with the version.
-        provenance.extra.insert(
-            GIT_AUTHOR_PROVENANCE.to_string(),
-            format!("{} <{}>", commit.author_name, commit.author_email),
-        );
-        provenance.extra.insert(
-            GIT_DATE_PROVENANCE.to_string(),
-            commit.committed_at.millis().to_string(),
-        );
-        let mut parents = Vec::with_capacity(commit.parents.len());
-        for parent in &commit.parents {
-            parents.push(self.mapped(&commit.sha, parent)?);
-        }
-        let mut file_changes = BTreeMap::new();
-        for change in changes.changes {
-            let path = change.path().to_string();
-            let repo_path =
-                RepoPathBuf::new(&path).map_err(|e| Error::InvalidPath(path.clone(), e))?;
-            let file_change = match change {
-                GitChange::Set { content, kind, .. } => {
-                    FileChange::set(self.repo.store_content(content).await?, kind)
-                }
-                GitChange::Delete { .. } => FileChange::Delete,
-            };
-            file_changes.insert(repo_path, file_change);
-        }
-        let mut extra = BTreeMap::new();
-        extra.insert(
-            GIT_SHA_EXTRA.to_string(),
-            Bytes::from(commit.sha.to_bytes()),
-        );
-        let cv = ChangeVersion {
-            change_id: ChangeId::derived("git", commit.sha.as_str()),
-            parents,
-            predecessor: None,
-            subtree_changes: BTreeMap::new(),
-            file_changes,
-            author,
-            provenance,
-            intent: None,
-            message: commit.message.clone(),
-            created_at: commit.committed_at,
-            extra,
-        };
-        let hash = self.repo.store_version(&cv).await?;
-        tracing::debug!(sha = %commit.sha, version = %hash, files = cv.file_changes.len(), "imported commit");
-        Ok(hash)
-    }
-}
-
-/// Body of the reader thread: resolve, order, and stream commits. Stops
-/// quietly when the writer hangs up.
-fn read_loop<S: GitSource>(
-    mut source: S,
-    head_ref: &str,
-    known: &HashSet<GitSha>,
-    tx: &mpsc::Sender<Result<Item>>,
-) {
-    let mut produce = || -> Result<()> {
-        let head = source.resolve(head_ref)?;
-        if tx.blocking_send(Ok(Item::Head(head.clone()))).is_err() {
-            return Ok(());
-        }
-        for commit in history(&mut source, &head)? {
-            let item = if known.contains(&commit.sha) {
-                Item::Known(commit)
-            } else {
-                let changes = source.changes(&commit.sha)?;
-                Item::New(commit, changes)
-            };
-            if tx.blocking_send(Ok(item)).is_err() {
-                return Ok(());
-            }
-        }
-        Ok(())
-    };
-    if let Err(e) = produce() {
-        // The writer may already be gone; nothing more to report then.
-        let _ = tx.blocking_send(Err(e));
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::reader::MemorySource;
+    use bytes::Bytes;
     use rill_core::{DeriveManager, RootTree, TreeOps};
     use rill_store::{RepoStore, Stores};
-    use rill_types::{EntryKind, RepoPathBuf, TrunkSeq};
+    use rill_types::{ChangeId, EntryKind, RepoPathBuf, TrunkSeq};
+
+    use super::*;
+    use crate::import::commit_version::TOOL;
+    use crate::import::GIT_SHA_EXTRA;
+    use crate::reader::MemorySource;
 
     async fn repo() -> RepoStore {
         let stores = Stores::memory();

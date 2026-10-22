@@ -9,7 +9,7 @@ use rill_core::rebase;
 use rill_types::{ChangeVersionHash, Timestamp};
 
 use super::lander::Lander;
-use super::sequence::{Candidate, Prepared};
+use super::prepare::{Candidate, Prepared};
 use crate::error::Result;
 use crate::queue::QueuedRequest;
 use crate::schedule::{Footprint, Plan, Slot};

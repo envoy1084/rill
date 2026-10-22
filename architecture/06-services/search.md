@@ -176,7 +176,7 @@ library-only: the server never constructs one and there is no RPC.
 * [index/search_index.rs](../../crates/domain/search/src/index/search_index.rs), [index/persist.rs](../../crates/domain/search/src/index/persist.rs), [index/docs.rs](../../crates/domain/search/src/index/docs.rs), [index/manifest.rs](../../crates/domain/search/src/index/manifest.rs), [index/config.rs](../../crates/domain/search/src/index/config.rs)
 * [query/search.rs](../../crates/domain/search/src/query/search.rs), [query/request.rs](../../crates/domain/search/src/query/request.rs), [query/lines.rs](../../crates/domain/search/src/query/lines.rs)
 * [symbols/index.rs](../../crates/domain/search/src/symbols/index.rs), [symbols/extract.rs](../../crates/domain/search/src/symbols/extract.rs)
-* Server: [workers/indexer.rs](../../crates/server/runtime/src/workers/indexer.rs), [services/repo/grep.rs](../../crates/server/api/src/services/repo/grep.rs), [state/registry.rs](../../crates/server/runtime/src/state/registry.rs), [repo.proto](../../crates/foundation/proto/proto/rill/v1/repo.proto)
+* Server: [workers/indexer.rs](../../crates/server/runtime/src/workers/indexer.rs), [services/repo/grep.rs](../../crates/server/api/src/services/repo/grep.rs), [state/repo_context.rs](../../crates/server/runtime/src/state/repo_context.rs), [repo.proto](../../crates/foundation/proto/proto/rill/v1/repo.proto)
 
 ---
 ← Previous: [Security review packet](../05-policy/security-review.md) · [Index](../index.md) · Next: [Exec](exec.md) →

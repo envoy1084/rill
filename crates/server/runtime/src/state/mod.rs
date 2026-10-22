@@ -6,9 +6,12 @@ mod index_requests;
 mod lifecycle;
 pub mod policy;
 mod registry;
+mod repo_build;
+mod repo_context;
 mod stores;
 
 pub use app::AppState;
 pub use lifecycle::Lifecycle;
-pub use registry::{RepoContext, RepoRegistry};
+pub use registry::RepoRegistry;
+pub use repo_context::RepoContext;
 pub use stores::open_stores;

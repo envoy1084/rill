@@ -138,10 +138,10 @@ history.
 ## Code
 
 * [rill-types/src/objects/workspace.rs](../../crates/foundation/types/src/objects/workspace.rs)
-* [rill-api/src/services/workspace.rs](../../crates/server/api/src/services/workspace.rs)
+* [rill-api/src/services/workspace/mod.rs](../../crates/server/api/src/services/workspace/mod.rs)
 * [rill-api/src/services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs) (`commit_version`, `version_from_diff`)
 * [rill-store/src/repo/records.rs](../../crates/foundation/store/src/repo/records.rs) (`append_operation`, `list_operations`)
-* [rill-store/src/keys.rs](../../crates/foundation/store/src/keys.rs)
+* [rill-store/src/keys/repo_keys.rs](../../crates/foundation/store/src/keys/repo_keys.rs)
 * [rill-sdk/src/workspace.rs](../../crates/clients/sdk/src/workspace.rs)
 * [rill-cli/src/commands/ws.rs](../../crates/clients/cli/src/commands/ws.rs)
 

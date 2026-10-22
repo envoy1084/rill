@@ -146,8 +146,8 @@ sequenceDiagram
 * [`submit/policy.rs`](../../crates/domain/policy/src/submit/policy.rs): `SubmitPolicy`, `SubmitDecision`.
 * [`submit/tests.rs`](../../crates/domain/policy/src/submit/tests.rs): default-policy cases.
 * [`rill-review/src/evaluate.rs`](../../crates/domain/review/src/evaluate.rs): `evaluate_for`, `refresh_status`.
-* [`state/policy.rs`](../../crates/server/runtime/src/state/policy.rs), [`state/registry.rs`](../../crates/server/runtime/src/state/registry.rs): storage and `reload_policy`.
-* [`services/admin.rs`](../../crates/server/api/src/services/admin.rs): `GetPolicy`, `SetPolicy`.
+* [`state/policy.rs`](../../crates/server/runtime/src/state/policy.rs), [`state/repo_context.rs`](../../crates/server/runtime/src/state/repo_context.rs): storage and `reload_policy`.
+* [`services/admin/mod.rs`](../../crates/server/api/src/services/admin/mod.rs): `GetPolicy`, `SetPolicy`.
 
 ---
 ← Previous: [Risk classification](risk-classification.md) · [Index](../index.md) · Next: [Signing](signing.md) →

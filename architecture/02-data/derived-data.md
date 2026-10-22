@@ -147,7 +147,7 @@ history and blame RPCs, the MCP blame tool and review agent context use
 * [tree/materialize.rs](../../crates/engine/core/src/tree/materialize.rs)
 * [rill-api services/repo/refs.rs](../../crates/server/api/src/services/repo/refs.rs): `GetDerived` compute dispatch
 * [rill-api services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/server/runtime/src/workers/deriver.rs): derive jobs
-* [rill-runtime state/registry.rs](../../crates/server/runtime/src/state/registry.rs): manager construction
+* [rill-runtime state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs): manager construction
 
 ---
 ← Previous: [Content and chunking](content-and-chunking.md) · [Index](../index.md) · Next: [Diff](../03-core-algorithms/diff.md) →

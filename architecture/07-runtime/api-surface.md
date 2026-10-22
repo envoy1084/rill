@@ -35,11 +35,11 @@ in, without it. It also registers `tonic-reflection` and
 | Service | Proto | Handler | Covers |
 | --- | --- | --- | --- |
 | `RepoService` | `repo.proto` | `services/repo/` | repositories, history, blame, grep, trees and blobs, diff, merge base, writes (`CreateChangeVersion`, `ApplyEdits`, `Rebase`, `Merge`, `Resolve`), refs and trunk, `Watch*` streams including `WatchEvents`, derived data |
-| `WorkspaceService` | `workspace.proto` | `services/workspace.rs` | server-side workspaces, snapshots, operation log, `Undo`, `WorkspaceDiff` |
+| `WorkspaceService` | `workspace.proto` | `services/workspace/mod.rs` | server-side workspaces, snapshots, operation log, `Undo`, `WorkspaceDiff` |
 | `ReviewService` | `review.proto` | `services/review/` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand`, `GetLandStatus`, `WatchReview` |
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
-| `AdminService` | `admin.proto` | `services/admin.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
+| `AdminService` | `admin.proto` | `services/admin/mod.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
 | `AccessService` | `access.proto` | `services/access/` | `AddRelation`, `RemoveRelation`, `ListRelations`, `Check`, `Expand`, `LookupPaths` ([permissions](../05-policy/permissions.md#accessservice)) |
 | `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser`, agents (`RegisterAgent`, `UpdateAgent`, `ListAgents`), workload issuers (`Put`/`List`/`DeleteWorkloadIssuer`), `KillSwitch`, SCIM credentials ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
 | `AuditService` | `audit.proto` | `services/audit.rs` | `ListAuditEntries`, `ListAuditRoots`, `SealAudit`, `ListAuditKeys`, `WatchAudit` ([audit log](../05-policy/audit.md)) |
@@ -131,7 +131,7 @@ helpers live in `primitives.rs` (`hash_from_proto`, `id_from_proto` over the
 Decoding never guesses. A bad field yields a `ConvertError`: `BadLength`,
 `Missing`, `BadEnum`, `Invalid` or `OutOfRange`. Each one names the field
 with a dotted path such as `content_ref.blob.hash`. A `ConvertError` becomes
-`INVALID_ARGUMENT` with that text. `convert/roundtrip_tests.rs` checks that
+`INVALID_ARGUMENT` with that text. `convert/roundtrip_tests/` checks that
 values survive a trip through the wire and back.
 
 ## HTTP object protocol
@@ -225,7 +225,7 @@ size refilled over a minute ([identity](../05-policy/identity-and-auth.md)).
 
 * [proto/rill/v1/types.proto](../../crates/foundation/proto/proto/rill/v1/types.proto), [repo.proto](../../crates/foundation/proto/proto/rill/v1/repo.proto), [workspace.proto](../../crates/foundation/proto/proto/rill/v1/workspace.proto), [review.proto](../../crates/foundation/proto/proto/rill/v1/review.proto), [intent.proto](../../crates/foundation/proto/proto/rill/v1/intent.proto), [lander.proto](../../crates/foundation/proto/proto/rill/v1/lander.proto), [admin.proto](../../crates/foundation/proto/proto/rill/v1/admin.proto)
 * [build.rs](../../crates/foundation/proto/build.rs), [src/lib.rs](../../crates/foundation/proto/src/lib.rs), [src/error.rs](../../crates/foundation/proto/src/error.rs)
-* [convert/mod.rs](../../crates/foundation/proto/src/convert/mod.rs), [convert/primitives.rs](../../crates/foundation/proto/src/convert/primitives.rs), [convert/roundtrip_tests.rs](../../crates/foundation/proto/src/convert/roundtrip_tests.rs)
+* [convert/mod.rs](../../crates/foundation/proto/src/convert/mod.rs), [convert/primitives.rs](../../crates/foundation/proto/src/convert/primitives.rs), [convert/roundtrip_tests/](../../crates/foundation/proto/src/convert/roundtrip_tests/mod.rs)
 * [rill-api/src/serve.rs](../../crates/server/api/src/serve.rs), [services/mod.rs](../../crates/server/api/src/services/mod.rs)
 * [objects/mod.rs](../../crates/server/api/src/objects/mod.rs), [objects/handlers.rs](../../crates/server/api/src/objects/handlers.rs), [objects/batch.rs](../../crates/server/api/src/objects/batch.rs), [auth/http.rs](../../crates/server/api/src/auth/http.rs)
 

@@ -56,9 +56,9 @@ each `Set` (inline, single blob or chunked; see
 | Producer | Uses the builder |
 | --- | --- |
 | `ApplyEdits` RPC ([repo/write.rs](../../crates/server/api/src/services/repo/write.rs)) | Yes. Sets identity from the edit base, then one `change(path, FileChange)` per edit; `Patch` edits are applied with `apply_unified` first |
-| Workspace `NewChange` ([services/workspace.rs](../../crates/server/api/src/services/workspace.rs)) | No. `version_from_diff` maps each `TreeDiffEntry` from `diff_trees(base_root, snapshot)` to `Set` or `Delete` |
+| Workspace `NewChange` ([services/workspace/mod.rs](../../crates/server/api/src/services/workspace/mod.rs)) | No. `version_from_diff` maps each `TreeDiffEntry` from `diff_trees(base_root, snapshot)` to `Set` or `Delete` |
 | `merge_changes`, `rebase`, `Resolve` RPC | No; they build or edit the struct directly |
-| git importer ([importer.rs](../../crates/domain/git-import/src/import/importer.rs)) | Yes, with `build`; it then adds the git SHA to `extra` and stores the version itself |
+| git importer ([commit_version.rs](../../crates/domain/git-import/src/import/commit_version.rs)) | Yes, with `build`; it then adds the git SHA to `extra` and stores the version itself |
 
 ## Validation
 

@@ -6,11 +6,15 @@ use rill_proto::convert::{hash_to_proto, id_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeId, Event, EventKind, LabelVote, RepoPathBuf, ReviewStatus, Timestamp};
 
-use super::{change_id, ReviewEventStream, ReviewSvc};
+use super::reviews::change_id;
+use super::ReviewSvc;
 use crate::services::common::{self, open};
 use crate::services::repo::forward;
 use rill_runtime::error::Result;
 use rill_runtime::state::RepoContext;
+
+/// Server stream of review events.
+pub type ReviewEventStream = crate::services::repo::EventStream<pb::ReviewEvent>;
 
 impl ReviewSvc {
     pub(super) async fn watch_review_impl(

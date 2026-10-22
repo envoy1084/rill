@@ -164,7 +164,7 @@ rebases those dependents automatically.
 * [rill-review/src/stacks.rs](../../crates/domain/review/src/stacks.rs)
 * [rill-runtime/src/workers/hooks.rs](../../crates/server/runtime/src/workers/hooks.rs) (`dependents_of`)
 * [rill-sdk/src/stack.rs](../../crates/clients/sdk/src/stack.rs)
-* [rill-cli/src/commands/change.rs](../../crates/clients/cli/src/commands/change.rs), [stack.rs](../../crates/clients/cli/src/commands/stack.rs)
+* [rill-cli/src/commands/change/mod.rs](../../crates/clients/cli/src/commands/change/mod.rs), [stack.rs](../../crates/clients/cli/src/commands/stack.rs)
 
 ---
 ← Previous: [Checkouts](checkouts.md) · [Index](../index.md) · Next: [Review](review.md) →

@@ -157,7 +157,7 @@ call `UpdateBase`.
 * [rill-sdk/src/local/status.rs](../../crates/clients/sdk/src/local/status.rs), [walk.rs](../../crates/clients/sdk/src/local/walk.rs), [fs.rs](../../crates/clients/sdk/src/local/fs.rs)
 * [rill-sdk/src/local/update.rs](../../crates/clients/sdk/src/local/update.rs), [remote.rs](../../crates/clients/sdk/src/local/remote.rs)
 * [rill-sdk/src/repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs), [write.rs](../../crates/clients/sdk/src/repo/write.rs)
-* [rill-cli/src/commands/checkout.rs](../../crates/clients/cli/src/commands/checkout.rs), [change.rs](../../crates/clients/cli/src/commands/change.rs), [status.rs](../../crates/clients/cli/src/commands/status.rs), [checkout_meta.rs](../../crates/clients/cli/src/checkout_meta.rs)
+* [rill-cli/src/commands/checkout.rs](../../crates/clients/cli/src/commands/checkout.rs), [change.rs](../../crates/clients/cli/src/commands/change/mod.rs), [status.rs](../../crates/clients/cli/src/commands/status.rs), [checkout_meta.rs](../../crates/clients/cli/src/checkout_meta.rs)
 
 ---
 ← Previous: [Workspaces](workspaces.md) · [Index](../index.md) · Next: [Changes and stacks](changes-and-stacks.md) →

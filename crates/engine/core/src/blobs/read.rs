@@ -138,7 +138,8 @@ fn check_size(expected: u64, actual: u64) -> Result<()> {
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use super::super::{pseudo_random, store_content};
+    use super::super::store_content;
+    use super::super::testing::pseudo_random;
     use super::*;
     use async_trait::async_trait;
     use rill_store::MemoryObjectStore;

@@ -61,7 +61,8 @@ pub(super) async fn put_manifest(
 
 #[cfg(test)]
 mod tests {
-    use super::super::{pseudo_random, read_content};
+    use super::super::read_content;
+    use super::super::testing::pseudo_random;
     use super::*;
     use rill_store::MemoryObjectStore;
 

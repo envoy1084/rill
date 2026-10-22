@@ -23,7 +23,7 @@ flowchart TD
 | --- | --- | --- |
 | `INLINE_THRESHOLD` | 256 bytes (inline at or below) | `rill-types` `objects/blob.rs` |
 | `CHUNK_THRESHOLD` | 1 MiB (chunked at or above) | `rill-types` `objects/blob.rs` |
-| `CHUNK_MIN` / `CHUNK_AVG` / `CHUNK_MAX` | 16 / 64 / 256 KiB | `rill-core` `blobs/mod.rs` |
+| `CHUNK_MIN` / `CHUNK_AVG` / `CHUNK_MAX` | 16 / 64 / 256 KiB | `rill-core` `blobs/chunking.rs` |
 
 `BlobManifest { total_size, chunks: Vec<ChunkRef { hash, size: u32 }> }` is
 `Encodable` and hashed under `BlobManifest`. Chunks and blobs are raw bytes
@@ -120,7 +120,7 @@ range of any file needs memory for a few chunks, not the file.
 
 ## Code
 
-* [rill-core blobs/](../../crates/engine/core/src/blobs/mod.rs): `store.rs` (`store_content`, `chunk_boundaries`), `stream.rs` (`store_content_stream`), `read.rs` (`read_content`, `read_content_range`, `content_parts`)
+* [rill-core blobs/](../../crates/engine/core/src/blobs/mod.rs): `chunking.rs` (chunk sizes), `reader.rs` (`BlobReader`), `store.rs` (`store_content`, `chunk_boundaries`), `stream.rs` (`store_content_stream`), `read.rs` (`read_content`, `read_content_range`, `content_parts`)
 * [rill-types objects/blob.rs](../../crates/foundation/types/src/objects/blob.rs): `ContentRef`, `ChunkRef`, `BlobManifest`, thresholds
 * [rill-store object.rs](../../crates/foundation/store/src/object.rs): `put_blob`, `get_many`, `verify`
 * [rill-api services/repo/trees.rs](../../crates/server/api/src/services/repo/trees.rs): `PutBlob`, `GetBlob`, `check_content_exists`, `MAX_INLINE`

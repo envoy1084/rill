@@ -41,7 +41,7 @@ then `repo`.
 ## Storage
 
 Tuples are keys with empty values in the repository's metadata
-([`keys.rs`](../../crates/foundation/store/src/keys.rs)), written in one
+([`keys/repo_keys.rs`](../../crates/foundation/store/src/keys/repo_keys.rs)), written in one
 transaction by
 [`add_relation` and `remove_relation`](../../crates/foundation/store/src/repo/relations.rs):
 

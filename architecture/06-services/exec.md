@@ -166,10 +166,10 @@ The lander picks a `VerifyMode` per risk class: `None` skips verification;
 
 * [lib.rs](../../crates/domain/exec/src/lib.rs), [error.rs](../../crates/domain/exec/src/error.rs)
 * [action.rs](../../crates/domain/exec/src/action.rs), [cache.rs](../../crates/domain/exec/src/cache.rs), [runner.rs](../../crates/domain/exec/src/runner.rs), [materialize.rs](../../crates/domain/exec/src/materialize.rs)
-* [sandbox/mod.rs](../../crates/domain/exec/src/sandbox/mod.rs), [sandbox/local.rs](../../crates/domain/exec/src/sandbox/local.rs), [sandbox/confine.rs](../../crates/domain/exec/src/sandbox/confine.rs)
+* [sandbox/backend.rs](../../crates/domain/exec/src/sandbox/backend.rs), [sandbox/outcome.rs](../../crates/domain/exec/src/sandbox/outcome.rs), [sandbox/local.rs](../../crates/domain/exec/src/sandbox/local.rs), [sandbox/confine.rs](../../crates/domain/exec/src/sandbox/confine.rs)
 * [verify.rs](../../crates/domain/exec/src/verify.rs)
-* Server: [workers/verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [state/registry.rs](../../crates/server/runtime/src/state/registry.rs), [config/server.rs](../../crates/server/runtime/src/config/server.rs)
-* Lander: [config.rs](../../crates/domain/lander/src/config.rs), [land/sequence.rs](../../crates/domain/lander/src/land/sequence.rs)
+* Server: [workers/verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs), [config/server.rs](../../crates/server/runtime/src/config/server.rs)
+* Lander: [config.rs](../../crates/domain/lander/src/config.rs), [land/prepare.rs](../../crates/domain/lander/src/land/prepare.rs)
 
 ---
 ← Previous: [Search](search.md) · [Index](../index.md) · Next: [Git import](git-import.md) →

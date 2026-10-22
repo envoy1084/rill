@@ -9,21 +9,12 @@ mod filter;
 mod groups;
 mod patch;
 mod resources;
+mod schemas;
 mod service;
 
 pub use error::ScimError;
 pub use filter::Filter;
 pub use patch::patch_user;
 pub use resources::UserFields;
+pub use schemas::{ERROR_SCHEMA, GROUP_SCHEMA, LIST_SCHEMA, PATCH_SCHEMA, USER_SCHEMA};
 pub use service::{ListQuery, Scim};
-
-/// The SCIM user schema.
-pub const USER_SCHEMA: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
-/// The SCIM group schema.
-pub const GROUP_SCHEMA: &str = "urn:ietf:params:scim:schemas:core:2.0:Group";
-/// List responses.
-pub const LIST_SCHEMA: &str = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
-/// Patch requests.
-pub const PATCH_SCHEMA: &str = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
-/// Error responses.
-pub const ERROR_SCHEMA: &str = "urn:ietf:params:scim:api:messages:2.0:Error";

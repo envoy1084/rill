@@ -4,200 +4,31 @@
 //! trees, derived data, the commit graph, review, landing, verification,
 //! search and authorization, plus the event bus and background workers.
 //! Contexts are built on first use and cached for the life of the process.
-
 use std::sync::Arc;
 
-use arc_swap::ArcSwap;
 use dashmap::DashMap;
-use rill_core::tree::DEFAULT_TREE_CACHE;
-use rill_core::{CommitGraph, DeriveManager, TreeOps};
-use rill_exec::{Isolation, LocalSandbox, Runner};
-use rill_lander::{AlwaysGreen, Lander, PostLandVerifier, Verifier};
-use rill_policy::Authorizer;
-use rill_review::service::{ReviewEvent, ReviewService};
-use rill_review::votes::LabelSet;
-use rill_search::{IndexConfig, SearchIndex};
 use rill_store::repo::RepoConfig;
-use rill_store::{RepoStore, Stores};
+use rill_store::Stores;
 use rill_types::RepoId;
-use tokio::sync::broadcast;
-use tokio_util::sync::CancellationToken;
 
-use super::policy;
-use crate::config::{SandboxKind, ServerConfig};
+use super::RepoContext;
+use crate::config::ServerConfig;
 use crate::error::{Error, Result};
 use crate::workers;
-
-/// How long a search waits for a root it asked to have indexed.
-const INDEX_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
-/// How often a waiting search looks for the root's manifest.
-const INDEX_POLL: std::time::Duration = std::time::Duration::from_millis(50);
-
-/// Size of the derived-data cache per repository.
-const DERIVE_CACHE: usize = 8192;
-
-/// Everything the handlers need for one repository.
-pub struct RepoContext {
-    /// The repository record.
-    pub config: RepoConfig,
-    /// Typed access to the repository's keyspace and objects.
-    pub repo: RepoStore,
-    /// Tree reads and writes with a cache.
-    pub trees: TreeOps,
-    /// Derived data (root trees, blame, history, summaries).
-    pub derive: Arc<DeriveManager>,
-    /// Ancestry queries.
-    pub graph: Arc<CommitGraph>,
-    /// The landing pipeline.
-    pub lander: Arc<Lander>,
-    /// Post-land verifier, when enabled.
-    pub postland: Option<Arc<PostLandVerifier>>,
-    /// Verification runner, when pre-land verification is enabled.
-    pub runner: Option<Arc<Runner>>,
-    /// Trigram search index, updated as changes land.
-    pub search: Arc<SearchIndex>,
-    /// ReBAC relation checks.
-    pub authorizer: Arc<Authorizer>,
-    /// Users, agents and org roles, for org administrators' access.
-    pub identity: Arc<crate::identity::IdentityView>,
-    /// Where refused requests are noted.
-    pub denials: Arc<crate::audit::denials::Denials>,
-    /// Secret scanning rules and what was found clean.
-    pub secrets: Arc<crate::secrets::Scanner>,
-    /// Vote labels.
-    pub labels: Arc<LabelSet>,
-    /// Cancelled when the server shuts down; long-lived streams and
-    /// workers over this repository watch it.
-    pub shutdown: CancellationToken,
-    /// The process's draining and abort signals and task tracker.
-    pub lifecycle: Arc<super::Lifecycle>,
-    review: Arc<ArcSwap<ReviewService>>,
-    review_events: broadcast::Sender<ReviewEvent>,
-    server_config: Arc<ServerConfig>,
-    /// Signs an attestation for every committed version.
-    pub attestor: Arc<rill_policy::Signer>,
-    index_requests: super::index_requests::IndexRequests,
-}
-
-impl RepoContext {
-    /// The repository id.
-    pub fn id(&self) -> RepoId {
-        self.config.id
-    }
-
-    /// Seconds between post-land verification sweeps.
-    pub fn postland_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(self.server_config.postland.interval_secs.max(1))
-    }
-
-    /// Search an indexed root, showing only paths `allowed` admits. This
-    /// is the server side of `RepoService.Grep`. The root is indexed on demand
-    /// when the indexer has not caught up with it.
-    pub async fn grep(
-        &self,
-        root: rill_types::TreeHash,
-        query: rill_search::SearchQuery,
-        allowed: rill_policy::PathFilter,
-    ) -> Result<Vec<rill_search::SearchHit>> {
-        if self.search.manifest(root).await.is_err() {
-            self.wait_for_index(root).await?;
-        }
-        // Boxed so the borrow-heavy search future has a concrete `Send`
-        // bound; otherwise the compiler cannot prove it for the tonic
-        // handler that awaits this.
-        let search = self.search.clone();
-        let fut: std::pin::Pin<
-            Box<
-                dyn std::future::Future<Output = rill_search::Result<Vec<rill_search::SearchHit>>>
-                    + Send,
-            >,
-        > = Box::pin(async move {
-            rill_search::search(&search, root, &query, move |p| allowed.allows(p)).await
-        });
-        Ok(fut.await?)
-    }
-
-    /// Ask the search writer to index `root` and wait for its manifest:
-    /// only the server holding the search lease writes the index.
-    async fn wait_for_index(&self, root: rill_types::TreeHash) -> Result<()> {
-        let _request = match self.index_requests.claim(root) {
-            Some(request) => {
-                rill_jobs::Queue::new(self.repo.clone(), rill_lander::land::followups::INDEX_QUEUE)
-                    .push(rill_lander::land::followups::index_root_job(&root))
-                    .await?;
-                Some(request)
-            }
-            None => None,
-        };
-        let deadline = tokio::time::Instant::now() + INDEX_WAIT;
-        while tokio::time::Instant::now() < deadline {
-            if self.search.manifest(root).await.is_ok() {
-                return Ok(());
-            }
-            tokio::time::sleep(INDEX_POLL).await;
-        }
-        Err(rill_search::Error::RootNotIndexed(root).into())
-    }
-
-    /// The current review service. Hot-swapped when policy changes, so
-    /// callers must not hold the returned `Arc` across requests.
-    pub fn review(&self) -> Arc<ReviewService> {
-        self.review.load_full()
-    }
-
-    /// Rebuild the review service from the policies stored in the repo
-    /// (after `SetPolicy`) and swap it in. Event subscribers are unaffected
-    /// because the broadcast sender is shared across rebuilds.
-    pub async fn reload_policy(&self) -> Result<()> {
-        let service = build_review(
-            &self.repo,
-            &self.derive,
-            &self.graph,
-            &self.labels,
-            &self.server_config,
-            self.review_events.clone(),
-        )
-        .await?;
-        self.review.store(Arc::new(service));
-        tracing::info!(repo = %self.config.name, "review policy reloaded");
-        Ok(())
-    }
-}
-
-async fn build_review(
-    repo: &RepoStore,
-    derive: &Arc<DeriveManager>,
-    graph: &Arc<CommitGraph>,
-    labels: &Arc<LabelSet>,
-    config: &ServerConfig,
-    events: broadcast::Sender<ReviewEvent>,
-) -> Result<ReviewService> {
-    let submit = policy::effective_submit(repo).await?;
-    let risk = policy::effective_risk(repo, &config.risk).await?;
-    Ok(ReviewService::new(
-        repo.clone(),
-        derive.clone(),
-        graph.clone(),
-        Arc::new(submit),
-        Arc::new(risk),
-        labels.clone(),
-    )
-    .with_events(events))
-}
 
 /// Builds and caches [`RepoContext`]s, resolving the `repo` field of
 /// requests by name or id.
 pub struct RepoRegistry {
-    stores: Stores,
-    config: Arc<ServerConfig>,
-    attestor: Arc<rill_policy::Signer>,
-    identity: Arc<crate::identity::IdentityView>,
-    denials: Arc<crate::audit::denials::Denials>,
-    contexts: DashMap<RepoId, Arc<RepoContext>>,
-    build_lock: tokio::sync::Mutex<()>,
-    lifecycle: Arc<super::Lifecycle>,
+    pub(super) stores: Stores,
+    pub(super) config: Arc<ServerConfig>,
+    pub(super) attestor: Arc<rill_policy::Signer>,
+    pub(super) identity: Arc<crate::identity::IdentityView>,
+    pub(super) denials: Arc<crate::audit::denials::Denials>,
+    pub(super) contexts: DashMap<RepoId, Arc<RepoContext>>,
+    pub(super) build_lock: tokio::sync::Mutex<()>,
+    pub(super) lifecycle: Arc<super::Lifecycle>,
     /// Structural merge, shared by every repository; `None` when off.
-    merger: Option<Arc<rill_merge_syntax::WeaveMerger>>,
+    pub(super) merger: Option<Arc<rill_merge_syntax::WeaveMerger>>,
 }
 
 impl RepoRegistry {
@@ -324,112 +155,6 @@ impl RepoRegistry {
             self.get(repo.id).await?;
         }
         Ok(repos.len())
-    }
-
-    async fn build(&self, config: RepoConfig) -> Result<RepoContext> {
-        let org = self.stores.org(&config.org);
-        let redacting = Arc::new(rill_store::redact::RedactingObjectStore::new(
-            org.objects.clone(),
-            &config.org,
-            self.identity.clone(),
-        ));
-        let repo = org.with_objects(redacting).repo(config.id);
-        let trees = TreeOps::new(repo.objects().clone(), DEFAULT_TREE_CACHE);
-        let derive = DeriveManager::new(repo.clone(), trees.clone(), DERIVE_CACHE);
-        if let Some(merger) = &self.merger {
-            derive.set_merger(merger.clone());
-        }
-        let graph = Arc::new(CommitGraph::new(repo.clone(), derive.clone()));
-        let labels = Arc::new(self.config.labels.clone());
-        let (review_events, _) = broadcast::channel(rill_review::service::DEFAULT_EVENT_CAPACITY);
-        let review = Arc::new(ArcSwap::from_pointee(
-            build_review(
-                &repo,
-                &derive,
-                &graph,
-                &labels,
-                &self.config,
-                review_events.clone(),
-            )
-            .await?,
-        ));
-
-        let verify = &self.config.verify;
-        let runner = match verify.enabled {
-            true => {
-                let isolation = match verify.sandbox {
-                    SandboxKind::Local => Isolation::None,
-                    SandboxKind::Confined => Isolation::Confined,
-                    SandboxKind::Gvisor => Isolation::Gvisor {
-                        runsc: verify.runsc.clone().into(),
-                    },
-                };
-                let sandbox = LocalSandbox::new(verify.network).with_isolation(isolation)?;
-                Some(Arc::new(Runner::new(
-                    repo.clone(),
-                    trees.clone(),
-                    Arc::new(sandbox),
-                )))
-            }
-            false => None,
-        };
-        let verifier: Arc<dyn Verifier> = match &runner {
-            Some(runner) => Arc::new(workers::ExecVerifier::new(runner.clone())),
-            None => Arc::new(AlwaysGreen),
-        };
-        let authorizer = Arc::new(Authorizer::new(repo.clone()));
-        let mut hooks = workers::ReviewHooksAdapter::new(review.clone())
-            .with_standing(config.org.clone(), self.identity.clone())
-            .with_graph(graph.clone());
-        if !self.config.dev_mode {
-            hooks = hooks.with_write_rights(workers::rights::WriteRights {
-                org: config.org.clone(),
-                authorizer: authorizer.clone(),
-                identity: self.identity.clone(),
-                trees: trees.clone(),
-                derive: derive.clone(),
-            });
-        }
-        let hooks = Arc::new(hooks);
-        let lander = Lander::new(
-            repo.clone(),
-            derive.clone(),
-            graph.clone(),
-            hooks,
-            verifier,
-            self.config.lander.clone(),
-        );
-        let postland = self
-            .config
-            .postland
-            .enabled
-            .then(|| PostLandVerifier::new(lander.clone(), self.config.postland.batch_size));
-        let search =
-            SearchIndex::open(repo.clone(), derive.clone(), IndexConfig::default()).await?;
-
-        Ok(RepoContext {
-            config,
-            repo,
-            trees,
-            derive,
-            graph,
-            lander,
-            postland,
-            runner,
-            search,
-            authorizer,
-            identity: self.identity.clone(),
-            denials: self.denials.clone(),
-            secrets: Default::default(),
-            labels,
-            shutdown: self.lifecycle.stop.child_token(),
-            lifecycle: self.lifecycle.clone(),
-            review,
-            review_events,
-            server_config: self.config.clone(),
-            attestor: self.attestor.clone(),
-            index_requests: Default::default(),
-        })
     }
 }
 

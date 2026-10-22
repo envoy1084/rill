@@ -168,7 +168,7 @@ for build profiles and features.
 - [rill-sdk/Cargo.toml](../../crates/clients/sdk/Cargo.toml)
 - [rill-mcp/Cargo.toml](../../crates/clients/mcp/Cargo.toml)
 - [rill-cli/Cargo.toml](../../crates/clients/cli/Cargo.toml)
-- [Lander adapters](../../crates/server/runtime/src/workers/mod.rs)
+- [Lander adapters](../../crates/server/runtime/src/workers/hooks.rs)
 
 ---
 ← Previous: [Principles and invariants](principles-and-invariants.md) · [Index](../index.md) · Next: [Glossary](glossary.md) →

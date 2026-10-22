@@ -7,7 +7,7 @@ use rill_proto::convert::{hash_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{EventKind, RefName, TrunkSeq};
 
-use super::{forward, EventStream};
+use super::stream::{forward, EventStream};
 use crate::services::common::open;
 use crate::services::repo::RepoSvc;
 use rill_runtime::error::Result;
