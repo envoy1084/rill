@@ -143,25 +143,21 @@ impl AdminClient {
 
     /// Every org.
     pub async fn list_orgs(&self) -> Result<Vec<OrgInfo>> {
-        let mut orgs = Vec::new();
-        let mut page_token = String::new();
-        loop {
+        crate::paging::all(|page_token| async move {
             let resp = crate::client::retry_idempotent(|| {
                 let svc = self.client.org_svc();
                 let request = pb::ListOrgsRequest {
-                    page_size: 1000,
+                    page_size: crate::paging::PAGE,
                     page_token: page_token.clone(),
                 };
                 async move { svc.list_orgs(request).await }
             })
             .await?
             .into_owned();
-            orgs.extend(resp.orgs.into_iter().map(OrgInfo::from));
-            if resp.next_page_token.is_empty() {
-                return Ok(orgs);
-            }
-            page_token = resp.next_page_token;
-        }
+            let orgs = resp.orgs.into_iter().map(OrgInfo::from).collect();
+            Ok((orgs, resp.next_page_token))
+        })
+        .await
     }
 
     /// Server health.

@@ -4,7 +4,7 @@ use rill_proto::convert::timestamp_to_proto;
 use rill_proto::names::REDACTION;
 use rill_proto::rill::v1 as pb;
 use rill_types::identity::{IdentityChange, Redaction};
-use rill_types::{ObjectHash, ObjectKind, Timestamp};
+use rill_types::{ObjectHash, Timestamp};
 
 use super::ProtectionSvc;
 use crate::auth::{caller, require_org_admin};
@@ -36,10 +36,7 @@ impl ProtectionSvc {
         let req = request.into_inner();
         let org = names::org(&req.parent)?;
         require_org_admin(&self.state, &ctx, &org).await?;
-        let kind = u8::try_from(req.kind.to_i32())
-            .ok()
-            .and_then(ObjectKind::from_u8)
-            .ok_or_else(|| Error::invalid("kind is required"))?;
+        let kind = rill_proto::convert::object_kind_from_proto("kind", req.kind)?;
         if req.reason.trim().is_empty() {
             return Err(Error::invalid("a redaction needs a reason"));
         }

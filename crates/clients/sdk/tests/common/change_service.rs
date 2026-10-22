@@ -57,11 +57,31 @@ impl ChangeService for MockRepo {
     ) -> RpcResult<pb::ApplyEditsResponse> {
         let req = Request::new(ctx, req).into_inner();
         self.applied.lock().unwrap().push(req.clone());
-        let failing = self.unavailable.load(std::sync::atomic::Ordering::SeqCst);
-        if failing > 0 {
-            self.unavailable
-                .store(failing - 1, std::sync::atomic::Ordering::SeqCst);
+        if MockRepo::take(&self.unavailable) {
             return Err(ConnectError::unavailable("server going away"));
+        }
+        if MockRepo::take(&self.rate_limited) {
+            let retry = rill_proto::google::rpc::RetryInfo {
+                retry_delay: buffa_types::google::protobuf::Duration {
+                    seconds: 1,
+                    ..Default::default()
+                }
+                .into(),
+            };
+            return Err(ConnectError::new(
+                connectrpc::ErrorCode::ResourceExhausted,
+                "rate limited",
+            )
+            .with_detail(connectrpc::ErrorDetail::from_message(
+                "google.rpc.RetryInfo",
+                &retry,
+            )));
+        }
+        if MockRepo::take(&self.too_large) {
+            return Err(ConnectError::new(
+                connectrpc::ErrorCode::ResourceExhausted,
+                "message too large",
+            ));
         }
         let mut file_changes = BTreeMap::new();
         for edit in &req.edits {

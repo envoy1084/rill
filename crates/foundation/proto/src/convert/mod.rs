@@ -22,7 +22,7 @@ mod roundtrip_tests;
 
 pub use content::{
     file_kind_from_proto, file_state_from_proto, file_state_to_proto, merge_terms_from_proto,
-    merge_terms_to_proto,
+    merge_terms_to_proto, object_kind_from_proto,
 };
 pub use intent::{intent_kind_from_proto, intent_status_from_proto, risk_from_proto};
 pub use land::{land_status_from_parts, land_status_parts, lane_from_proto, ticket_from_proto};

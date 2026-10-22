@@ -74,28 +74,26 @@ impl AuditClient {
 
     /// The chain's seals, oldest first.
     pub async fn roots(&self, org: &str) -> Result<Vec<AuditRoot>> {
-        let mut out = Vec::new();
-        let mut page_token = String::new();
-        loop {
+        crate::paging::all(|page_token| async move {
             let resp = retry_idempotent(|| {
                 let svc = self.svc();
                 let request = pb::ListAuditRootsRequest {
                     parent: crate::names::org(org),
-                    page_size: 1000,
+                    page_size: crate::paging::PAGE,
                     page_token: page_token.clone(),
                 };
                 async move { svc.list_audit_roots(request).await }
             })
             .await?
             .into_owned();
-            for root in &resp.roots {
-                out.push(decode(&root.encoded)?);
-            }
-            if resp.next_page_token.is_empty() {
-                return Ok(out);
-            }
-            page_token = resp.next_page_token;
-        }
+            let roots = resp
+                .roots
+                .iter()
+                .map(|r| decode(&r.encoded))
+                .collect::<Result<Vec<_>>>()?;
+            Ok((roots, resp.next_page_token))
+        })
+        .await
     }
 
     /// Seal what the chain gained since its last seal.

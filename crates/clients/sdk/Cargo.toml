@@ -7,7 +7,13 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# `testing::DevServer`: an in-process dev server for tests built on the SDK.
+testing = ["dep:rill-api", "dep:tokio-util"]
+
 [dependencies]
+rill-api = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true }
 backon = { workspace = true }
 tempfile = { workspace = true }
 rill-types = { workspace = true }
@@ -41,6 +47,7 @@ postcard = { workspace = true }
 
 [dev-dependencies]
 axum = { workspace = true }
+buffa-types = { workspace = true }
 buffa = { workspace = true }
 connectrpc = { workspace = true }
 futures = { workspace = true }
@@ -49,3 +56,7 @@ tempfile = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 async-trait = { workspace = true }
+
+[[test]]
+name = "conformance"
+required-features = ["testing"]

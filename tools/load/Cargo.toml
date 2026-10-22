@@ -12,10 +12,8 @@ publish = false
 rill-types = { workspace = true }
 rill-proto = { workspace = true }
 futures = { workspace = true }
-rill-sdk = { workspace = true }
-rill-api = { workspace = true }
+rill-sdk = { workspace = true, features = ["testing"] }
 tokio = { workspace = true }
-tokio-util = { workspace = true }
 bytes = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }

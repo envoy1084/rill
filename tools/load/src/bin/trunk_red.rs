@@ -7,8 +7,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use rill_load::healing::{run_scenarios, Slo, Trunk};
-use rill_load::EmbeddedServer;
-use rill_sdk::{Client, ClientConfig};
+use rill_sdk::testing::DevServer;
 use rill_types::VerifyMode;
 
 #[derive(Parser)]
@@ -39,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .init();
     let grace = Duration::from_secs(args.grace);
-    let mut config = EmbeddedServer::config();
+    let mut config = DevServer::config();
     config.verify.enabled = true;
     config.exec.local.workers = args.exec_workers;
     config.postland.enabled = true;
@@ -57,8 +56,8 @@ async fn main() -> anyhow::Result<()> {
     ] {
         *mode = VerifyMode::None;
     }
-    let server = EmbeddedServer::start_with(config).await?;
-    let client = Client::connect(ClientConfig::new(server.endpoint.clone())).await?;
+    let server = DevServer::start_with(config).await?;
+    let client = server.client().await?;
     let markers = tempfile::tempdir()?;
     let trunk = Trunk::seed(client, "healing", &markers.path().display().to_string()).await?;
     let report = run_scenarios(&trunk, &Slo::with_grace(grace), args.only.as_deref()).await;

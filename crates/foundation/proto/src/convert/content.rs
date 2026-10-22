@@ -1,7 +1,7 @@
 //! Content references, file kinds and file states.
 
 use rill_types::objects::change::FileState;
-use rill_types::{ContentRef, FileKind, Merge};
+use rill_types::{ContentRef, FileKind, Merge, ObjectKind};
 
 use crate::convert::primitives::{enum_from_proto, hash_from_proto, hash_to_proto, required};
 use crate::error::{ConvertError, Result};
@@ -46,6 +46,37 @@ pub fn file_kind_from_proto(
         pb::FileKind::Symlink => Ok(FileKind::Symlink),
         // `enum_from_proto` already rejected zero.
         pb::FileKind::Unspecified => Err(ConvertError::BadEnum { field, value }),
+    }
+}
+
+impl From<ObjectKind> for pb::ObjectKind {
+    fn from(kind: ObjectKind) -> Self {
+        match kind {
+            ObjectKind::Blob => pb::ObjectKind::Blob,
+            ObjectKind::Chunk => pb::ObjectKind::Chunk,
+            ObjectKind::BlobManifest => pb::ObjectKind::BlobManifest,
+            ObjectKind::Tree => pb::ObjectKind::Tree,
+            ObjectKind::ChangeVersion => pb::ObjectKind::ChangeVersion,
+            ObjectKind::Derived => pb::ObjectKind::Derived,
+        }
+    }
+}
+
+/// Decode an `ObjectKind` enum field.
+pub fn object_kind_from_proto(
+    field: &'static str,
+    value: impl Into<buffa::EnumValue<pb::ObjectKind>>,
+) -> Result<ObjectKind> {
+    let value = value.into().to_i32();
+    match enum_from_proto(field, value)? {
+        pb::ObjectKind::Blob => Ok(ObjectKind::Blob),
+        pb::ObjectKind::Chunk => Ok(ObjectKind::Chunk),
+        pb::ObjectKind::BlobManifest => Ok(ObjectKind::BlobManifest),
+        pb::ObjectKind::Tree => Ok(ObjectKind::Tree),
+        pb::ObjectKind::ChangeVersion => Ok(ObjectKind::ChangeVersion),
+        pb::ObjectKind::Derived => Ok(ObjectKind::Derived),
+        // `enum_from_proto` already rejected zero.
+        pb::ObjectKind::Unspecified => Err(ConvertError::BadEnum { field, value }),
     }
 }
 

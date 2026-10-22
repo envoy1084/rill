@@ -18,7 +18,6 @@ use hdrhistogram::Histogram;
 use parking_lot::Mutex;
 use prost::Message;
 use rand::RngExt;
-use rill_api::{Listeners, ServerConfig, StorageConfig};
 use rill_reapi_proto::reapi::content_addressable_storage_client::ContentAddressableStorageClient;
 use rill_reapi_proto::reapi::execution_client::ExecutionClient;
 use rill_reapi_proto::reapi::{
@@ -26,8 +25,8 @@ use rill_reapi_proto::reapi::{
     BatchUpdateBlobsRequest, Command, Digest, Directory, ExecuteRequest, ExecuteResponse, FileNode,
     Platform,
 };
+use rill_sdk::testing::DevServer;
 use tokio::sync::Semaphore;
-use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 #[derive(Parser)]
@@ -189,26 +188,10 @@ struct Tally {
     errors_seen: HashMap<String, u64>,
 }
 
-async fn embedded(workers: usize) -> anyhow::Result<(String, CancellationToken)> {
-    let any: std::net::SocketAddr = "127.0.0.1:0".parse()?;
-    let listeners = Listeners::bind(any, any).await?;
-    let (grpc, _) = listeners.addrs()?;
-    let mut config = ServerConfig {
-        dev_mode: true,
-        storage: StorageConfig::Memory,
-        ..ServerConfig::default()
-    };
+async fn embedded(workers: usize) -> anyhow::Result<DevServer> {
+    let mut config = DevServer::config();
     config.exec.local.workers = workers;
-    config.rate_limit.per_principal_per_sec = 0;
-    let shutdown = CancellationToken::new();
-    let state = rill_api::build_state(config, shutdown.clone()).await?;
-    let token = shutdown.clone();
-    tokio::spawn(async move {
-        if let Err(e) = rill_api::serve_with_state(state, listeners, token).await {
-            eprintln!("embedded server stopped: {e}");
-        }
-    });
-    Ok((format!("http://{grpc}"), shutdown))
+    Ok(DevServer::start_with(config).await?)
 }
 
 #[tokio::main]
@@ -217,8 +200,8 @@ async fn main() -> anyhow::Result<()> {
     let (endpoint, _server) = match &args.endpoint {
         Some(e) => (e.clone(), None),
         None => {
-            let (e, stop) = embedded(args.local_workers).await?;
-            (e, Some(stop))
+            let server = embedded(args.local_workers).await?;
+            (server.endpoint().to_string(), Some(server))
         }
     };
     let channel = loop {

@@ -64,31 +64,31 @@ impl AccessClient {
 
     /// A repository's tuples (owners only).
     pub async fn list(&self, repo: &str, filter: RelationFilter) -> Result<Vec<Relation>> {
-        let mut out = Vec::new();
-        let mut page_token = String::new();
-        loop {
-            let request = pb::ListRelationsRequest {
-                parent: names::repo(repo),
-                page_size: 1000,
-                page_token: page_token.clone(),
-                filter: filter.to_filter(),
-            };
-            let resp = retry_idempotent(|| {
-                let (svc, request) = (self.svc(), request.clone());
-                async move { svc.list_relations(request).await }
-            })
-            .await?
-            .into_owned();
-            out.extend(
-                resp.relations
+        let filter = filter.to_filter();
+        crate::paging::all(|page_token| {
+            let filter = filter.clone();
+            async move {
+                let request = pb::ListRelationsRequest {
+                    parent: names::repo(repo),
+                    page_size: crate::paging::PAGE,
+                    page_token,
+                    filter,
+                };
+                let resp = retry_idempotent(|| {
+                    let (svc, request) = (self.svc(), request.clone());
+                    async move { svc.list_relations(request).await }
+                })
+                .await?
+                .into_owned();
+                let relations = resp
+                    .relations
                     .into_iter()
-                    .map(|r| Relation::from_proto(repo, r)),
-            );
-            if resp.next_page_token.is_empty() {
-                return Ok(out);
+                    .map(|r| Relation::from_proto(repo, r))
+                    .collect();
+                Ok((relations, resp.next_page_token))
             }
-            page_token = resp.next_page_token;
-        }
+        })
+        .await
     }
 
     /// Whether `subject` (the caller when `None`) holds `relation` on

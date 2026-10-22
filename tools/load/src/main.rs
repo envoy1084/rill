@@ -3,7 +3,8 @@
 use std::time::Duration;
 
 use clap::Parser;
-use rill_load::{run, Burst, EmbeddedServer, Profile, Settings};
+use rill_load::{run, Burst, Profile, Settings};
+use rill_sdk::testing::DevServer;
 
 #[derive(Parser)]
 #[command(about = "Load generator: synthetic agents at a fraction of the D1 workload")]
@@ -66,13 +67,18 @@ async fn main() -> anyhow::Result<()> {
     let embedded = match &args.endpoint {
         Some(_) => None,
         None => {
-            Some(EmbeddedServer::start(if args.contended { args.exec_workers } else { 0 }).await?)
+            let mut config = DevServer::config();
+            if args.contended && args.exec_workers > 0 {
+                config.verify.enabled = true;
+                config.exec.local.workers = args.exec_workers;
+            }
+            Some(DevServer::start_with(config).await?)
         }
     };
     let endpoint = args
         .endpoint
         .clone()
-        .or_else(|| embedded.as_ref().map(|s| s.endpoint.clone()))
+        .or_else(|| embedded.as_ref().map(|s| s.endpoint().to_string()))
         .expect("one of the two is set");
     let burst = args
         .burst_every

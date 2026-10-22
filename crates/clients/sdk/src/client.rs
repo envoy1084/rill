@@ -142,11 +142,15 @@ impl Connection {
 /// idempotency claim (15 s on the server).
 const RETRY_BUDGET: Duration = Duration::from_secs(20);
 
-/// Run a read, or a call that carries an operation id, retrying while the
+/// The longest a server's requested wait holds one retry.
+const MAX_SERVER_DELAY: Duration = Duration::from_secs(5);
+
+/// Run a read, or a call that carries a request id, retrying while the
 /// cluster is unavailable (a dead or draining server, a cut connection, the
-/// claim of a server that died mid-request). Reads have no effect and the
-/// server runs an identified operation at most once, so retrying cannot
-/// repeat an effect.
+/// claim of a server that died mid-request) or refuses for now with a
+/// delay to wait (a rate limit, a full queue). Reads have no effect, the
+/// server runs an identified operation at most once, and a refused call
+/// never ran, so retrying cannot repeat an effect.
 pub(crate) async fn retry_idempotent<T, F, Fut>(call: F) -> std::result::Result<T, ConnectError>
 where
     F: FnMut() -> Fut,
@@ -161,9 +165,24 @@ where
         .without_max_times();
     call.retry(schedule)
         .sleep(tokio::time::sleep)
-        .when(|e: &ConnectError| e.code == connectrpc::ErrorCode::Unavailable)
+        .when(|e: &ConnectError| {
+            e.code == connectrpc::ErrorCode::Unavailable || server_delay(e).is_some()
+        })
+        .adjust(|e, delay| {
+            delay.map(|d| server_delay(e).map_or(d, |wait| wait.min(MAX_SERVER_DELAY)))
+        })
         .notify(|e, _| tracing::debug!(error = %e, "retrying an idempotent call"))
         .await
+}
+
+/// The wait a refusal asks for: `RESOURCE_EXHAUSTED` with a `RetryInfo`
+/// (a rate limit, a full queue). A request too large for the server has no
+/// delay and is not retried.
+fn server_delay(e: &ConnectError) -> Option<Duration> {
+    if e.code != connectrpc::ErrorCode::ResourceExhausted {
+        return None;
+    }
+    crate::error::Details::of(e).retry_after
 }
 
 /// Generated repo client over the SDK transport.
@@ -349,6 +368,22 @@ impl Client {
     /// Relationship tuples and questions about them.
     pub fn access(&self) -> AccessClient {
         AccessClient::new(self.clone())
+    }
+
+    /// Users, agents, sign-in and tokens of `org` (empty: the default
+    /// org).
+    pub fn identity(&self, org: &str) -> crate::identity::IdentityClient {
+        crate::identity::IdentityClient::new(self.clone(), org)
+    }
+
+    /// Redactions and data keys of `org`.
+    pub fn protection(&self, org: &str) -> crate::protection::ProtectionClient {
+        crate::protection::ProtectionClient::new(self.clone(), org)
+    }
+
+    /// Secrets of `org`.
+    pub fn secrets(&self, org: &str) -> crate::secrets::SecretClient {
+        crate::secrets::SecretClient::new(self.clone(), org)
     }
 
     /// Read grants this client has been given; shared by its clones.

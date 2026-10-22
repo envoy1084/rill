@@ -110,6 +110,27 @@ impl Error {
         self.code() == Some(Code::NotFound)
     }
 
+    /// True when the server refused for `reason`.
+    pub fn is(&self, reason: ErrorReason) -> bool {
+        self.reason() == Some(reason)
+    }
+
+    /// For a policy denial, what is still missing (votes, checks, owners).
+    pub fn missing(&self) -> &[String] {
+        match self {
+            Error::Status { missing, .. } => missing,
+            _ => &[],
+        }
+    }
+
+    /// How long the server asked the caller to wait before retrying.
+    pub fn retry_after(&self) -> Option<std::time::Duration> {
+        match self {
+            Error::Status { retry_after, .. } => *retry_after,
+            _ => None,
+        }
+    }
+
     /// Build a configuration error.
     pub fn config(msg: impl Into<String>) -> Self {
         Error::Config(msg.into())
@@ -123,6 +144,27 @@ impl Error {
 
 impl From<connectrpc::ConnectError> for Error {
     fn from(err: connectrpc::ConnectError) -> Self {
+        let details = Details::of(&err);
+        Error::Status {
+            code: err.code,
+            message: err.message.unwrap_or_default(),
+            reason: details.reason,
+            missing: details.missing,
+            retry_after: details.retry_after,
+        }
+    }
+}
+
+/// What an error's details say.
+#[derive(Default)]
+pub(crate) struct Details {
+    pub(crate) reason: Option<ErrorReason>,
+    pub(crate) missing: Vec<String>,
+    pub(crate) retry_after: Option<std::time::Duration>,
+}
+
+impl Details {
+    pub(crate) fn of(err: &connectrpc::ConnectError) -> Self {
         let mut reason = None;
         let mut missing = Vec::new();
         let mut retry_after = None;
@@ -161,9 +203,7 @@ impl From<connectrpc::ConnectError> for Error {
                 _ => {}
             }
         }
-        Error::Status {
-            code: err.code,
-            message: err.message.unwrap_or_default(),
+        Details {
             reason,
             missing,
             retry_after,
@@ -185,6 +225,60 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn detail(type_name: &str, message: &impl Message) -> connectrpc::ErrorDetail {
+        connectrpc::ErrorDetail::from_message(type_name, message)
+    }
+
+    #[test]
+    fn details_give_the_reason_what_is_missing_and_when_to_retry() {
+        let err = connectrpc::ConnectError::new(Code::FailedPrecondition, "not yet")
+            .with_detail(detail(
+                "google.rpc.ErrorInfo",
+                &rpc::ErrorInfo {
+                    reason: "POLICY_DENIED".into(),
+                    domain: rill_proto::ERROR_DOMAIN.into(),
+                    metadata: Default::default(),
+                },
+            ))
+            .with_detail(detail(
+                "google.rpc.PreconditionFailure",
+                &rpc::PreconditionFailure {
+                    violations: vec![rpc::precondition_failure::Violation {
+                        r#type: "POLICY".into(),
+                        subject: String::new(),
+                        description: "Review +2".into(),
+                    }],
+                },
+            ))
+            .with_detail(detail(
+                "google.rpc.RetryInfo",
+                &rpc::RetryInfo {
+                    retry_delay: buffa_types::google::protobuf::Duration {
+                        seconds: 3,
+                        ..Default::default()
+                    }
+                    .into(),
+                },
+            ));
+        let err = Error::from(err);
+        assert!(err.is(ErrorReason::PolicyDenied));
+        assert_eq!(err.missing(), ["Review +2"]);
+        assert_eq!(err.retry_after(), Some(std::time::Duration::from_secs(3)));
+    }
+
+    #[test]
+    fn a_reason_from_another_domain_is_not_ours() {
+        let err = connectrpc::ConnectError::new(Code::NotFound, "gone").with_detail(detail(
+            "google.rpc.ErrorInfo",
+            &rpc::ErrorInfo {
+                reason: "NOT_FOUND".into(),
+                domain: "example.com".into(),
+                metadata: Default::default(),
+            },
+        ));
+        assert_eq!(Error::from(err).reason(), None);
+    }
 
     #[test]
     fn status_mapping_preserves_code() {

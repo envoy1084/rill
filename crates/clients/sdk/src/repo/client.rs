@@ -66,6 +66,16 @@ impl RepoClient {
         TrunkClient::new(self.client.clone(), self.resource.clone())
     }
 
+    /// Verification runs, test history, flakes and quarantines.
+    pub fn checks(&self) -> crate::checks::ChecksClient {
+        crate::checks::ChecksClient::new(self.client.clone(), self.resource.clone())
+    }
+
+    /// Long-running operations.
+    pub fn operations(&self) -> crate::operations::OperationClient {
+        crate::operations::OperationClient::new(self.client.clone(), self.resource.clone())
+    }
+
     /// Stack helpers composed from review and repo calls.
     pub fn stack(&self) -> StackClient {
         StackClient::new(self.clone())

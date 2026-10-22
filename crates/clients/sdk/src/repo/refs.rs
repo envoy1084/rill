@@ -62,32 +62,33 @@ impl RepoClient {
             Some(p) if !p.is_empty() => format!("name = {:?}", format!("{p}*")),
             _ => String::new(),
         };
-        let mut refs = Vec::new();
-        let mut page_token = String::new();
-        loop {
-            let resp = crate::client::retry_idempotent(|| {
-                let svc = self.svc();
-                let request = pb::ListRefsRequest {
-                    parent: self.resource.clone(),
-                    page_size: 1000,
-                    page_token: page_token.clone(),
-                    filter: filter.clone(),
-                };
-                async move { svc.list_refs(request).await }
-            })
-            .await?
-            .into_owned();
-            for r in resp.refs {
-                refs.push(RefInfo::try_from(r)?);
+        crate::paging::all(|page_token| {
+            let filter = filter.clone();
+            async move {
+                let resp = crate::client::retry_idempotent(|| {
+                    let svc = self.svc();
+                    let request = pb::ListRefsRequest {
+                        parent: self.resource.clone(),
+                        page_size: crate::paging::PAGE,
+                        page_token: page_token.clone(),
+                        filter: filter.clone(),
+                    };
+                    async move { svc.list_refs(request).await }
+                })
+                .await?
+                .into_owned();
+                let refs = resp
+                    .refs
+                    .into_iter()
+                    .map(RefInfo::try_from)
+                    .collect::<Result<Vec<_>>>()?;
+                Ok((refs, resp.next_page_token))
             }
-            if resp.next_page_token.is_empty() {
-                return Ok(refs);
-            }
-            page_token = resp.next_page_token;
-        }
+        })
+        .await
     }
 
-    /// Cut `releases/<name>` at trunk position `at` (the head when `None`).
+    /// Cut `release/<name>` at trunk position `at` (the head when `None`).
     /// Returns the ref, the version it points at and that trunk position.
     pub async fn cut_release(
         &self,
@@ -197,28 +198,29 @@ impl RepoClient {
     /// Landings between two trunk positions, inclusive.
     pub async fn trunk_range(&self, from: TrunkSeq, to: TrunkSeq) -> Result<Vec<LandEvent>> {
         let filter = format!("position >= {} AND position <= {}", from.get(), to.get());
-        let mut landings = Vec::new();
-        let mut page_token = String::new();
-        loop {
-            let resp = crate::client::retry_idempotent(|| {
-                let svc = self.svc();
-                let request = pb::ListTrunkPositionsRequest {
-                    parent: self.resource.clone(),
-                    page_size: 1000,
-                    page_token: page_token.clone(),
-                    filter: filter.clone(),
-                };
-                async move { svc.list_trunk_positions(request).await }
-            })
-            .await?
-            .into_owned();
-            for landing in resp.landings {
-                landings.push(LandEvent::try_from(landing)?);
+        crate::paging::all(|page_token| {
+            let filter = filter.clone();
+            async move {
+                let resp = crate::client::retry_idempotent(|| {
+                    let svc = self.svc();
+                    let request = pb::ListTrunkPositionsRequest {
+                        parent: self.resource.clone(),
+                        page_size: crate::paging::PAGE,
+                        page_token: page_token.clone(),
+                        filter: filter.clone(),
+                    };
+                    async move { svc.list_trunk_positions(request).await }
+                })
+                .await?
+                .into_owned();
+                let landings = resp
+                    .landings
+                    .into_iter()
+                    .map(LandEvent::try_from)
+                    .collect::<Result<Vec<_>>>()?;
+                Ok((landings, resp.next_page_token))
             }
-            if resp.next_page_token.is_empty() {
-                return Ok(landings);
-            }
-            page_token = resp.next_page_token;
-        }
+        })
+        .await
     }
 }

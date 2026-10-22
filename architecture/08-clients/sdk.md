@@ -13,10 +13,13 @@ flowchart LR
     Cl --> Repo[RepoClient]
     Cl --> Admin[AdminClient]
     Cl --> Access[AccessClient]
+    Cl --> Id["IdentityClient, ProtectionClient,<br/>SecretClient (per org)"]
     Repo --> WS[WorkspaceClient]
     Repo --> Rv[ReviewClient]
     Repo --> In[IntentClient]
     Repo --> La[TrunkClient]
+    Repo --> Ck[ChecksClient]
+    Repo --> Op[OperationClient]
     Repo --> St[StackClient]
     Repo --> Co[local::Checkout]
 ```
@@ -35,9 +38,16 @@ Listings, path resolution, diffs and version reads return read grants; the
 client keeps them by object hash (`Client::read_grants`, nine minutes) and
 `get_blob` and `tree` send the one naming the object they fetch
 ([read grants](../05-policy/permissions.md#read-grants)). `Client::repo(name_or_id)` returns a `RepoClient`, which
-puts the repository on every request and hands out the per-service clients.
-Inputs and outputs are `rill-types` values where one exists. Otherwise they
-are small structs in `types/`.
+names the repository (`orgs/{org}/repos/{repo}`, from a bare name, `org/name`
+or a full name; `names.rs`) in every request and hands out the per-service
+clients; `Client::identity(org)`, `protection(org)` and `secrets(org)` do
+the same for an org. Inputs and outputs are `rill-types` values where one
+exists, small structs in `types/` where the SDK adds something, and the
+generated messages (`rill_sdk::pb`) for administrative records it passes
+through. Every list method either returns a `Page` with the next page's
+token or, for lists an administrator reads whole, follows the tokens
+itself (`paging.rs`); `filter.rs` builds the filter text from typed
+options, quoting every value.
 
 Nothing is dialled until the first request; a bad endpoint fails there.
 `Client::connect` first exchanges a workload credential when one is
@@ -183,11 +193,37 @@ cancelled land and `Error::Timeout` when the deadline passes.
 
 ## Errors
 
-`Error` variants: `Status {code, message}`, `Transport`, `Convert`,
-`Invalid`, `Config`, `Io`, `Timeout`, `Conflict {change_id, hash, paths}`,
-`Checkout` and `LandFailed {ticket, status, message}`. Callers branch on
-`Error::code()` and `is_not_found()`. See
-[api surface](../07-runtime/api-surface.md) for status codes.
+`Error` variants: `Status {code, message, reason, missing, retry_after}`,
+`Convert`, `Invalid`, `Config`, `Io`, `Timeout`, `Conflict {change_id,
+hash, paths}`, `Checkout` and `LandFailed {ticket, status, message}`. A
+status error carries what the server's details say: the `ErrorReason`
+from `ErrorInfo` (only for the `rill.dev` domain), what a policy denial
+still misses, and how long to wait. Callers branch on `Error::code()`,
+`is(reason)` (`ErrorReason::EtagMismatch`, `PolicyDenied`, …),
+`is_not_found()`, `missing()` and `retry_after()`. See
+[api surface](../07-runtime/api-surface.md#errors) for the reasons.
+
+## Retries
+
+Every call goes through `retry_idempotent`, which retries while the
+cluster is unavailable (`UNAVAILABLE`: a dead or draining server, a cut
+connection, a claim a dead server left) and while the server refuses for
+now with a wait (`RESOURCE_EXHAUSTED` with `RetryInfo`: a rate limit, a
+full landing queue), waiting what the server asks, at most 5 s a time.
+Jittered `backon` backoff runs from 100 ms to 2 s, up to 20 s in total.
+Retrying is safe: reads have no effect, a refused call never ran, and
+every mutation carries a `request_id` (a fresh one unless the caller
+passes its own through a `*_with_op` method), which the server runs at
+most once. A `RESOURCE_EXHAUSTED` without a wait (a request over the size
+limit) is not retried.
+
+## Testing
+
+The `testing` feature adds `testing::DevServer`: a dev-mode, memory-backed
+server in the test's process on a free port, with `client()` connected to
+it and `start_with(config)` for other settings. The load tools use it, and
+`tests/conformance.rs` runs the [SDK conformance
+scenarios](../../sdks/conformance/README.md) against it.
 
 ## Limitations
 
@@ -197,12 +233,8 @@ cancelled land and `Error::Timeout` when the deadline passes.
 - A checkout has no rename detection. A moved file shows as `Deleted` plus
   `Added`. A symlink's content is its target string.
 - When `RILL_ENDPOINT` is set, `discover` ignores the config file entirely.
-- The server always returns `next_page_token: None`, so a page holds the
-  whole limit-bounded result.
-- Unary reads and calls carrying an operation id are retried
-  (`retry_idempotent`: `UNAVAILABLE`, jittered `backon` backoff from 100 ms
-  to 2 s, up to 20 s in total); other mutations and
-  `watch_*` streams are not.
+- `watch_*` streams are not retried; a cut stream ends with its error.
+- `RetryInfo` carries whole seconds as the SDK reads it.
 - `RepoClient::grep` has no fallback; the tree walk lives in [mcp](mcp.md).
 
 ## Code
@@ -211,7 +243,8 @@ cancelled land and `Error::Timeout` when the deadline passes.
 - [repo/mod.rs](../../crates/clients/sdk/src/repo/mod.rs), [repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs), [repo/write.rs](../../crates/clients/sdk/src/repo/write.rs), [repo/history.rs](../../crates/clients/sdk/src/repo/history.rs), [repo/watch.rs](../../crates/clients/sdk/src/repo/watch.rs)
 - [types/root.rs](../../crates/clients/sdk/src/types/root.rs), [types/edit.rs](../../crates/clients/sdk/src/types/edit.rs), [types/page.rs](../../crates/clients/sdk/src/types/page.rs)
 - [local/checkout.rs](../../crates/clients/sdk/src/local/checkout.rs), [local/meta.rs](../../crates/clients/sdk/src/local/meta.rs), [local/status.rs](../../crates/clients/sdk/src/local/status.rs), [local/update.rs](../../crates/clients/sdk/src/local/update.rs), [local/walk.rs](../../crates/clients/sdk/src/local/walk.rs)
-- [stack.rs](../../crates/clients/sdk/src/stack.rs), [review.rs](../../crates/clients/sdk/src/review.rs), [workspace.rs](../../crates/clients/sdk/src/workspace.rs), [trunk.rs](../../crates/clients/sdk/src/trunk.rs), [admin.rs](../../crates/clients/sdk/src/admin.rs)
+- [stack.rs](../../crates/clients/sdk/src/stack.rs), [review.rs](../../crates/clients/sdk/src/review.rs), [workspace.rs](../../crates/clients/sdk/src/workspace.rs), [trunk.rs](../../crates/clients/sdk/src/trunk.rs), [admin.rs](../../crates/clients/sdk/src/admin.rs), [checks.rs](../../crates/clients/sdk/src/checks.rs), [operations.rs](../../crates/clients/sdk/src/operations.rs), [identity/](../../crates/clients/sdk/src/identity/mod.rs), [protection.rs](../../crates/clients/sdk/src/protection.rs), [secrets.rs](../../crates/clients/sdk/src/secrets.rs)
+- [names.rs](../../crates/clients/sdk/src/names.rs), [filter.rs](../../crates/clients/sdk/src/filter.rs), [paging.rs](../../crates/clients/sdk/src/paging.rs), [testing.rs](../../crates/clients/sdk/src/testing.rs), [tests/conformance.rs](../../crates/clients/sdk/tests/conformance.rs)
 
 ---
 ← Previous: [Cache tier](../07-runtime/cache.md) · [Index](../index.md) · Next: [CLI](cli.md) →

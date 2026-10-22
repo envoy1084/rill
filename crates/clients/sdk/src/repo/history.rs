@@ -64,26 +64,21 @@ impl RepoClient {
 
     /// Every version of a change in creation order; the last is current.
     pub async fn change_versions(&self, change_id: ChangeId) -> Result<Vec<ChangeInfo>> {
-        let mut versions = Vec::new();
-        let mut page_token = String::new();
-        loop {
+        crate::paging::all(|page_token| async move {
             let resp = crate::client::retry_idempotent(|| {
                 let svc = self.changes();
                 let request = pb::ListVersionsRequest {
                     parent: crate::names::change(&self.resource, &change_id),
-                    page_size: 1000,
+                    page_size: crate::paging::PAGE,
                     page_token: page_token.clone(),
                 };
                 async move { svc.list_versions(request).await }
             })
             .await?
             .into_owned();
-            versions.extend(convert_infos(resp.versions)?);
-            if resp.next_page_token.is_empty() {
-                return Ok(versions);
-            }
-            page_token = resp.next_page_token;
-        }
+            Ok((convert_infos(resp.versions)?, resp.next_page_token))
+        })
+        .await
     }
 
     /// The current version of a change.

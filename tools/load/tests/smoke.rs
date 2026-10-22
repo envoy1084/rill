@@ -2,13 +2,14 @@
 
 use std::time::Duration;
 
-use rill_load::{run, EmbeddedServer, Profile, Settings};
+use rill_load::{run, Profile, Settings};
+use rill_sdk::testing::DevServer;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn short_run_completes_without_errors() {
-    let server = EmbeddedServer::start(0).await.unwrap();
+    let server = DevServer::start().await.unwrap();
     let report = run(Settings {
-        endpoint: server.endpoint.clone(),
+        endpoint: server.endpoint().to_string(),
         repo: "smoke".into(),
         profile: Profile::of_d1(0.2),
         duration: Duration::from_secs(2),
@@ -45,9 +46,9 @@ async fn short_run_completes_without_errors() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn disjoint_landings_all_land() {
-    let server = EmbeddedServer::start(0).await.unwrap();
+    let server = DevServer::start().await.unwrap();
     let report = run(Settings {
-        endpoint: server.endpoint.clone(),
+        endpoint: server.endpoint().to_string(),
         repo: "disjoint".into(),
         profile: Profile::of_d1(0.0).with_lands(5.0),
         duration: Duration::from_secs(3),
@@ -80,9 +81,12 @@ async fn disjoint_landings_all_land() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn contended_landings_all_land_through_the_merge_drivers() {
-    let server = EmbeddedServer::start(4).await.unwrap();
+    let mut config = DevServer::config();
+    config.verify.enabled = true;
+    config.exec.local.workers = 4;
+    let server = DevServer::start_with(config).await.unwrap();
     let report = run(Settings {
-        endpoint: server.endpoint.clone(),
+        endpoint: server.endpoint().to_string(),
         repo: "contended".into(),
         profile: Profile::of_d1(0.0).with_lands(4.0),
         duration: Duration::from_secs(4),

@@ -230,3 +230,44 @@ async fn writes_retry_through_unavailable_servers_with_one_request_id() {
         "every attempt is the same operation"
     );
 }
+
+#[tokio::test]
+async fn a_refusal_that_asks_for_a_wait_is_retried_after_it() {
+    let mock = MockRepo::new();
+    mock.set_trunk(1, fake_hash("head"));
+    mock.rate_limited
+        .store(1, std::sync::atomic::Ordering::SeqCst);
+    let h = Harness::with_repo(mock).await;
+    let started = std::time::Instant::now();
+    h.client
+        .repo("main")
+        .apply_edits(
+            EditBase::Root(Root::trunk()),
+            vec![Edit::set(path("a.txt"), "hi")],
+            ApplyOptions::message("waited"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(h.repo.applied.lock().unwrap().len(), 2);
+    assert!(started.elapsed() >= std::time::Duration::from_secs(1));
+}
+
+#[tokio::test]
+async fn a_refusal_without_a_wait_is_not_retried() {
+    let mock = MockRepo::new();
+    mock.set_trunk(1, fake_hash("head"));
+    mock.too_large.store(1, std::sync::atomic::Ordering::SeqCst);
+    let h = Harness::with_repo(mock).await;
+    let err = h
+        .client
+        .repo("main")
+        .apply_edits(
+            EditBase::Root(Root::trunk()),
+            vec![Edit::set(path("a.txt"), "hi")],
+            ApplyOptions::message("too big"),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), Some(rill_sdk::Code::ResourceExhausted));
+    assert_eq!(h.repo.applied.lock().unwrap().len(), 1);
+}

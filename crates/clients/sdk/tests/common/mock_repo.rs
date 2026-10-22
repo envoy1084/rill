@@ -42,6 +42,11 @@ pub struct MockRepo {
     pub chunk_size: usize,
     /// `ApplyEdits` calls still to fail with `Unavailable`.
     pub unavailable: std::sync::atomic::AtomicUsize,
+    /// `ApplyEdits` calls still to refuse as rate limited, asking for a
+    /// one-second wait.
+    pub rate_limited: std::sync::atomic::AtomicUsize,
+    /// `ApplyEdits` calls still to refuse as too large, with no wait.
+    pub too_large: std::sync::atomic::AtomicUsize,
 }
 
 impl Default for MockRepo {
@@ -63,6 +68,8 @@ impl MockRepo {
             rebases: Mutex::default(),
             chunk_size: 1000,
             unavailable: std::sync::atomic::AtomicUsize::new(0),
+            rate_limited: std::sync::atomic::AtomicUsize::new(0),
+            too_large: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -117,6 +124,19 @@ impl MockRepo {
                 kind: pb::FileKind::from(file.kind).into(),
             })),
         }
+    }
+
+    /// Take one of `counter`'s remaining failures, if any.
+    pub(super) fn take(counter: &std::sync::atomic::AtomicUsize) -> bool {
+        use std::sync::atomic::Ordering::SeqCst;
+        let mut n = counter.load(SeqCst);
+        while n > 0 {
+            match counter.compare_exchange(n, n - 1, SeqCst, SeqCst) {
+                Ok(_) => return true,
+                Err(now) => n = now,
+            }
+        }
+        false
     }
 
     pub(super) fn record_auth<T>(&self, req: &Request<T>) {

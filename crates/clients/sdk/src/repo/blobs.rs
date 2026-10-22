@@ -111,7 +111,7 @@ impl RepoClient {
                 objects: objects
                     .iter()
                     .map(|(kind, hash)| pb::ObjectRef {
-                        kind: object_kind_to_proto(*kind).into(),
+                        kind: pb::ObjectKind::from(*kind).into(),
                         hash: hash_to_proto(hash),
                     })
                     .collect(),
@@ -121,17 +121,6 @@ impl RepoClient {
         .await?
         .into_owned();
         Ok(resp.present)
-    }
-}
-
-fn object_kind_to_proto(kind: ObjectKind) -> pb::ObjectKind {
-    match kind {
-        ObjectKind::Blob => pb::ObjectKind::Blob,
-        ObjectKind::Chunk => pb::ObjectKind::Chunk,
-        ObjectKind::BlobManifest => pb::ObjectKind::BlobManifest,
-        ObjectKind::Tree => pb::ObjectKind::Tree,
-        ObjectKind::ChangeVersion => pb::ObjectKind::ChangeVersion,
-        ObjectKind::Derived => pb::ObjectKind::Derived,
     }
 }
 
