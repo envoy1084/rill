@@ -109,6 +109,17 @@ impl Lander {
                 }
             }
             let batch = self.without_lost_members(batch, &lost).await;
+            let batch = match self.line.is_trunk() {
+                true => {
+                    let health = self.repo.trunk_health().await.unwrap_or_default();
+                    // What a red trunk holds waits for a later sweep, not the
+                    // next window: nothing it holds would land there either.
+                    let (batch, waiting) = self.guard(batch, &health).await;
+                    let (batch, _waiting) = hold_split_groups(batch, waiting);
+                    batch
+                }
+                false => batch,
+            };
             let (batch, later) = self.admit(batch, &rules.landing.throttle);
             let (batch, later) = hold_split_groups(batch, later);
             held.extend(later);

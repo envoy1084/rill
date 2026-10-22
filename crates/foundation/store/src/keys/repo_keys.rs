@@ -261,6 +261,14 @@ impl RepoKeys {
     }
 
     /// The prefix of every target's stats.
+    pub fn incidents(&self) -> Bytes {
+        self.table(table::INCIDENT)
+    }
+
+    pub fn incident(&self, culprit: u64) -> Bytes {
+        seq_key(&self.incidents(), culprit)
+    }
+
     pub fn test_quarantine(&self, target: &str) -> Bytes {
         self.row(table::TEST_QUARANTINE, &target)
     }

@@ -64,6 +64,16 @@ pub trait ReviewHooks: Send + Sync {
         Ok(Vec::new())
     }
 
+    /// An incident about `change`'s landing was opened, or its automatic
+    /// revert could not land: tell its owner (and sponsor).
+    async fn notify_incident(
+        &self,
+        _change: ChangeId,
+        _incident: &rill_types::Incident,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     /// Whether `requester` may land `version` of `change` now, judged on
     /// the review as read; the lander lands only if that review is still
     /// what it was when the landing commits. The default is for changes
@@ -201,6 +211,18 @@ pub struct VerifyRequest {
 #[async_trait]
 pub trait Verifier: Send + Sync {
     async fn verify(&self, request: VerifyRequest) -> Result<VerificationOutcome>;
+
+    /// Whether going from `base` to `root` could change the outcome of
+    /// `steps`: it touched their inputs. `true` when that cannot be told,
+    /// which is the default.
+    async fn could_affect(
+        &self,
+        _root: TreeHash,
+        _base: Option<TreeHash>,
+        _steps: &std::collections::BTreeSet<String>,
+    ) -> Result<bool> {
+        Ok(true)
+    }
 }
 
 /// A verifier that passes everything.
@@ -304,4 +326,12 @@ pub trait TargetGraph: Send + Sync {
         root: TreeHash,
         base: Option<TreeHash>,
     ) -> Result<Option<std::collections::BTreeSet<String>>>;
+}
+
+/// Hands a trunk break to a fix agent. Dispatch to real agents arrives
+/// with the reviewer fleet; until then the server has none.
+#[async_trait]
+pub trait FixDispatcher: Send + Sync {
+    /// Offer `incident`; returns who took it, or `None`.
+    async fn dispatch(&self, incident: &rill_types::Incident) -> Result<Option<String>>;
 }

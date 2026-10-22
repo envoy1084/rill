@@ -28,7 +28,7 @@ const MAX_LIST: usize = 1000;
 /// The lander service.
 #[derive(Clone)]
 pub struct LanderSvc {
-    state: Arc<AppState>,
+    pub(super) state: Arc<AppState>,
 }
 
 impl LanderSvc {
@@ -311,6 +311,31 @@ impl LanderService for LanderSvc {
                 }))
             })
             .await;
+        result.map_err(Status::from)
+    }
+
+    async fn get_trunk_health(
+        &self,
+        request: Request<pb::GetTrunkHealthRequest>,
+    ) -> GrpcResult<pb::GetTrunkHealthResponse> {
+        Ok(Response::new(self.trunk_health_impl(request).await?))
+    }
+
+    async fn list_incidents(
+        &self,
+        request: Request<pb::ListIncidentsRequest>,
+    ) -> GrpcResult<pb::ListIncidentsResponse> {
+        Ok(Response::new(self.incidents_impl(request).await?))
+    }
+
+    async fn freeze_trunk(
+        &self,
+        request: Request<pb::FreezeTrunkRequest>,
+    ) -> GrpcResult<pb::FreezeTrunkResponse> {
+        let result = idem::once(&self.state, request, |r| async move {
+            self.freeze_impl(r).await.map(Response::new)
+        })
+        .await;
         result.map_err(Status::from)
     }
 

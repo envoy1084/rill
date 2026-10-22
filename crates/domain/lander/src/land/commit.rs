@@ -87,6 +87,16 @@ impl Lander {
                 .landed(candidate.queued.request.requested_at.millis(), now);
         }
         let landed: Vec<_> = landings.iter().map(|l| (l.change_id, l.version)).collect();
+        if self.line.is_trunk() {
+            let fixed: Vec<_> = landings
+                .iter()
+                .zip(&chain)
+                .map(|(l, c)| (l.seq, c.cv.clone()))
+                .collect();
+            if let Err(e) = self.note_fixes(&fixed).await {
+                tracing::warn!(error = %e, "noting what a landing fixes failed");
+            }
+        }
         for (landing, candidate) in landings.into_iter().zip(&chain) {
             self.announce(&candidate.queued, landing, &candidate.cv)
                 .await;

@@ -4,6 +4,7 @@ mod commit;
 mod domains;
 pub mod followups;
 mod groups;
+mod guard;
 mod head_config;
 mod lander;
 mod prepare;

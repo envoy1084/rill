@@ -460,3 +460,66 @@ async fn an_owner_quarantines_a_target_and_lifts_it_again() {
             .released
     );
 }
+
+#[tokio::test]
+async fn an_owner_freezes_trunk_and_its_health_says_so() {
+    let server = TestServer::start(dev_config()).await;
+    let mut c = clients(&server, None).await;
+    c.repo
+        .create_repo(pb::CreateRepoRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            description: None,
+            windows_safe: false,
+        })
+        .await
+        .unwrap();
+    let lander = rill_proto::rill::v1::lander_service_client::LanderServiceClient::new(
+        connect(&server.grpc).await,
+    );
+    let health = |_: &mut Clients| {
+        let mut lander = lander.clone();
+        async move {
+            lander
+                .get_trunk_health(pb::GetTrunkHealthRequest { repo: "app".into() })
+                .await
+                .unwrap()
+                .into_inner()
+        }
+    };
+    let fresh = health(&mut c).await;
+    assert_eq!(fresh.health.unwrap().state, "green");
+    assert!(fresh.open.is_empty());
+
+    let freeze = |frozen| pb::FreezeTrunkRequest {
+        operation_id: Bytes::new(),
+        repo: "app".into(),
+        frozen,
+        reason: "incident review".into(),
+    };
+    let frozen = lander
+        .clone()
+        .freeze_trunk(freeze(true))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(frozen.health.unwrap().frozen);
+    let now = health(&mut c).await.health.unwrap();
+    assert_eq!(
+        (now.frozen, now.frozen_reason.as_deref()),
+        (true, Some("incident review"))
+    );
+    lander.clone().freeze_trunk(freeze(false)).await.unwrap();
+    assert!(!health(&mut c).await.health.unwrap().frozen);
+    let incidents = lander
+        .clone()
+        .list_incidents(pb::ListIncidentsRequest {
+            repo: "app".into(),
+            limit: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .incidents;
+    assert!(incidents.is_empty());
+}

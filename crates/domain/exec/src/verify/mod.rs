@@ -1,6 +1,7 @@
 //! Repository-defined verification: `.rill/verify.toml` compiled to REAPI
 //! actions and run by whichever workers serve the scheduler.
 
+mod affects;
 mod compile;
 pub mod graph;
 mod outcome;

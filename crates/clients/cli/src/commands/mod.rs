@@ -9,6 +9,7 @@ pub mod change;
 pub mod checkout;
 pub mod checks;
 pub mod export;
+pub mod health;
 pub mod history;
 pub mod identity;
 pub mod import;

@@ -64,7 +64,13 @@ impl Handler for RevertHandler {
                 tracing::info!(%culprit, "forward fix landed; no auto-revert");
                 Ok(())
             }
-            Err(e) => Err(JobFailure::Retry(e.to_string())),
+            Err(e) => {
+                // It stays scheduled; the culprit's owner hears once.
+                if let Err(note) = self.lander.revert_blocked(culprit, &e.to_string()).await {
+                    tracing::warn!(%culprit, error = %note, "recording a blocked revert failed");
+                }
+                Err(JobFailure::Retry(e.to_string()))
+            }
         }
     }
 }

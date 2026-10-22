@@ -178,6 +178,56 @@ impl ReviewHooks for ReviewHooksAdapter {
             .collect())
     }
 
+    async fn notify_incident(
+        &self,
+        change: ChangeId,
+        incident: &rill_types::Incident,
+    ) -> rill_lander::Result<()> {
+        let service = self.service();
+        let state = match service.get(&change).await {
+            Ok(state) => state,
+            Err(ReviewError::ReviewNotFound(_)) => return Ok(()),
+            Err(e) => return Err(hook_err(e)),
+        };
+        let culprit = incident.culprit;
+        let sponsor = incident
+            .sponsor
+            .as_ref()
+            .map(|s| format!(" (sponsored by {s})"))
+            .unwrap_or_default();
+        let body = match &incident.revert_blocked {
+            None => format!(
+                "Trunk is red: this change, landed at {culprit}{sponsor}, breaks {}. \
+                 It is reverted automatically after the grace period unless a change \
+                 with a `Fixes: {culprit}` line lands first.{}\n\n{}",
+                incident.steps.join(", "),
+                incident
+                    .assigned
+                    .as_ref()
+                    .map(|a| format!(" {a} is working on a fix."))
+                    .unwrap_or_default(),
+                incident.details
+            ),
+            Some(reason) => format!(
+                "The automatic revert of {culprit} could not land: {reason}. Trunk stays \
+                 red until a change with a `Fixes: {culprit}` line, or a revert, lands."
+            ),
+        };
+        service
+            .comment(
+                &change,
+                &rill_lander::revert::lander_principal(),
+                ThreadAnchor::Change,
+                body,
+                None,
+                None,
+                Some(state.owner.clone()),
+            )
+            .await
+            .map_err(hook_err)?;
+        Ok(())
+    }
+
     /// Judge the review as stored now: still landing, still the version
     /// that was requested, and still allowed by the policy for the
     /// requester. The lander commits only against this very snapshot.

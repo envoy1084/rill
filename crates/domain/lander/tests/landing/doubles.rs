@@ -14,6 +14,7 @@ use crate::common::Fixture;
 pub struct RecordingHooks {
     pub landed: Mutex<Vec<(ChangeId, TrunkSeq)>>,
     pub returned: Mutex<Vec<(ChangeId, String)>>,
+    pub incidents: Mutex<Vec<(ChangeId, rill_types::Incident)>>,
 }
 
 #[async_trait]
@@ -39,6 +40,15 @@ impl ReviewHooks for RecordingHooks {
 
     async fn dependents_of(&self, _change: ChangeId) -> rill_lander::Result<Vec<ChangeId>> {
         Ok(Vec::new())
+    }
+
+    async fn notify_incident(
+        &self,
+        change: ChangeId,
+        incident: &rill_types::Incident,
+    ) -> rill_lander::Result<()> {
+        self.incidents.lock().await.push((change, incident.clone()));
+        Ok(())
     }
 }
 
@@ -237,4 +247,67 @@ pub fn selecting_verifier(fx: &Fixture) -> Arc<dyn Verifier> {
             })
         }
     }))
+}
+
+/// A plan of named steps: step `x` fails while a file `bad_x` exists. With
+/// a base, a step runs only when its `bad_x` changed since it, and a
+/// change affects step `x` when it touches `bad_x`, as with real inputs.
+pub struct StepsVerifier {
+    pub trees: rill_core::TreeOps,
+    pub steps: Vec<&'static str>,
+    pub calls: AtomicUsize,
+}
+
+impl StepsVerifier {
+    async fn file(
+        &self,
+        root: Option<rill_types::TreeHash>,
+        step: &str,
+    ) -> Option<rill_types::EntryKind> {
+        let root = root?;
+        self.trees
+            .lookup(root, &RepoPathBuf::new(format!("bad_{step}")).unwrap())
+            .await
+            .unwrap()
+    }
+}
+
+#[async_trait]
+impl Verifier for StepsVerifier {
+    async fn verify(&self, request: VerifyRequest) -> rill_lander::Result<VerificationOutcome> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let mut failures = Vec::new();
+        for step in &self.steps {
+            let now = self.file(Some(request.root), step).await;
+            let runs = match request.base {
+                Some(base) => self.file(Some(base), step).await != now,
+                None => true,
+            };
+            if runs && now.is_some() {
+                failures.push(rill_lander::Failure {
+                    target: format!("step:{step}"),
+                    step: step.to_string(),
+                    flake_permille: 0,
+                });
+            }
+        }
+        Ok(match failures.is_empty() {
+            true => VerificationOutcome::green("ok"),
+            false => VerificationOutcome::red("steps failed").with_failures(failures),
+        })
+    }
+
+    async fn could_affect(
+        &self,
+        root: rill_types::TreeHash,
+        base: Option<rill_types::TreeHash>,
+        steps: &std::collections::BTreeSet<String>,
+    ) -> rill_lander::Result<bool> {
+        for step in steps {
+            if self.file(Some(root), step).await != self.file(base, step).await {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }

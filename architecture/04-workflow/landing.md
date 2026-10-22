@@ -125,11 +125,15 @@ Each window of up to `MAX_BATCH` (64):
    concurrently. The first time a request is taken up, `hooks.mark_landing`
    moves its review to `Landing` (or accepts it already `Landing`, when a
    lander that took over resumes it). A refusal fails the request.
-2. **Admit.** A configuration change ends the batch before it or is all of
+2. **Guard.** On trunk, a frozen trunk lets only the emergency lane
+   through and a guarded one holds landings that could affect a failing
+   step ([post-land verification](post-land-verification.md#incidents-and-trunk-health));
+   what it holds waits for a later sweep.
+3. **Admit.** A configuration change ends the batch before it or is all of
    it, and requests after it wait, so the rules in force never change
    within a batch. In a throttled domain only the first request is taken;
    the rest wait for the next batch, and `LandEvent::Throttled` says why.
-3. **Speculate** in waves (`Plan`): a request goes in the wave after every
+4. **Speculate** in waves (`Plan`): a request goes in the wave after every
    earlier request it overlaps. Each is placed (`Slot`) on the trunk head
    when no surviving earlier request overlaps it, after the latest one when
    that one's chain holds all it overlaps, or else on the lined-up batch.
@@ -141,7 +145,7 @@ Each window of up to `MAX_BATCH` (64):
    mode is `None`; its land-critical values are stored; and it is approved.
    A failure removes only what was speculated on top of it: later requests
    are placed against the survivors.
-4. **Approve.** `hooks.approve(change, requested version, requester)`
+5. **Approve.** `hooks.approve(change, requested version, requester)`
    reads the review and judges it: it must still be `Landing` or
    `Landable`, its current version must still be the requested one, the
    submit policy must still allow the requester, the version's author and
@@ -151,7 +155,7 @@ Each window of up to `MAX_BATCH` (64):
    quarantined by secret scanning. A refusal sets `Ejected { reason }`.
    An approval carries the review snapshot, the policy digest and the
    votes it saw.
-5. **Line up.** In commit order each candidate is re-parented onto the one
+6. **Line up.** In commit order each candidate is re-parented onto the one
    before it. Everything it overlaps is already in its base, so everything
    between its base and the tip is disjoint from it: the new version is
    the same edits on a new parent, keeping what its rebase recorded
@@ -162,7 +166,7 @@ Each window of up to `MAX_BATCH` (64):
    them; a storage failure fails the first and returns what was lined up
    after it to the queue. Requests placed on
    the lined-up batch are prepared on the stored tip.
-6. **Commit** the chain in one `RepoStore::land` batch on the head read at
+7. **Commit** the chain in one `RepoStore::land` batch on the head read at
    the start. A conflict (trunk moved, or a review changed after it was
    approved) rebuilds the window, up to `max_retries` times; a conflict
    because the lease moved on stops the sweep (`Fenced`).
@@ -392,6 +396,7 @@ the queued requests.
 | `max_sponsor_in_flight` | 2,000 per sponsor |
 | `max_queued` | 10,000 in all |
 | `sponsor_weights` | empty (every sponsor 1) |
+| `guard_after`, `guard_incidents` | 30 min, 3: when a red trunk turns guarded (see [post-land verification](post-land-verification.md#incidents-and-trunk-health)) |
 | `auto_revert`, `revert_grace` | `true`, 15 min (see [post-land verification](post-land-verification.md)) |
 
 The verifier is `ExecVerifier` (runs `.rill/verify.toml` through the

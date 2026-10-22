@@ -19,6 +19,7 @@ pub mod repo;
 pub mod review;
 mod secrets;
 pub mod session;
+mod trunk_health;
 pub mod workspace;
 
 pub use access::AccessSvc;

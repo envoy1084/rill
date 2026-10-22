@@ -25,6 +25,7 @@ pub enum QuarantineCmd {
 /// `rill checks quarantine add`.
 #[derive(Args, Debug)]
 pub struct AddArgs {
+    /// `step:<name>` or `test:<id>`.
     pub target: String,
     /// Why, recorded with it.
     #[arg(long, default_value = "")]
@@ -34,9 +35,11 @@ pub struct AddArgs {
 /// A command naming one target.
 #[derive(Args, Debug)]
 pub struct TargetArg {
+    /// `step:<name>` or `test:<id>`.
     pub target: String,
 }
 
+/// Run a quarantine subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
     let repo = ctx.repo_name()?;
     let mut svc = ctx.client()?.checks_svc();

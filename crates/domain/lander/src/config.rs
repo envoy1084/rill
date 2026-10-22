@@ -72,6 +72,11 @@ pub struct LandPolicy {
     pub max_queued: usize,
     /// Shares of the agent lane by sponsor; 1 when unlisted.
     pub sponsor_weights: std::collections::BTreeMap<String, u32>,
+    /// Red this long makes trunk guarded: landings touching what fails
+    /// wait.
+    pub guard_after: Duration,
+    /// This many open incidents at once make trunk guarded.
+    pub guard_incidents: usize,
 }
 
 impl Default for LandPolicy {
@@ -87,6 +92,8 @@ impl Default for LandPolicy {
             max_sponsor_in_flight: 2_000,
             max_queued: 10_000,
             sponsor_weights: Default::default(),
+            guard_after: Duration::from_secs(30 * 60),
+            guard_incidents: 3,
         }
     }
 }

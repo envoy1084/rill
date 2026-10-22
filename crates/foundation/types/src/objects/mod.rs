@@ -4,6 +4,7 @@
 pub mod blob;
 pub mod change;
 pub mod event;
+pub mod health;
 pub mod intent;
 pub mod land_request;
 pub mod landing;

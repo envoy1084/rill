@@ -189,6 +189,21 @@ impl Verifier for ExecVerifier {
             VerificationOutcome::red(details).with_failures(failures)
         })
     }
+
+    async fn could_affect(
+        &self,
+        root: rill_types::TreeHash,
+        base: Option<rill_types::TreeHash>,
+        steps: &std::collections::BTreeSet<String>,
+    ) -> rill_lander::Result<bool> {
+        match self.runner.could_affect(root, base, steps).await {
+            Ok(affects) => Ok(affects),
+            Err(e) => {
+                tracing::warn!(error = %e, "could not tell what a change affects");
+                Ok(true)
+            }
+        }
+    }
 }
 
 #[cfg(test)]

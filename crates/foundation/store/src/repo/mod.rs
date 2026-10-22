@@ -3,6 +3,7 @@
 mod codec;
 mod derived;
 mod events;
+mod health;
 mod idem;
 mod land_queue;
 mod landing;

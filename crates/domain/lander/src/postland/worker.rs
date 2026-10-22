@@ -1,5 +1,6 @@
 //! The worker that follows trunk and verifies what landed.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -9,6 +10,7 @@ use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use super::batch::BatchSize;
+use super::bisect::Search;
 use super::record::{
     load_cursor, load_marks, recent_records, record_at, store_cursor, store_marks,
     VerificationRecord, VerificationStatus,
@@ -140,8 +142,26 @@ impl PostLandVerifier {
             if full {
                 next_marks.full_green = to;
             }
+            self.lander.close_incidents(to).await?;
         } else if let Some(previous) = base_culprit {
-            // Still red since an earlier culprit; nothing new to find.
+            // Still red since an earlier culprit; a step failing that its
+            // incidents do not explain is a new break, searched for alone.
+            let health = repo.trunk_health().await?;
+            let new_steps: BTreeSet<String> = tip
+                .failures
+                .iter()
+                .map(|f| f.step.clone())
+                .filter(|step| !health.failing_steps.contains(step))
+                .collect();
+            if !new_steps.is_empty() {
+                let search = Search {
+                    full,
+                    focus: Some(&new_steps),
+                    failures: &tip.failures,
+                    details: &tip.details,
+                };
+                culprit = Some(self.bisect_with(cursor, to, &search).await?);
+            }
             self.fill(
                 cursor,
                 to,
@@ -150,12 +170,18 @@ impl PostLandVerifier {
                 "still red",
             )
             .await?;
-            self.set_culprit(to, previous).await?;
+            self.set_culprit(to, culprit.unwrap_or(previous)).await?;
         } else {
             // A full run can find what selection missed before the cursor:
             // search from the last full pass.
             let from = if full { marks.full_green } else { cursor };
-            let found = self.bisect_with(from, to, full).await?;
+            let search = Search {
+                full,
+                focus: None,
+                failures: &tip.failures,
+                details: &tip.details,
+            };
+            let found = self.bisect_with(from, to, &search).await?;
             culprit = Some(found);
             self.set_culprit(to, found).await?;
             self.fill(
@@ -190,6 +216,8 @@ impl PostLandVerifier {
             }
         }
         self.batch.after(tip.passed());
+        // Red long enough turns guarded even when nothing new happened.
+        self.lander.refresh_health().await?;
         if let Err(e) = store_cursor(repo, cursor, to, &lease).await {
             self.lease.lost().await;
             return Err(e);

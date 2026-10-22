@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    access, admin, change, checkout, history, import, intent, land, org, refs, release, repo,
-    review, stack, status, watch, ws,
+    access, admin, change, checkout, health, history, import, intent, land, org, refs, release,
+    repo, review, stack, status, watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -136,8 +136,9 @@ pub enum Command {
     /// Land a change on trunk.
     Land(land::LandArgs),
 
-    /// Trunk status: head, in-flight landings, recent landings.
-    Trunk,
+    /// Trunk status: head, in-flight landings, recent landings; and its
+    /// health, incidents and freeze.
+    Trunk(health::TrunkArgs),
 
     /// Recent landings with their verification.
     Landings(land::LandingsArgs),

@@ -1,7 +1,7 @@
 //! Stacks, review and landing.
 
 use rill_cli::cli::Command;
-use rill_cli::commands::{land, review, stack};
+use rill_cli::commands::{health, land, review, stack};
 
 use super::parse;
 
@@ -71,7 +71,24 @@ fn landing_group() {
             ..
         })
     ));
-    assert!(matches!(parse(&["trunk"]).command, Command::Trunk));
+    assert!(matches!(
+        parse(&["trunk"]).command,
+        Command::Trunk(health::TrunkArgs { cmd: None })
+    ));
+    assert!(matches!(
+        parse(&["trunk", "freeze", "--reason", "incident"]).command,
+        Command::Trunk(health::TrunkArgs {
+            cmd: Some(health::TrunkCmd::Freeze(health::FreezeArgs { reason }))
+        }) if reason == "incident"
+    ));
+    assert!(matches!(
+        parse(&["trunk", "incidents", "-n", "5"]).command,
+        Command::Trunk(health::TrunkArgs {
+            cmd: Some(health::TrunkCmd::Incidents(health::IncidentsArgs {
+                limit: 5
+            }))
+        })
+    ));
     assert!(
         matches!(parse(&["landings", "-n", "3", "--before", "trunk@9"]).command, Command::Landings(a) if a.limit == 3)
     );

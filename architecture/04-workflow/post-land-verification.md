@@ -58,13 +58,60 @@ later bisection decides it.
 
 `bisect(green, red)` is a k-ary search (`BISECT_WAYS` = 8): each round
 verifies the 7 evenly spaced positions inside the range at once (each a
-direct record; `rill-exec`'s action cache makes repeats cheap) and keeps the
-range between the last green and the first red of them, so 64 positions
-take two rounds instead of six. `Flaky` counts as not green. The culprit's
-own record gets `culprit = itself`, red records after it get `culprit =
-it`, `LandEvent::Culprit` is published, and if `LandPolicy.auto_revert` is
-set (the default), `schedule_auto_revert` queues the revert. A `Flaky`
-probe counts as passing.
+direct record, verified against the range's passing end; `rill-exec`'s
+action cache makes repeats cheap) and keeps the range between the last
+passing and the first red of them, so 64 positions take two rounds
+instead of six. `Flaky` counts as passing.
+
+The search is narrowed first. Only a landing that touched the failing
+steps' inputs can have turned them red, so it searches only the positions
+for which `Verifier::could_affect(root, parent root, failing steps)` holds
+(the server answers from the plan: the change touched the plan or one of
+the steps' input globs), plus the known-red end. Usually that is one
+position, verified once. When the steps are unknown it searches the whole
+range.
+
+A sweep on a trunk that is already red still looks for new breaks: steps
+failing at the tip that trunk's open incidents do not explain are searched
+for alone (`Search.focus`): a probe is red only if one of those steps
+fails. That finds a second, overlapping culprit instead of blaming the
+first.
+
+The culprit's own record gets `culprit = itself`, red records after it get
+`culprit = it`, `LandEvent::Culprit` is published, an incident is opened
+(below) and, if `LandPolicy.auto_revert` is set (the default),
+`schedule_auto_revert` queues the revert.
+
+## Incidents and trunk health
+
+Every culprit opens an `Incident` (`inc/(culprit seq)`, named `trunk@N`):
+the culprit's version, change, failing targets and steps (only the new ones
+for a focused search), its verification details, and where it came from
+(author, session, model, sponsor). The lander tells the culprit's owner
+(`ReviewHooks::notify_incident`: a comment addressed to the owner on the
+culprit's review, naming the sponsor, the failing steps, the grace period
+and how to fix it) and offers it to a `FixDispatcher` when the server has
+one (fix agents come with the reviewer fleet; the server has none yet).
+
+An incident is `Open` until a landing reverts its culprit or names it in a
+`Fixes: trunk@N` trailer or its provenance (`fixes`); the land
+transaction's caller then moves it to `Fixing` with the resolution
+(`Reverted` or `Fixed` at that position). When a sweep's tip passes, every
+open incident closes (`Recovered` if nothing fixed it explicitly).
+
+Trunk's health (`TrunkHealth`, a misc row) is judged from the open
+incidents after every change and every sweep (`healing::judge`): `Green`
+with none, `Fixing` when all have a fix landed, else `Red`, and `Guarded`
+once red for `guard_after` (30 minutes) or with `guard_incidents` (3)
+incidents open. Each change writes `TrunkHealthChanged` and each incident
+change `IncidentChanged`, both audited (`trunk.health`, `trunk.incident`).
+
+A guarded trunk holds back, until a later sweep, landings that could
+affect a failing step (asked of the verifier as above), except emergency
+landings and those naming an open incident as fixed. An owner can freeze
+trunk (`FreezeTrunk`): then only the emergency lane lands, whatever the
+health. `rill trunk health`, `rill trunk incidents`, `rill trunk
+freeze [--reason]` and `rill trunk thaw` show and change it.
 
 ## Revert
 
@@ -87,10 +134,13 @@ is `RevertFailed` (gRPC `Aborted`). On success it publishes
 the repository's `revert` queue, ready `revert_grace` after the culprit was
 found, so a restart does not forget it. Each server with the workers role
 runs a revert worker (`workers/reverter.rs`, `RevertHandler`); the job
-calls `auto_revert`, retrying with backoff if landing fails. That skips the
-revert if `has_forward_fix(seq)` finds a later trunk position whose
-provenance has `reverts == seq`, or whose message or linked intent title
-or body contains `trunk@<seq>`. Otherwise it reverts as the service
+calls `auto_revert`, retrying with backoff if landing fails; the first
+failure (a conflict the [conflict ladder](landing.md#conflict-ladder) could
+not resolve, say) is recorded on the incident as `revert_blocked` and the
+culprit's owner is told. It skips the revert if `has_forward_fix(seq)`
+finds a later trunk position that reverts it or names it in a `Fixes:
+trunk@N` trailer or its provenance's `fixes`; a message merely mentioning
+`trunk@N` does not count. Otherwise it reverts as the service
 principal `svc:lander`, as a change whose id is derived from the culprit's
 position: a job rerun after a crash finds the request or the landed revert
 the first run made instead of reverting twice.
@@ -108,6 +158,7 @@ policy reload. A missing review (reverts, direct lands) is never an error.
 | `mark_landed` | `mark_landed` (to `Landed`, sets `landed_seq`) |
 | `return_to_owner` | `landing_failed` (on `InvalidStatus`, `refresh`), then a change-level thread from `svc:lander` addressed `to` the owner |
 | `dependents_of` | `stack_of`, the members after the change |
+| `notify_incident` | a change-level thread from `svc:lander` addressed to the owner: the break, or that its revert is blocked |
 
 The lander logs hook errors and carries on. Status transitions are in
 [review](review.md).
@@ -127,23 +178,28 @@ record (target `postland`) with external reports, worst wins: `Failed` or
 `Inherited`, then `Running`, `Pending`, `Skipped`, `Passed`; no reports is
 `Pending`. An inferred red record blaming another position is `Inherited`.
 `RevertSeq` and `Bisect` need the `land()` permit; `Bisect` fails with
-`FailedPrecondition` when the worker is disabled.
+`FailedPrecondition` when the worker is disabled. `GetTrunkHealth` (health
+and open incidents) and `ListIncidents` need read access; `FreezeTrunk`
+needs repository ownership.
 
 ## Limitations
 
 * The cursor only moves forward; positions below it are re-verified only
   by an explicit `Bisect`.
-* A new failure inside a batch that is already red is attributed to the
-  earlier culprit; it is not bisected separately.
-* `has_forward_fix` is a substring match on `trunk@N`.
+* A new break in a step that is already failing is attributed to the
+  earlier culprit; only newly failing steps are searched separately.
+* Held landings of a guarded trunk show as `Queued`, without a reason.
 * The `Bisect` RPC does not take `sweep_lock` and does not check that
   `from` is green or `to` red.
-* A revert that conflicts fails with `RevertFailed` and is not retried.
+* A blocked revert is retried by its job until the job runs out of
+  attempts.
 * External reports have no size limit or retention.
 
 ## Code
 
-* [rill-lander/src/postland/worker.rs](../../crates/domain/lander/src/postland/worker.rs), [record.rs](../../crates/domain/lander/src/postland/record.rs)
+* [rill-lander/src/postland/](../../crates/domain/lander/src/postland/mod.rs): [worker.rs](../../crates/domain/lander/src/postland/worker.rs), [bisect.rs](../../crates/domain/lander/src/postland/bisect.rs), [positions.rs](../../crates/domain/lander/src/postland/positions.rs), [batch.rs](../../crates/domain/lander/src/postland/batch.rs), [record.rs](../../crates/domain/lander/src/postland/record.rs)
+* [rill-lander/src/healing/](../../crates/domain/lander/src/healing/mod.rs) (incidents, health, fixes), [land/guard.rs](../../crates/domain/lander/src/land/guard.rs); store [repo/health.rs](../../crates/foundation/store/src/repo/health.rs)
+* [rill-exec/src/verify/affects.rs](../../crates/domain/exec/src/verify/affects.rs), [rill-api/src/services/trunk_health.rs](../../crates/server/api/src/services/trunk_health.rs)
 * [rill-lander/src/revert.rs](../../crates/domain/lander/src/revert.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)
 * [rill-runtime/src/workers/hooks.rs](../../crates/server/runtime/src/workers/hooks.rs), [verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [repo_tasks.rs](../../crates/server/runtime/src/workers/repo_tasks.rs)
 * [rill-api/src/services/lander.rs](../../crates/server/api/src/services/lander.rs)

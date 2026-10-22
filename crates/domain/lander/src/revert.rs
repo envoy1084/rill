@@ -164,29 +164,17 @@ async fn revert_with(
     }
 }
 
-/// True when something landed after `seq` that claims to fix or revert
-/// it: a version whose message or intent mentions `trunk@<seq>`, or a
-/// revert of it.
+/// True when something landed after `seq` that reverts it or names it in
+/// a `Fixes: trunk@N` trailer or its provenance.
 pub async fn has_forward_fix(lander: &Lander, seq: TrunkSeq) -> Result<bool> {
     let repo = lander.repo();
     let Some((head, _)) = repo.trunk_head().await? else {
         return Ok(false);
     };
-    let needle = seq.to_string();
     for (_, hash) in repo.trunk_range(seq, head).await? {
         let cv = lander.derive().change(&hash).await?;
-        if cv.provenance.extra.get(REVERTS_KEY) == Some(&seq.get().to_string()) {
+        if crate::healing::fixes_of(&cv).contains(&seq) {
             return Ok(true);
-        }
-        if cv.message.contains(&needle) {
-            return Ok(true);
-        }
-        if let Some(intent) = cv.intent {
-            if let Some(intent) = repo.get_intent(&intent).await? {
-                if intent.title.contains(&needle) || intent.body.contains(&needle) {
-                    return Ok(true);
-                }
-            }
         }
     }
     Ok(false)

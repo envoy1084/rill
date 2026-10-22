@@ -82,6 +82,7 @@ idempotent!(
     RotateDataKeysRequest,
     DeleteSecretRequest,
     QuarantineRequest,
+    FreezeTrunkRequest,
     ReleaseQuarantineRequest,
     PutIdentityProviderRequest,
     DeleteIdentityProviderRequest,

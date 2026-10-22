@@ -14,6 +14,12 @@ service LanderService {
   rpc ReportVerification(ReportVerificationRequest) returns (ReportVerificationResponse);
   rpc RevertSeq(RevertSeqRequest) returns (RevertSeqResponse);
   rpc Bisect(BisectRequest) returns (BisectResponse);
+  // Trunk's state and the incidents keeping it red.
+  rpc GetTrunkHealth(GetTrunkHealthRequest) returns (GetTrunkHealthResponse);
+  // Incidents, open and closed, newest culprit first.
+  rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse);
+  // Freeze trunk so only emergency landings land, or thaw it (owners).
+  rpc FreezeTrunk(FreezeTrunkRequest) returns (FreezeTrunkResponse);
 }
 
 enum VerificationStatus {
@@ -119,4 +125,64 @@ message BisectResponse {
   optional uint64 culprit = 1;
   // Sequences the bisect tested, with their outcomes.
   repeated VerificationResult tested = 2;
+}
+
+message TrunkHealth {
+  // green, red, fixing or guarded.
+  string state = 1;
+  int64 since = 2;
+  // Culprits of the open incidents.
+  repeated uint64 open = 3;
+  repeated string failing_steps = 4;
+  bool frozen = 5;
+  optional string frozen_reason = 6;
+}
+
+message Incident {
+  uint64 culprit = 1;
+  bytes version = 2;
+  bytes change_id = 3;
+  repeated string failures = 4;
+  repeated string steps = 5;
+  string details = 6;
+  Principal author = 7;
+  optional string session = 8;
+  optional string model = 9;
+  optional Principal sponsor = 10;
+  // open, fixing or closed.
+  string state = 11;
+  int64 opened_at = 12;
+  int64 updated_at = 13;
+  // The landing that reverted or fixed it.
+  optional uint64 fix = 14;
+  // reverted, fixed or recovered, and at which position.
+  optional string resolution = 15;
+  optional uint64 resolved_at = 16;
+  optional string revert_blocked = 17;
+  optional string assigned = 18;
+}
+
+message GetTrunkHealthRequest {
+  string repo = 1;
+}
+message GetTrunkHealthResponse {
+  TrunkHealth health = 1;
+  repeated Incident open = 2;
+}
+message ListIncidentsRequest {
+  string repo = 1;
+  // Default 20.
+  uint32 limit = 2;
+}
+message ListIncidentsResponse {
+  repeated Incident incidents = 1;
+}
+message FreezeTrunkRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bool frozen = 3;
+  string reason = 4;
+}
+message FreezeTrunkResponse {
+  TrunkHealth health = 1;
 }

@@ -17,7 +17,7 @@ use crate::events::LandEvent;
 use crate::queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest, SWEEP_LIMIT};
 use crate::schedule::{keep_groups_together, serve_order, share_key, Eta, Thrash, Timings};
 use crate::traits::{
-    ConflictResolver, NoRegenerator, Regenerator, ReviewHooks, TargetGraph, Verifier,
+    ConflictResolver, FixDispatcher, NoRegenerator, Regenerator, ReviewHooks, TargetGraph, Verifier,
 };
 
 /// Capacity of the event channel; slow subscribers lag rather than block
@@ -33,10 +33,12 @@ pub struct Lander {
     pub(super) repo: RepoStore,
     pub(super) derive: Arc<DeriveManager>,
     pub(super) graph: Arc<CommitGraph>,
-    pub(super) hooks: Arc<dyn ReviewHooks>,
+    pub(crate) hooks: Arc<dyn ReviewHooks>,
     pub(super) verifier: Arc<dyn Verifier>,
     pub(crate) regenerator: Arc<dyn Regenerator>,
     pub(super) resolver: Option<Arc<dyn ConflictResolver>>,
+    /// Offered new trunk incidents, when the server has fix agents.
+    pub(crate) fixer: Option<Arc<dyn FixDispatcher>>,
     /// Build targets as conflict domains, when the server has a graph.
     pub(super) targets: Option<Arc<dyn TargetGraph>>,
     /// Targets each version touches, by version.
@@ -90,6 +92,7 @@ impl Lander {
             line: Line::Trunk,
             regenerator: Arc::new(NoRegenerator),
             resolver: None,
+            fixer: None,
             targets: None,
             touched: Default::default(),
             policy,
@@ -116,6 +119,12 @@ impl Lander {
     /// Run `regenerate` merge drivers with `regenerator`.
     pub fn with_regenerator(mut self, regenerator: Arc<dyn Regenerator>) -> Self {
         self.regenerator = regenerator;
+        self
+    }
+
+    /// Offer new trunk incidents to `fixer`.
+    pub fn with_fixer(mut self, fixer: Arc<dyn FixDispatcher>) -> Self {
+        self.fixer = Some(fixer);
         self
     }
 
