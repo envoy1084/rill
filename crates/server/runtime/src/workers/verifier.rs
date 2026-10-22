@@ -316,7 +316,12 @@ mod tests {
             };
             history
                 .record(&TestRun {
-                    target: if junit { "test:suite::flaky" } else { "step:unit" }.into(),
+                    target: if junit {
+                        "test:suite::flaky"
+                    } else {
+                        "step:unit"
+                    }
+                    .into(),
                     outcome,
                     retried: false,
                     duration_ms: None,
