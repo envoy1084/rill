@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use arc_swap::ArcSwap;
 use rill_core::{CommitGraph, DeriveManager, TreeOps};
-use rill_exec::Runner;
 use rill_lander::{Lander, PostLandVerifier};
 use rill_policy::Authorizer;
 use rill_review::service::{ReviewEvent, ReviewService};
@@ -42,8 +41,6 @@ pub struct RepoContext {
     pub lander: Arc<Lander>,
     /// Post-land verifier, when enabled.
     pub postland: Option<Arc<PostLandVerifier>>,
-    /// Verification runner, when pre-land verification is enabled.
-    pub runner: Option<Arc<Runner>>,
     /// Trigram search index, updated as changes land.
     pub search: Arc<SearchIndex>,
     /// ReBAC relation checks.

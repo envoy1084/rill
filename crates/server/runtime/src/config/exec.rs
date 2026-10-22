@@ -1,5 +1,6 @@
 //! The remote execution service.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,8 @@ pub struct ExecConfig {
     pub default_timeout_secs: u64,
     /// The longest timeout, in seconds, an action may ask for.
     pub max_timeout_secs: u64,
+    /// Workers inside this server.
+    pub local: LocalWorkersConfig,
 }
 
 impl Default for ExecConfig {
@@ -39,6 +42,50 @@ impl Default for ExecConfig {
             max_attempts: 3,
             default_timeout_secs: 30 * 60,
             max_timeout_secs: 2 * 60 * 60,
+            local: LocalWorkersConfig::default(),
         }
     }
+}
+
+/// `[exec.local]`: workers that run actions in this server's process,
+/// for development and single-host setups.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LocalWorkersConfig {
+    /// How many; each runs one action at a time.
+    pub workers: usize,
+    /// How their commands are isolated.
+    pub sandbox: SandboxKind,
+    /// Whether commands may use the network (advisory under `local`).
+    pub network: bool,
+    /// The `runsc` binary for the `gvisor` sandbox.
+    pub runsc: String,
+    /// The platform properties they serve; actions asking for others wait
+    /// for other workers.
+    pub platform: BTreeMap<String, String>,
+}
+
+impl Default for LocalWorkersConfig {
+    fn default() -> Self {
+        LocalWorkersConfig {
+            workers: 0,
+            sandbox: SandboxKind::Local,
+            network: false,
+            runsc: "runsc".into(),
+            platform: BTreeMap::new(),
+        }
+    }
+}
+
+/// How a local worker isolates commands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxKind {
+    /// On the host in a private directory, unisolated.
+    #[default]
+    Local,
+    /// Linux only: Landlock, seccomp and resource limits.
+    Confined,
+    /// Each command under gVisor's `runsc do`.
+    Gvisor,
 }

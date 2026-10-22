@@ -1,6 +1,6 @@
 [package]
 name = "rill-exec"
-description = "Verification runner for Rill: sandboxed command execution with a content-addressed action cache"
+description = "Execution for Rill: REAPI execution spaces, the scheduler, verify plans and local workers"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -28,6 +28,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 dashmap = { workspace = true }
 toml = { workspace = true }
+globset = { workspace = true }
 tempfile = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
@@ -39,3 +40,4 @@ seccompiler = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+rill-jobs = { workspace = true }

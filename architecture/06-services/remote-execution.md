@@ -7,7 +7,9 @@ the server (`bazel --digest_function=blake3 build
 --remote_executor=grpc://rill:7420`), and actions run on sandboxed
 Buildbarn workers that take them from Rill's scheduler. Results go into a
 shared action cache, so an action anyone already ran is never run again.
-Repository code runs only on workers, never in the server process.
+Repositories' own `.rill/verify.toml` checks compile to actions on the
+same scheduler ([exec](exec.md)). Repository code runs only on workers:
+Buildbarn's, or the in-process local workers of development setups.
 
 ```mermaid
 flowchart LR
@@ -137,8 +139,6 @@ Both are on the queues dashboard. Queue depths appear with every other
   `BatchReadBlobs` or `Action` read loads the blob whole.
 * In Kubernetes the worker and runner share a pod network; actions are
   kept off the network only by NetworkPolicy, not per container.
-* `.rill/verify.toml` still runs in-process through `LocalSandbox`; it
-  moves onto remote execution in the next phase.
 
 ## Code
 

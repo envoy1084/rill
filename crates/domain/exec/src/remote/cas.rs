@@ -107,6 +107,15 @@ impl ExecSpace {
             .await
     }
 
+    /// Store `bytes` under their own digest, unless already stored.
+    pub async fn put(&self, bytes: Bytes) -> Result<BlobDigest> {
+        let digest = BlobDigest::of(&bytes);
+        if !self.missing(&[digest]).await?.is_empty() {
+            self.write(&digest, bytes).await?;
+        }
+        Ok(digest)
+    }
+
     /// Store content arriving as `parts`, checked against `digest` once it
     /// is complete. Content below the chunking threshold is collected and
     /// stored as one blob (repository storage would inline the smallest).

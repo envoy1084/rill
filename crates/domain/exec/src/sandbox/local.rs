@@ -10,10 +10,8 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 use tokio::task::JoinHandle;
 
-use super::{RawOutcome, Sandbox};
-use crate::action::{Action, TIMEOUT_EXIT_CODE};
+use super::{local_path, Invocation, RawOutcome, Sandbox, TIMEOUT_EXIT_CODE};
 use crate::error::{Error, Result};
-use crate::materialize::local_path;
 
 /// Host variables passed through to every command, on top of the
 /// action's own environment.
@@ -42,7 +40,6 @@ pub struct LocalSandbox {
     /// (TCP) and `Gvisor`; advisory under `Isolation::None`.
     pub network: bool,
     isolation: Isolation,
-    worker: String,
 }
 
 impl Default for LocalSandbox {
@@ -54,15 +51,9 @@ impl Default for LocalSandbox {
 impl LocalSandbox {
     /// An unisolated sandbox; `network` is advisory.
     pub fn new(network: bool) -> Self {
-        let worker = std::env::var("HOSTNAME")
-            .ok()
-            .filter(|h| !h.is_empty())
-            .map(|h| format!("local@{h}"))
-            .unwrap_or_else(|| "local".to_string());
         LocalSandbox {
             network,
             isolation: Isolation::None,
-            worker,
         }
     }
 
@@ -78,7 +69,7 @@ impl LocalSandbox {
         Ok(self)
     }
 
-    fn command(&self, dir: &Path, cwd: &Path, action: &Action) -> Result<Command> {
+    fn command(&self, dir: &Path, cwd: &Path, action: &Invocation) -> Result<Command> {
         let program = action
             .program()
             .ok_or_else(|| Error::InvalidAction("empty command".into()))?;
@@ -119,7 +110,7 @@ impl LocalSandbox {
 
 #[async_trait]
 impl Sandbox for LocalSandbox {
-    async fn run(&self, dir: &Path, action: &Action) -> Result<RawOutcome> {
+    async fn run(&self, dir: &Path, action: &Invocation) -> Result<RawOutcome> {
         let program = action.program().unwrap_or_default();
         let cwd = local_path(dir, &action.working_dir)?;
 
@@ -185,10 +176,6 @@ impl Sandbox for LocalSandbox {
             timed_out,
         })
     }
-
-    fn worker_name(&self) -> String {
-        self.worker.clone()
-    }
 }
 
 /// How long to wait for the output pipes to close after a kill. Something
@@ -231,15 +218,10 @@ fn kill_group(_pid: Option<u32>) {}
 
 #[cfg(all(test, unix))]
 mod tests {
-    use rill_types::ObjectHash;
-
     use super::*;
 
-    fn sh(script: &str) -> Action {
-        Action::new(
-            vec!["sh".into(), "-c".into(), script.into()],
-            ObjectHash::ZERO,
-        )
+    fn sh(script: &str) -> Invocation {
+        Invocation::new(vec!["sh".into(), "-c".into(), script.into()])
     }
 
     #[tokio::test]
@@ -289,8 +271,6 @@ mod tests {
 
 #[cfg(all(test, target_os = "linux"))]
 mod confined_tests {
-    use rill_types::ObjectHash;
-
     use super::*;
 
     #[tokio::test]
@@ -304,7 +284,7 @@ mod confined_tests {
             target.display(),
             target.display()
         );
-        let action = Action::new(vec!["sh".into(), "-c".into(), script], ObjectHash::ZERO);
+        let action = Invocation::new(vec!["sh".into(), "-c".into(), script]);
         let out = LocalSandbox::new(false)
             .with_isolation(Isolation::Confined)
             .unwrap()

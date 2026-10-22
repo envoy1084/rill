@@ -254,13 +254,16 @@ the queued requests.
 | `sponsor_weights` | empty (every sponsor 1) |
 | `auto_revert`, `revert_grace` | `false`, 15 min (see [post-land verification](post-land-verification.md)) |
 
-The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
-`rill-exec`) when `[verify].enabled`, else `AlwaysGreen`.
+The verifier is `ExecVerifier` (runs `.rill/verify.toml` through the
+execution scheduler, see [exec](../06-services/exec.md)) when
+`[verify].enabled`, else `AlwaysGreen`. It gets a `VerifyRequest`: the
+candidate's root, its version, its risk class, the stage (`PreLand`) and,
+in `Affected` mode, the trunk tip's root as the base, so steps whose inputs
+the change did not touch are skipped. `Full` passes no base and runs every
+step.
 
 ## Limitations
 
-* `VerifyMode::Affected` and `Full` call the same verifier; the mode is not
-  passed through.
 * A request keeps the risk class it was enqueued with.
 * A slow verification holds its wave, and so its window: the batch commits
   together.

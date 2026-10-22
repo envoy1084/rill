@@ -29,6 +29,8 @@ pub struct RepoRegistry {
     pub(super) lifecycle: Arc<super::Lifecycle>,
     /// Structural merge, shared by every repository; `None` when off.
     pub(super) merger: Option<Arc<rill_merge_syntax::WeaveMerger>>,
+    /// The execution scheduler verification submits to.
+    pub(super) exec: Arc<rill_exec::remote::Scheduler>,
 }
 
 impl RepoRegistry {
@@ -40,6 +42,7 @@ impl RepoRegistry {
         attestor: Arc<rill_policy::Signer>,
         identity: Arc<crate::identity::IdentityView>,
         lifecycle: Arc<super::Lifecycle>,
+        exec: Arc<rill_exec::remote::Scheduler>,
     ) -> Self {
         let merger = config
             .merge
@@ -55,6 +58,7 @@ impl RepoRegistry {
             build_lock: tokio::sync::Mutex::new(()),
             lifecycle,
             merger,
+            exec,
         }
     }
 

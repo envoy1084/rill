@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use common::{fast_policy, Fixture};
-use rill_lander::{NoopHooks, PostLandVerifier, VerificationOutcome, Verifier};
-use rill_types::{ChangeVersionHash, RepoPathBuf, TreeHash, TrunkSeq};
+use rill_lander::{NoopHooks, PostLandVerifier, VerificationOutcome, Verifier, VerifyRequest};
+use rill_types::{RepoPathBuf, TrunkSeq};
 
 /// Red once a `bad` file exists; records how many verifications overlap.
 struct Watching {
@@ -21,11 +21,8 @@ struct Watching {
 
 #[async_trait]
 impl Verifier for Watching {
-    async fn verify(
-        &self,
-        root: TreeHash,
-        _version: ChangeVersionHash,
-    ) -> rill_lander::Result<VerificationOutcome> {
+    async fn verify(&self, request: VerifyRequest) -> rill_lander::Result<VerificationOutcome> {
+        let root = request.root;
         self.calls.fetch_add(1, Ordering::SeqCst);
         let now = self.running.fetch_add(1, Ordering::SeqCst) + 1;
         self.peak.fetch_max(now, Ordering::SeqCst);

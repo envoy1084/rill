@@ -100,18 +100,19 @@ impl AppState {
         });
         let attestor = Arc::new(load_attestor(&config)?);
         let lifecycle = Arc::new(super::Lifecycle::new(shutdown.clone()));
+        let exec = Arc::new(rill_exec::remote::Scheduler::new(
+            stores.clone(),
+            crate::exec::scheduler_config(&config.exec),
+        ));
         let repos = RepoRegistry::new(
             stores.clone(),
             config.clone(),
             attestor.clone(),
             identity.clone(),
             lifecycle.clone(),
+            exec.clone(),
         );
         let rate_limits = crate::rate::RateLimits::new(&config.rate_limit);
-        let exec = Arc::new(rill_exec::remote::Scheduler::new(
-            stores.clone(),
-            crate::exec::scheduler_config(&config.exec),
-        ));
         let worker_secrets =
             crate::exec::WorkerSecrets::load(config.exec.worker_secret_file.as_deref())?;
         Ok(Arc::new(AppState {

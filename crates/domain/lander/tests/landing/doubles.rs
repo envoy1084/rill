@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use rill_lander::{FnVerifier, ReviewHooks, VerificationOutcome, Verifier};
-use rill_types::{ChangeId, ChangeVersionHash, RepoPathBuf, TreeHash, TrunkSeq};
+use rill_lander::{FnVerifier, ReviewHooks, VerificationOutcome, Verifier, VerifyRequest};
+use rill_types::{ChangeId, ChangeVersionHash, RepoPathBuf, TrunkSeq};
 use tokio::sync::Mutex;
 
 use crate::common::Fixture;
@@ -49,11 +49,7 @@ pub struct CountingVerifier {
 
 #[async_trait]
 impl Verifier for CountingVerifier {
-    async fn verify(
-        &self,
-        _root: TreeHash,
-        _version: ChangeVersionHash,
-    ) -> rill_lander::Result<VerificationOutcome> {
+    async fn verify(&self, _request: VerifyRequest) -> rill_lander::Result<VerificationOutcome> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(if self.green {
             VerificationOutcome::green("ok")
@@ -93,7 +89,8 @@ impl ReviewHooks for RefusingHooks {
 /// Verifier that is red whenever `bad` exists at the root.
 pub fn bad_file_verifier(fx: &Fixture) -> Arc<dyn Verifier> {
     let trees = fx.trees.clone();
-    Arc::new(FnVerifier(move |root: TreeHash, _| {
+    Arc::new(FnVerifier(move |request: VerifyRequest| {
+        let root = request.root;
         let trees = trees.clone();
         async move {
             let bad = trees

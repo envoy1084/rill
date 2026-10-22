@@ -47,7 +47,7 @@ only needs a folder in the right group. `tools/fuzz` is a separate
 | `rill-review` | Labels, votes, threads, interdiff, stacks, submit evaluation, review agents | Landing |
 | `rill-lander` | Queue, sequencer, rebase onto trunk, CAS land, landing records, post-land verification, bisect, revert | Review state (through `ReviewHooks`), execution (through `Verifier`) |
 | `rill-search` | Trigram index, symbol extraction, query execution | Permission filtering (the server passes a `PathFilter`) |
-| `rill-exec` | Action cache, sandbox materialization and confinement, verify plans; remote execution's content store, action cache, operations and scheduler | Serving the protocols (`rill-api`), running actions (Buildbarn workers) |
+| `rill-exec` | Remote execution's content store, action cache, operations and scheduler; verify plans compiled to actions; in-process local workers and their sandboxes | Serving the protocols (`rill-api`), production workers (Buildbarn) |
 | `rill-identity` | Token signing keys and the key services that wrap them (local, Vault, AWS KMS, Google Cloud KMS), key rotation, OIDC and SAML | Request authentication (the server owns it) |
 | `rill-git-import` | One-way git history import onto trunk | Export, mirroring |
 | `rill-runtime` | A server process's state: configuration, stores, `AppState` and per-repository `RepoContext`s, background workers and job handlers, telemetry, the identity view, the audit log, rate limits, the checks every stored version passes (`writes`, `secrets`, `quarantine`), and the server error type with its gRPC status mapping | Requests (`rill-api` serves them) |

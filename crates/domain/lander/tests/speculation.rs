@@ -12,8 +12,9 @@ use async_trait::async_trait;
 use common::{fast_policy, request, Fixture};
 use rill_lander::{
     LandEvent, LandPolicy, LandStatus, Lander, NoopHooks, VerificationOutcome, Verifier,
+    VerifyRequest,
 };
-use rill_types::{ChangeVersionHash, LandTicket, Principal, RiskClass, TreeHash, TrunkSeq};
+use rill_types::{ChangeVersionHash, LandTicket, Principal, RiskClass, TrunkSeq};
 
 /// Green after a pause, counting how many verifications overlap.
 #[derive(Default)]
@@ -24,11 +25,7 @@ struct Concurrent {
 
 #[async_trait]
 impl Verifier for Concurrent {
-    async fn verify(
-        &self,
-        _root: TreeHash,
-        _version: ChangeVersionHash,
-    ) -> rill_lander::Result<VerificationOutcome> {
+    async fn verify(&self, _request: VerifyRequest) -> rill_lander::Result<VerificationOutcome> {
         let now = self.now.fetch_add(1, Ordering::SeqCst) + 1;
         self.most.fetch_max(now, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(100)).await;

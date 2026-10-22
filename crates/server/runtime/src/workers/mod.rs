@@ -1,6 +1,7 @@
-//! Background tasks that run per repository: the landing loop, post-land
+//! Background tasks: per repository, the landing loop, post-land
 //! verification, the derive and index job workers, event retention and
-//! the follower that keeps cached policy and relations current.
+//! the follower that keeps cached policy and relations current; per
+//! server, local execution workers.
 
 mod deriver;
 mod discovery;
@@ -9,6 +10,7 @@ mod hooks;
 mod idempotency;
 mod indexer;
 mod leader;
+mod local_exec;
 mod repo_tasks;
 mod reverter;
 pub(crate) mod rights;
@@ -18,5 +20,6 @@ pub use discovery::discover_repos;
 pub use hooks::ReviewHooksAdapter;
 pub use idempotency::sweep_idempotency;
 pub use indexer::SEARCH_LEASE;
+pub use local_exec::spawn_local_workers;
 pub use repo_tasks::spawn_repo_workers;
 pub use verifier::ExecVerifier;

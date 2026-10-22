@@ -4,7 +4,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use rill_lander::land::followups;
-use rill_lander::{AlwaysGreen, LandEvent, LandStatus, NoopHooks};
+use rill_lander::{
+    AlwaysGreen, FnVerifier, LandEvent, LandStatus, NoopHooks, VerificationOutcome, VerifyRequest,
+    VerifyStage,
+};
 use rill_types::{RepoPathBuf, RiskClass, TrunkSeq};
 
 use crate::common::{fast_policy, request, Fixture};
@@ -225,4 +228,51 @@ async fn red_verifier_fails_the_request() {
     assert_eq!(verifier.calls.load(Ordering::SeqCst), 1);
     assert_eq!(fx.head().await.0, TrunkSeq(1));
     assert_eq!(hooks.returned.lock().await.len(), 1);
+}
+
+#[tokio::test]
+async fn affected_mode_verifies_against_trunk_and_full_mode_verifies_everything() {
+    let fx = Fixture::new().await;
+    let seen = Arc::new(std::sync::Mutex::new(Vec::<VerifyRequest>::new()));
+    let record = seen.clone();
+    let verifier = Arc::new(FnVerifier(move |request: VerifyRequest| {
+        record.lock().unwrap().push(request);
+        async { Ok(VerificationOutcome::green("ok")) }
+    }));
+    let lander = fx.lander(Arc::new(NoopHooks), verifier, fast_policy());
+
+    let (_, first) = fx.commit(None, &[("a", "a")], "first").await;
+    lander
+        .land_now(request(&first, RiskClass::Trivial))
+        .await
+        .unwrap();
+    let (_, trunk) = fx.head().await;
+    let trunk_root = fx.root(&trunk).await;
+
+    let (_, normal) = fx.commit(Some(trunk), &[("n", "n")], "normal").await;
+    lander
+        .land_now(request(&normal, RiskClass::Normal))
+        .await
+        .unwrap();
+    let (_, trunk) = fx.head().await;
+    let (_, critical) = fx.commit(Some(trunk), &[("c", "c")], "critical").await;
+    lander
+        .land_now(request(&critical, RiskClass::Critical))
+        .await
+        .unwrap();
+
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 2);
+    assert_eq!(
+        (seen[0].base, seen[0].risk, seen[0].stage),
+        (
+            Some(trunk_root),
+            Some(RiskClass::Normal),
+            VerifyStage::PreLand
+        )
+    );
+    assert_eq!(
+        (seen[1].base, seen[1].risk),
+        (None, Some(RiskClass::Critical))
+    );
 }

@@ -30,4 +30,5 @@ pub use queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest};
 pub use revert::{auto_revert, build_revert, has_forward_fix, revert, RevertOutcome};
 pub use traits::{
     AlwaysGreen, Approval, FnVerifier, NoopHooks, ReviewHooks, VerificationOutcome, Verifier,
+    VerifyRequest, VerifyStage,
 };

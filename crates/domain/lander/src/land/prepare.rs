@@ -9,7 +9,7 @@ use crate::config::VerifyMode;
 use crate::error::{Error, Result};
 use crate::events::LandEvent;
 use crate::queue::QueuedRequest;
-use crate::traits::Approval;
+use crate::traits::{Approval, VerifyRequest, VerifyStage};
 
 /// A request ready to land: rebased, verified and approved.
 pub(super) struct Candidate {
@@ -66,7 +66,9 @@ impl Lander {
             .request
             .verify_override
             .unwrap_or_else(|| self.policy.verify_mode(queued.request.risk));
-        if mode != VerifyMode::None && !self.verify(queued, &version).await? {
+        // `Full` verifies everything; `Affected` only what changed since trunk.
+        let base = tip.filter(|_| mode == VerifyMode::Affected);
+        if mode != VerifyMode::None && !self.verify(queued, &version, base.as_ref()).await? {
             return Ok(Prepared::Dropped);
         }
         self.derive.ensure_land_critical(&version).await?;
@@ -147,13 +149,27 @@ impl Lander {
 
     /// Run pre-land verification. Returns `false` after recording a
     /// failure status.
-    async fn verify(&self, queued: &QueuedRequest, hash: &ChangeVersionHash) -> Result<bool> {
+    async fn verify(
+        &self,
+        queued: &QueuedRequest,
+        hash: &ChangeVersionHash,
+        base: Option<&ChangeVersionHash>,
+    ) -> Result<bool> {
         self.set_status(queued, LandStatus::Verifying).await;
         let root = self.derive.get::<RootTree>(hash).await?;
+        let base = match base {
+            Some(base) => Some(self.derive.get::<RootTree>(base).await?),
+            None => None,
+        };
+        let request = VerifyRequest {
+            root,
+            version: *hash,
+            base,
+            risk: Some(queued.request.risk),
+            stage: VerifyStage::PreLand,
+        };
         let outcome =
-            match tokio::time::timeout(self.policy.max_wait, self.verifier.verify(root, *hash))
-                .await
-            {
+            match tokio::time::timeout(self.policy.max_wait, self.verifier.verify(request)).await {
                 Ok(outcome) => outcome?,
                 Err(_) => {
                     self.fail(

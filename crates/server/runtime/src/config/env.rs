@@ -33,6 +33,7 @@ impl ServerConfig {
     /// * `RILL_ADMINS`: comma-separated instance administrator names;
     /// * `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED`, `RILL_EXEC_ENABLED`: `true`/`false`;
     /// * `RILL_EXEC_WORKER_SECRET_FILE`: the file of worker secrets;
+    /// * `RILL_EXEC_LOCAL_WORKERS`: how many in-process execution workers;
     /// * `RILL_POSTLAND_INTERVAL_SECS`.
     pub fn apply_env(&mut self, lookup: impl Fn(&str) -> Option<String>) -> Result<()> {
         if let Some(v) = lookup("RILL_LISTEN_GRPC") {
@@ -127,6 +128,9 @@ impl ServerConfig {
         }
         if let Some(v) = lookup("RILL_EXEC_WORKER_SECRET_FILE") {
             self.exec.worker_secret_file = (!v.is_empty()).then(|| PathBuf::from(v));
+        }
+        if let Some(v) = lookup("RILL_EXEC_LOCAL_WORKERS") {
+            self.exec.local.workers = parse_env("RILL_EXEC_LOCAL_WORKERS", &v)?;
         }
         if let Some(v) = lookup("RILL_POSTLAND_ENABLED") {
             self.postland.enabled = parse_bool("RILL_POSTLAND_ENABLED", &v)?;

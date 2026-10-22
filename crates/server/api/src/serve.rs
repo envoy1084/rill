@@ -114,6 +114,7 @@ pub async fn serve_with_state(
             shutdown.clone(),
         ));
         tokio::spawn(reap_execution(state.clone(), shutdown.clone()));
+        rill_runtime::workers::spawn_local_workers(&state, &shutdown)?;
         tokio::spawn(rill_runtime::workers::discover_repos(
             state.clone(),
             shutdown.clone(),
@@ -158,7 +159,7 @@ async fn sweep_rate_limits(state: Arc<AppState>, shutdown: CancellationToken) {
 const EXEC_REAP_EVERY: std::time::Duration = std::time::Duration::from_secs(10);
 
 async fn reap_execution(state: Arc<AppState>, shutdown: CancellationToken) {
-    if !state.config.exec.enabled {
+    if !state.config.exec.enabled && !state.config.verify.enabled {
         return;
     }
     let mut tick = tokio::time::interval(EXEC_REAP_EVERY);

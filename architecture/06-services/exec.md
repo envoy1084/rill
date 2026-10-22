@@ -1,175 +1,181 @@
 # Exec
 
-`rill-exec` runs verification commands against materialized trees and
-caches each result by the digest of its `Action`. The digest covers every
-input, so an action with a known digest is never run twice by anything
-sharing the repository's metadata store. The server wraps it as the
-lander's `Verifier` for pre-land and post-land verification.
+A repository says how to verify itself in `.rill/verify.toml`, versioned
+with the code it checks. `rill-exec` compiles each step into an REAPI
+action in the org's execution space and queues it on the same scheduler
+that serves Bazel ([remote execution](remote-execution.md)), so every
+check runs on a sandboxed worker, is cached by what it reads, and merges
+with an identical check already running. The server wraps this as the
+lander's `Verifier` for pre-land and post-land verification. Repository
+code never runs in the request path of the server.
 
 ```mermaid
 flowchart LR
-  pipe[lander Pipeline::verify] --> ev[ExecVerifier]
+  pipe[lander pre-land] --> ev[ExecVerifier]
   post[PostLandVerifier] --> ev
-  ev --> vt[verify_tree] --> run[Runner]
-  run --> ac[ActionCache] --> derived[(derived ac@1)]
-  run --> mat[materialize] --> objects[(object store)]
-  run --> sb[Sandbox]
+  ev --> pr[PlanRunner]
+  pr --> sel[select: risk, affected]
+  pr --> comp[compile: input root, Command, Action]
+  comp --> space[(org execution space)]
+  pr --> sched[Scheduler]
+  sched --> lw[LocalWorker in process]
+  sched --> bb[Buildbarn workers]
 ```
 
 `rill-exec` decides how to run a step. When verification runs, and what a
 red result means for landing, belongs to `rill-lander` (see
 [landing](../04-workflow/landing.md)).
 
-## Actions and results
-
-An `Action` has `command` (`command[0]` is the executable), `env`,
-`input_root: TreeHash`, `working_dir`, `timeout` (600 s from
-`Action::new`), `platform` (`host_platform()`: `os` and `arch`) and
-`output_paths`. It is `Encodable` as a derived object; `digest()` is the
-hash of its canonical encoding. All fields are in the digest, so changing
-the timeout or one env var changes the key. Maps are `BTreeMap`, so
-insertion order does not matter.
-
-An `ActionResult` holds `exit_code` (`TIMEOUT_EXIT_CODE` = 124 on timeout,
--1 when killed by a signal), `stdout` and `stderr` as `ContentRef`s,
-`duration_ms`, `output_files`, `worker`, `started_at` and `timed_out`.
-`succeeded()` is `exit_code == 0 && !timed_out`. A failing command is a
-result, not an error, and is cached like a passing one.
-
-`ActionCache` stores results under derived kind `ac@1` keyed by digest.
-Captured bytes go through `rill_core::store_content`, so logs and outputs
-are ordinary blobs in the object store.
-
-## Runner
-
-```mermaid
-stateDiagram-v2
-  [*] --> Lookup
-  Lookup --> Hit: cached
-  Lookup --> Lock: miss
-  Lock --> Hit: cached after lock
-  Lock --> Materialize: still missing
-  Materialize --> Run: tempdir populated
-  Run --> Store: outputs read, cache.put
-  Store --> Miss
-  Hit --> [*]
-  Miss --> [*]
-```
-
-`Runner::execute` returns `(ActionResult, CacheStatus)`. Concurrent misses
-for one digest serialize on a per-digest mutex in `in_flight`, and the
-second caller re-checks the cache under the lock. On a miss the runner
-creates a temp directory, materializes the full `input_root` into it, calls
-`Sandbox::run`, reads the declared outputs (a missing output is not an
-error), stores everything, writes the cache record, and removes the
-directory on a blocking thread.
-
-`materialize` reads blobs on the async side and writes batches of 256 files
-on `spawn_blocking`. Anything already at a target path is removed first so
-a stale symlink is never followed. Unix modes are 0644 or 0755; symlink
-content is the link target. `local_path` rejects any non-normal path
-component with `Error::PathEscape`.
-
-## Sandboxes
-
-`Sandbox::run(dir, action) -> RawOutcome` is the whole contract. The runner
-owns materialization, caching and output capture.
-
-* `LocalSandbox` runs a `tokio::process::Command` in the materialized
-  directory with `env_clear()`, the action's `env`, and `PATH` and `HOME`
-  passed through from the host unless the action sets them. stdin is null
-  and the child gets its own process group on Unix. stdout and stderr are
-  drained while waiting, so a chatty process cannot deadlock. On timeout it
-  `killpg`s the group with `SIGKILL` and waits at most `DRAIN_GRACE` (2 s)
-  for the pipes.
-* Its `Isolation` picks how far the process is fenced in:
-  * `None`: the above and nothing more. `network` is advisory. This is the
-    only choice on macOS and is for trusted single-tenant servers, tests
-    and development.
-  * `Confined` (Linux only; refused elsewhere with `NotSupported`):
-    `sandbox/confine.rs` prepares, before `fork`, a Landlock ruleset
-    (`landlock` crate) that allows read and execute on system directories
-    and the host `PATH`, read and write on `/dev`, and everything inside
-    the step's directory; when `network` is false it also handles TCP bind
-    and connect, which refuses them. A seccomp filter (`seccompiler`)
-    returns `EPERM` for `ptrace`, `mount`, `unshare`, `setns`, `bpf`,
-    `kexec_load`, module loading, key management and clock changes. The
-    child applies `RLIMIT_FSIZE` (4 GiB), `RLIMIT_CORE` (0), the ruleset
-    and the filter in `pre_exec`; a kernel that does not enforce Landlock
-    fails the step rather than running it unconfined. `TMPDIR` points at
-    `.rill-tmp` inside the step directory.
-  * `Gvisor { runsc }`: the command runs as
-    `runsc --network=none|host --overlay2=none do --cwd=<dir> -- <cmd>`, a
-    user-space kernel for untrusted multi-tenant work. `runsc` must be
-    installed and allowed to create sandboxes (root or `--rootless`
-    setups).
-
-## Verify plans
-
-A tree declares its own checks in `.rill/verify.toml` (`PLAN_PATH`), so the
-plan is versioned with the code. A tree without the file verifies green
-with zero steps.
+## Plans
 
 ```toml
 [[step]]
-name = "unit"                    # optional; default "step-<index>"
-command = ["cargo", "test"]      # required, non-empty
-timeout_secs = 900               # optional; default 600
-working_dir = "crates/core"      # optional; default root
-env = { RUST_BACKTRACE = "1" }   # optional
-outputs = ["target/report.xml"]  # optional
+name = "unit"                              # default "step-<index>"; unique
+command = ["cargo", "test", "--locked"]   # required
+inputs = ["**/*.rs", "**/Cargo.toml", "Cargo.lock"]   # default: every file
+working_dir = "crates/core"               # default: the root
+env = { RUST_BACKTRACE = "1" }
+outputs = ["report.xml"]                  # relative to working_dir
+timeout_secs = 900                        # default 600
+platform = { OSFamily = "linux" }         # added to [verify] platform
+shards = 4                                # 1 to 256
+risk = ["normal", "sensitive", "critical"] # default: every class
 ```
 
-`VerificationPlan::parse` binds each step to the root and host platform.
-Bad TOML, an empty command or non-UTF-8 content is `Error::Config`.
-`verify_plan` runs steps in order and stops at the first step that did not
-succeed. `VerificationOutcome { green, steps }` records each step's result
-and whether it was cached.
+`Plan::parse` (`verify/plan.rs`) refuses unknown keys, empty commands,
+duplicate names, shard counts out of range, unknown risk classes and
+invalid paths with `Error::Config`. A tree without the file is green with
+no steps. The verifier turns a plan that does not parse into a red result
+for the change that carries it.
 
-## Server wiring
+**Inputs** are globs (`globset`, `*` within a component, `**` across
+them). They decide two things:
 
-`RepoContext` builds a `Runner` with `LocalSandbox::new(verify.network)`
-and the `Isolation` for `[verify] sandbox` (`local`, `confined`, `gvisor`
-with `runsc`) only when `[verify] enabled` (or `RILL_VERIFY_ENABLED`) is true; otherwise
-the lander gets `AlwaysGreen`. `ExecVerifier` calls `verify_tree`, maps any
-`rill_exec::Error` to `rill_lander::Error::Verifier`, and returns green or
-red with a one-line detail such as `step "unit" failed with exit code 1`.
-`PostLandVerifier` uses the same verifier through `lander.verifier()`, so
-re-verifying a tree already verified pre-land is a cache hit per step.
+* **The input root.** `ExecSpace::input_root` (`remote/inputs/`) copies
+  only the matching files into the execution space as REAPI `Directory`
+  messages, so an edit outside a step's inputs leaves its action digest,
+  and so its cached result, unchanged. Directories no pattern can reach are
+  not read. Each directory's digest is remembered under (filter, path,
+  tree hash) in the derived kind `reapi:input`, so a new tree costs only
+  its changed directories. File digests come straight from the tree for
+  raw blobs ([ADR 016](../10-decisions/016-plain-blake3-for-content.md));
+  chunked files are read once and their digest remembered (`reapi:whole`).
+  Files the space lacks are copied in. `with_directory` adds the working
+  directory, empty, when no input lives there.
+* **Selection.** `select` (`verify/select.rs`) skips a step when the
+  change's risk class is not in its `risk` list (`NotGating`), or when a
+  base tree is known and no changed path matches its inputs
+  (`Unaffected`). An unaffected step's action is the one the base already
+  ran. A change to the plan file itself runs every step.
 
-The lander picks a `VerifyMode` per risk class: `None` skips verification;
-`Affected` and `Full` call the verifier the same way. `LandPolicy::max_wait`
-(30 min) bounds the whole plan. See
-[configuration](../07-runtime/configuration.md) for the keys.
+**Compiling** (`verify/compile.rs`) writes one `Command` and `Action` per
+shard: arguments, sorted environment, `output_paths`, the working
+directory, the step timeout, and the platform (`[verify] platform` plus
+the step's). Shards differ only in `TEST_SHARD_INDEX` and
+`TEST_TOTAL_SHARDS`, the test sharding protocol runners such as Bazel's
+and `nextest --partition` scripts read.
+
+## Running
+
+`PlanRunner::verify(Target { root, base, risk, priority })`
+(`verify/run.rs`):
+
+1. loads the plan, diffs `base` against `root` when given, and selects
+   steps;
+2. compiles the selected steps concurrently;
+3. for each action, returns the cached result if the space's action cache
+   has one, otherwise submits it to the scheduler as `verify:<repo>` and
+   waits on the operation's update counter;
+4. stops at the first step that does not pass, and keeps the last 4 KiB of
+   its standard error (or output) as the excerpt.
+
+`VerificationOutcome { green, steps, excerpt }` lists each step or shard
+as `Passed`, `Failed { exit_code }`, `TimedOut`, `Error` (the action could
+not run), `Unaffected` or `NotGating`, with whether it was cached, its
+action, output digests, worker and duration. `summary()` is the one line
+the lander records, for example
+`step "unit" shard 2/4 failed with exit code 1; 3 passed (1 cached)`.
+Only successful results enter the action cache.
+
+Pre-land requests run at `High` priority, post-land at `Normal`.
+
+## Local workers
+
+`LocalWorker` (`worker/`) runs actions inside the server for development
+and single-host setups. It speaks Buildbarn's worker protocol to the
+scheduler directly (`Scheduler::synchronize`), so queueing, merging,
+leases and the reaper treat it like any other worker:
+
+* idle, it reports and is offered the next action for its platform;
+* it stages the input root from the execution space into a temporary
+  directory, creates the working directory and output parents, runs the
+  command in its `Sandbox`, and stores standard output, standard error and
+  each output path that is a regular file;
+* while running it reports progress every `report_every_secs`, which
+  renews its claim; a reply that gives it another state means the claim
+  was lost, and it drops the action;
+* a timeout is `DEADLINE_EXCEEDED` with the partial result; an action it
+  cannot run (a missing blob, a bad path) is a status with no result.
+
+`[exec.local] workers` starts that many on servers with the workers role,
+each one action at a time; `rill dev` starts two and turns verification
+on. Outside dev mode the server refuses to start them with
+`sandbox = "local"`.
+
+## Sandboxes
+
+`Sandbox::run(dir, invocation) -> RawOutcome` is the whole contract: the
+worker owns staging and output capture. An `Invocation` is a command,
+environment, working directory and timeout.
+
+* `LocalSandbox` runs a `tokio::process::Command` in the staged directory
+  with `env_clear()`, the invocation's environment, and `PATH` and `HOME`
+  from the host unless set. stdin is null and the child gets its own
+  process group. stdout and stderr are drained while waiting. On timeout it
+  `killpg`s the group and waits at most 2 s for the pipes; the exit code is
+  124 (`TIMEOUT_EXIT_CODE`).
+* `[exec.local] sandbox` picks its `Isolation`:
+  * `local` (`None`): nothing more; `network` is advisory. For trusted
+    single-tenant servers, tests and development.
+  * `confined` (Linux only): `sandbox/confine.rs` prepares, before `fork`,
+    a Landlock ruleset (read and execute on system directories and the
+    host `PATH`, read and write on `/dev` and the step's directory; TCP
+    bind and connect refused without `network`) and a seccomp filter
+    (`EPERM` for `ptrace`, `mount`, `unshare`, `setns`, `bpf`, `kexec_load`,
+    module loading, key management and clock changes). The child applies
+    `RLIMIT_FSIZE` (4 GiB), `RLIMIT_CORE` (0), the ruleset and the filter
+    in `pre_exec`; a kernel without Landlock fails the step. `TMPDIR` is
+    `.rill-tmp` inside the step directory.
+  * `gvisor`: each command under `runsc --network=none|host --overlay2=none
+    do`.
+
+Multi-tenant deployments run Buildbarn workers under gVisor instead
+([remote execution](remote-execution.md#workers-and-sandboxes)) and leave
+`[exec.local] workers` at 0.
 
 ## Limitations
 
-* `Isolation::None` commands run as the server's user with its network
-  and filesystem; only safe for trusted, single-tenant use.
-* `Confined` does not limit reads of system directories, UDP, memory or
-  process count, and runs as the server's user. Use `gvisor` for
-  untrusted code.
-* The confinement test runs only on Linux (in CI, or locally in a Linux
-  container); the gVisor wiring has no automated test.
-* The cache key's platform is `os` and `arch` only. A toolchain upgrade
-  does not invalidate cached results.
-* Failed results stay cached until the digest changes; there is no
-  eviction or retry of a flaky failure.
-* Every step re-materializes the full tree; sparse profiles are not used.
-* `VerifyMode::Affected` behaves exactly like `Full`.
-* A `max_wait` expiry drops the verifier future; the process is then
-  stopped only by `kill_on_drop`, not by a process-group kill.
-* Output paths and materialized symlinks are not confined: an output that
-  is a symlink is read through, and a directory output is `Error::Io`.
+* A step whose platform no worker serves waits in its queue until the
+  lander's `max_wait` (30 min) ends the attempt.
+* A local worker captures only regular files as outputs; a directory
+  output is ignored. Standard output and error are held in memory whole.
+* A chunked input file is read whole once to learn its digest.
+* `Isolation::None` commands run as the server's user with its network and
+  filesystem. `Confined` does not limit reads of system directories, UDP,
+  memory or process count.
+* Steps of one plan run concurrently; a failure stops the wait, but the
+  others' actions still run to completion on their workers.
+* Platform properties are the only toolchain identity: a worker image
+  upgrade under the same properties keeps old cached results.
 
 ## Code
 
-* [lib.rs](../../crates/domain/exec/src/lib.rs), [error.rs](../../crates/domain/exec/src/error.rs)
-* [action.rs](../../crates/domain/exec/src/action.rs), [cache.rs](../../crates/domain/exec/src/cache.rs), [runner.rs](../../crates/domain/exec/src/runner.rs), [materialize.rs](../../crates/domain/exec/src/materialize.rs)
-* [sandbox/backend.rs](../../crates/domain/exec/src/sandbox/backend.rs), [sandbox/outcome.rs](../../crates/domain/exec/src/sandbox/outcome.rs), [sandbox/local.rs](../../crates/domain/exec/src/sandbox/local.rs), [sandbox/confine.rs](../../crates/domain/exec/src/sandbox/confine.rs)
-* [verify.rs](../../crates/domain/exec/src/verify.rs)
-* Server: [workers/verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs), [config/server.rs](../../crates/server/runtime/src/config/server.rs)
-* Lander: [config.rs](../../crates/domain/lander/src/config.rs), [land/prepare.rs](../../crates/domain/lander/src/land/prepare.rs)
+* [verify/](../../crates/domain/exec/src/verify/mod.rs): [plan.rs](../../crates/domain/exec/src/verify/plan.rs), [select.rs](../../crates/domain/exec/src/verify/select.rs), [compile.rs](../../crates/domain/exec/src/verify/compile.rs), [run.rs](../../crates/domain/exec/src/verify/run.rs), [outcome.rs](../../crates/domain/exec/src/verify/outcome.rs)
+* [remote/inputs/](../../crates/domain/exec/src/remote/inputs/mod.rs): [filter.rs](../../crates/domain/exec/src/remote/inputs/filter.rs), [upload.rs](../../crates/domain/exec/src/remote/inputs/upload.rs), [graft.rs](../../crates/domain/exec/src/remote/inputs/graft.rs)
+* [worker/](../../crates/domain/exec/src/worker/mod.rs): [local.rs](../../crates/domain/exec/src/worker/local.rs), [execute.rs](../../crates/domain/exec/src/worker/execute.rs), [stage.rs](../../crates/domain/exec/src/worker/stage.rs)
+* [sandbox/](../../crates/domain/exec/src/sandbox/mod.rs): [local.rs](../../crates/domain/exec/src/sandbox/local.rs), [confine.rs](../../crates/domain/exec/src/sandbox/confine.rs)
+* Server: [workers/verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [workers/local_exec.rs](../../crates/server/runtime/src/workers/local_exec.rs), [state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs)
+* Tests: [tests/verification/](../../crates/domain/exec/tests/verification/main.rs), [grpc verification](../../crates/server/api/tests/grpc/verification.rs)
 
 ---
 ← Previous: [Search](search.md) · [Index](../index.md) · Next: [Remote execution](remote-execution.md) →

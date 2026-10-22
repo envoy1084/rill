@@ -98,6 +98,14 @@ affinity: {}
 # Remote execution. Servers serve REAPI; workers are Buildbarn's bb_worker
 # beside bb_runner, in pods under a gVisor RuntimeClass. `workerSecret`
 # names a Secret (key `secret`) the servers and workers share.
+# Run each repository's .rill/verify.toml on the exec workers before and
+# after landing. The platform must match the workers' (files/exec/worker.jsonnet).
+verify:
+  enabled: false
+  platform:
+    OSFamily: linux
+    container-image: rill-exec-runner
+
 exec:
   workerSecret: ""
   workers:

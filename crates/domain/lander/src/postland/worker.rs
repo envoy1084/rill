@@ -17,6 +17,7 @@ use super::reverts::schedule_auto_revert;
 use crate::error::{Error, Result};
 use crate::events::LandEvent;
 use crate::land::Lander;
+use crate::traits::{VerifyRequest, VerifyStage};
 
 /// Positions a bisection round splits its range into.
 pub const BISECT_WAYS: u64 = 8;
@@ -199,7 +200,24 @@ impl PostLandVerifier {
         let repo = self.lander.repo();
         let version = repo.trunk_at(seq).await?.ok_or(Error::NotLanded(seq))?;
         let root = self.lander.derive().get::<RootTree>(&version).await?;
-        let outcome = self.lander.verifier().verify(root, version).await?;
+        let base = match seq.0.checked_sub(1).filter(|p| *p > 0) {
+            Some(previous) => match repo.trunk_at(TrunkSeq(previous)).await? {
+                Some(before) => Some(self.lander.derive().get::<RootTree>(&before).await?),
+                None => None,
+            },
+            None => None,
+        };
+        let outcome = self
+            .lander
+            .verifier()
+            .verify(VerifyRequest {
+                root,
+                version,
+                base,
+                risk: None,
+                stage: VerifyStage::PostLand,
+            })
+            .await?;
         let mut status = if outcome.green {
             VerificationStatus::Green
         } else {

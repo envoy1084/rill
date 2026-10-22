@@ -5839,6 +5839,7 @@ dependencies = [
  "bytes",
  "dashmap",
  "futures",
+ "globset",
  "hex",
  "landlock",
  "libc",

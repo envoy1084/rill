@@ -39,7 +39,8 @@ holds `sweep_lock` (a process-local `tokio::sync::Mutex`) and:
    a second sweep can move it twice.
 
 `verify_seq(seq)` runs the lander's `Verifier` on the root of
-`trunk_at(seq)`, writes a direct record and publishes
+`trunk_at(seq)` (stage `PostLand`, no risk class, the previous position's
+root as the base, so only steps the landing affected run), writes a direct record and publishes
 `LandEvent::Verification { seq, green }`. If an earlier direct record for
 that position disagrees, the new record is `Flaky`. `fill` writes an
 `inferred: true` record for each position strictly between the bounds

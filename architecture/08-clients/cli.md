@@ -124,7 +124,8 @@ The service runs from the same binary (`server/mod.rs`):
 * `rill dev [--data DIR | --memory] [--listen-grpc ADDR] [--listen-http ADDR]`
   runs every role in one process with `dev_mode` on, storage in
   `~/.rill/dev` by default, and ports 7470 / 7471 (`DEV_GRPC_PORT` /
-  `DEV_HTTP_PORT`).
+  `DEV_HTTP_PORT`). Verification is on, with two unisolated in-process
+  execution workers (`DEV_LOCAL_WORKERS`) running `.rill/verify.toml`.
 * `rill api [--config PATH] [--listen-grpc ADDR] [--listen-http ADDR]
   [--storage memory|local:<dir>] [--roles api,workers]` loads the file and
   `RILL_*` environment through `ServerConfig::load`, then applies the

@@ -49,6 +49,17 @@ stringData:
     {{- end }}
     {{- end }}
 
+    {{- if .Values.verify.enabled }}
+
+    [verify]
+    enabled = true
+
+    [verify.platform]
+    {{- range $name, $value := .Values.verify.platform }}
+    {{ $name | quote }} = {{ $value | quote }}
+    {{- end }}
+    {{- end }}
+
     {{- if .Values.exec.workerSecret }}
 
     [exec]

@@ -20,7 +20,8 @@ const HEADER: &str = r#"# rill api configuration.
 #   RILL_VAULT_ADDR + RILL_VAULT_KEY (VAULT_TOKEN) Vault Transit
 #   RILL_AWS_KMS_KEY, RILL_GCP_KMS_KEY           cloud KMS (aws / gcp builds)
 #   RILL_ADMINS                          instance administrators, comma-separated
-#   RILL_VERIFY_ENABLED, RILL_POSTLAND_ENABLED, RILL_POSTLAND_INTERVAL_SECS
+#   RILL_VERIFY_ENABLED, RILL_POSTLAND_ENABLED, RILL_POSTLAND_INTERVAL_SECS,
+#   RILL_EXEC_LOCAL_WORKERS
 #
 # Storage alternatives:
 #   [storage]

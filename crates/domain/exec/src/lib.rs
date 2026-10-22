@@ -1,31 +1,19 @@
-//! Verification runner for Rill.
+//! Execution for Rill.
 //!
-//! An [`Action`] names a command, its environment and the input tree it
-//! runs against; its digest is the key into a content-addressed
-//! [`ActionCache`] stored in the repository. A [`Runner`] materializes the
-//! input tree, executes the command in a [`Sandbox`] and stores the
-//! result, so an action with a known digest is never run twice.
-//!
-//! [`verify_tree`] ties this to repositories: a tree's `.rill/verify.toml`
-//! declares the steps that verify it, and the outcome is the conjunction
-//! of their results.
+//! [`remote`] is the REAPI side: each org's execution space (content
+//! store and action cache), operations, and the scheduler that queues
+//! actions for workers. [`verify`] compiles a tree's `.rill/verify.toml`
+//! into actions and runs them through that scheduler. [`worker`] runs
+//! actions inside the server with a [`sandbox`], for development and
+//! single-host setups; production uses Buildbarn workers.
 
-pub mod action;
-pub mod cache;
 pub mod error;
-pub mod materialize;
 pub mod remote;
-pub mod runner;
 pub mod sandbox;
 pub mod verify;
+pub mod worker;
 
-pub use action::{host_platform, Action, ActionResult, TIMEOUT_EXIT_CODE};
-pub use cache::{ActionCache, CACHE_KIND};
 pub use error::{Error, Result};
-pub use materialize::{materialize, MaterializeOptions, MaterializedFile};
-pub use runner::{CacheStatus, Runner};
-pub use sandbox::{Isolation, LocalSandbox, RawOutcome, Sandbox};
-pub use verify::{
-    load_plan, verify_plan, verify_tree, PlanStep, StepResult, VerificationOutcome,
-    VerificationPlan, PLAN_PATH,
-};
+pub use sandbox::{Invocation, Isolation, LocalSandbox, RawOutcome, Sandbox, TIMEOUT_EXIT_CODE};
+pub use verify::{PlanRunner, Target, VerificationOutcome, PLAN_PATH};
+pub use worker::LocalWorker;

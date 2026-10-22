@@ -30,6 +30,7 @@ mod shutdown;
 mod signin;
 mod structural;
 mod telemetry;
+mod verification;
 mod workspaces;
 
 use std::sync::Arc;

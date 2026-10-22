@@ -18,6 +18,7 @@ use crate::error::{Error, Result};
 use crate::remote::digest::BlobDigest;
 use crate::remote::operation::{OperationRecord, Stage};
 use crate::remote::platform::platform_key;
+use crate::remote::timestamps::proto_timestamp as timestamp;
 
 impl Scheduler {
     /// Answer one worker report.
@@ -343,12 +344,5 @@ pub fn failure(status: rill_reapi_proto::rpc::Status) -> ExecuteResponse {
     ExecuteResponse {
         status: Some(status),
         ..Default::default()
-    }
-}
-
-fn timestamp(millis: i64) -> prost_types::Timestamp {
-    prost_types::Timestamp {
-        seconds: millis.div_euclid(1000),
-        nanos: (millis.rem_euclid(1000) * 1_000_000) as i32,
     }
 }

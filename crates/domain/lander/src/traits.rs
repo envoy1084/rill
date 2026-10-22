@@ -6,7 +6,9 @@
 
 use async_trait::async_trait;
 use rill_store::repo::ReviewSnapshot;
-use rill_types::{ChangeId, ChangeVersionHash, LabelVote, Principal, TreeHash, TrunkSeq};
+use rill_types::{
+    ChangeId, ChangeVersionHash, LabelVote, Principal, RiskClass, TreeHash, TrunkSeq,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
@@ -116,16 +118,33 @@ impl VerificationOutcome {
     }
 }
 
-/// Runs verification for a tree. The server adapts `rill-exec` to this;
-/// the version hash is passed so implementations can attribute results.
+/// Why a tree is being verified.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerifyStage {
+    /// Before landing, gating the change.
+    PreLand,
+    /// After landing, following trunk.
+    PostLand,
+}
+
+/// A tree to verify and what it changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VerifyRequest {
+    /// The root tree of `version`.
+    pub root: TreeHash,
+    pub version: ChangeVersionHash,
+    /// The tree `root` was made against, so checks whose inputs did not
+    /// change can be skipped; `None` checks everything.
+    pub base: Option<TreeHash>,
+    /// The change's risk class, when gating one.
+    pub risk: Option<RiskClass>,
+    pub stage: VerifyStage,
+}
+
+/// Runs verification for a tree. The server adapts `rill-exec` to this.
 #[async_trait]
 pub trait Verifier: Send + Sync {
-    /// Verify `root`, the root tree of `version`.
-    async fn verify(
-        &self,
-        root: TreeHash,
-        version: ChangeVersionHash,
-    ) -> Result<VerificationOutcome>;
+    async fn verify(&self, request: VerifyRequest) -> Result<VerificationOutcome>;
 }
 
 /// A verifier that passes everything.
@@ -134,30 +153,22 @@ pub struct AlwaysGreen;
 
 #[async_trait]
 impl Verifier for AlwaysGreen {
-    async fn verify(
-        &self,
-        _root: TreeHash,
-        _version: ChangeVersionHash,
-    ) -> Result<VerificationOutcome> {
+    async fn verify(&self, _request: VerifyRequest) -> Result<VerificationOutcome> {
         Ok(VerificationOutcome::green("no verification configured"))
     }
 }
 
-/// A verifier built from a closure over the root tree, for tests and
+/// A verifier built from a closure over the request, for tests and
 /// simple policies.
 pub struct FnVerifier<F>(pub F);
 
 #[async_trait]
 impl<F, Fut> Verifier for FnVerifier<F>
 where
-    F: Fn(TreeHash, ChangeVersionHash) -> Fut + Send + Sync,
+    F: Fn(VerifyRequest) -> Fut + Send + Sync,
     Fut: std::future::Future<Output = Result<VerificationOutcome>> + Send,
 {
-    async fn verify(
-        &self,
-        root: TreeHash,
-        version: ChangeVersionHash,
-    ) -> Result<VerificationOutcome> {
-        (self.0)(root, version).await
+    async fn verify(&self, request: VerifyRequest) -> Result<VerificationOutcome> {
+        (self.0)(request).await
     }
 }

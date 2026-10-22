@@ -13,6 +13,8 @@ use crate::Result;
 pub const DEV_GRPC_PORT: u16 = 7470;
 /// HTTP port `rill dev` listens on.
 pub const DEV_HTTP_PORT: u16 = 7471;
+/// Execution workers `rill dev` runs in-process.
+pub const DEV_LOCAL_WORKERS: usize = 2;
 
 /// The configuration `rill dev` runs with.
 pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
@@ -48,8 +50,18 @@ pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
             drain_secs: 0,
             grace_secs: 5,
         },
+        // Plans run on workers in this process, unisolated: a development
+        // server runs its user's own code.
+        verify: rill_runtime::config::VerifyConfig {
+            enabled: true,
+            ..Default::default()
+        },
         exec: rill_runtime::config::ExecConfig {
             worker_secret_file: std::env::var_os("RILL_EXEC_WORKER_SECRET_FILE").map(PathBuf::from),
+            local: rill_runtime::config::LocalWorkersConfig {
+                workers: DEV_LOCAL_WORKERS,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..ServerConfig::default()
