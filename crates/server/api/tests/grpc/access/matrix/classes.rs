@@ -98,6 +98,7 @@ const MATRIX: &[(&str, Class)] = &[
     ("LanderService/GetTrunkHealth", ReadRoot),
     ("LanderService/ListIncidents", ReadRoot),
     ("LanderService/FreezeTrunk", Owner),
+    ("LanderService/RevertSet", Owner),
     ("IntentService/CreateIntent", WriteRoot),
     ("IntentService/GetIntent", ReadRoot),
     ("IntentService/UpdateIntent", WriteRoot),

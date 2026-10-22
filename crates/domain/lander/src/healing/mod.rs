@@ -3,7 +3,9 @@
 
 mod fixes;
 mod incidents;
+mod revert_set;
 mod state;
 
 pub use fixes::{fixes_of, is_revert, FIXES_KEY};
+pub use revert_set::{RevertEntry, Selector, MAX_REVERT_SET};
 pub use state::{judge, GuardRules};

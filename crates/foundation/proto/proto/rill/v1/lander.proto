@@ -20,6 +20,10 @@ service LanderService {
   rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse);
   // Freeze trunk so only emergency landings land, or thaw it (owners).
   rpc FreezeTrunk(FreezeTrunkRequest) returns (FreezeTrunkResponse);
+  // Revert every landing a session, model, sponsor, author or intent made
+  // (owners): a preview of what would be reverted and which reverts
+  // conflict, or with `apply` the reverts queued in the emergency lane.
+  rpc RevertSet(RevertSetRequest) returns (RevertSetResponse);
 }
 
 enum VerificationStatus {
@@ -185,4 +189,33 @@ message FreezeTrunkRequest {
 }
 message FreezeTrunkResponse {
   TrunkHealth health = 1;
+}
+
+message RevertSetRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  optional string session = 3;
+  optional string model = 4;
+  // By name (`ann`) or as shown (`agent:bot`).
+  optional string sponsor = 5;
+  optional string author = 6;
+  optional bytes intent = 7;
+  // Positions in (since, until]; all of trunk when absent.
+  optional uint64 since = 8;
+  optional uint64 until = 9;
+  bool apply = 10;
+  string reason = 11;
+}
+message RevertSetEntry {
+  uint64 seq = 1;
+  bytes change_id = 2;
+  string summary = 3;
+  // Previews: paths its revert conflicts at after the newer reverts.
+  repeated string conflicts = 4;
+  // Applied: the revert's land ticket.
+  optional string ticket = 5;
+}
+message RevertSetResponse {
+  // Newest first.
+  repeated RevertSetEntry entries = 1;
 }

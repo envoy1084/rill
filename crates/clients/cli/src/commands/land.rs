@@ -58,11 +58,36 @@ pub struct VerifyArgs {
 /// `rill revert`.
 #[derive(Args, Debug)]
 pub struct RevertArgs {
-    /// Trunk sequence to revert.
-    pub seq: String,
+    /// Trunk sequence to revert; or select landings by origin below.
+    pub seq: Option<String>,
     /// Why.
     #[arg(short, long)]
     pub message: String,
+    /// Revert every landing of this agent session.
+    #[arg(long, conflicts_with = "seq")]
+    pub session: Option<String>,
+    /// ... made by this model.
+    #[arg(long, conflicts_with = "seq")]
+    pub model: Option<String>,
+    /// ... sponsored by this principal.
+    #[arg(long, conflicts_with = "seq")]
+    pub sponsor: Option<String>,
+    /// ... authored by this principal.
+    #[arg(long, conflicts_with = "seq")]
+    pub author: Option<String>,
+    /// ... linked to this intent.
+    #[arg(long, conflicts_with = "seq")]
+    pub intent: Option<String>,
+    /// Only landings after this position.
+    #[arg(long, conflicts_with = "seq")]
+    pub since: Option<String>,
+    /// Only landings up to this position.
+    #[arg(long, conflicts_with = "seq")]
+    pub until: Option<String>,
+    /// Queue the reverts; without it, only show what would be reverted
+    /// (repository owners).
+    #[arg(long, conflicts_with = "seq")]
+    pub apply: bool,
 }
 
 /// `rill bisect`.
@@ -274,7 +299,10 @@ pub async fn verify(ctx: &mut Ctx<'_>, args: VerifyArgs) -> Result<()> {
 
 /// Run `rill revert`.
 pub async fn revert(ctx: &mut Ctx<'_>, args: RevertArgs) -> Result<()> {
-    let seq = seq_arg(&args.seq)?;
+    let Some(seq) = &args.seq else {
+        return crate::commands::health::revert_set(ctx, args).await;
+    };
+    let seq = seq_arg(seq)?;
     let result = ctx.repo()?.lander().revert(seq, &args.message).await?;
     ctx.emit(json::revert_result(&result), |out| {
         out.line(format!(

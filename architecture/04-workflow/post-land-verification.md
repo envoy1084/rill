@@ -145,6 +145,26 @@ principal `svc:lander`, as a change whose id is derived from the culprit's
 position: a job rerun after a crash finds the request or the landed revert
 the first run made instead of reverting twice.
 
+## Blast-radius reverts
+
+`RevertSet` (repository owners; `rill revert --session S --model M
+--sponsor P --author A --intent I [--since N] [--until M] -m why`) undoes
+every landing one origin made: those whose vouched provenance matches every
+field given (session and model come from the token that wrote a version,
+so a client cannot claim them), in `(since, until]`, not reverts
+themselves and not already reverted, newest first, at most 500. A range
+alone is refused: it is not a blast radius.
+
+Without `apply` (`--apply`) it is a preview: each revert is built and
+rebased onto the result of the newer ones, and the paths it would
+conflict at are listed; nothing lands (the versions it built stay for the
+collector). With `apply`, each revert is queued on its own in the
+emergency lane without pre-land verification, a millisecond apart so they
+are served newest first, and the reverts that do not conflict land even
+when one does (that one goes through the conflict ladder and back to the
+requester). One `RevertsRequested` event records the selector and count
+(audited as `trunk.mass_revert`).
+
 ## `ReviewHooks`
 
 `rill-lander` does not depend on `rill-review`. It calls back through the
@@ -180,7 +200,7 @@ record (target `postland`) with external reports, worst wins: `Failed` or
 `RevertSeq` and `Bisect` need the `land()` permit; `Bisect` fails with
 `FailedPrecondition` when the worker is disabled. `GetTrunkHealth` (health
 and open incidents) and `ListIncidents` need read access; `FreezeTrunk`
-needs repository ownership.
+and `RevertSet` need repository ownership.
 
 ## Limitations
 
@@ -198,7 +218,7 @@ needs repository ownership.
 ## Code
 
 * [rill-lander/src/postland/](../../crates/domain/lander/src/postland/mod.rs): [worker.rs](../../crates/domain/lander/src/postland/worker.rs), [bisect.rs](../../crates/domain/lander/src/postland/bisect.rs), [positions.rs](../../crates/domain/lander/src/postland/positions.rs), [batch.rs](../../crates/domain/lander/src/postland/batch.rs), [record.rs](../../crates/domain/lander/src/postland/record.rs)
-* [rill-lander/src/healing/](../../crates/domain/lander/src/healing/mod.rs) (incidents, health, fixes), [land/guard.rs](../../crates/domain/lander/src/land/guard.rs); store [repo/health.rs](../../crates/foundation/store/src/repo/health.rs)
+* [rill-lander/src/healing/](../../crates/domain/lander/src/healing/mod.rs) (incidents, health, fixes, mass reverts), [land/guard.rs](../../crates/domain/lander/src/land/guard.rs); store [repo/health.rs](../../crates/foundation/store/src/repo/health.rs)
 * [rill-exec/src/verify/affects.rs](../../crates/domain/exec/src/verify/affects.rs), [rill-api/src/services/trunk_health.rs](../../crates/server/api/src/services/trunk_health.rs)
 * [rill-lander/src/revert.rs](../../crates/domain/lander/src/revert.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)
 * [rill-runtime/src/workers/hooks.rs](../../crates/server/runtime/src/workers/hooks.rs), [verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [repo_tasks.rs](../../crates/server/runtime/src/workers/repo_tasks.rs)

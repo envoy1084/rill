@@ -189,3 +189,77 @@ fn incident_json(i: &pb::Incident) -> Value {
         "assigned": i.assigned,
     })
 }
+
+/// `rill revert --session …`: preview or queue reverts of every landing a
+/// selector matches.
+pub async fn revert_set(ctx: &mut Ctx<'_>, args: crate::commands::land::RevertArgs) -> Result<()> {
+    let repo = ctx.repo_name()?;
+    let seq = |s: &Option<String>| -> Result<Option<u64>> {
+        s.as_deref()
+            .map(|s| crate::commands::seq_arg(s).map(|q| q.get()))
+            .transpose()
+    };
+    let intent = args
+        .intent
+        .as_deref()
+        .map(|i| {
+            i.parse::<rill_types::IntentId>()
+                .map(|id| rill_proto::convert::id_to_proto(&id))
+                .map_err(|e| crate::error::CliError::usage(format!("--intent: {e}")))
+        })
+        .transpose()?;
+    let request = pb::RevertSetRequest {
+        operation_id: Bytes::new(),
+        repo,
+        session: args.session,
+        model: args.model,
+        sponsor: args.sponsor,
+        author: args.author,
+        intent,
+        since: seq(&args.since)?,
+        until: seq(&args.until)?,
+        apply: args.apply,
+        reason: args.message,
+    };
+    let entries = ctx
+        .client()?
+        .lander_svc()
+        .revert_set(request)
+        .await?
+        .into_inner()
+        .entries;
+    let apply = args.apply;
+    ctx.emit(
+        j!({ "applied": apply, "entries": entries.iter().map(|e| j!({
+            "seq": e.seq,
+            "summary": e.summary,
+            "conflicts": e.conflicts,
+            "ticket": e.ticket,
+        })).collect::<Vec<_>>() }),
+        |out| {
+            if entries.is_empty() {
+                return out.line(out.dim("nothing matches"));
+            }
+            if apply {
+                for e in &entries {
+                    out.line(format!(
+                        "revert of trunk@{} queued: ticket {}",
+                        e.seq,
+                        e.ticket.clone().unwrap_or_default()
+                    ))?;
+                }
+                return Ok(());
+            }
+            let mut table = Table::new(&["SEQ", "SUMMARY", "CONFLICTS"]);
+            for e in &entries {
+                table.row(vec![
+                    format!("trunk@{}", e.seq),
+                    e.summary.clone(),
+                    e.conflicts.join(", "),
+                ]);
+            }
+            out.table(table)?;
+            out.line(out.dim("a preview: run again with --apply to queue these reverts"))
+        },
+    )
+}

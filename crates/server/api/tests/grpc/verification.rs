@@ -523,3 +523,92 @@ async fn an_owner_freezes_trunk_and_its_health_says_so() {
         .incidents;
     assert!(incidents.is_empty());
 }
+
+#[tokio::test]
+async fn an_owner_previews_and_reverts_everything_an_author_landed() {
+    let server = TestServer::start(dev_config()).await;
+    let mut c = clients(&server, None).await;
+    c.repo
+        .create_repo(pb::CreateRepoRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            description: None,
+            windows_safe: false,
+        })
+        .await
+        .unwrap();
+    let change = c
+        .repo
+        .apply_edits(pb::ApplyEditsRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            base: None,
+            edits: vec![set_edit("agent.txt", b"done by an agent\n")],
+            message: "agent work".into(),
+            intent: None,
+            provenance: None,
+            change_id: None,
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .version
+        .unwrap()
+        .change_id;
+    land(&mut c, "app", change).await;
+
+    let mut lander = rill_proto::rill::v1::lander_service_client::LanderServiceClient::new(
+        connect(&server.grpc).await,
+    );
+    let select = |apply| pb::RevertSetRequest {
+        operation_id: Bytes::new(),
+        repo: "app".into(),
+        // Sessions and models come from tokens; a dev caller has none.
+        author: Some("dev".into()),
+        apply,
+        reason: "session went wrong".into(),
+        ..Default::default()
+    };
+    let unnamed = lander
+        .revert_set(pb::RevertSetRequest {
+            since: Some(0),
+            ..select(false)
+        })
+        .await;
+    assert!(unnamed.is_ok(), "an author is named");
+    let range_only = lander
+        .revert_set(pb::RevertSetRequest {
+            author: None,
+            since: Some(0),
+            ..select(false)
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(range_only.code(), tonic::Code::InvalidArgument);
+
+    let preview = lander.revert_set(select(false)).await.unwrap().into_inner();
+    assert_eq!(preview.entries.len(), 1);
+    assert_eq!(
+        (preview.entries[0].seq, preview.entries[0].ticket.as_ref()),
+        (1, None)
+    );
+    let applied = lander.revert_set(select(true)).await.unwrap().into_inner();
+    let ticket = applied.entries[0].ticket.clone().unwrap();
+    for _ in 0..100 {
+        let status = c
+            .review
+            .get_land_status(pb::GetLandStatusRequest {
+                repo: "app".into(),
+                ticket: ticket.clone(),
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        if status.seq.is_some() {
+            assert_eq!(status.seq, Some(2));
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    panic!("the revert did not land");
+}

@@ -269,3 +269,99 @@ async fn a_guarded_trunk_holds_what_touches_the_failing_steps_and_a_frozen_one_a
     );
     assert_eq!(fx.head().await.0, TrunkSeq(4), "only the emergency landed");
 }
+
+/// Land a change by agent `bot` in `session` setting `path`.
+async fn land_as(fx: &Fixture, lander: &Arc<Lander>, session: &str, path: &str, body: &str) {
+    let parent = fx.repo.trunk_head().await.unwrap().map(|(_, h)| h);
+    let mut builder = rill_core::ChangeBuilder::new(Principal::agent("bot"))
+        .message(format!("{session}: {path}"))
+        .provenance(rill_types::Provenance {
+            session: Some(session.into()),
+            model: Some("m1".into()),
+            ..Default::default()
+        })
+        .file(path, body.as_bytes().to_vec())
+        .unwrap();
+    if let Some(parent) = parent {
+        builder = builder.parent(parent);
+    }
+    let (_, cv) = builder.commit(&fx.repo).await.unwrap();
+    let status = lander
+        .land_now(request(&cv, RiskClass::Trivial))
+        .await
+        .unwrap();
+    assert!(matches!(status, LandStatus::Landed { .. }), "{status:?}");
+}
+
+#[tokio::test]
+async fn a_session_is_previewed_then_reverted_newest_first_and_independent_reverts_land() {
+    let fx = Fixture::new().await;
+    let lander = fx.lander(
+        Arc::new(RecordingHooks::default()),
+        Arc::new(rill_lander::AlwaysGreen),
+        no_auto_revert(),
+    );
+    land_as(&fx, &lander, "s1", "a", "1").await;
+    land_as(&fx, &lander, "s2", "b", "1").await;
+    land_as(&fx, &lander, "s1", "c", "1").await;
+    // Someone else built on what s1 wrote to `a`.
+    land(&fx, &lander, &[("a", "2")]).await;
+    let selector = rill_lander::healing::Selector {
+        session: Some("s1".into()),
+        ..Default::default()
+    };
+
+    let plan = lander.plan_reverts(&selector).await.unwrap();
+    let seen: Vec<_> = plan
+        .iter()
+        .map(|e| (e.seq.get(), e.conflicts.len()))
+        .collect();
+    assert_eq!(
+        seen,
+        vec![(3, 0), (1, 1)],
+        "newest first; the revert of `a` conflicts"
+    );
+    assert_eq!(fx.head().await.0, TrunkSeq(4), "a preview lands nothing");
+
+    let range_only = rill_lander::healing::Selector {
+        since: Some(TrunkSeq(0)),
+        ..Default::default()
+    };
+    assert!(
+        lander.plan_reverts(&range_only).await.is_err(),
+        "a range alone is not a blast radius"
+    );
+
+    let tickets = lander
+        .apply_reverts(&selector, "session s1 went wrong", &Principal::human("ann"))
+        .await
+        .unwrap();
+    assert_eq!(
+        tickets.iter().map(|(s, _)| s.get()).collect::<Vec<_>>(),
+        vec![3, 1]
+    );
+    lander.run_once().await.unwrap();
+    let statuses: Vec<_> =
+        futures::future::join_all(tickets.iter().map(|(_, t)| lander.queue().status(*t)))
+            .await
+            .into_iter()
+            .map(|s| s.unwrap().unwrap())
+            .collect();
+    assert!(
+        matches!(statuses[0], LandStatus::Landed { .. }),
+        "{statuses:?}"
+    );
+    assert!(
+        matches!(statuses[1], LandStatus::Conflict { .. }),
+        "{statuses:?}"
+    );
+    assert!(
+        lander
+            .plan_reverts(&selector)
+            .await
+            .unwrap()
+            .iter()
+            .all(|e| e.seq != TrunkSeq(3)),
+        "a reverted landing is not matched again"
+    );
+}

@@ -339,6 +339,17 @@ impl LanderService for LanderSvc {
         result.map_err(Status::from)
     }
 
+    async fn revert_set(
+        &self,
+        request: Request<pb::RevertSetRequest>,
+    ) -> GrpcResult<pb::RevertSetResponse> {
+        let result = idem::once(&self.state, request, |r| async move {
+            self.revert_set_impl(r).await.map(Response::new)
+        })
+        .await;
+        result.map_err(Status::from)
+    }
+
     async fn bisect(&self, request: Request<pb::BisectRequest>) -> GrpcResult<pb::BisectResponse> {
         let result: rill_runtime::error::Result<Response<pb::BisectResponse>> =
             idem::once(&self.state, request, |request| async move {

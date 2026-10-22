@@ -1,14 +1,15 @@
 //! Trunk health on `LanderService`: its state, the incidents behind it,
 //! and freezing it.
 
-use rill_proto::convert::{hash_to_proto, id_to_proto, timestamp_to_proto};
+use rill_lander::healing::Selector;
+use rill_proto::convert::{hash_to_proto, id_from_proto, id_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
-use rill_types::{Incident, Resolution, TrunkHealth};
+use rill_types::{Incident, Resolution, TrunkHealth, TrunkSeq};
 use tonic::Request;
 
 use super::common::open;
 use super::lander::LanderSvc;
-use rill_runtime::error::Result;
+use rill_runtime::error::{Error, Result};
 
 /// Incidents in a page by default.
 const DEFAULT_INCIDENTS: usize = 20;
@@ -67,6 +68,66 @@ impl LanderSvc {
         Ok(pb::FreezeTrunkResponse {
             health: Some(health_to_proto(&health)),
         })
+    }
+}
+
+impl LanderSvc {
+    pub(super) async fn revert_set_impl(
+        &self,
+        request: Request<pb::RevertSetRequest>,
+    ) -> Result<pb::RevertSetResponse> {
+        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        opened.permit().admin().await?;
+        let req = request.get_ref();
+        let selector = Selector {
+            session: req.session.clone(),
+            model: req.model.clone(),
+            sponsor: req.sponsor.clone(),
+            author: req.author.clone(),
+            intent: req
+                .intent
+                .as_ref()
+                .map(|i| id_from_proto("intent", i))
+                .transpose()?,
+            since: req.since.map(TrunkSeq),
+            until: req.until.map(TrunkSeq),
+        };
+        if !selector.names_origin() {
+            return Err(Error::invalid(
+                "name a session, model, sponsor, author or intent to revert",
+            ));
+        }
+        let lander = &opened.repo.lander;
+        let entries = if req.apply {
+            let reason = match req.reason.is_empty() {
+                true => format!("mass revert of {}", selector.describe()),
+                false => req.reason.clone(),
+            };
+            lander
+                .apply_reverts(&selector, &reason, opened.principal())
+                .await?
+                .into_iter()
+                .map(|(seq, ticket)| pb::RevertSetEntry {
+                    seq: seq.get(),
+                    ticket: Some(ticket.0.to_string()),
+                    ..Default::default()
+                })
+                .collect()
+        } else {
+            lander
+                .plan_reverts(&selector)
+                .await?
+                .into_iter()
+                .map(|e| pb::RevertSetEntry {
+                    seq: e.seq.get(),
+                    change_id: id_to_proto(&e.change),
+                    summary: e.summary,
+                    conflicts: e.conflicts.iter().map(ToString::to_string).collect(),
+                    ticket: None,
+                })
+                .collect()
+        };
+        Ok(pb::RevertSetResponse { entries })
     }
 }
 
