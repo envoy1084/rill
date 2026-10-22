@@ -31,10 +31,25 @@ impl Profile {
 
     /// The same rates with `lands_per_sec` landings, and enough new
     /// versions and votes to feed them.
-    pub fn with_lands(mut self, lands_per_sec: f64) -> Self {
+    pub fn with_lands(self, lands_per_sec: f64) -> Self {
+        Profile {
+            lands_per_sec,
+            ..self.fed_for(lands_per_sec)
+        }
+    }
+
+    /// The same rates with `lands_per_sec` landings and nothing else
+    /// changed.
+    pub fn with_lands_only(mut self, lands_per_sec: f64) -> Self {
         self.lands_per_sec = lands_per_sec;
-        self.versions_per_sec = self.versions_per_sec.max(lands_per_sec * 1.5);
-        self.votes_per_sec = self.votes_per_sec.max(lands_per_sec * 1.5);
+        self
+    }
+
+    /// The same rates with enough new versions and votes for landings at
+    /// `peak` per second.
+    pub fn fed_for(mut self, peak: f64) -> Self {
+        self.versions_per_sec = self.versions_per_sec.max(peak * 1.5);
+        self.votes_per_sec = self.votes_per_sec.max(peak * 1.5);
         self
     }
 }

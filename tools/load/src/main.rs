@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use clap::Parser;
-use rill_load::{run, EmbeddedServer, Profile, Settings};
+use rill_load::{run, Burst, EmbeddedServer, Profile, Settings};
 
 #[derive(Parser)]
 #[command(about = "Load generator: synthetic agents at a fraction of the D1 workload")]
@@ -46,6 +46,18 @@ struct Args {
     /// Print an interim report to stderr every this many seconds.
     #[arg(long)]
     report_every: Option<u64>,
+    /// Changes contend for hot registries (merged by union) and a
+    /// lockfile (regenerated); the embedded server runs workers for it.
+    #[arg(long)]
+    contended: bool,
+    /// Land at twice the rate for --burst-secs of every this many seconds.
+    #[arg(long, requires = "burst_secs")]
+    burst_every: Option<u64>,
+    #[arg(long)]
+    burst_secs: Option<u64>,
+    /// In-process execution workers of the embedded server.
+    #[arg(long, default_value_t = 16)]
+    exec_workers: usize,
 }
 
 #[tokio::main]
@@ -53,19 +65,31 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let embedded = match &args.endpoint {
         Some(_) => None,
-        None => Some(EmbeddedServer::start().await?),
+        None => {
+            Some(EmbeddedServer::start(if args.contended { args.exec_workers } else { 0 }).await?)
+        }
     };
     let endpoint = args
         .endpoint
         .clone()
         .or_else(|| embedded.as_ref().map(|s| s.endpoint.clone()))
         .expect("one of the two is set");
+    let burst = args
+        .burst_every
+        .zip(args.burst_secs)
+        .map(|(every, length)| Burst {
+            every: Duration::from_secs(every),
+            length: Duration::from_secs(length),
+        });
     let report = run(Settings {
         endpoint,
         repo: args.repo,
-        profile: match args.lands_per_sec {
-            Some(lands) => Profile::of_d1(args.percent).with_lands(lands),
-            None => Profile::of_d1(args.percent),
+        profile: match (args.lands_per_sec, burst.is_some()) {
+            (Some(lands), true) => Profile::of_d1(args.percent)
+                .fed_for(lands * 2.0)
+                .with_lands_only(lands),
+            (Some(lands), false) => Profile::of_d1(args.percent).with_lands(lands),
+            (None, _) => Profile::of_d1(args.percent),
         },
         duration: Duration::from_secs(args.duration),
         max_in_flight: args.max_in_flight,
@@ -74,6 +98,8 @@ async fn main() -> anyhow::Result<()> {
         token: args.token,
         watchers: args.watchers,
         report_every: args.report_every.map(Duration::from_secs),
+        contended: args.contended,
+        burst,
     })
     .await?;
     if args.json {
@@ -89,6 +115,9 @@ async fn main() -> anyhow::Result<()> {
         ledger["lost_versions"].as_array().map_or(0, Vec::len),
         ledger["lost_landings"].as_array().map_or(0, Vec::len),
     );
+    if !report["resolutions"].is_null() {
+        println!("merged by: {}", report["resolutions"]);
+    }
     println!("SLOs met: {}", report["slo"]["met"]);
     Ok(())
 }

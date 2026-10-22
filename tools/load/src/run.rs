@@ -34,6 +34,25 @@ pub struct Settings {
     pub watchers: usize,
     /// Print an interim report to stderr this often; long runs.
     pub report_every: Option<Duration>,
+    /// Changes contend for registries and a lockfile the repository
+    /// resolves with merge drivers (needs execution for `regenerate`).
+    pub contended: bool,
+    /// Land at twice the rate during these windows.
+    pub burst: Option<Burst>,
+}
+
+/// Periodic bursts of landings: the first `length` of every `every`.
+#[derive(Debug, Clone, Copy)]
+pub struct Burst {
+    pub every: Duration,
+    pub length: Duration,
+}
+
+impl Burst {
+    fn covers(&self, since_start: Duration) -> bool {
+        let every = self.every.as_secs_f64().max(f64::EPSILON);
+        since_start.as_secs_f64() % every < self.length.as_secs_f64()
+    }
 }
 
 /// Create and seed the repository, then drive load for the duration.
@@ -47,17 +66,21 @@ pub async fn run(settings: Settings) -> anyhow::Result<serde_json::Value> {
         .create_repo(&settings.repo, Some("load test".into()))
         .await?;
     let repo = client.repo(&settings.repo);
-    seed(&repo).await?;
+    seed(&repo, settings.contended).await?;
 
     let stats = Arc::new(Stats::default());
     let ledger = Arc::new(Ledger::default());
-    let workload = Arc::new(Workload::new(
+    let mut workload = Workload::new(
         repo.clone(),
         stats.clone(),
         ledger.clone(),
         settings.hot_share,
         settings.disjoint,
-    ));
+    );
+    if settings.contended {
+        workload = workload.contended();
+    }
+    let workload = Arc::new(workload);
     let limit = Arc::new(Semaphore::new(settings.max_in_flight));
     let p = settings.profile;
     let deadline = Instant::now() + settings.duration;
@@ -148,6 +171,28 @@ pub async fn run(settings: Settings) -> anyhow::Result<serde_json::Value> {
             }
         },
     );
+    if let Some(burst) = settings.burst {
+        ticker(
+            &mut tickers,
+            "land",
+            p.lands_per_sec,
+            deadline,
+            &limit,
+            &stats,
+            {
+                let w = workload.clone();
+                move || {
+                    let w = w.clone();
+                    let bursting = burst.covers(started.elapsed());
+                    async move {
+                        if bursting {
+                            w.land().await
+                        }
+                    }
+                }
+            },
+        );
+    }
     while let Some(result) = tickers.join_next().await {
         result?;
     }
@@ -155,6 +200,9 @@ pub async fn run(settings: Settings) -> anyhow::Result<serde_json::Value> {
     // still counts toward latencies.
     let mut report = stats.report(settings.duration);
     report["ledger"] = ledger.verify(&repo).await;
+    if settings.contended {
+        report["resolutions"] = crate::contended::resolutions(&repo, &ledger.landed()).await;
+    }
     report["slo"] = crate::slo::judge(&report);
     report["drain_secs"] =
         serde_json::json!((started.elapsed().saturating_sub(settings.duration)).as_secs_f64());
@@ -212,8 +260,9 @@ fn ticker<F, Fut>(
     });
 }
 
-/// Land one change containing every seeded file.
-async fn seed(repo: &rill_sdk::RepoClient) -> anyhow::Result<()> {
+/// Land one change containing every seeded file, and the contended
+/// profile's files when `contended`.
+async fn seed(repo: &rill_sdk::RepoClient, contended: bool) -> anyhow::Result<()> {
     // A new repository has no trunk; creating a workspace stores the empty
     // tree the first change is based on.
     repo.workspaces()
@@ -228,6 +277,9 @@ async fn seed(repo: &rill_sdk::RepoClient) -> anyhow::Result<()> {
                 kind: FileKind::Regular,
             });
         }
+    }
+    if contended {
+        edits.extend(crate::contended::seed_edits());
     }
     let result = repo
         .apply_edits(

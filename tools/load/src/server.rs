@@ -12,16 +12,22 @@ pub struct EmbeddedServer {
 }
 
 impl EmbeddedServer {
-    /// Start a memory-backed dev server on a free port.
-    pub async fn start() -> anyhow::Result<Self> {
+    /// Start a memory-backed dev server on a free port, with
+    /// `exec_workers` in-process workers running verification and merge
+    /// drivers (none: verification off).
+    pub async fn start(exec_workers: usize) -> anyhow::Result<Self> {
         let any: SocketAddr = "127.0.0.1:0".parse()?;
         let listeners = Listeners::bind(any, any).await?;
         let (grpc, _) = listeners.addrs()?;
-        let config = ServerConfig {
+        let mut config = ServerConfig {
             dev_mode: true,
             storage: StorageConfig::Memory,
             ..ServerConfig::default()
         };
+        if exec_workers > 0 {
+            config.verify.enabled = true;
+            config.exec.local.workers = exec_workers;
+        }
         let shutdown = CancellationToken::new();
         let state = rill_api::build_state(config, shutdown.clone()).await?;
         let token = shutdown.clone();

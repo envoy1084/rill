@@ -23,6 +23,11 @@ impl Ledger {
         self.landings.lock().push((seq, hash));
     }
 
+    /// The landed versions, in the order they were reported.
+    pub fn landed(&self) -> Vec<ChangeVersionHash> {
+        self.landings.lock().iter().map(|(_, h)| *h).collect()
+    }
+
     /// Read everything back: how many acknowledged versions and landings
     /// are missing or changed.
     pub async fn verify(&self, repo: &RepoClient) -> Value {

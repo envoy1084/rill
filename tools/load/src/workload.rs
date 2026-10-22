@@ -26,6 +26,10 @@ pub struct Workload {
     pub hot_share: f64,
     /// Every change writes a new file of its own, so no two interact.
     pub disjoint: bool,
+    /// Changes contend for registries and a lockfile ([`crate::contended`]).
+    pub contended: bool,
+    /// Distinguishes this run's generated names from another's.
+    run: u32,
     fresh: std::sync::atomic::AtomicU64,
     /// Changes created but not yet submitted.
     drafts: Mutex<Vec<ChangeId>>,
@@ -47,10 +51,19 @@ impl Workload {
             ledger,
             hot_share,
             disjoint,
+            contended: false,
+            run: rand::rng().random(),
             fresh: std::sync::atomic::AtomicU64::new(0),
             drafts: Mutex::new(Vec::new()),
             approved: Mutex::new(Vec::new()),
         }
+    }
+
+    /// Contend for the registries and the lockfile instead of editing
+    /// the seeded files.
+    pub fn contended(mut self) -> Self {
+        self.contended = true;
+        self
     }
 
     /// A file to edit: a new one of its own when disjoint.
@@ -123,24 +136,33 @@ impl Workload {
         }
     }
 
-    /// A new change editing one file at trunk.
+    /// A new change: one file edited at trunk, or a contended change.
     pub async fn new_version(&self) {
-        let path = self.edit_path();
-        let body = format!(
-            "pub const value_{}: u32 = 1;\n",
-            rand::rng().random_range(0..1000)
-        );
-        let edit = Edit::Set {
-            path,
-            bytes: Bytes::from(body),
-            kind: FileKind::Regular,
+        let (base, edits) = if self.contended {
+            let n = self
+                .fresh
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            match self.contended_edits(&format!("{:08x}-{n}", self.run)).await {
+                Some(change) => change,
+                None => return,
+            }
+        } else {
+            let body = format!(
+                "pub const value_{}: u32 = 1;\n",
+                rand::rng().random_range(0..1000)
+            );
+            let edit = Edit::Set {
+                path: self.edit_path(),
+                bytes: Bytes::from(body),
+                kind: FileKind::Regular,
+            };
+            (Root::trunk(), vec![edit])
         };
         let opts = ApplyOptions::message("load: edit");
         if let Some(result) = self
             .timed(
                 "create_version",
-                self.repo
-                    .apply_edits(EditBase::Root(Root::trunk()), vec![edit], opts),
+                self.repo.apply_edits(EditBase::Root(base), edits, opts),
             )
             .await
         {
@@ -149,9 +171,21 @@ impl Workload {
         }
     }
 
+    /// The next change of `pool`: the newest, or in the contended profile
+    /// the oldest, as an agent lands work it started a while ago (on a
+    /// head that has moved since).
+    fn next(&self, pool: &Mutex<Vec<ChangeId>>) -> Option<ChangeId> {
+        let mut pool = pool.lock();
+        match (self.contended, pool.is_empty()) {
+            (_, true) => None,
+            (true, false) => Some(pool.remove(0)),
+            (false, false) => pool.pop(),
+        }
+    }
+
     /// Submit a draft and approve it.
     pub async fn review(&self) {
-        let Some(change) = self.drafts.lock().pop() else {
+        let Some(change) = self.next(&self.drafts) else {
             return;
         };
         let reviews = self.repo.reviews();
@@ -161,16 +195,26 @@ impl Workload {
         if self
             .timed("vote", reviews.vote(change, "Review", 2, None, None))
             .await
-            .is_some()
+            .is_none()
         {
-            self.approved.lock().push(change);
+            return;
         }
+        // Contended changes are not all trivial: CI's verdict is needed too.
+        if self.contended
+            && self
+                .timed("vote", reviews.vote(change, "Verified", 1, None, None))
+                .await
+                .is_none()
+        {
+            return;
+        }
+        self.approved.lock().push(change);
     }
 
     /// Request landing an approved change and wait for the outcome; the
     /// latency is queue-to-trunk.
     pub async fn land(&self) {
-        let Some(change) = self.approved.lock().pop() else {
+        let Some(change) = self.next(&self.approved) else {
             return;
         };
         let started = Instant::now();
@@ -192,7 +236,12 @@ impl Workload {
                     self.ledger.landing(seq, hash);
                 }
             }
-            _ => self.stats.error("land"),
+            // A request that came back is a give-up; count it by why.
+            Err(rill_sdk::Error::LandFailed { message, .. }) => {
+                self.stats.error_with("land", &message)
+            }
+            Err(e) => self.stats.error_with("land", &e),
+            Ok(_) => self.stats.error("land"),
         }
     }
 }

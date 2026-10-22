@@ -2,6 +2,7 @@
 //! design workload, against an embedded dev server or a remote endpoint,
 //! reporting throughput and latency percentiles per operation.
 
+pub mod contended;
 pub mod ledger;
 pub mod profile;
 pub mod run;
@@ -12,5 +13,5 @@ pub mod watch;
 pub mod workload;
 
 pub use profile::Profile;
-pub use run::{run, Settings};
+pub use run::{run, Burst, Settings};
 pub use server::EmbeddedServer;
