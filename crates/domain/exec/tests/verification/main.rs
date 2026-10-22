@@ -4,5 +4,6 @@
 #![cfg(unix)]
 
 mod fixture;
+mod graph;
 mod running;
 mod selection;

@@ -267,8 +267,9 @@ step.
 * A request keeps the risk class it was enqueued with.
 * A slow verification holds its wave, and so its window: the batch commits
   together.
-* Conflict domains are paths and declared groups; build-target domains
-  wait for build-graph data (remote execution).
+* Conflict domains are paths and declared groups. Verification computes
+  affected build targets ([exec](../06-services/exec.md#build-graphs)), but
+  the sequencer does not use them as domains yet.
 * A re-parented request is not verified again: under path domains its
   verification still holds, under build-target domains it would not.
 * Requests queued in the same millisecond are served in ticket order,

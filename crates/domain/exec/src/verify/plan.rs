@@ -12,6 +12,7 @@
 //! platform = { OSFamily = "linux" }  # added to the server's default
 //! shards = 4
 //! risk = ["normal", "sensitive", "critical"]
+//! targets = "affected"               # needs [graph]; see graph/
 //! ```
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -21,6 +22,7 @@ use rill_core::{read_content, TreeOps};
 use rill_types::{EntryKind, RepoPathBuf, RiskClass, TreeHash};
 use serde::Deserialize;
 
+use super::graph::{GraphFile, GraphSpec};
 use crate::error::{Error, Result};
 use crate::remote::InputFilter;
 
@@ -53,12 +55,17 @@ pub struct Step {
     pub shards: u32,
     /// Risk classes the step gates; `None` is every class.
     pub risk: Option<BTreeSet<RiskClass>>,
+    /// The step is given the build targets the change affects, in the
+    /// file `RILL_AFFECTED_TARGETS` names, and skipped when there are none.
+    pub affected_targets: bool,
 }
 
 /// The steps that verify a tree.
 #[derive(Debug, Clone, Default)]
 pub struct Plan {
     pub steps: Vec<Step>,
+    /// How to find the build targets a change affects.
+    pub graph: Option<GraphSpec>,
 }
 
 impl Plan {
@@ -93,6 +100,20 @@ impl Plan {
                 RepoPathBuf::new(output)
                     .map_err(|e| invalid(format!("step {name:?} output {output:?}: {e}")))?;
             }
+            let affected_targets = match step.targets.as_deref() {
+                None | Some("all") => false,
+                Some("affected") if file.graph.is_some() => true,
+                Some("affected") => {
+                    return Err(invalid(format!(
+                        "step {name:?} wants affected targets but the plan has no [graph]"
+                    )))
+                }
+                Some(other) => {
+                    return Err(invalid(format!(
+                        "step {name:?}: targets is \"affected\" or \"all\", not {other:?}"
+                    )))
+                }
+            };
             let risk = match step.risk {
                 None => None,
                 Some(classes) => Some(
@@ -116,10 +137,12 @@ impl Plan {
                 platform: step.platform,
                 shards,
                 risk,
+                affected_targets,
                 name,
             });
         }
-        Ok(Plan { steps })
+        let graph = file.graph.map(GraphFile::into_spec).transpose()?;
+        Ok(Plan { steps, graph })
     }
 }
 
@@ -135,6 +158,7 @@ fn invalid(reason: String) -> Error {
 struct PlanFile {
     #[serde(default)]
     step: Vec<StepFile>,
+    graph: Option<GraphFile>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -154,6 +178,7 @@ struct StepFile {
     platform: BTreeMap<String, String>,
     shards: Option<u32>,
     risk: Option<Vec<String>>,
+    targets: Option<String>,
 }
 
 /// The plan at [`PLAN_PATH`] in `root`, or `None` when the tree has none.
@@ -216,9 +241,25 @@ command = ["true"]
             "[[step]]\ncommand = [\"x\"]\nrisk = [\"spicy\"]\n",
             "[[step]]\ncommand = [\"x\"]\ninput = [\"typo\"]\n",
             "[[step]]\ncommand = [\"x\"]\noutputs = [\"../up\"]\n",
+            "[[step]]\ncommand = [\"x\"]\ntargets = \"affected\"\n",
+            "[graph]\ntool = \"make\"\n",
+            "[graph]\noutput = \"h.json\"\n",
         ] {
             assert!(Plan::parse(text).is_err(), "{text}");
         }
         assert!(Plan::parse("").unwrap().steps.is_empty());
+    }
+
+    #[test]
+    fn a_graph_preset_writes_its_hashes_where_the_plan_reads_them() {
+        let plan = Plan::parse(
+            "[graph]\ntool = \"bazel\"\n[[step]]\ncommand = [\"x\"]\ntargets = \"affected\"\n",
+        )
+        .unwrap();
+        let graph = plan.graph.unwrap();
+        assert_eq!(graph.step.command[0], "bazel-diff");
+        assert_eq!(graph.step.command.last(), Some(&graph.output));
+        assert_eq!(graph.step.outputs, std::slice::from_ref(&graph.output));
+        assert!(plan.steps[0].affected_targets);
     }
 }

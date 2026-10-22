@@ -23,17 +23,33 @@ pub struct CompiledAction {
     pub platform: Platform,
 }
 
+/// A file Rill adds to a step's input root, relative to its working
+/// directory, named to the command by an environment variable.
+#[derive(Debug, Clone)]
+pub struct ExtraFile {
+    pub name: String,
+    pub env: String,
+    pub bytes: Bytes,
+}
+
 /// Store `step`'s actions for `root` in `space`: one per shard, sharing
-/// an input root of the files the step reads.
+/// an input root of the files the step reads (and `extra`).
 pub async fn compile(
     space: &ExecSpace,
     trees: &TreeOps,
     root: TreeHash,
     step: &Step,
     default_platform: &BTreeMap<String, String>,
+    extra: Option<ExtraFile>,
 ) -> Result<Vec<CompiledAction>> {
     let input_root = space.input_root(trees, root, &step.inputs).await?;
-    let input_root = space.with_directory(input_root, &step.working_dir).await?;
+    let mut input_root = space.with_directory(input_root, &step.working_dir).await?;
+    let mut base_env = step.env.clone();
+    if let Some(extra) = extra {
+        let path = step.working_dir.join(&extra.name)?;
+        input_root = space.with_file(input_root, &path, extra.bytes).await?;
+        base_env.insert(extra.env, extra.name);
+    }
     let mut properties = default_platform.clone();
     properties.extend(step.platform.clone());
     let platform = Platform {
@@ -49,7 +65,7 @@ pub async fn compile(
     let mut actions = Vec::with_capacity(step.shards as usize);
     for index in 0..step.shards {
         let shard = (step.shards > 1).then_some((index, step.shards));
-        let mut env = step.env.clone();
+        let mut env = base_env.clone();
         if let Some((index, total)) = shard {
             env.insert("TEST_SHARD_INDEX".into(), index.to_string());
             env.insert("TEST_TOTAL_SHARDS".into(), total.to_string());

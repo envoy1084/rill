@@ -68,6 +68,38 @@ them). They decide two things:
   (`Unaffected`). An unaffected step's action is the one the base already
   ran. A change to the plan file itself runs every step.
 
+## Build graphs
+
+Bazel and Buck2 repositories test by target, and a change affects the
+targets whose transitive inputs it touched. A plan can declare how to list
+targets with a hash of everything each depends on:
+
+```toml
+[graph]
+tool = "bazel"      # bazel-diff generate-hashes -w . -b bazel target-hashes.json
+# tool = "buck2"    # buck2 targets //... --show-target-hash --json
+# command = [...], output = "...", inputs, working_dir, env, platform, timeout_secs (1800)
+
+[[step]]
+name = "affected-tests"
+command = ["sh", "-c", "bazel test $(cat \"$RILL_AFFECTED_TARGETS\")"]
+targets = "affected"
+```
+
+The query is an action like any step (`verify/graph/`), named
+`build-graph`, so its result is cached per tree: the base's query usually
+ran when trunk was verified. `parse_target_hashes` reads bazel-diff's
+output (`{"hashes": {label: "hash~directHash"}, "metadata": ...}`, checked
+against bazel-diff 63 on a sample workspace) and Buck2's array of targets. `affected_targets`
+is every label whose hash differs from the base's or that is new; with no
+base, or when the base's query fails, every target. A step with
+`targets = "affected"` gets the list, one label per line, in
+`.rill-affected-targets` in its working directory (named by
+`RILL_AFFECTED_TARGETS`), which is part of its action, and is
+`Unaffected` when the list is empty. A failing query fails verification.
+bazel-diff and the build tool come from the worker image; the query
+usually needs a platform whose workers can fetch external dependencies.
+
 **Compiling** (`verify/compile.rs`) writes one `Command` and `Action` per
 shard: arguments, sorted environment, `output_paths`, the working
 directory, the step timeout, and the platform (`[verify] platform` plus
@@ -165,12 +197,17 @@ Multi-tenant deployments run Buildbarn workers under gVisor instead
   memory or process count.
 * Steps of one plan run concurrently; a failure stops the wait, but the
   others' actions still run to completion on their workers.
+* Affected targets select what a step runs; the lander's conflict
+  domains are still paths and declared groups, not targets.
+* The base's and the change's queries each parse their whole hash file;
+  nothing keeps parsed graphs in memory.
 * Platform properties are the only toolchain identity: a worker image
   upgrade under the same properties keeps old cached results.
 
 ## Code
 
-* [verify/](../../crates/domain/exec/src/verify/mod.rs): [plan.rs](../../crates/domain/exec/src/verify/plan.rs), [select.rs](../../crates/domain/exec/src/verify/select.rs), [compile.rs](../../crates/domain/exec/src/verify/compile.rs), [run.rs](../../crates/domain/exec/src/verify/run.rs), [outcome.rs](../../crates/domain/exec/src/verify/outcome.rs)
+* [verify/](../../crates/domain/exec/src/verify/mod.rs): [plan.rs](../../crates/domain/exec/src/verify/plan.rs), [select.rs](../../crates/domain/exec/src/verify/select.rs), [compile.rs](../../crates/domain/exec/src/verify/compile.rs), [run.rs](../../crates/domain/exec/src/verify/run.rs), [submit.rs](../../crates/domain/exec/src/verify/submit.rs), [outcome.rs](../../crates/domain/exec/src/verify/outcome.rs)
+* [verify/graph/](../../crates/domain/exec/src/verify/graph/mod.rs): [spec.rs](../../crates/domain/exec/src/verify/graph/spec.rs), [query.rs](../../crates/domain/exec/src/verify/graph/query.rs), [hashes.rs](../../crates/domain/exec/src/verify/graph/hashes.rs), [affected.rs](../../crates/domain/exec/src/verify/graph/affected.rs)
 * [remote/inputs/](../../crates/domain/exec/src/remote/inputs/mod.rs): [filter.rs](../../crates/domain/exec/src/remote/inputs/filter.rs), [upload.rs](../../crates/domain/exec/src/remote/inputs/upload.rs), [graft.rs](../../crates/domain/exec/src/remote/inputs/graft.rs)
 * [worker/](../../crates/domain/exec/src/worker/mod.rs): [local.rs](../../crates/domain/exec/src/worker/local.rs), [execute.rs](../../crates/domain/exec/src/worker/execute.rs), [stage.rs](../../crates/domain/exec/src/worker/stage.rs)
 * [sandbox/](../../crates/domain/exec/src/sandbox/mod.rs): [local.rs](../../crates/domain/exec/src/sandbox/local.rs), [confine.rs](../../crates/domain/exec/src/sandbox/confine.rs)
