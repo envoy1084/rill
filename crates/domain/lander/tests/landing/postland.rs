@@ -123,6 +123,28 @@ async fn postland_green_batch_needs_one_verification() {
 }
 
 #[tokio::test]
+async fn a_worker_behind_trunk_catches_up_without_waiting_an_interval_per_batch() {
+    let fx = Fixture::new().await;
+    let lander = fx.lander(Arc::new(NoopHooks), Arc::new(AlwaysGreen), fast_policy());
+    land_chain(&fx, &lander, &[&[("a", "1")], &[("b", "2")], &[("c", "3")]]).await;
+    let worker = PostLandVerifier::new(lander.clone(), 1);
+    let shutdown = tokio_util::sync::CancellationToken::new();
+    let task = tokio::spawn(
+        worker
+            .clone()
+            .run_forever(Duration::from_secs(1), shutdown.clone()),
+    );
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    assert_eq!(
+        worker.cursor().await.unwrap(),
+        TrunkSeq(3),
+        "one interval verifies every batch trunk is ahead by"
+    );
+    shutdown.cancel();
+    task.await.unwrap();
+}
+
+#[tokio::test]
 async fn revert_restores_pre_land_tree() {
     let fx = Fixture::new().await;
     let lander = fx.lander(Arc::new(NoopHooks), Arc::new(AlwaysGreen), fast_policy());

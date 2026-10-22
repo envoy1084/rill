@@ -51,6 +51,10 @@ holds `sweep_lock` (a process-local `tokio::sync::Mutex`) and:
    compare-and-swaps fenced on the `postland` lease, so neither a replaced
    verifier nor a second sweep can move them twice.
 
+A sweep that leaves trunk's head past `to` is followed at once by
+another, so after a red batch shrinks the size, verification catches up
+within one interval instead of falling further behind with every one.
+
 Inferred records are replaced when a position is verified directly or a
 later bisection decides it.
 

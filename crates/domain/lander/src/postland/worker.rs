@@ -37,6 +37,8 @@ pub struct Sweep {
     pub culprit: Option<TrunkSeq>,
     /// The tip ran the whole plan.
     pub full: bool,
+    /// Trunk's head was past `to`: more is waiting to be verified.
+    pub behind: bool,
 }
 
 /// Verifies trunk positions after they land, bisects red batches to the
@@ -229,6 +231,7 @@ impl PostLandVerifier {
             green: tip.passed(),
             culprit,
             full,
+            behind: head > to,
         }))
     }
 
@@ -245,11 +248,23 @@ impl PostLandVerifier {
         loop {
             tokio::select! {
                 _ = shutdown.cancelled() => break,
-                _ = tokio::time::sleep(interval) => {
-                    match self.run_once().await {
-                        Ok(Some(sweep)) => tracing::info!(?sweep, "post-land sweep"),
-                        Ok(None) => {}
-                        Err(e) => tracing::error!(error = %e, "post-land sweep failed"),
+                _ = tokio::time::sleep(interval) => {}
+            }
+            // Sweep again at once while trunk is ahead, so a small batch
+            // after a red one does not leave verification further behind
+            // with every interval.
+            while !shutdown.is_cancelled() {
+                match self.run_once().await {
+                    Ok(Some(sweep)) => {
+                        tracing::info!(?sweep, "post-land sweep");
+                        if !sweep.behind {
+                            break;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        tracing::error!(error = %e, "post-land sweep failed");
+                        break;
                     }
                 }
             }
