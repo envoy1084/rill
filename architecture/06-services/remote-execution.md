@@ -171,7 +171,7 @@ Both are on the queues dashboard. Queue depths appear with every other
 
 ## Code
 
-* [remote/](../../crates/domain/exec/src/remote/mod.rs): [space.rs](../../crates/domain/exec/src/remote/space.rs), [cas.rs](../../crates/domain/exec/src/remote/cas.rs), [results.rs](../../crates/domain/exec/src/remote/results.rs), [operation.rs](../../crates/domain/exec/src/remote/operation.rs), [platform.rs](../../crates/domain/exec/src/remote/platform.rs), [scheduler/](../../crates/domain/exec/src/remote/scheduler/mod.rs)
+* [remote/](../../crates/domain/exec/src/remote/mod.rs): [space.rs](../../crates/domain/exec/src/remote/space.rs), [cas.rs](../../crates/domain/exec/src/remote/cas.rs), [cache/](../../crates/domain/exec/src/remote/cache/mod.rs), [secrets/](../../crates/domain/exec/src/remote/secrets/mod.rs), [operation.rs](../../crates/domain/exec/src/remote/operation.rs), [platform.rs](../../crates/domain/exec/src/remote/platform.rs), [scheduler/](../../crates/domain/exec/src/remote/scheduler/mod.rs)
 * Services: [services/exec/](../../crates/server/api/src/services/exec/mod.rs), worker auth [auth/worker.rs](../../crates/server/api/src/auth/worker.rs), [runtime exec.rs](../../crates/server/runtime/src/exec.rs)
 * Protos: [rill-reapi-proto](../../crates/foundation/reapi-proto/proto/README.md)
 * Local workers: [deploy/exec/](../../deploy/exec/run.sh)
