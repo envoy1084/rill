@@ -31,7 +31,8 @@ impl ServerConfig {
     ///   `RILL_VAULT_KEY`, `RILL_AWS_KMS_KEY`, `RILL_GCP_KMS_KEY`: the key
     ///   service that wraps token keys;
     /// * `RILL_ADMINS`: comma-separated instance administrator names;
-    /// * `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED`: `true`/`false`;
+    /// * `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED`, `RILL_EXEC_ENABLED`: `true`/`false`;
+    /// * `RILL_EXEC_WORKER_SECRET_FILE`: the file of worker secrets;
     /// * `RILL_POSTLAND_INTERVAL_SECS`.
     pub fn apply_env(&mut self, lookup: impl Fn(&str) -> Option<String>) -> Result<()> {
         if let Some(v) = lookup("RILL_LISTEN_GRPC") {
@@ -120,6 +121,12 @@ impl ServerConfig {
         }
         if let Some(v) = lookup("RILL_VERIFY_ENABLED") {
             self.verify.enabled = parse_bool("RILL_VERIFY_ENABLED", &v)?;
+        }
+        if let Some(v) = lookup("RILL_EXEC_ENABLED") {
+            self.exec.enabled = parse_bool("RILL_EXEC_ENABLED", &v)?;
+        }
+        if let Some(v) = lookup("RILL_EXEC_WORKER_SECRET_FILE") {
+            self.exec.worker_secret_file = (!v.is_empty()).then(|| PathBuf::from(v));
         }
         if let Some(v) = lookup("RILL_POSTLAND_ENABLED") {
             self.postland.enabled = parse_bool("RILL_POSTLAND_ENABLED", &v)?;

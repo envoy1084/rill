@@ -34,6 +34,10 @@ pub struct AppState {
     pub data_keys: Option<Arc<rill_identity::keys::DataKeyManager>>,
     /// Per-principal request rate limits, when on.
     pub rate_limits: Option<crate::rate::RateLimits>,
+    /// The remote execution scheduler.
+    pub exec: Arc<rill_exec::remote::Scheduler>,
+    /// The secrets remote execution workers present.
+    pub worker_secrets: crate::exec::WorkerSecrets,
     /// Every metric the server keeps.
     pub metrics: Arc<crate::telemetry::Metrics>,
     /// Process start time, for health reporting.
@@ -104,6 +108,12 @@ impl AppState {
             lifecycle.clone(),
         );
         let rate_limits = crate::rate::RateLimits::new(&config.rate_limit);
+        let exec = Arc::new(rill_exec::remote::Scheduler::new(
+            stores.clone(),
+            crate::exec::scheduler_config(&config.exec),
+        ));
+        let worker_secrets =
+            crate::exec::WorkerSecrets::load(config.exec.worker_secret_file.as_deref())?;
         Ok(Arc::new(AppState {
             stores,
             config,
@@ -115,6 +125,8 @@ impl AppState {
             lifecycle,
             data_keys,
             rate_limits,
+            exec,
+            worker_secrets,
             metrics,
             started_at: std::time::Instant::now(),
         }))

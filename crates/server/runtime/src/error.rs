@@ -146,7 +146,7 @@ impl Error {
             Error::Events(rill_events::Error::Store(e)) => store_code(e),
             Error::Jobs(rill_jobs::Error::Store(e)) => store_code(e),
             Error::Jobs(rill_jobs::Error::Lost(_)) => Code::Aborted,
-            Error::Exec(_) => Code::Internal,
+            Error::Exec(e) => exec_code(e),
             Error::Identity(e) => match e {
                 rill_identity::Error::Store(e) => store_code(e),
                 rill_identity::Error::Policy(e) => policy_code(e),
@@ -181,6 +181,18 @@ impl Error {
             Error::Unavailable(_) => Code::Unavailable,
             Error::Exhausted(_) | Error::RateLimited { .. } => Code::ResourceExhausted,
         }
+    }
+}
+
+fn exec_code(e: &rill_exec::Error) -> Code {
+    use rill_exec::Error as E;
+    match e {
+        E::InvalidDigest(_) | E::DigestMismatch(_) | E::InvalidAction(_) => Code::InvalidArgument,
+        E::MissingBlob(_) => Code::FailedPrecondition,
+        E::Contended(_) => Code::Unavailable,
+        E::Jobs(rill_jobs::Error::Lost(_)) => Code::Aborted,
+        E::Store(e) => store_code(e),
+        _ => Code::Internal,
     }
 }
 

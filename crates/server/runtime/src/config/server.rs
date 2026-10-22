@@ -59,6 +59,8 @@ pub struct ServerConfig {
     pub postland: PostLandConfig,
     /// Per-principal request rate limits.
     pub rate_limit: super::RateLimitConfig,
+    /// Remote execution.
+    pub exec: super::ExecConfig,
     /// File holding the hex P-256 secret key the server signs commit
     /// attestations with. Without it a key is generated per process, so
     /// attestations do not verify across restarts.
@@ -95,6 +97,7 @@ impl Default for ServerConfig {
             verify: VerifyConfig::default(),
             postland: PostLandConfig::default(),
             rate_limit: super::RateLimitConfig::default(),
+            exec: super::ExecConfig::default(),
             attestation_key: None,
             dev_mode: false,
         }

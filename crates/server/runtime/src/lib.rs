@@ -15,6 +15,7 @@
 pub mod audit;
 pub mod config;
 pub mod error;
+pub mod exec;
 pub mod identity;
 pub mod quarantine;
 pub mod rate;

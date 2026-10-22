@@ -18,6 +18,9 @@ saml = ["rill-identity/saml"]
 
 [dependencies]
 rill-runtime = { workspace = true }
+rill-exec = { workspace = true }
+rill-reapi-proto = { workspace = true }
+prost-types = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true, features = ["s3"] }
 rill-core = { workspace = true }

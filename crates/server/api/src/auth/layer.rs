@@ -84,9 +84,20 @@ where
                 .get(super::context::RELATIONS_SEEN_HEADER)
                 .and_then(|v| v.to_str().ok())
                 .map(str::to_owned);
-            let admitted = authenticate(&state, header.as_deref())
-                .await
-                .and_then(|ctx| state.admit(&ctx).map(|()| ctx));
+            let worker = header
+                .as_deref()
+                .and_then(super::bearer_token)
+                .is_some_and(|t| state.worker_secrets.admits(t));
+            if worker {
+                request.extensions_mut().insert(super::ExecWorker);
+            }
+            let admitted = if worker {
+                Ok(super::worker_context())
+            } else {
+                authenticate(&state, header.as_deref())
+                    .await
+                    .and_then(|ctx| state.admit(&ctx).map(|()| ctx))
+            };
             match admitted {
                 Ok(mut ctx) => {
                     ctx.relations_seen = super::context::relations_seen(seen.as_deref());

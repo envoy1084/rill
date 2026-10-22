@@ -11,6 +11,7 @@ mod common;
 mod encryption;
 mod end_to_end;
 mod events;
+mod exec;
 mod history;
 mod identity;
 mod keycloak;

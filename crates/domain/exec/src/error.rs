@@ -47,6 +47,21 @@ pub enum Error {
 
     #[error("codec error: {0}")]
     Codec(String),
+
+    #[error(transparent)]
+    Jobs(#[from] rill_jobs::Error),
+
+    #[error("invalid digest {0}")]
+    InvalidDigest(String),
+
+    #[error("content does not match its digest {0}")]
+    DigestMismatch(String),
+
+    #[error("blob {0} is not in the CAS")]
+    MissingBlob(String),
+
+    #[error("contended: {0}")]
+    Contended(String),
 }
 
 /// Result alias for this crate.

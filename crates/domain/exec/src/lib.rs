@@ -14,6 +14,7 @@ pub mod action;
 pub mod cache;
 pub mod error;
 pub mod materialize;
+pub mod remote;
 pub mod runner;
 pub mod sandbox;
 pub mod verify;

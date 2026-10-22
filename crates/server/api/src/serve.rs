@@ -22,9 +22,16 @@ use tower::Layer;
 
 use crate::auth::{AuthLayer, AuthService};
 use crate::objects;
+use rill_reapi_proto::bytestream::byte_stream_server::ByteStreamServer;
+use rill_reapi_proto::reapi::action_cache_server::ActionCacheServer;
+use rill_reapi_proto::reapi::capabilities_server::CapabilitiesServer;
+use rill_reapi_proto::reapi::content_addressable_storage_server::ContentAddressableStorageServer;
+use rill_reapi_proto::reapi::execution_server::ExecutionServer;
+use rill_reapi_proto::remoteworker::operation_queue_server::OperationQueueServer;
+
 use crate::services::{
-    AccessSvc, AdminSvc, AuditSvc, IdentitySvc, IntentSvc, LanderSvc, ProtectionSvc, RepoSvc,
-    ReviewSvc, SessionSvc, WorkspaceSvc,
+    AccessSvc, AdminSvc, AuditSvc, ExecSvc, IdentitySvc, IntentSvc, LanderSvc, ProtectionSvc,
+    RepoSvc, ReviewSvc, SessionSvc, WorkspaceSvc,
 };
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
@@ -106,6 +113,7 @@ pub async fn serve_with_state(
             state.stores.clone(),
             shutdown.clone(),
         ));
+        tokio::spawn(reap_execution(state.clone(), shutdown.clone()));
         tokio::spawn(rill_runtime::workers::discover_repos(
             state.clone(),
             shutdown.clone(),
@@ -146,6 +154,26 @@ async fn sweep_rate_limits(state: Arc<AppState>, shutdown: CancellationToken) {
     }
 }
 
+/// How often actions are taken back from workers that stopped reporting.
+const EXEC_REAP_EVERY: std::time::Duration = std::time::Duration::from_secs(10);
+
+async fn reap_execution(state: Arc<AppState>, shutdown: CancellationToken) {
+    if !state.config.exec.enabled {
+        return;
+    }
+    let mut tick = tokio::time::interval(EXEC_REAP_EVERY);
+    loop {
+        tokio::select! {
+            _ = shutdown.cancelled() => return,
+            _ = tick.tick() => {
+                if let Err(e) = state.exec.reap().await {
+                    tracing::warn!(error = %e, "reaping remote execution");
+                }
+            }
+        }
+    }
+}
+
 async fn serve_grpc(
     state: Arc<AppState>,
     listener: TcpListener,
@@ -175,6 +203,7 @@ async fn serve_grpc(
             .tls_config(crate::tls::grpc(tls)?)
             .map_err(|e| Error::Config(format!("tls: {e}")))?;
     }
+    let exec = ExecSvc::new(state.clone());
     builder
         .add_service(reflection)
         .add_service(health)
@@ -213,6 +242,12 @@ async fn serve_grpc(
                 state.clone()
             )))),
         )
+        .add_service(auth.layer(limits!(ExecutionServer::new(exec.clone()))))
+        .add_service(auth.layer(limits!(ActionCacheServer::new(exec.clone()))))
+        .add_service(auth.layer(limits!(ContentAddressableStorageServer::new(exec.clone()))))
+        .add_service(auth.layer(limits!(CapabilitiesServer::new(exec.clone()))))
+        .add_service(auth.layer(limits!(ByteStreamServer::new(exec.clone()))))
+        .add_service(auth.layer(limits!(OperationQueueServer::new(exec))))
         .add_service(auth.layer(limits!(AdminServiceServer::new(AdminSvc::new(state)))))
         .serve_with_incoming_shutdown(grpc_incoming(listener), shutdown.cancelled_owned())
         .await

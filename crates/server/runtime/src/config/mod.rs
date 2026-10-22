@@ -10,6 +10,7 @@ mod audit;
 mod auth;
 mod encryption;
 mod env;
+mod exec;
 mod identity;
 mod rate_limit;
 mod server;
@@ -18,6 +19,7 @@ mod storage;
 pub use audit::AuditConfig;
 pub use auth::{AuthConfig, StaticToken};
 pub use encryption::EncryptionConfig;
+pub use exec::ExecConfig;
 pub use identity::{IdentityConfig, LifetimesConfig, RotationConfig};
 pub use rate_limit::RateLimitConfig;
 pub use server::{

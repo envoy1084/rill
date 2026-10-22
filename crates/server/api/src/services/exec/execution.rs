@@ -1,0 +1,208 @@
+//! Execute: serve an action from the cache, or queue it (joining an
+//! identical one already queued) and stream its operation to the end.
+
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::Duration;
+
+use futures::Stream;
+use prost::Message;
+use rill_exec::remote::{
+    parse_operation_name, priority_of, BlobDigest, ExecSpace, Stage, Submission,
+};
+use rill_reapi_proto::longrunning::Operation;
+use rill_reapi_proto::reapi::execution_server::Execution;
+use rill_reapi_proto::reapi::{Action, ExecuteRequest, ExecuteResponse, WaitExecutionRequest};
+use rill_runtime::error::Error;
+use rill_runtime::state::AppState;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tonic::{Request, Response, Status};
+
+use super::access::{admit, ExecCaller};
+use super::operations::{cached, operation_of};
+use super::service::ExecSvc;
+
+/// How long a stream waits for a change before repeating the operation,
+/// which keeps idle connections open.
+const KEEPALIVE: Duration = Duration::from_secs(30);
+
+type OperationStream = Pin<Box<dyn Stream<Item = Result<Operation, Status>> + Send>>;
+
+#[tonic::async_trait]
+impl Execution for ExecSvc {
+    type ExecuteStream = OperationStream;
+
+    async fn execute(
+        &self,
+        request: Request<ExecuteRequest>,
+    ) -> Result<Response<OperationStream>, Status> {
+        let caller = admit(&self.state, &request, &request.get_ref().instance_name).await?;
+        let request = request.into_inner();
+        let digest = request
+            .action_digest
+            .as_ref()
+            .ok_or_else(|| Status::invalid_argument("action_digest is required"))?;
+        let digest = BlobDigest::parse(digest).map_err(Error::from)?;
+        let action = load_action(&caller.space, &digest).await?;
+        let lookup = !request.skip_cache_lookup && !action.do_not_cache;
+        if lookup {
+            if let Some(result) = caller.space.result(&digest).await.map_err(Error::from)? {
+                let response = ExecuteResponse {
+                    result: Some(result),
+                    cached_result: true,
+                    ..Default::default()
+                };
+                let name = format!("{}/operations/cached-{}", caller.space.org, digest.hash);
+                let op = cached(name, digest, response);
+                return Ok(Response::new(Box::pin(futures::stream::iter([Ok(op)]))));
+            }
+        }
+        check_inputs(&caller, &action).await?;
+        let platform = match action.platform.clone() {
+            Some(p) => Some(p),
+            None => command_platform(&caller.space, &action).await?,
+        };
+        let submitted = self
+            .state
+            .exec
+            .submit(
+                &caller.space,
+                Submission {
+                    action: digest,
+                    platform,
+                    priority: priority_of(request.execution_policy.map_or(0, |p| p.priority)),
+                    requester: caller.ctx.principal.to_string(),
+                    do_not_cache: action.do_not_cache,
+                },
+            )
+            .await
+            .map_err(Error::from)?;
+        Ok(Response::new(follow(
+            self.state.clone(),
+            caller.space,
+            submitted.operation.id,
+        )))
+    }
+
+    type WaitExecutionStream = OperationStream;
+
+    async fn wait_execution(
+        &self,
+        request: Request<WaitExecutionRequest>,
+    ) -> Result<Response<OperationStream>, Status> {
+        let name = request.get_ref().name.clone();
+        let (org, id) = parse_operation_name(&name)
+            .ok_or_else(|| Status::not_found(format!("operation {name:?}")))?;
+        let caller = admit(&self.state, &request, org).await?;
+        if self
+            .state
+            .exec
+            .operation(&caller.space, id)
+            .await
+            .map_err(Error::from)?
+            .is_none()
+        {
+            return Err(Status::not_found(format!("operation {name:?}")));
+        }
+        Ok(Response::new(follow(
+            self.state.clone(),
+            caller.space,
+            id.to_string(),
+        )))
+    }
+}
+
+async fn load_action(space: &ExecSpace, digest: &BlobDigest) -> Result<Action, Status> {
+    let bytes = space
+        .read(digest)
+        .await
+        .map_err(Error::from)?
+        .ok_or_else(|| Status::failed_precondition(format!("action {digest} is not in the CAS")))?;
+    Action::decode(bytes).map_err(|e| Status::invalid_argument(format!("action {digest}: {e}")))
+}
+
+async fn check_inputs(caller: &ExecCaller, action: &Action) -> Result<(), Status> {
+    let mut needed = Vec::new();
+    for digest in [&action.command_digest, &action.input_root_digest]
+        .into_iter()
+        .flatten()
+    {
+        needed.push(BlobDigest::parse(digest).map_err(Error::from)?);
+    }
+    let missing = caller.space.missing(&needed).await.map_err(Error::from)?;
+    if let Some(first) = missing.first() {
+        return Err(Status::failed_precondition(format!(
+            "MISSING: blobs/{}/{} is not in the CAS",
+            first.hash, first.size
+        )));
+    }
+    Ok(())
+}
+
+async fn command_platform(
+    space: &ExecSpace,
+    action: &Action,
+) -> Result<Option<rill_reapi_proto::reapi::Platform>, Status> {
+    let Some(digest) = &action.command_digest else {
+        return Ok(None);
+    };
+    let digest = BlobDigest::parse(digest).map_err(Error::from)?;
+    let Some(bytes) = space.read(&digest).await.map_err(Error::from)? else {
+        return Ok(None);
+    };
+    #[allow(deprecated)]
+    let platform = rill_reapi_proto::reapi::Command::decode(bytes)
+        .map_err(|e| Status::invalid_argument(format!("command {digest}: {e}")))?
+        .platform;
+    Ok(platform)
+}
+
+/// Stream operation `id` as it changes, until it completes.
+fn follow(state: Arc<AppState>, space: ExecSpace, id: String) -> OperationStream {
+    let (tx, rx) = mpsc::channel(4);
+    tokio::spawn(async move {
+        let mut last = None;
+        loop {
+            let seen = match state.exec.operation_updates(&space, &id).await {
+                Ok(seen) => seen,
+                Err(e) => {
+                    let _ = tx.send(Err(Status::from(Error::from(e)))).await;
+                    return;
+                }
+            };
+            let op = match state.exec.operation(&space, &id).await {
+                Ok(Some(op)) => op,
+                Ok(None) => {
+                    let _ = tx
+                        .send(Err(Status::not_found(format!("operation {id}"))))
+                        .await;
+                    return;
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(Status::from(Error::from(e)))).await;
+                    return;
+                }
+            };
+            let done = op.stage == Stage::Completed;
+            if last != Some(op.stage) || done {
+                last = Some(op.stage);
+                if tx.send(Ok(operation_of(&op))).await.is_err() || done {
+                    return;
+                }
+            }
+            if let Err(e) = state
+                .exec
+                .wait_operation(&space, &id, seen, KEEPALIVE)
+                .await
+            {
+                let _ = tx.send(Err(Status::from(Error::from(e)))).await;
+                return;
+            }
+            if tx.is_closed() {
+                return;
+            }
+        }
+    });
+    Box::pin(ReceiverStream::new(rx))
+}
