@@ -36,7 +36,7 @@ only needs a folder in the right group. `tools/fuzz` is a separate
 | Crate | Owns | Does not own |
 | --- | --- | --- |
 | `rill-types` | Object model, ids, BLAKE3 hashing, canonical encoding, `Merge<T>` | I/O, policy decisions |
-| `rill-proto` | `rill.v1` protobufs, generated tonic services, domain/wire conversion | Handlers |
+| `rill-proto` | `rill.v1` protobufs, generated buffa messages and Connect service traits and clients, domain/wire conversion | Handlers |
 | `rill-reapi-proto` | Vendored REAPI v2, Google API and Buildbarn worker protos, generated tonic services | Execution logic |
 | `rill-store` | `ObjectStore` / `MetaStore` traits, the keyspace layer, object backends (memory, files, S3) and metadata engines (memory, redb, FoundationDB), typed `RepoStore`, trunk CAS | Diff, merge, authorization |
 | `rill-events` | Reading the event log: filtered, resumable tails that wait on the event counter; retention | Writing events (each writer does, in its own transaction) |
@@ -50,8 +50,8 @@ only needs a folder in the right group. `tools/fuzz` is a separate
 | `rill-exec` | Remote execution's content store, action cache, operations and scheduler; verify plans compiled to actions; in-process local workers and their sandboxes | Serving the protocols (`rill-api`), production workers (Buildbarn) |
 | `rill-identity` | Token signing keys and the key services that wrap them (local, Vault, AWS KMS, Google Cloud KMS), key rotation, OIDC and SAML | Request authentication (the server owns it) |
 | `rill-git-import` | One-way git history import onto trunk | Export, mirroring |
-| `rill-runtime` | A server process's state: configuration, stores, `AppState` and per-repository `RepoContext`s, background workers and job handlers, telemetry, the identity view, the audit log, rate limits, the checks every stored version passes (`writes`, `secrets`, `quarantine`), and the server error type with its gRPC status mapping | Requests (`rill-api` serves them) |
-| `rill-api` | Authentication middleware and `Permit`, gRPC handlers and watch streams, the object HTTP protocol, read grants, SCIM, sign-in, binding and serving the listeners | State and workers |
+| `rill-runtime` | A server process's state: configuration, stores, `AppState` and per-repository `RepoContext`s, background workers and job handlers, telemetry, the identity view, the audit log, rate limits, the checks every stored version passes (`writes`, `secrets`, `quarantine`), and the server error type with its error-code mapping | Requests (`rill-api` serves them) |
+| `rill-api` | Authentication interceptor and `Permit`, API handlers and watch streams, the object HTTP protocol, read grants, SCIM, sign-in, binding and serving the listeners | State and workers |
 | `rill-cache` | The regional cache tier: grant checks, a disk LRU, coalesced origin fetches | Authorization decisions (the origin's grants carry them) |
 | `rill-sdk` | Typed client, blob upload, local checkout (`.rill/`), status, sync, stack helpers | User interface |
 | `rill-cli` | The `rill` binary: client commands, `rill dev`, `rill api`, `rill cache`, output formats, exit codes | Business rules |
@@ -117,7 +117,7 @@ that order in a few places:
   adapts them through the lander's `ReviewHooks` and `Verifier` traits
   (`ReviewHooksAdapter`, `ExecVerifier`).
 - `rill-proto` depends only on `rill-types`. It is the wire layer between
-  the domain crates and anything that speaks gRPC.
+  the domain crates and anything that speaks the API.
 - `rill-merge-syntax` sits just above `rill-core`, whose `ContentMerger`
   trait it implements; `rill-core` never depends on it. The server and the
   SDK plug it in.
@@ -126,7 +126,7 @@ that order in a few places:
 - `rill-sdk` depends on `rill-proto` and `rill-core`, not on `rill-api`.
   It is a client of the wire surface, not of the server crate.
 - `rill-mcp` depends on `rill-sdk` (and `rill-types`, `rill-core`). It uses
-  `rill-proto` and `tonic` only as dev-dependencies for tests.
+  `rill-proto` and `connectrpc` only as dev-dependencies for tests.
 - `rill-cache` depends on `rill-policy` (grant verification), `rill-store`
   (hash checks) and `rill-types`, not on `rill-api`: it talks to the origin
   only over the object protocol.
@@ -141,11 +141,15 @@ that order in a few places:
 
 RPC and HTTP dependencies:
 
-- `tonic` appears in `rill-proto`, `rill-runtime` (status mapping and the
-  telemetry layer), `rill-api`, `rill-sdk` and `rill-cli`.
-  No crate below `rill-proto` depends on it.
-- `axum` appears only in `rill-api` and `rill-cache`, which serve the
-  object protocol and health endpoints.
+- `connectrpc` and `buffa` (the `rill.v1` API, ADR 017) appear in
+  `rill-proto`, `rill-runtime` (error mapping), `rill-api`, `rill-sdk` and
+  `rill-cli`. No crate below `rill-proto` depends on them.
+- `tonic` and `prost` serve and call REAPI: `rill-reapi-proto`,
+  `rill-exec`, `rill-runtime` (status mapping), `rill-api` and the load
+  tools. The `rill-api` tests also use tonic's raw gRPC client to call
+  every RPC by name.
+- `axum` appears only in `rill-api` and `rill-cache`, which serve the API,
+  the object protocol and health endpoints.
 - The library crates `rill-core`, `rill-policy`, `rill-review`,
   `rill-lander`, `rill-exec` and `rill-search` have no RPC dependency.
 

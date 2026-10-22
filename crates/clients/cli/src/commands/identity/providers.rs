@@ -91,7 +91,7 @@ fn info_json(p: &pb::IdentityProviderInfo) -> serde_json::Value {
 
 /// Run `rill admin idp`.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
-    let mut svc = ctx.client()?.identity_svc();
+    let svc = ctx.client()?.identity_svc();
     match cmd {
         IdpCmd::Add(a) => {
             let saml_metadata = match &a.saml_metadata {
@@ -101,7 +101,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
             let saved = svc
                 .put_identity_provider(pb::PutIdentityProviderRequest {
                     operation_id: Default::default(),
-                    provider: Some(pb::IdentityProviderSpec {
+                    provider: (pb::IdentityProviderSpec {
                         org: a.org.org,
                         name: a.name,
                         issuer: a.issuer.unwrap_or_default(),
@@ -114,11 +114,13 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
                         auto_provision: a.auto_provision,
                         saml_metadata,
                         saml_sp_entity_id: a.saml_sp_entity_id,
-                    }),
+                    })
+                    .into(),
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .provider
+                .into_option()
                 .unwrap_or_default();
             ctx.emit(info_json(&saved), |out| {
                 out.line(format!("provider {}/{} saved", saved.org, saved.name))
@@ -128,7 +130,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
             let providers = svc
                 .list_identity_providers(pb::ListIdentityProvidersRequest { org: o.org })
                 .await?
-                .into_inner()
+                .into_owned()
                 .providers;
             ctx.emit(
                 json!(providers.iter().map(info_json).collect::<Vec<_>>()),
@@ -154,7 +156,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
                     name: a.name.clone(),
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .deleted;
             ctx.emit(json!({ "deleted": deleted }), |out| {
                 out.line(if deleted {

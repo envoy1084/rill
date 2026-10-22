@@ -1,11 +1,12 @@
 //! Server error type and its mapping onto gRPC statuses.
 //!
 //! Every lower crate's error converts into [`Error`] via `From`, and
-//! [`Error`] converts into [`tonic::Status`] so handlers can use `?` all
-//! the way down. The mapping picks the status code from the *meaning* of
+//! [`Error`] converts into [`ConnectError`] (and [`tonic::Status`] for
+//! REAPI) so handlers can use `?` all the way down. The mapping picks the status code from the *meaning* of
 //! the underlying error (not found, conflict, bad input) rather than from
 //! which crate produced it.
 
+use connectrpc::{ConnectError, ErrorCode};
 use rill_proto::ConvertError;
 use thiserror::Error;
 use tonic::{Code, Status};
@@ -306,6 +307,39 @@ impl From<Error> for Status {
             );
         }
         status
+    }
+}
+
+impl From<Error> for ConnectError {
+    fn from(err: Error) -> Self {
+        let status = Status::from(err);
+        let code = ErrorCode::from_grpc_code(status.code() as u32).unwrap_or(ErrorCode::Unknown);
+        let mut error = ConnectError::new(code, status.message());
+        if let Some(secs) = status.metadata().get("retry-after") {
+            let mut headers = http::HeaderMap::new();
+            if let Ok(value) = http::HeaderValue::from_bytes(secs.as_bytes()) {
+                headers.insert("retry-after", value);
+            }
+            error = error.with_headers(headers);
+        }
+        error
+    }
+}
+
+impl From<ConnectError> for Error {
+    fn from(err: ConnectError) -> Self {
+        let msg = err.message.unwrap_or_default();
+        match err.code {
+            ErrorCode::NotFound => Error::NotFound(msg),
+            ErrorCode::PermissionDenied => Error::PermissionDenied(msg),
+            ErrorCode::Unauthenticated => Error::Unauthenticated(msg),
+            ErrorCode::InvalidArgument => Error::InvalidArgument(msg),
+            ErrorCode::FailedPrecondition => Error::FailedPrecondition(msg),
+            ErrorCode::AlreadyExists => Error::AlreadyExists(msg),
+            ErrorCode::Unimplemented => Error::Unimplemented(msg),
+            ErrorCode::Unavailable => Error::Unavailable(msg),
+            _ => Error::Internal(msg),
+        }
     }
 }
 

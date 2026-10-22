@@ -5,9 +5,9 @@ use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::identity::{AccountStatus, AgentBudgets, AgentRecord, Sponsor, WorkloadBinding};
 use rill_types::{Principal, RepoPathBuf, Timestamp};
-use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -23,7 +23,7 @@ fn parse_sponsor(text: &str) -> Result<Sponsor> {
 
 pub fn agent_proto(a: &AgentRecord) -> pb::Agent {
     pb::Agent {
-        spec: Some(pb::AgentSpec {
+        spec: (pb::AgentSpec {
             org: a.org.clone(),
             name: a.principal.name.clone(),
             sponsor: a.sponsor.label(),
@@ -31,12 +31,13 @@ pub fn agent_proto(a: &AgentRecord) -> pb::Agent {
             repos: a.repos.clone(),
             paths: a.paths.clone(),
             models: a.models.clone(),
-            budgets: Some(pb::AgentBudgets {
+            budgets: (pb::AgentBudgets {
                 versions_per_day: a.budgets.versions_per_day,
                 lands_per_day: a.budgets.lands_per_day,
                 requests_per_minute: a.budgets.requests_per_minute,
                 executions_per_day: a.budgets.executions_per_day,
-            }),
+            })
+            .into(),
             workloads: a
                 .workloads
                 .iter()
@@ -47,14 +48,15 @@ pub fn agent_proto(a: &AgentRecord) -> pb::Agent {
                 })
                 .collect(),
             expires_at: a.expires_at.map(timestamp_to_proto),
-        }),
-        principal: Some(pb::Principal::from(&a.principal)),
+        })
+        .into(),
+        principal: pb::Principal::from(&a.principal).into(),
         status: match a.status {
             AccountStatus::Active => "active",
             AccountStatus::Suspended => "suspended",
         }
         .into(),
-        created_by: Some(pb::Principal::from(&a.created_by)),
+        created_by: pb::Principal::from(&a.created_by).into(),
         created_at: timestamp_to_proto(a.created_at),
         updated_at: timestamp_to_proto(a.updated_at),
     }
@@ -74,7 +76,7 @@ fn from_spec(spec: pb::AgentSpec, created_by: &Principal, now: Timestamp) -> Res
             "name the repositories the agent may use, or *",
         ));
     }
-    let budgets = spec.budgets.unwrap_or_default();
+    let budgets = spec.budgets.into_option().unwrap_or_default();
     Ok(AgentRecord {
         org: spec.org,
         principal: Principal::agent(&spec.name),
@@ -135,7 +137,7 @@ async fn may_manage(
 
 pub async fn register(
     state: &AppState,
-    request: Request<pb::RegisterAgentRequest>,
+    request: Call<pb::RegisterAgentRequest>,
 ) -> Result<pb::RegisterAgentResponse> {
     let ctx = caller(&request)?;
     let spec = request
@@ -158,13 +160,13 @@ pub async fn register(
         })?;
     tracing::info!(by = %ctx.principal, agent = %agent.principal, org = %agent.org, sponsor = %agent.sponsor.label(), "agent registered");
     Ok(pb::RegisterAgentResponse {
-        agent: Some(agent_proto(&agent)),
+        agent: agent_proto(&agent).into(),
     })
 }
 
 pub async fn update(
     state: &AppState,
-    request: Request<pb::UpdateAgentRequest>,
+    request: Call<pb::UpdateAgentRequest>,
 ) -> Result<pb::UpdateAgentResponse> {
     let ctx = caller(&request)?;
     let req = request.into_inner();
@@ -175,7 +177,7 @@ pub async fn update(
         .ok_or_else(|| Error::NotFound(format!("agent {}/{}", req.org, req.name)))?;
     may_manage(state, &ctx, &before.org, &before.sponsor).await?;
     let now = Timestamp::now();
-    let mut after = match req.spec {
+    let mut after = match req.spec.into_option() {
         Some(spec) => {
             if spec.org != before.org || spec.name != before.principal.name {
                 return Err(Error::invalid("the spec must name the same org and agent"));
@@ -202,13 +204,13 @@ pub async fn update(
     store.update_agent(&before, &after, &ctx.principal).await?;
     tracing::info!(by = %ctx.principal, agent = %after.principal, status = ?after.status, "agent updated");
     Ok(pb::UpdateAgentResponse {
-        agent: Some(agent_proto(&after)),
+        agent: agent_proto(&after).into(),
     })
 }
 
 pub async fn list(
     state: &AppState,
-    request: Request<pb::ListAgentsRequest>,
+    request: Call<pb::ListAgentsRequest>,
 ) -> Result<pb::ListAgentsResponse> {
     let ctx = caller(&request)?;
     let org = request.into_inner().org;

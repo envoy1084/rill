@@ -13,7 +13,7 @@ use crate::*;
 #[tokio::test(flavor = "multi_thread")]
 async fn every_caller_gets_exactly_what_its_class_allows() {
     let callers = callers().await;
-    let channel = connect(&callers.acl.server.grpc).await;
+    let channel = channel(&callers.acl.server.grpc).await;
     let mut mismatches = Vec::new();
     for method in raw::methods() {
         let class = class_of(&method);

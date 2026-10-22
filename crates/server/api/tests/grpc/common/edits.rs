@@ -13,9 +13,9 @@ pub(crate) fn set_edit(path: &str, bytes: &[u8]) -> pb::Edit {
     pb::Edit {
         path: path.into(),
         op: Some(pb::edit::Op::SetContent(pb::SetContent {
-            content: Some(inline(bytes)),
-            kind: pb::FileKind::Regular as i32,
-            copy_from: None,
+            content: inline(bytes).into(),
+            kind: pb::FileKind::Regular.into(),
+            copy_from: None.into(),
         })),
     }
 }

@@ -137,8 +137,8 @@ impl Trunk {
                 repo: self.name.clone(),
             })
             .await?
-            .into_inner();
-        Ok((reply.health.unwrap_or_default(), reply.open))
+            .into_owned();
+        Ok((reply.health.into_option().unwrap_or_default(), reply.open))
     }
 
     /// The latest incidents, open or closed, newest first.
@@ -151,7 +151,7 @@ impl Trunk {
                 limit: 100,
             })
             .await?
-            .into_inner();
+            .into_owned();
         Ok(reply.incidents)
     }
 

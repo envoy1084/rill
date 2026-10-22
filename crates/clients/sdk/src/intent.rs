@@ -37,23 +37,23 @@ impl IntentClient {
             repo: self.repo.clone(),
             title: intent.title,
             body: intent.body,
-            kind: pb::IntentKind::from(intent.kind) as i32,
+            kind: pb::IntentKind::from(intent.kind).into(),
             parent: intent.parent.as_ref().map(id_to_proto),
-            risk_override: intent.risk_override.map(|r| pb::RiskClass::from(r) as i32),
+            risk_override: intent.risk_override.map(|r| pb::RiskClass::from(r).into()),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.create_intent(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("create_intent.intent", resp.intent)?.try_into()?)
     }
 
     /// An intent by id.
     pub async fn get(&self, id: IntentId) -> Result<Intent> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetIntentRequest {
                 repo: self.repo.clone(),
                 id: id_to_proto(&id),
@@ -61,7 +61,7 @@ impl IntentClient {
             async move { svc.get_intent(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("get_intent.intent", resp.intent)?.try_into()?)
     }
 
@@ -83,21 +83,21 @@ impl IntentClient {
             id: id_to_proto(&id),
             title: update.title,
             body: update.body,
-            status: update.status.map(|s| pb::IntentStatus::from(s) as i32),
+            status: update.status.map(|s| pb::IntentStatus::from(s).into()),
             parent: update.parent.value().map(id_to_proto),
             clear_parent: update.parent.clears(),
             risk_override: update
                 .risk_override
                 .value()
-                .map(|r| pb::RiskClass::from(*r) as i32),
+                .map(|r| pb::RiskClass::from(*r).into()),
             clear_risk_override: update.risk_override.clears(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.update_intent(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("update_intent.intent", resp.intent)?.try_into()?)
     }
 
@@ -108,12 +108,12 @@ impl IntentClient {
             status: filter
                 .status
                 .into_iter()
-                .map(|s| pb::IntentStatus::from(s) as i32)
+                .map(|s| pb::IntentStatus::from(s).into())
                 .collect(),
             kind: filter
                 .kind
                 .into_iter()
-                .map(|k| pb::IntentKind::from(k) as i32)
+                .map(|k| pb::IntentKind::from(k).into())
                 .collect(),
             owner: filter.owner.as_ref().map(id_to_proto),
             parent: filter.parent.as_ref().map(id_to_proto),
@@ -121,11 +121,11 @@ impl IntentClient {
             page_token: filter.page_token,
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.list_intents(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         let items = resp
             .intents
             .into_iter()
@@ -154,11 +154,11 @@ impl IntentClient {
             change_id: id_to_proto(&change_id),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.link_change(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("link_change.intent", resp.intent)?.try_into()?)
     }
 
@@ -170,7 +170,7 @@ impl IntentClient {
         limit: u32,
     ) -> Result<Vec<ScoredIntent>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::FindSimilarIntentsRequest {
                 repo: self.repo.clone(),
                 title: title.to_string(),
@@ -180,7 +180,7 @@ impl IntentClient {
             async move { svc.find_similar_intents(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         resp.results
             .into_iter()
             .map(ScoredIntent::try_from)

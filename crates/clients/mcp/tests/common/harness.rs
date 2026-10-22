@@ -3,10 +3,8 @@
 use std::sync::Arc;
 
 use rill_mcp::{McpServer, ToolContext};
-use rill_proto::rill::v1::repo_service_server::RepoServiceServer;
 use rill_sdk::{Client, ClientConfig};
 use tokio::net::TcpListener;
-use tokio_stream::wrappers::TcpListenerStream;
 
 use super::mock_repo::MockRepo;
 
@@ -22,12 +20,14 @@ impl Harness {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let svc = repo.clone();
+        let router = connectrpc::Router::new().add_service(svc);
         tokio::spawn(async move {
-            tonic::transport::Server::builder()
-                .add_service(RepoServiceServer::from_arc(svc))
-                .serve_with_incoming(TcpListenerStream::new(listener))
-                .await
-                .unwrap();
+            axum::serve(
+                listener,
+                axum::Router::new().fallback_service(router.into_axum_service()),
+            )
+            .await
+            .unwrap();
         });
         let client = Client::connect(ClientConfig::new(format!("http://{addr}")))
             .await

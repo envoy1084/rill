@@ -50,7 +50,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(created.repo.unwrap().name, "main");
 
     // Watch trunk before anything lands so the event is observed live.
@@ -62,33 +62,33 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         })
         .await
         .unwrap()
-        .into_inner();
+        .messages();
 
     let first = c
         .repo
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: repo.into(),
-            base: None,
+            base: None.into(),
             edits: vec![
                 set_edit("README.md", b"hello\nworld\n"),
                 set_edit("src/lib.rs", b"fn a() {}\n"),
             ],
             message: "initial".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner();
-    let change_id = first.version.as_ref().unwrap().change_id.clone();
+        .into_owned();
+    let change_id = first.version.as_option().unwrap().change_id.clone();
     assert!(first.version.unwrap().parents.is_empty());
 
     let seq = land(&mut c, repo, change_id.clone()).await;
     assert_eq!(seq, 1);
 
-    let landed = tokio::time::timeout(Duration::from_secs(5), trunk_watch.message())
+    let landed = tokio::time::timeout(Duration::from_secs(5), trunk_watch.next())
         .await
         .expect("trunk event")
         .unwrap()
@@ -100,12 +100,12 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         .repo
         .list_dir(pb::ListDirRequest {
             repo: repo.into(),
-            root: Some(trunk()),
+            root: trunk().into(),
             path: String::new(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let names: Vec<_> = listing.entries.iter().map(|e| e.name.as_str()).collect();
     assert_eq!(names, vec!["README.md", "src"]);
 
@@ -115,9 +115,10 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: repo.into(),
-            base: Some(pb::EditBase {
+            base: (pb::EditBase {
                 base: Some(pb::edit_base::Base::Root(trunk())),
-            }),
+            })
+            .into(),
             edits: vec![pb::Edit {
                 path: "README.md".into(),
                 op: Some(pb::edit::Op::Patch(
@@ -127,33 +128,34 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
             }],
             message: "patch readme".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
 
     let diff = c
         .repo
         .diff(pb::DiffRequest {
             repo: repo.into(),
-            base: Some(trunk()),
-            target: Some(pb::RootSpec {
+            base: trunk().into(),
+            target: (pb::RootSpec {
                 root: Some(pb::root_spec::Root::VersionHash(second.hash.clone())),
-            }),
+            })
+            .into(),
             paths: vec![],
-            format: pb::DiffFormat::Structured as i32,
+            format: pb::DiffFormat::Structured.into(),
             context_lines: 0,
             limit: 0,
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(diff.files.len(), 1);
     assert_eq!(diff.files[0].path, "README.md");
     let hunk = &diff.files[0].hunks[0];
-    let ops: Vec<i32> = hunk.lines.iter().map(|l| l.op).collect();
+    let ops: Vec<i32> = hunk.lines.iter().map(|l| l.op.to_i32()).collect();
     assert!(ops.contains(&(pb::diff_line::Op::Delete as i32)));
     assert!(ops.contains(&(pb::diff_line::Op::Insert as i32)));
 
@@ -166,7 +168,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(blame.lines.len(), 2);
     assert_eq!(blame.lines[0].version, first.hash);
     assert_eq!(blame.lines[0].trunk_seq, Some(1));
@@ -178,9 +180,10 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         .repo
         .grep(pb::GrepRequest {
             repo: repo.into(),
-            root: Some(pb::RootSpec {
+            root: (pb::RootSpec {
                 root: Some(pb::root_spec::Root::VersionHash(second.hash.clone())),
-            }),
+            })
+            .into(),
             pattern: "THERE".into(),
             case_insensitive: true,
             path_globs: vec!["*.md".into()],
@@ -189,7 +192,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(found.hits.len(), 1, "{found:?}");
     assert_eq!(found.hits[0].path, "README.md");
     assert_eq!(found.hits[0].line_no, 2);
@@ -199,7 +202,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         .repo
         .grep(pb::GrepRequest {
             repo: repo.into(),
-            root: None,
+            root: None.into(),
             pattern: "THERE".into(),
             case_insensitive: false,
             path_globs: vec![],
@@ -208,7 +211,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert!(none.hits.is_empty());
 
     // Workspace flow: upload a blob, snapshot the tree it belongs to, and
@@ -233,7 +236,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         ]))
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let blob_ref = put.content.unwrap();
     let blob_hash = match &blob_ref.r#ref {
         Some(pb::content_ref::Ref::Blob(b)) => ObjectHash::from_slice(&b.hash).unwrap(),
@@ -246,12 +249,12 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
             operation_id: Bytes::new(),
             repo: repo.into(),
             name: "scratch".into(),
-            base: None,
-            sparse: None,
+            base: None.into(),
+            sparse: None.into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .workspace
         .unwrap();
     assert_eq!(ws.base, first.hash);
@@ -263,25 +266,26 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: repo.into(),
-            base: Some(pb::EditBase {
+            base: (pb::EditBase {
                 base: Some(pb::edit_base::Base::Root(trunk())),
-            }),
+            })
+            .into(),
             edits: vec![pb::Edit {
                 path: "data.bin".into(),
                 op: Some(pb::edit::Op::SetContent(pb::SetContent {
-                    content: Some(blob_ref.clone()),
-                    kind: pb::FileKind::Regular as i32,
-                    copy_from: None,
+                    content: blob_ref.clone().into(),
+                    kind: pb::FileKind::Regular.into(),
+                    copy_from: None.into(),
                 })),
             }],
             message: "draft".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let draft_root = c
         .repo
         .get_derived(pb::GetDerivedRequest {
@@ -291,7 +295,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .data;
     // Derived records are postcard: a one-byte version then the 32-byte hash.
     let tree_hash = Bytes::copy_from_slice(&draft_root[draft_root.len() - 32..]);
@@ -312,11 +316,11 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
             workspace: ws.id.clone(),
             message: "from workspace".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(new_change.change_id, ws.working_change);
     let version = new_change.version.unwrap();
     assert_eq!(version.parents, vec![first.hash.clone()]);
@@ -331,7 +335,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .operations;
     assert_eq!(ops.len(), 3);
 
@@ -361,13 +365,13 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         .who_am_i(pb::WhoAmIRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(me.principal.unwrap().name, "dev");
     let health = c
         .admin
         .health(pb::HealthRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert!(health.ok);
 }

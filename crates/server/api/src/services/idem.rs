@@ -6,12 +6,13 @@
 
 use std::future::Future;
 
-use prost::Message;
+use buffa::Message;
 use rill_proto::rill::v1 as pb;
 use rill_store::repo::Claim;
-use tonic::{Request, Response};
 
 use crate::auth::caller;
+use crate::services::Call;
+use connectrpc::Response;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -121,13 +122,13 @@ pub fn current() -> Option<Scope> {
 /// Requests without an id run every time.
 pub async fn once<Req, Resp, F, Fut>(
     state: &AppState,
-    request: Request<Req>,
+    request: Call<Req>,
     handler: F,
 ) -> Result<Response<Resp>>
 where
     Req: Idempotent,
-    Resp: Message + Default,
-    F: FnOnce(Request<Req>) -> Fut,
+    Resp: Message,
+    F: FnOnce(Call<Req>) -> Fut,
     Fut: Future<Output = Result<Response<Resp>>>,
 {
     let operation = request.get_ref().operation_id().to_vec();
@@ -140,7 +141,7 @@ where
     let prior = match stores.idem_claim(&principal, &operation, digest).await? {
         Claim::Fresh { prior } => prior,
         Claim::Replay(bytes) => {
-            let response = Resp::decode(bytes)
+            let response = Resp::decode_from_slice(&bytes)
                 .map_err(|e| Error::Internal(format!("stored response: {e}")))?;
             return Ok(Response::new(response));
         }
@@ -184,7 +185,7 @@ where
                     &principal,
                     &operation,
                     digest,
-                    &response.get_ref().encode_to_vec(),
+                    &response.body.encode_to_vec(),
                 )
                 .await?;
             Ok(response)

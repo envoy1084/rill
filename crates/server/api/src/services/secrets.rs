@@ -6,16 +6,17 @@ use std::sync::Arc;
 use rill_exec::remote::secrets::{SecretInfo, SecretScope};
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::secret_service_server::SecretService;
+use rill_proto::rill::v1::SecretService;
 use rill_types::identity::IdentityChange;
-use tonic::{Request, Response, Status};
 
 use super::idem;
 use crate::auth::{caller, require_org_admin};
+use crate::services::Call;
+use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::error::Result;
 use rill_runtime::state::AppState;
 
-type GrpcResult<T> = std::result::Result<Response<T>, Status>;
+type GrpcResult<T> = std::result::Result<Response<T>, ConnectError>;
 
 /// The secret service.
 #[derive(Clone)]
@@ -43,12 +44,12 @@ fn info_proto(info: SecretInfo) -> pb::SecretInfo {
         repos: info.scope.repos,
         trunk_only: info.scope.trunk_only,
         updated_at: timestamp_to_proto(info.updated_at),
-        updated_by: Some(pb::Principal::from(info.updated_by)),
+        updated_by: pb::Principal::from(info.updated_by).into(),
     }
 }
 
 impl SecretSvc {
-    async fn put(&self, request: Request<pb::PutSecretRequest>) -> Result<pb::PutSecretResponse> {
+    async fn put(&self, request: Call<pb::PutSecretRequest>) -> Result<pb::PutSecretResponse> {
         let ctx = caller(&request)?;
         let req = request.into_inner();
         let org = org_of(&req.org);
@@ -79,13 +80,13 @@ impl SecretSvc {
             .await?;
         tracing::info!(by = %ctx.principal, org, name = %info.name, "secret set");
         Ok(pb::PutSecretResponse {
-            secret: Some(info_proto(info)),
+            secret: info_proto(info).into(),
         })
     }
 
     async fn delete(
         &self,
-        request: Request<pb::DeleteSecretRequest>,
+        request: Call<pb::DeleteSecretRequest>,
     ) -> Result<pb::DeleteSecretResponse> {
         let ctx = caller(&request)?;
         let req = request.into_inner();
@@ -108,10 +109,7 @@ impl SecretSvc {
         Ok(pb::DeleteSecretResponse { deleted })
     }
 
-    async fn list(
-        &self,
-        request: Request<pb::ListSecretsRequest>,
-    ) -> Result<pb::ListSecretsResponse> {
+    async fn list(&self, request: Call<pb::ListSecretsRequest>) -> Result<pb::ListSecretsResponse> {
         let ctx = caller(&request)?;
         let org = org_of(&request.get_ref().org);
         require_org_admin(&self.state, &ctx, &org).await?;
@@ -122,38 +120,45 @@ impl SecretSvc {
     }
 }
 
-#[tonic::async_trait]
+// Handlers return their concrete response types.
+#[allow(refining_impl_trait)]
 impl SecretService for SecretSvc {
     // Not through `idem`: it keeps a hash of the request, which would
     // hold the value. Setting a secret again is harmless anyway.
     async fn put_secret(
         &self,
-        request: Request<pb::PutSecretRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::PutSecretRequest>,
     ) -> GrpcResult<pb::PutSecretResponse> {
+        let request = Call::new(ctx, request);
         self.put(request)
             .await
             .map(Response::new)
-            .map_err(Status::from)
+            .map_err(ConnectError::from)
     }
 
     async fn delete_secret(
         &self,
-        request: Request<pb::DeleteSecretRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::DeleteSecretRequest>,
     ) -> GrpcResult<pb::DeleteSecretResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.delete(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn list_secrets(
         &self,
-        request: Request<pb::ListSecretsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListSecretsRequest>,
     ) -> GrpcResult<pb::ListSecretsResponse> {
+        let request = Call::new(ctx, request);
         self.list(request)
             .await
             .map(Response::new)
-            .map_err(Status::from)
+            .map_err(ConnectError::from)
     }
 }

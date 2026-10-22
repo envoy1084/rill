@@ -8,22 +8,11 @@ use std::sync::Arc;
 use rustls::server::WebPkiClientVerifier;
 use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use tonic::transport::{Certificate, Identity, ServerTlsConfig};
 
 use rill_runtime::config::TlsConfig;
 use rill_runtime::error::{Error, Result};
 
-/// The gRPC listener's TLS.
-pub fn grpc(config: &TlsConfig) -> Result<ServerTlsConfig> {
-    let identity = Identity::from_pem(read(&config.cert)?, read(&config.key)?);
-    let mut tls = ServerTlsConfig::new().identity(identity);
-    if let Some(ca) = &config.client_ca {
-        tls = tls.client_ca_root(Certificate::from_pem(read(ca)?));
-    }
-    Ok(tls)
-}
-
-/// The HTTP listener's TLS.
+/// TLS for both listeners, offering HTTP/2 and HTTP/1.1.
 pub fn http(config: &TlsConfig) -> Result<axum_server::tls_rustls::RustlsConfig> {
     let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
     let certs = CertificateDer::pem_file_iter(&config.cert)
@@ -55,10 +44,6 @@ pub fn http(config: &TlsConfig) -> Result<axum_server::tls_rustls::RustlsConfig>
     Ok(axum_server::tls_rustls::RustlsConfig::from_config(
         Arc::new(server),
     ))
-}
-
-fn read(path: &Path) -> Result<Vec<u8>> {
-    std::fs::read(path).map_err(|e| Error::Config(format!("tls: reading {}: {e}", path.display())))
 }
 
 fn tls_err(path: &Path, e: impl std::fmt::Display) -> Error {

@@ -131,8 +131,8 @@ impl From<&EventKind> for pb::event::Kind {
             EventKind::StatusChanged { change, from, to } => {
                 Kind::StatusChanged(pb::StatusChangedEvent {
                     change_id: id_to_proto(change),
-                    from: pb::ReviewStatus::from(*from) as i32,
-                    to: pb::ReviewStatus::from(*to) as i32,
+                    from: pb::ReviewStatus::from(*from).into(),
+                    to: pb::ReviewStatus::from(*to).into(),
                 })
             }
             EventKind::LandRequested {
@@ -279,7 +279,7 @@ impl TryFrom<pb::event::Kind> for EventKind {
 impl From<&Event> for pb::Event {
     fn from(e: &Event) -> Self {
         pb::Event {
-            actor: Some(pb::Principal::from(&e.actor)),
+            actor: pb::Principal::from(&e.actor).into(),
             at: timestamp_to_proto(e.at),
             kind: Some(pb::event::Kind::from(&e.kind)),
         }

@@ -313,12 +313,13 @@ instance; that is the trust boundary.
 
 ## Transport layers
 
-[`AuthLayer`](../../crates/server/api/src/auth/layer.rs) is a tower layer,
-not a tonic `Interceptor`, because interceptors are synchronous and team lookup
-may need the store. `serve_grpc` wraps the Repo, Workspace, Review, Intent,
-Lander and Admin services. Reflection and gRPC health are not wrapped. The
-layer stores the `AuthContext` in request extensions or short-circuits with
-the error status. Handlers read it with `caller(&request)`. A missing
+[`AuthInterceptor`](../../crates/server/api/src/auth/interceptor.rs) is a
+`connectrpc` interceptor around every Rill service: authentication may await
+the store (team lookups), and a refusal is encoded in the protocol the client
+spoke (Connect, gRPC or gRPC-web). `SessionService`, reflection and health
+pass without a token. REAPI's tonic services use the tower
+[`AuthLayer`](../../crates/server/api/src/auth/layer.rs) with the same logic.
+Both store the `AuthContext` in the request's extensions or fail the call. Handlers read it with `caller(&request)`. A missing
 extension is a wiring bug and is still reported as `UNAUTHENTICATED`, so
 nothing proceeds without a caller.
 

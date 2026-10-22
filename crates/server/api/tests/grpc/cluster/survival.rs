@@ -19,6 +19,11 @@ async fn cluster_loses_nothing(stores: rill_store::Stores) {
     let repo = "main";
     let c = clients_at(&endpoint, None).await;
     let write = edit(repo, "lost-reply.txt", &op());
+    // Open the connection first, so the cut falls on the write itself.
+    c.repo
+        .get_repo(pb::GetRepoRequest { repo: repo.into() })
+        .await
+        .unwrap();
     grpc.cut_next_request();
     assert!(c.repo.clone().apply_edits(write.clone()).await.is_err());
     let dead = grpc.take_cut().expect("the request reached a server");

@@ -34,7 +34,11 @@ impl TryFrom<pb::FileKind> for FileKind {
 }
 
 /// Decode a `FileKind` enum field.
-pub fn file_kind_from_proto(field: &'static str, value: i32) -> Result<FileKind> {
+pub fn file_kind_from_proto(
+    field: &'static str,
+    value: impl Into<buffa::EnumValue<pb::FileKind>>,
+) -> Result<FileKind> {
+    let value = value.into().to_i32();
     let kind: pb::FileKind = enum_from_proto(field, value)?;
     match kind {
         pb::FileKind::Regular => Ok(FileKind::Regular),
@@ -90,19 +94,19 @@ impl TryFrom<pb::ContentRef> for ContentRef {
 pub fn file_state_to_proto(state: &FileState) -> pb::FileState {
     match state {
         None => pb::FileState {
-            content: None,
-            kind: pb::FileKind::Unspecified as i32,
+            content: None.into(),
+            kind: pb::FileKind::Unspecified.into(),
         },
         Some((content, kind)) => pb::FileState {
-            content: Some(pb::ContentRef::from(content)),
-            kind: pb::FileKind::from(*kind) as i32,
+            content: pb::ContentRef::from(content).into(),
+            kind: pb::FileKind::from(*kind).into(),
         },
     }
 }
 
 /// Decode a file state; a message without content is "absent".
 pub fn file_state_from_proto(state: pb::FileState) -> Result<FileState> {
-    match state.content {
+    match state.content.into_option() {
         None => Ok(None),
         Some(content) => Ok(Some((
             ContentRef::try_from(content)?,

@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 
-use futures::StreamExt;
 use rill_proto::rill::v1 as pb;
 use rill_types::audit::{AuditEntry, AuditRoot};
 
@@ -40,7 +39,7 @@ impl AuditClient {
         limit: u32,
     ) -> Result<(Vec<AuditEntry>, u64)> {
         let resp = retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ListAuditEntriesRequest {
                 org: org.to_string(),
                 after_seq,
@@ -49,7 +48,7 @@ impl AuditClient {
             async move { svc.list_audit_entries(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         let entries = resp
             .entries
             .iter()
@@ -75,39 +74,39 @@ impl AuditClient {
     /// The chain's seals, oldest first.
     pub async fn roots(&self, org: &str) -> Result<Vec<AuditRoot>> {
         let resp = retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ListAuditRootsRequest {
                 org: org.to_string(),
             };
             async move { svc.list_audit_roots(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         resp.roots.iter().map(|r| decode(&r.encoded)).collect()
     }
 
     /// Seal what the chain gained since its last seal.
     pub async fn seal(&self, org: &str) -> Result<Option<AuditRoot>> {
         let resp = retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::SealAuditRequest {
                 org: org.to_string(),
             };
             async move { svc.seal_audit(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         resp.root.map(|r| decode(&r.encoded)).transpose()
     }
 
     /// The published audit keys, by token key id.
     pub async fn keys(&self) -> Result<HashMap<u32, Vec<u8>>> {
         let resp = retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             async move { svc.list_audit_keys(pb::ListAuditKeysRequest {}).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(resp
             .keys
             .into_iter()
@@ -123,11 +122,10 @@ impl AuditClient {
                 org: org.to_string(),
                 after_seq,
             })
-            .await?
-            .into_inner();
-        Ok(Box::pin(stream.map(|item| match item {
-            Ok(e) => decode(&e.encoded),
-            Err(status) => Err(Error::from(status)),
-        })))
+            .await?;
+        Ok(crate::repo::map_stream(
+            stream,
+            |e: pb::AuditEntryRecord| decode(&e.encoded),
+        ))
     }
 }

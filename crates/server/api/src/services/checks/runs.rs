@@ -11,11 +11,12 @@ use rill_exec::runs::{Run, RunStore};
 use rill_proto::rill::v1 as pb;
 use rill_types::ObjectHash;
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Request, Status};
 
 use super::convert;
 use super::service::ChecksSvc;
 use crate::services::common::{open, Opened};
+use crate::services::Call;
+use connectrpc::ConnectError;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -27,7 +28,7 @@ const MAX_READ: u64 = 1 << 20;
 const KEEPALIVE: Duration = Duration::from_secs(30);
 
 pub(super) type RunStream =
-    Pin<Box<dyn Stream<Item = std::result::Result<pb::VerifyRun, Status>> + Send>>;
+    Pin<Box<dyn Stream<Item = std::result::Result<pb::VerifyRun, ConnectError>> + Send>>;
 
 fn runs_of(state: &AppState, opened: &Opened) -> RunStore {
     RunStore::new(
@@ -45,7 +46,7 @@ async fn run(runs: &RunStore, id: &str) -> Result<Run> {
 impl ChecksSvc {
     pub(super) async fn list_runs(
         &self,
-        request: Request<pb::ListRunsRequest>,
+        request: Call<pb::ListRunsRequest>,
     ) -> Result<pb::ListRunsResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -66,17 +67,14 @@ impl ChecksSvc {
         })
     }
 
-    pub(super) async fn get_run(
-        &self,
-        request: Request<pb::GetRunRequest>,
-    ) -> Result<pb::VerifyRun> {
+    pub(super) async fn get_run(&self, request: Call<pb::GetRunRequest>) -> Result<pb::VerifyRun> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
         let found = run(&runs_of(&self.state, &opened), &request.get_ref().run).await?;
         Ok(convert::run(&found.header, &found.steps))
     }
 
-    pub(super) async fn watch_run(&self, request: Request<pb::GetRunRequest>) -> Result<RunStream> {
+    pub(super) async fn watch_run(&self, request: Call<pb::GetRunRequest>) -> Result<RunStream> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
         let runs = runs_of(&self.state, &opened);
@@ -89,14 +87,14 @@ impl ChecksSvc {
                 let seen = match runs.updates(&id).await {
                     Ok(seen) => seen,
                     Err(e) => {
-                        let _ = tx.send(Err(Status::from(Error::from(e)))).await;
+                        let _ = tx.send(Err(ConnectError::from(Error::from(e)))).await;
                         return;
                     }
                 };
                 let current = match run(&runs, &id).await {
                     Ok(current) => current,
                     Err(e) => {
-                        let _ = tx.send(Err(Status::from(e))).await;
+                        let _ = tx.send(Err(ConnectError::from(e))).await;
                         return;
                     }
                 };
@@ -110,7 +108,7 @@ impl ChecksSvc {
                     waited = runs.wait(&id, seen, KEEPALIVE) => waited,
                 };
                 if let Err(e) = waited {
-                    let _ = tx.send(Err(Status::from(Error::from(e)))).await;
+                    let _ = tx.send(Err(ConnectError::from(Error::from(e)))).await;
                     return;
                 }
             }
@@ -120,7 +118,7 @@ impl ChecksSvc {
 
     pub(super) async fn read_log(
         &self,
-        request: Request<pb::ReadLogRequest>,
+        request: Call<pb::ReadLogRequest>,
     ) -> Result<pb::ReadBytesResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -129,8 +127,8 @@ impl ChecksSvc {
         let step = found
             .step(req.step)
             .ok_or_else(|| Error::not_found(format!("step {} of run {}", req.step, req.run)))?;
-        let digest = match pb::LogStream::try_from(req.stream) {
-            Ok(pb::LogStream::Stderr) => step.stderr,
+        let digest = match req.stream.as_known() {
+            Some(pb::LogStream::Stderr) => step.stderr,
             _ => step.stdout,
         };
         let Some(digest) = digest else {
@@ -142,7 +140,7 @@ impl ChecksSvc {
 
     pub(super) async fn read_artifact(
         &self,
-        request: Request<pb::ReadArtifactRequest>,
+        request: Call<pb::ReadArtifactRequest>,
     ) -> Result<pb::ReadBytesResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;

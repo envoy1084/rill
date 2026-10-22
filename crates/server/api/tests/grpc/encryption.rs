@@ -65,7 +65,7 @@ async fn objects_are_sealed_per_org_and_open_only_where_they_were_written() {
     stores.create_org("acme", "").await.unwrap();
 
     let marker = "PLAINTEXT-MARKER-0123456789 ".repeat(40);
-    let mut c = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
+    let c = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
             operation_id: Bytes::new(),
@@ -79,11 +79,11 @@ async fn objects_are_sealed_per_org_and_open_only_where_they_were_written() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            base: None,
+            base: None.into(),
             edits: vec![set_edit("notes.txt", marker.as_bytes())],
             message: "notes".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
@@ -134,7 +134,7 @@ async fn objects_are_sealed_per_org_and_open_only_where_they_were_written() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(rotated.key_id, Some(2));
     let rewrapped = c
         .protection
@@ -145,7 +145,7 @@ async fn objects_are_sealed_per_org_and_open_only_where_they_were_written() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(rewrapped.rewrapped, 3);
 
     // Another server with the key service opens everything; one without

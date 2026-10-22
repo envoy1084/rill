@@ -4,9 +4,9 @@ use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::identity::{IdentityProvider, SamlSettings};
 use rill_types::Timestamp;
-use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -77,7 +77,7 @@ fn check_issuer(state: &AppState, issuer: &str) -> Result<()> {
 
 pub async fn put(
     state: &AppState,
-    request: Request<pb::PutIdentityProviderRequest>,
+    request: Call<pb::PutIdentityProviderRequest>,
 ) -> Result<pb::PutIdentityProviderResponse> {
     let ctx = caller(&request)?;
     let spec = request
@@ -154,13 +154,13 @@ pub async fn put(
         })?;
     tracing::info!(by = %ctx.principal, org = %provider.org, provider = %provider.name, "identity provider saved");
     Ok(pb::PutIdentityProviderResponse {
-        provider: Some(info(provider)),
+        provider: info(provider).into(),
     })
 }
 
 pub async fn list(
     state: &AppState,
-    request: Request<pb::ListIdentityProvidersRequest>,
+    request: Call<pb::ListIdentityProvidersRequest>,
 ) -> Result<pb::ListIdentityProvidersResponse> {
     let ctx = caller(&request)?;
     let org = &request.get_ref().org;
@@ -173,7 +173,7 @@ pub async fn list(
 
 pub async fn delete(
     state: &AppState,
-    request: Request<pb::DeleteIdentityProviderRequest>,
+    request: Call<pb::DeleteIdentityProviderRequest>,
 ) -> Result<pb::DeleteIdentityProviderResponse> {
     let ctx = caller(&request)?;
     let req = request.get_ref();

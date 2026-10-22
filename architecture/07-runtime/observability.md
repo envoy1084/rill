@@ -1,8 +1,8 @@
 # Observability
 
 Every server process exports Prometheus metrics, writes structured logs
-and, when an endpoint is configured, sends OpenTelemetry traces. Each gRPC
-request runs in a span that carries its request id and principal, so log
+and, when an endpoint is configured, sends OpenTelemetry traces. Each API
+request (Connect, gRPC or REAPI) runs in a span that carries its request id and principal, so log
 lines, traces and client errors for one request can be matched. Health
 endpoints tell load balancers and orchestrators whether a process is alive
 and whether it should get traffic.
@@ -13,7 +13,7 @@ and whether it should get traffic.
 | --- | --- |
 | `GET /livez` | 200 while the process serves HTTP |
 | `GET /readyz` | 503 `draining` once shutdown starts; 503 with the failing components when a store is unreachable; else 200 |
-| gRPC `grpc.health.v1.Health` | `SERVING` for every service and the empty name, `NOT_SERVING` once draining starts |
+| `grpc.health.v1.Health` (gRPC or Connect) | `SERVING` for every service and the empty name, `NOT_SERVING` once draining starts |
 
 Both HTTP endpoints and `/metrics` are on the HTTP listener and need no
 token; a workers-only process (`--roles workers`) serves just these.
@@ -25,8 +25,8 @@ All names start with `rill_`.
 
 | Metric | Labels | Meaning |
 | --- | --- | --- |
-| `rpc_requests_total` | `service`, `method`, `code` | gRPC requests by outcome (`Ok`, `NotFound`, ...) |
-| `rpc_duration_seconds` | `service`, `method` | gRPC latency histogram |
+| `rpc_requests_total` | `service`, `method`, `code` | API requests by outcome (`Ok`, `NotFound`, ...); a Connect error's code is recorded by the `RecordCodes` interceptor, a gRPC one read from `grpc-status` |
+| `rpc_duration_seconds` | `service`, `method` | API latency histogram |
 | `meta_transactions_total` | `outcome` | metadata transactions: `committed`, `conflict`, `error` |
 | `meta_transaction_duration_seconds` | | metadata transaction latency histogram |
 | `jobs_pending`, `jobs_dead`, `jobs_retried` | `repo`, `queue` | job queue counters (`derive`, `index`) |

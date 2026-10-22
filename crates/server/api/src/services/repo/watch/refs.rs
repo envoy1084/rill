@@ -10,13 +10,14 @@ use rill_types::{EventKind, RefName, TrunkSeq};
 use super::stream::{forward, EventStream};
 use crate::services::common::open;
 use crate::services::repo::RepoSvc;
+use crate::services::Call;
 use rill_runtime::error::Result;
 use rill_runtime::state::RepoContext;
 
 impl RepoSvc {
     pub(in crate::services::repo) async fn watch_refs_impl(
         &self,
-        request: tonic::Request<pb::WatchRefsRequest>,
+        request: Call<pb::WatchRefsRequest>,
     ) -> Result<EventStream<pb::RefEvent>> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;

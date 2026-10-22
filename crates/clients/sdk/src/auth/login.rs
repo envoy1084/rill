@@ -1,9 +1,8 @@
 //! `login`: the device flow through one of the organization's providers,
 //! then the provider's ID token exchanged for a Rill session.
 
+use crate::client::Connection;
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::session_service_client::SessionServiceClient;
-use tonic::transport::Channel;
 
 use super::device::{DeviceAuthorization, DeviceFlow};
 use super::store::Credentials;
@@ -18,24 +17,28 @@ pub trait LoginPrompt: Send + Sync {
 }
 
 /// The providers `org` signs in through.
-pub async fn sign_in_providers(channel: Channel, org: &str) -> Result<Vec<pb::SignInProvider>> {
-    Ok(SessionServiceClient::new(channel)
+pub async fn sign_in_providers(
+    connection: Connection,
+    org: &str,
+) -> Result<Vec<pb::SignInProvider>> {
+    Ok(connection
+        .sessions()
         .list_sign_in_providers(pb::ListSignInProvidersRequest { org: org.into() })
         .await?
-        .into_inner()
+        .into_owned()
         .providers)
 }
 
-/// Sign in to the server behind `channel` (reached at `endpoint`) through
+/// Sign in to the server behind `connection` (reached at `endpoint`) through
 /// `org`'s provider `provider` (the only one when `None`).
 pub async fn login(
-    channel: Channel,
+    connection: Connection,
     endpoint: &str,
     org: &str,
     provider: Option<&str>,
     prompt: &dyn LoginPrompt,
 ) -> Result<Credentials> {
-    let providers = sign_in_providers(channel.clone(), org).await?;
+    let providers = sign_in_providers(connection.clone(), org).await?;
     let chosen = match provider {
         Some(name) => providers
             .into_iter()
@@ -86,7 +89,8 @@ pub async fn login(
     let authorization = flow.start(&http).await?;
     prompt.show(&authorization);
     let id_token = flow.wait(&http, &authorization).await?;
-    let grant = SessionServiceClient::new(channel)
+    let grant = connection
+        .sessions()
         .exchange_token(pb::ExchangeTokenRequest {
             subject_token: id_token,
             subject_token_type: TOKEN_TYPE_ID.into(),
@@ -95,6 +99,6 @@ pub async fn login(
             model: None,
         })
         .await?
-        .into_inner();
+        .into_owned();
     Ok(Credentials::from_grant(endpoint, grant))
 }

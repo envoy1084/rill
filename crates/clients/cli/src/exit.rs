@@ -15,7 +15,7 @@
 //! and decide", `1` means "something is broken", `2` means "fix the
 //! invocation".
 
-use tonic::Code;
+use rill_sdk::Code;
 
 use crate::error::CliError;
 

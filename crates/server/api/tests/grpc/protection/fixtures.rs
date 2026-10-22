@@ -28,20 +28,20 @@ pub async fn apply(
     c: &mut Clients,
     repo: &str,
     edits: Vec<pb::Edit>,
-) -> Result<pb::ApplyEditsResponse, Status> {
+) -> Result<pb::ApplyEditsResponse, ConnectError> {
     c.repo
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: repo.into(),
-            base: None,
+            base: None.into(),
             edits,
             message: "edit".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
-        .map(|r| r.into_inner())
+        .map(|r| r.into_owned())
 }
 
 /// An edit storing `bytes` as a blob uploaded beforehand.
@@ -57,14 +57,15 @@ pub async fn blob(server: &TestServer, path: &str, bytes: &[u8]) -> (pb::Edit, O
     let edit = pb::Edit {
         path: path.into(),
         op: Some(pb::edit::Op::SetContent(pb::SetContent {
-            content: Some(pb::ContentRef {
+            content: (pb::ContentRef {
                 r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
                     hash: Bytes::copy_from_slice(hash.as_bytes()),
                     size: bytes.len() as u64,
                 })),
-            }),
-            kind: pb::FileKind::Regular as i32,
-            copy_from: None,
+            })
+            .into(),
+            kind: pb::FileKind::Regular.into(),
+            copy_from: None.into(),
         })),
     };
     (edit, hash)
@@ -89,24 +90,25 @@ pub async fn apply_on(
     base: Option<&Bytes>,
     edits: Vec<pb::Edit>,
     message: &str,
-) -> Result<pb::ApplyEditsResponse, Status> {
+) -> Result<pb::ApplyEditsResponse, ConnectError> {
     c.repo
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: repo.into(),
-            base: base.map(|v| pb::EditBase {
+            base: (base.map(|v| pb::EditBase {
                 base: Some(pb::edit_base::Base::Root(pb::RootSpec {
                     root: Some(pb::root_spec::Root::VersionHash(v.clone())),
                 })),
-            }),
+            }))
+            .into(),
             edits,
             message: message.into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
-        .map(|r| r.into_inner())
+        .map(|r| r.into_owned())
 }
 
 /// `n` distinct, well-formed fake AWS access key ids (base32 after the

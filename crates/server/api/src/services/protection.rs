@@ -5,18 +5,19 @@ use std::sync::Arc;
 
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::protection_service_server::ProtectionService;
+use rill_proto::rill::v1::ProtectionService;
 use rill_types::identity::{IdentityChange, Redaction};
 use rill_types::{ObjectHash, ObjectKind, Timestamp};
-use tonic::{Request, Response, Status};
 
 use super::common::{hash, open};
 use super::idem;
 use crate::auth::{caller, require_instance_admin, require_org_admin};
+use crate::services::Call;
+use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
-type GrpcResult<T> = std::result::Result<Response<T>, Status>;
+type GrpcResult<T> = std::result::Result<Response<T>, ConnectError>;
 
 /// The protection service.
 #[derive(Clone)]
@@ -42,12 +43,12 @@ fn redaction_proto(r: &Redaction) -> pb::RedactionRecord {
     pb::RedactionRecord {
         id: r.id.clone(),
         org: r.org.clone(),
-        kind: r.kind as i32,
+        kind: (r.kind as i32).into(),
         hash: bytes::Bytes::copy_from_slice(r.hash.as_bytes()),
         reason: r.reason.clone(),
-        requested_by: Some(pb::Principal::from(r.requested_by.clone())),
+        requested_by: pb::Principal::from(r.requested_by.clone()).into(),
         requested_at: timestamp_to_proto(r.requested_at),
-        approved_by: r.approved_by.clone().map(pb::Principal::from),
+        approved_by: r.approved_by.clone().map(pb::Principal::from).into(),
         applied_at: r.applied_at.map(timestamp_to_proto),
     }
 }
@@ -55,7 +56,7 @@ fn redaction_proto(r: &Redaction) -> pb::RedactionRecord {
 impl ProtectionSvc {
     async fn rotate(
         &self,
-        request: Request<pb::RotateDataKeysRequest>,
+        request: Call<pb::RotateDataKeysRequest>,
     ) -> Result<pb::RotateDataKeysResponse> {
         let ctx = caller(&request)?;
         require_instance_admin(&self.state, &ctx)?;
@@ -87,13 +88,13 @@ impl ProtectionSvc {
 
     async fn request(
         &self,
-        request: Request<pb::RequestRedactionRequest>,
+        request: Call<pb::RequestRedactionRequest>,
     ) -> Result<pb::RequestRedactionResponse> {
         let ctx = caller(&request)?;
         let req = request.into_inner();
         let org = org_of(&req.org);
         require_org_admin(&self.state, &ctx, &org).await?;
-        let kind = u8::try_from(req.kind)
+        let kind = u8::try_from(req.kind.to_i32())
             .ok()
             .and_then(ObjectKind::from_u8)
             .ok_or_else(|| Error::invalid("kind is required"))?;
@@ -118,13 +119,13 @@ impl ProtectionSvc {
             .await?;
         tracing::info!(by = %ctx.principal, org = %redaction.org, id = %redaction.id, hash = %redaction.hash, "redaction requested");
         Ok(pb::RequestRedactionResponse {
-            redaction: Some(redaction_proto(&redaction)),
+            redaction: redaction_proto(&redaction).into(),
         })
     }
 
     async fn approve(
         &self,
-        request: Request<pb::ApproveRedactionRequest>,
+        request: Call<pb::ApproveRedactionRequest>,
     ) -> Result<pb::ApproveRedactionResponse> {
         let ctx = caller(&request)?;
         let req = request.into_inner();
@@ -150,13 +151,13 @@ impl ProtectionSvc {
             });
         tracing::warn!(by = %ctx.principal, org = %org, id = %redaction.id, hash = %redaction.hash, "redaction applied");
         Ok(pb::ApproveRedactionResponse {
-            redaction: Some(redaction_proto(&redaction)),
+            redaction: redaction_proto(&redaction).into(),
         })
     }
 
     async fn list(
         &self,
-        request: Request<pb::ListRedactionsRequest>,
+        request: Call<pb::ListRedactionsRequest>,
     ) -> Result<pb::ListRedactionsResponse> {
         let ctx = caller(&request)?;
         let org = org_of(&request.get_ref().org);
@@ -169,7 +170,7 @@ impl ProtectionSvc {
 
     async fn clear(
         &self,
-        request: Request<pb::ClearQuarantineRequest>,
+        request: Call<pb::ClearQuarantineRequest>,
     ) -> Result<pb::ClearQuarantineResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().admin().await?;
@@ -191,59 +192,70 @@ impl ProtectionSvc {
     }
 }
 
-#[tonic::async_trait]
+// Handlers return their concrete response types.
+#[allow(refining_impl_trait)]
 impl ProtectionService for ProtectionSvc {
     async fn request_redaction(
         &self,
-        request: Request<pb::RequestRedactionRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::RequestRedactionRequest>,
     ) -> GrpcResult<pb::RequestRedactionResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.request(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn approve_redaction(
         &self,
-        request: Request<pb::ApproveRedactionRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ApproveRedactionRequest>,
     ) -> GrpcResult<pb::ApproveRedactionResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.approve(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn list_redactions(
         &self,
-        request: Request<pb::ListRedactionsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListRedactionsRequest>,
     ) -> GrpcResult<pb::ListRedactionsResponse> {
+        let request = Call::new(ctx, request);
         self.list(request)
             .await
             .map(Response::new)
-            .map_err(Status::from)
+            .map_err(ConnectError::from)
     }
 
     async fn clear_quarantine(
         &self,
-        request: Request<pb::ClearQuarantineRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ClearQuarantineRequest>,
     ) -> GrpcResult<pb::ClearQuarantineResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.clear(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn rotate_data_keys(
         &self,
-        request: Request<pb::RotateDataKeysRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::RotateDataKeysRequest>,
     ) -> GrpcResult<pb::RotateDataKeysResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.rotate(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 }

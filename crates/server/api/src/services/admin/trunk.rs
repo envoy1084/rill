@@ -1,15 +1,15 @@
 //! Appending imported history to trunk.
 
 use rill_proto::rill::v1 as pb;
-use tonic::Request;
 
 use super::AdminSvc;
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 impl AdminSvc {
     pub(super) async fn append_trunk_impl(
         &self,
-        request: Request<pb::AppendTrunkRequest>,
+        request: Call<pb::AppendTrunkRequest>,
     ) -> Result<pb::AppendTrunkResponse> {
         let opened = self.open_named(&request, &request.get_ref().repo).await?;
         opened.permit().admin().await?;

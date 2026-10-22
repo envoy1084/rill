@@ -21,12 +21,12 @@ async fn grep_is_bounded_by_the_token_paths() {
     )
     .with_paths([path("pub")]);
     let token = acl.server.token_with(&alice(), &narrowed);
-    let mut c = clients(&acl.server, Some(&token)).await;
+    let c = clients(&acl.server, Some(&token)).await;
     let hits = c
         .repo
         .grep(pb::GrepRequest {
             repo: "acl".into(),
-            root: Some(acl.at_version()),
+            root: acl.at_version().into(),
             pattern: CANARY.into(),
             case_insensitive: false,
             path_globs: vec![],
@@ -34,7 +34,7 @@ async fn grep_is_bounded_by_the_token_paths() {
             context_lines: 0,
         })
         .await
-        .map(|r| r.into_inner().hits)
+        .map(|r| r.into_owned().hits)
         .unwrap_or_default();
     assert!(hits.is_empty(), "a token for pub/ found {hits:?}");
     acl.server.stop().await;
@@ -62,7 +62,7 @@ fn subtree_version(acl: &Acl, at: &str, change: SubtreeChange) -> pb::ChangeVers
 async fn subtree_changes_need_write_on_the_target_and_read_on_the_source() {
     let mut acl = Acl::start().await;
     acl.grant("pub", "writer", &bob()).await;
-    let mut c = acl.as_principal(&bob()).await;
+    let c = acl.as_principal(&bob()).await;
     let attempts = [
         (
             "delete outside the writable directory",
@@ -84,12 +84,12 @@ async fn subtree_changes_need_write_on_the_target_and_read_on_the_source() {
             .create_change_version(pb::CreateChangeVersionRequest {
                 operation_id: Bytes::new(),
                 repo: "acl".into(),
-                version: Some(subtree_version(&acl, at, change)),
+                version: subtree_version(&acl, at, change).into(),
                 signatures: Vec::new(),
             })
             .await;
         assert_eq!(
-            result.map(|_| ()).unwrap_err().code(),
+            result.map(|_| ()).unwrap_err().code,
             Code::PermissionDenied,
             "{what}"
         );
@@ -99,7 +99,7 @@ async fn subtree_changes_need_write_on_the_target_and_read_on_the_source() {
         .create_change_version(pb::CreateChangeVersionRequest {
             operation_id: Bytes::new(),
             repo: "acl".into(),
-            version: Some(subtree_version(&acl, "pub", SubtreeChange::Delete)),
+            version: (subtree_version(&acl, "pub", SubtreeChange::Delete)).into(),
             signatures: Vec::new(),
         })
         .await
@@ -138,17 +138,18 @@ async fn another_orgs_object_cannot_be_fetched_by_hash() {
         "{}",
         response.status()
     );
-    let mut c = acl.as_principal(&alice()).await;
+    let c = acl.as_principal(&alice()).await;
     let blob = c
         .repo
         .get_blob(pb::GetBlobRequest {
             repo: "acl".into(),
-            content: Some(pb::ContentRef {
+            content: (pb::ContentRef {
                 r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
                     hash: Bytes::copy_from_slice(hash.as_bytes()),
                     size: 14,
                 })),
-            }),
+            })
+            .into(),
             offset: None,
             length: None,
             grant: String::new(),
@@ -157,8 +158,8 @@ async fn another_orgs_object_cannot_be_fetched_by_hash() {
     let found = match blob {
         Err(_) => false,
         Ok(stream) => {
-            let mut stream = stream.into_inner();
-            matches!(stream.message().await, Ok(Some(_)))
+            let mut stream = stream.messages();
+            matches!(stream.next().await, Some(Ok(_)))
         }
     };
     assert!(!found, "GetBlob served another org's object");

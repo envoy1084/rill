@@ -18,7 +18,7 @@ pub(super) fn outcome(outcome: TestOutcome) -> i32 {
 pub(super) fn test_run(run: TestRun) -> pb::TestRun {
     pb::TestRun {
         target: run.target,
-        outcome: outcome(run.outcome),
+        outcome: outcome(run.outcome).into(),
         retried: run.retried,
         duration_ms: run.duration_ms,
         action: run
@@ -39,7 +39,7 @@ pub(super) fn flaky(target: String, score: f64, stats: FlakeStats) -> pb::FlakyT
         runs: stats.runs,
         failures: stats.failures,
         flips: stats.flips,
-        last: stats.last.map_or(0, outcome),
+        last: stats.last.map_or(0, outcome).into(),
     }
 }
 
@@ -86,7 +86,7 @@ fn step(indexed: &IndexedStep) -> pb::RunStep {
         name: s.step.clone(),
         shard,
         shards,
-        state: state as i32,
+        state: state.into(),
         exit_code,
         error,
         cached: s.cached,

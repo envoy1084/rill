@@ -29,8 +29,8 @@ pub use intent::{intent_kind_from_proto, intent_status_from_proto, risk_from_pro
 pub use land::{land_status_from_parts, land_status_parts, lane_from_proto, ticket_from_proto};
 pub use primitives::{
     enum_from_proto, hash_from_proto, hash_to_proto, hashes_from_proto, id_from_proto, id_to_proto,
-    ids_from_proto, opt_hash_from_proto, opt_id_from_proto, path_from_proto, ref_name_from_proto,
-    required, timestamp_from_proto, timestamp_to_proto, trunk_seq_from_proto, trunk_seq_to_proto,
-    RillId,
+    ids_from_proto, known, opt_hash_from_proto, opt_id_from_proto, path_from_proto,
+    ref_name_from_proto, required, timestamp_from_proto, timestamp_to_proto, trunk_seq_from_proto,
+    trunk_seq_to_proto, Present, RillId,
 };
 pub use review::{comment_category_from_proto, confidence_from_proto, review_status_from_proto};

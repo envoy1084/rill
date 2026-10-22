@@ -187,8 +187,8 @@ impl VersionResult {
 /// Wire encoding of resolved content and kind.
 pub(crate) fn set_content_proto(content: ContentRef, kind: FileKind) -> pb::SetContent {
     pb::SetContent {
-        content: Some(pb::ContentRef::from(content)),
-        kind: pb::FileKind::from(kind) as i32,
-        copy_from: None,
+        content: pb::ContentRef::from(content).into(),
+        kind: pb::FileKind::from(kind).into(),
+        copy_from: None.into(),
     }
 }

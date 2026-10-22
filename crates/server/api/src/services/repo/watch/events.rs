@@ -9,12 +9,13 @@ use rill_types::RepoPathBuf;
 use super::stream::{forward, start_from, EventStream};
 use crate::services::common::open;
 use crate::services::repo::RepoSvc;
+use crate::services::Call;
 use rill_runtime::error::Result;
 
 impl RepoSvc {
     pub(in crate::services::repo) async fn watch_events_impl(
         &self,
-        request: tonic::Request<pb::WatchEventsRequest>,
+        request: Call<pb::WatchEventsRequest>,
     ) -> Result<EventStream<pb::EventEnvelope>> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
@@ -30,7 +31,7 @@ impl RepoSvc {
         Ok(forward(ctx, log, |cursor, event| async move {
             Ok(Some(pb::EventEnvelope {
                 cursor: Bytes::copy_from_slice(cursor.as_bytes()),
-                event: Some(pb::Event::from(&event)),
+                event: pb::Event::from(&event).into(),
             }))
         }))
     }

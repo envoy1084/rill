@@ -22,34 +22,36 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         .repo
         .resolve_path(pb::ResolvePathRequest {
             repo: "app".into(),
-            root: Some(at.clone()),
+            root: at.clone().into(),
             path: "data/customers.txt".into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .read_grant;
     let read = |c: &mut Clients| {
-        let mut repo = c.repo.clone();
+        let repo = c.repo.clone();
         let grant = grant.clone();
         let leaked = leaked.clone();
         async move {
             repo.get_blob(pb::GetBlobRequest {
                 repo: "app".into(),
-                content: Some(pb::ContentRef {
+                content: (pb::ContentRef {
                     r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
                         hash: Bytes::copy_from_slice(hash.as_bytes()),
                         size: leaked.len() as u64,
                     })),
-                }),
+                })
+                .into(),
                 offset: None,
                 length: None,
                 grant,
             })
             .await?
-            .into_inner()
-            .message()
+            .messages()
+            .next()
             .await
+            .transpose()
         }
     };
     assert!(read(&mut root).await.unwrap().is_some());
@@ -59,17 +61,17 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         .request_redaction(pb::RequestRedactionRequest {
             operation_id: Bytes::new(),
             org: "default".into(),
-            kind: pb::ObjectKind::Blob as i32,
+            kind: pb::ObjectKind::Blob.into(),
             hash: Bytes::copy_from_slice(hash.as_bytes()),
             reason: "customer data committed by mistake".into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .redaction
         .unwrap();
     let approve = |c: &mut Clients| {
-        let mut p = c.protection.clone();
+        let p = c.protection.clone();
         let id = request.id.clone();
         async move {
             p.approve_redaction(pb::ApproveRedactionRequest {
@@ -81,7 +83,7 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         }
     };
     assert_eq!(
-        approve(&mut root).await.unwrap_err().code(),
+        approve(&mut root).await.unwrap_err().code,
         Code::PermissionDenied,
         "not one's own"
     );
@@ -92,7 +94,7 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
     approve(&mut sec).await.unwrap();
 
     assert_eq!(
-        read(&mut root).await.unwrap_err().code(),
+        read(&mut root).await.unwrap_err().code,
         Code::FailedPrecondition
     );
     let token = server.token_for(&Principal::human("root"));
@@ -135,13 +137,13 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         .repo
         .grep(pb::GrepRequest {
             repo: "app".into(),
-            root: Some(at),
+            root: at.into(),
             pattern: "customer".into(),
             ..Default::default()
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .hits;
     assert!(hits.is_empty(), "{hits:?}");
     // The list goes to cache tiers (service principals) and instance
@@ -175,7 +177,7 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .entries
         .into_iter()
         .map(|e| e.action)
@@ -193,7 +195,7 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
 async fn a_redacted_tree_is_refused_even_when_cached() {
     let server = TestServer::start(admins_config()).await;
     let mut root = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
-    let mut sec = clients(&server, Some(&server.token_for(&Principal::human("sec")))).await;
+    let sec = clients(&server, Some(&server.token_for(&Principal::human("sec")))).await;
     repo(&mut root, "app").await;
     let version = apply(
         &mut root,
@@ -207,12 +209,12 @@ async fn a_redacted_tree_is_refused_even_when_cached() {
         root: Some(pb::root_spec::Root::VersionHash(version.clone())),
     };
     let list = |c: &mut Clients| {
-        let mut repo = c.repo.clone();
+        let repo = c.repo.clone();
         let at = at.clone();
         async move {
             repo.list_dir(pb::ListDirRequest {
                 repo: "app".into(),
-                root: Some(at),
+                root: at.into(),
                 path: "private".into(),
             })
             .await
@@ -238,13 +240,13 @@ async fn a_redacted_tree_is_refused_even_when_cached() {
         .request_redaction(pb::RequestRedactionRequest {
             operation_id: Bytes::new(),
             org: "default".into(),
-            kind: pb::ObjectKind::Tree as i32,
+            kind: pb::ObjectKind::Tree.into(),
             hash: Bytes::copy_from_slice(dir.as_bytes()),
             reason: "names".into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .redaction
         .unwrap()
         .id;
@@ -257,6 +259,6 @@ async fn a_redacted_tree_is_refused_even_when_cached() {
         .await
         .unwrap();
     let refused = list(&mut root).await.unwrap_err();
-    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
+    assert_eq!(refused.code, Code::FailedPrecondition, "{refused:?}");
     server.stop().await;
 }

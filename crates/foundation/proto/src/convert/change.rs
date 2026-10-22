@@ -46,9 +46,9 @@ impl From<&FileChange> for pb::FileChange {
                 kind,
                 copy_from,
             } => pb::file_change::Change::Set(pb::file_change::Set {
-                content: Some(pb::ContentRef::from(content)),
-                kind: pb::FileKind::from(*kind) as i32,
-                copy_from: copy_from.as_ref().map(pb::CopySource::from),
+                content: pb::ContentRef::from(content).into(),
+                kind: pb::FileKind::from(*kind).into(),
+                copy_from: copy_from.as_ref().map(pb::CopySource::from).into(),
             }),
             FileChange::Delete => pb::file_change::Change::Delete(pb::file_change::Delete {}),
             FileChange::Conflict(merge) => {
@@ -148,8 +148,8 @@ impl From<&ChangeVersion> for pb::ChangeVersion {
                 .iter()
                 .map(|(p, c)| (p.to_string(), pb::FileChange::from(c)))
                 .collect(),
-            author: Some(pb::Principal::from(&cv.author)),
-            provenance: Some(pb::Provenance::from(&cv.provenance)),
+            author: pb::Principal::from(&cv.author).into(),
+            provenance: pb::Provenance::from(&cv.provenance).into(),
             intent: cv.intent.as_ref().map(id_to_proto),
             message: cv.message.clone(),
             created_at: timestamp_to_proto(cv.created_at),
@@ -203,8 +203,8 @@ impl From<&ChangeInfo> for pb::ChangeInfo {
             change_id: id_to_proto(&ci.change_id),
             parents: ci.parents.iter().map(hash_to_proto).collect(),
             predecessor: ci.predecessor.as_ref().map(hash_to_proto),
-            author: Some(pb::Principal::from(&ci.author)),
-            provenance: Some(pb::Provenance::from(&ci.provenance)),
+            author: pb::Principal::from(&ci.author).into(),
+            provenance: pb::Provenance::from(&ci.provenance).into(),
             intent: ci.intent.as_ref().map(id_to_proto),
             message: ci.message.clone(),
             created_at: timestamp_to_proto(ci.created_at),
@@ -249,7 +249,7 @@ impl TryFrom<pb::ChangeInfo> for ChangeInfo {
 impl From<&Signature> for pb::Signature {
     fn from(s: &Signature) -> Self {
         pb::Signature {
-            signer: Some(pb::Principal::from(&s.signer)),
+            signer: pb::Principal::from(&s.signer).into(),
             public_key: s.public_key.clone(),
             signature: s.signature.clone(),
             signed_at: timestamp_to_proto(s.signed_at),

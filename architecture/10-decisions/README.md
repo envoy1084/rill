@@ -18,7 +18,7 @@ accepted one beyond fixing errors. Status is one of `accepted`,
 | [002](002-content-in-object-store.md) | File content lives only in the object store | accepted |
 | [003](003-single-sequencer.md) | One sequencer per repository; trunk is never sharded | accepted |
 | [004](004-queues-and-events-on-fdb.md) | Job queues, event log and leases live in FoundationDB | accepted |
-| [005](005-rill-v2-api.md) | `rill.v2` is a clean break, served as gRPC and Connect | accepted |
+| [005](005-rill-v2-api.md) | `rill.v2` is a clean break, served as gRPC and Connect | superseded by 017 for naming and transport |
 | [006](006-workspace-authoritative.md) | The server workspace is authoritative; checkouts are caches | accepted |
 | [007](007-reapi-execution.md) | Execution speaks REAPI v2 with BLAKE3 | accepted |
 | [008](008-derived-data-async.md) | Derived data is asynchronous except a land-critical set | accepted |
@@ -30,6 +30,7 @@ accepted one beyond fixing errors. Status is one of `accepted`,
 | [014](014-objects-per-organization.md) | Objects are stored and deduplicated per organization | accepted |
 | [015](015-reuse-open-source.md) | Reuse mature open source; build only what is Rill's | accepted |
 | [016](016-plain-blake3-for-content.md) | Raw content is plain BLAKE3 | accepted |
+| [017](017-api-in-place-on-connect.md) | The API is redesigned in place as `rill.v1`, on connect-rust | accepted |
 
 ## Template
 

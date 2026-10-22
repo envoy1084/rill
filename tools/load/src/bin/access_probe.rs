@@ -99,7 +99,7 @@ async fn main() {
             .access_svc()
             .add_relation(pb::AddRelationRequest {
                 operation_id: Default::default(),
-                relation: Some(tuple.clone()),
+                relation: tuple.clone().into(),
             })
             .await
             .expect("grant");
@@ -117,11 +117,11 @@ async fn main() {
             .access_svc()
             .remove_relation(pb::RemoveRelationRequest {
                 operation_id: Default::default(),
-                relation: Some(tuple.clone()),
+                relation: tuple.clone().into(),
             })
             .await
             .expect("revoke")
-            .into_inner();
+            .into_owned();
         let t0 = Instant::now();
         // A client that knows the version: refused on its first request.
         for endpoint in &args.check {

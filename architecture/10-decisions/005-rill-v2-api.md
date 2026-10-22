@@ -1,6 +1,6 @@
 # 005 · `rill.v2` is a clean break, served as gRPC and Connect
 
-Status: accepted
+Status: superseded by [017](017-api-in-place-on-connect.md) for naming and transport
 
 ## Context
 

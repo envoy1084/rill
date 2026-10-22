@@ -43,7 +43,7 @@ impl VerificationStatus {
     }
 
     fn from_proto(field: &'static str, value: i32) -> Result<Self> {
-        match pb::VerificationStatus::try_from(value) {
+        match rill_proto::convert::known::<pb::VerificationStatus>(value) {
             Ok(pb::VerificationStatus::Pending) => Ok(VerificationStatus::Pending),
             Ok(pb::VerificationStatus::Running) => Ok(VerificationStatus::Running),
             Ok(pb::VerificationStatus::Passed) => Ok(VerificationStatus::Passed),
@@ -78,7 +78,10 @@ impl TryFrom<pb::VerificationReport> for VerificationReport {
     fn try_from(r: pb::VerificationReport) -> Result<Self> {
         Ok(VerificationReport {
             target: r.target,
-            status: VerificationStatus::from_proto("verification_report.status", r.status)?,
+            status: VerificationStatus::from_proto(
+                "verification_report.status",
+                r.status.to_i32(),
+            )?,
             reporter: required("verification_report.reporter", r.reporter)?.try_into()?,
             reported_at: timestamp_from_proto(r.reported_at),
             details: r.details,
@@ -106,7 +109,10 @@ impl TryFrom<pb::VerificationResult> for VerificationRecord {
     fn try_from(r: pb::VerificationResult) -> Result<Self> {
         Ok(VerificationRecord {
             seq: trunk_seq_from_proto(r.seq),
-            status: VerificationStatus::from_proto("verification_result.status", r.status)?,
+            status: VerificationStatus::from_proto(
+                "verification_result.status",
+                r.status.to_i32(),
+            )?,
             culprit: r.culprit.map(trunk_seq_from_proto),
             reports: r
                 .reports

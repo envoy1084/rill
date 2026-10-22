@@ -6,7 +6,6 @@ use futures::StreamExt;
 use rill_proto::convert::id_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{TrunkSeq, Versionstamp};
-use tonic::Streaming;
 
 use super::RepoClient;
 use crate::error::{Error, Result};
@@ -22,8 +21,7 @@ impl RepoClient {
                 repo: self.repo.clone(),
                 after_seq: after_seq.map(TrunkSeq::get),
             })
-            .await?
-            .into_inner();
+            .await?;
         Ok(convert_stream(stream))
     }
 
@@ -35,8 +33,7 @@ impl RepoClient {
                 repo: self.repo.clone(),
                 prefix: prefix.map(str::to_string),
             })
-            .await?
-            .into_inner();
+            .await?;
         Ok(convert_stream(stream))
     }
 
@@ -48,8 +45,7 @@ impl RepoClient {
                 repo: self.repo.clone(),
                 after: after.to_proto(),
             })
-            .await?
-            .into_inner();
+            .await?;
         Ok(convert_stream(stream))
     }
 
@@ -68,25 +64,56 @@ impl RepoClient {
                 change_id: query.change.map(|c| id_to_proto(&c)),
                 ref_prefix: query.ref_prefix,
             })
-            .await?
-            .into_inner();
+            .await?;
         Ok(convert_stream(stream))
     }
 }
 
-/// Map a tonic stream of wire messages into SDK values.
-pub(crate) fn convert_stream<W, T, E>(stream: Streaming<W>) -> EventStream<T>
+/// A server stream of wire messages, as SDK values. A failure ends it.
+pub(crate) fn convert_stream<V, W, T, E>(
+    stream: connectrpc::client::ServerStream<crate::client::ResponseBody, V>,
+) -> EventStream<T>
 where
-    W: Send + 'static,
+    V: buffa::MessageView<'static, Owned = W> + Send + 'static,
+    W: buffa::view::HasMessageView<View<'static> = V>
+        + buffa::Message
+        + connectrpc::JsonDeserialize
+        + Send
+        + 'static,
     T: TryFrom<W, Error = E> + Send + 'static,
     E: Into<Error>,
 {
-    stream
-        .map(|item| match item {
-            Ok(msg) => T::try_from(msg).map_err(Into::into),
-            Err(status) => Err(status.into()),
-        })
-        .boxed()
+    map_stream(stream, |msg| T::try_from(msg).map_err(Into::into))
+}
+
+/// A server stream of wire messages, each turned into an SDK value by
+/// `f`. A failure ends it.
+pub(crate) fn map_stream<V, W, T>(
+    stream: connectrpc::client::ServerStream<crate::client::ResponseBody, V>,
+    f: impl Fn(W) -> Result<T> + Send + Sync + 'static,
+) -> EventStream<T>
+where
+    V: buffa::MessageView<'static, Owned = W> + Send + 'static,
+    W: buffa::view::HasMessageView<View<'static> = V>
+        + buffa::Message
+        + connectrpc::JsonDeserialize
+        + Send
+        + 'static,
+    T: Send + 'static,
+{
+    let f = std::sync::Arc::new(f);
+    futures::stream::unfold(Some(stream), move |state| {
+        let f = f.clone();
+        async move {
+            let mut stream = state?;
+            match stream.message::<W>().await {
+                Ok(Some(msg)) => Some((f(msg.to_owned_message()), Some(stream))),
+                Ok(None) => None,
+                Err(e) => Some((Err(e.into()), None)),
+            }
+        }
+    })
+    .boxed()
 }
 
 /// Where a log watch starts.

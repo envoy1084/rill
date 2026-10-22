@@ -16,5 +16,5 @@ mod write;
 pub use blobs::PUT_BLOB_CHUNK_SIZE;
 pub use client::RepoClient;
 pub use tree::DirListing;
-pub(crate) use watch::convert_stream as watch_stream;
 pub use watch::WatchStart;
+pub(crate) use watch::{convert_stream as watch_stream, map_stream};

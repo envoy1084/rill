@@ -1,6 +1,6 @@
-//! Shared values and the prost encode/decode step.
+//! Shared values and the wire encode/decode step.
 
-use prost::Message;
+use buffa::Message;
 use rill_types::{ObjectHash, ObjectKind, RepoPathBuf};
 
 pub(super) fn h(s: &str) -> ObjectHash {
@@ -11,8 +11,8 @@ pub(super) fn p(s: &str) -> RepoPathBuf {
     RepoPathBuf::new(s).unwrap()
 }
 
-/// Encode to bytes and decode again, so prost's own serialization is part of
+/// Encode to bytes and decode again, so the wire serialization is part of
 /// the round trip.
-pub(super) fn wire<M: Message + Default>(m: M) -> M {
-    M::decode(m.encode_to_vec().as_slice()).unwrap()
+pub(super) fn wire<M: Message>(m: M) -> M {
+    M::decode_from_slice(&m.encode_to_vec()).unwrap()
 }

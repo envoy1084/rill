@@ -14,14 +14,15 @@ use rill_proto::rill::v1 as pb;
 use rill_types::{
     ChangeVersionHash, OperationId, Principal, Provenance, RepoPathBuf, TreeHash, TrunkSeq,
 };
-use tonic::{Request, Response, Status};
 
 use crate::auth::{caller, Permit};
+use crate::services::Call;
+use connectrpc::{ConnectError, Response};
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::{AppState, RepoContext};
 
 /// What a handler returns.
-pub type GrpcResult<T> = std::result::Result<Response<T>, Status>;
+pub type GrpcResult<T> = std::result::Result<Response<T>, ConnectError>;
 
 /// A request's caller and the repository it names.
 pub struct Opened {
@@ -50,7 +51,7 @@ impl Opened {
 }
 
 /// Resolve the caller and the repository named by `repo`.
-pub async fn open<T>(state: &AppState, request: &Request<T>, repo: &str) -> Result<Opened> {
+pub async fn open<T>(state: &AppState, request: &Call<T>, repo: &str) -> Result<Opened> {
     let ctx = caller(request)?;
     let repo = state.repos.resolve(repo).await?;
     Ok(Opened {
@@ -227,7 +228,7 @@ pub async fn land_event(
         seq: seq.get(),
         hash: hash_to_proto(&version),
         change_id: id_to_proto(&cv.change_id),
-        landed_by: Some(pb::Principal::from(landed_by)),
+        landed_by: pb::Principal::from(landed_by).into(),
         at: timestamp_to_proto(at),
         reverts_seq,
     })
@@ -263,7 +264,7 @@ pub fn ticket_proto(record: &rill_types::LandRequestRecord) -> pb::LandTicket {
     pb::LandTicket {
         id: record.ticket.0.to_string(),
         change_id: id_to_proto(&record.request.change_id),
-        status: land_status_proto(&record.status) as i32,
+        status: land_status_proto(&record.status).into(),
         requested_at: timestamp_to_proto(record.request.requested_at),
     }
 }

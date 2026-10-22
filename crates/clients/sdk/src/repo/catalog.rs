@@ -19,7 +19,7 @@ impl Client {
             .repo_svc()
             .list_repos(pb::ListReposRequest { limit, page_token })
             .await?
-            .into_inner();
+            .into_owned();
         let items = resp
             .repos
             .into_iter()
@@ -49,11 +49,11 @@ impl Client {
             windows_safe,
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.repo_svc(), request.clone());
+            let (svc, request) = (self.repo_svc(), request.clone());
             async move { svc.create_repo(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         rill_proto::convert::required("create_repo.repo", resp.repo)?.try_into()
     }
 }

@@ -18,14 +18,22 @@ async fn a_planted_secret_is_blocked_at_every_write() {
     )
     .await
     .unwrap_err();
-    assert_eq!(inline.code(), Code::FailedPrecondition);
+    assert_eq!(inline.code, Code::FailedPrecondition);
     assert!(
-        inline.message().contains("aws-access-token"),
+        inline
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("aws-access-token"),
         "{}",
-        inline.message()
+        inline.message.as_deref().unwrap_or_default()
     );
     assert!(
-        !inline.message().contains(AWS_KEY),
+        !inline
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .contains(AWS_KEY),
         "the refusal never repeats the secret"
     );
 
@@ -34,7 +42,7 @@ async fn a_planted_secret_is_blocked_at_every_write() {
     big.extend_from_slice(format!("\nkey = {AWS_KEY}\n").as_bytes());
     let (edit, _) = blob(&server, "data/big.txt", &big).await;
     assert_eq!(
-        apply(&mut c, "app", vec![edit]).await.unwrap_err().code(),
+        apply(&mut c, "app", vec![edit]).await.unwrap_err().code,
         Code::FailedPrecondition
     );
 
@@ -64,12 +72,12 @@ async fn a_planted_secret_is_blocked_at_every_write() {
         .create_change_version(pb::CreateChangeVersionRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            version: Some(pb::ChangeVersion::from(cv)),
+            version: pb::ChangeVersion::from(cv).into(),
             signatures: Vec::new(),
         })
         .await
         .unwrap_err();
-    assert_eq!(raw.code(), Code::FailedPrecondition);
+    assert_eq!(raw.code, Code::FailedPrecondition);
 
     let ws = c
         .workspace
@@ -77,12 +85,12 @@ async fn a_planted_secret_is_blocked_at_every_write() {
             operation_id: Bytes::new(),
             repo: "app".into(),
             name: "w".into(),
-            base: None,
-            sparse: None,
+            base: None.into(),
+            sparse: None.into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .workspace
         .unwrap();
     let ctx = server.state.repos.resolve("app").await.unwrap();
@@ -114,11 +122,11 @@ async fn a_planted_secret_is_blocked_at_every_write() {
             workspace: ws.id,
             message: "from the working copy".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
         })
         .await
         .unwrap_err();
-    assert_eq!(change.code(), Code::FailedPrecondition, "{change:?}");
+    assert_eq!(change.code, Code::FailedPrecondition, "{change:?}");
 
     // Clean content goes through, and the refusals are audited.
     apply(&mut c, "app", vec![set_edit("README", b"hello\n")])
@@ -136,7 +144,7 @@ async fn a_planted_secret_is_blocked_at_every_write() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .entries
         .into_iter()
         .filter(|e| e.action == "secret.block")

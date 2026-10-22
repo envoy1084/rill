@@ -48,12 +48,12 @@ impl From<&Workspace> for pb::Workspace {
         pb::Workspace {
             id: id_to_proto(&w.id),
             repo: id_to_proto(&w.repo),
-            owner: Some(pb::Principal::from(&w.owner)),
+            owner: pb::Principal::from(&w.owner).into(),
             name: w.name.clone(),
             base: hash_to_proto(&w.base),
             working_change: id_to_proto(&w.working_change),
             snapshot: w.snapshot.as_ref().map(hash_to_proto),
-            sparse: Some(pb::SparseProfile::from(&w.sparse)),
+            sparse: pb::SparseProfile::from(&w.sparse).into(),
             head_op: w.head_op.as_ref().map(id_to_proto),
             created_at: timestamp_to_proto(w.created_at),
             updated_at: timestamp_to_proto(w.updated_at),
@@ -115,10 +115,10 @@ impl From<&OperationKind> for pb::OperationKind {
                 version: hash_to_proto(version),
             }),
             OperationKind::SetSparse { profile } => ok::Kind::SetSparse(ok::SetSparse {
-                profile: Some(pb::SparseProfile::from(profile)),
+                profile: pb::SparseProfile::from(profile).into(),
             }),
             OperationKind::Handoff { to } => ok::Kind::Handoff(ok::Handoff {
-                to: Some(pb::Principal::from(to)),
+                to: pb::Principal::from(to).into(),
             }),
             OperationKind::Undo { undone } => ok::Kind::Undo(ok::Undo {
                 undone: id_to_proto(undone),
@@ -181,10 +181,10 @@ impl From<&Operation> for pb::Operation {
             id: id_to_proto(&op.id),
             workspace: id_to_proto(&op.workspace),
             parent: op.parent.as_ref().map(id_to_proto),
-            actor: Some(pb::Principal::from(&op.actor)),
-            kind: Some(pb::OperationKind::from(&op.kind)),
+            actor: pb::Principal::from(&op.actor).into(),
+            kind: pb::OperationKind::from(&op.kind).into(),
             at: timestamp_to_proto(op.at),
-            resulting: Some(pb::Workspace::from(&op.resulting)),
+            resulting: pb::Workspace::from(&op.resulting).into(),
         }
     }
 }

@@ -1,9 +1,9 @@
 //! The relation engine as clients see it: closed repositories, org
 //! administrators, explanations, and versions every server honours.
 
+use connectrpc::client::CallOptions;
 use rill_types::identity::OrgRole;
 use rill_types::Principal;
-use tonic::metadata::MetadataValue;
 
 use super::super::*;
 use super::fixture::*;
@@ -17,11 +17,11 @@ fn tuple(path: &str, relation: &str, subject: &str) -> Option<pb::Relation> {
     })
 }
 
-async fn list_root(c: &mut Clients, repo: &str) -> Result<(), Status> {
+async fn list_root(c: &mut Clients, repo: &str) -> Result<(), ConnectError> {
     c.repo
         .list_dir(pb::ListDirRequest {
             repo: repo.into(),
-            root: None,
+            root: None.into(),
             path: String::new(),
         })
         .await
@@ -35,7 +35,7 @@ async fn a_repository_without_tuples_is_closed_but_to_org_admins() {
     let olga = add_user(&server, "olga", vec![OrgRole::Admin], &[]).await;
     let mut stranger = clients(&server, Some(&server.token_for(&Principal::human("sam")))).await;
     assert_eq!(
-        list_root(&mut stranger, "orphan").await.unwrap_err().code(),
+        list_root(&mut stranger, "orphan").await.unwrap_err().code,
         Code::PermissionDenied
     );
     let mut admin = clients(&server, Some(&server.token_for(&olga))).await;
@@ -50,20 +50,20 @@ async fn a_repository_without_tuples_is_closed_but_to_org_admins() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert!(check.allowed && check.org_admin && check.because.is_empty());
     server.stop().await;
 }
 
 #[tokio::test]
 async fn check_expand_and_lookup_explain_access() {
-    let mut acl = Acl::start().await;
+    let acl = Acl::start().await;
     add_user(&acl.server, "carol", vec![], &["core"]).await;
     acl.owner
         .access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
-            relation: tuple("pub", "writer", "team:core"),
+            relation: (tuple("pub", "writer", "team:core")).into(),
         })
         .await
         .unwrap();
@@ -78,7 +78,7 @@ async fn check_expand_and_lookup_explain_access() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert!(check.allowed);
     assert_eq!(
         check.because,
@@ -96,18 +96,18 @@ async fn check_expand_and_lookup_explain_access() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .tuples;
     let team = expanded
         .iter()
-        .find(|t| t.tuple.as_ref().unwrap().subject == "team:core")
+        .find(|t| t.tuple.as_option().unwrap().subject == "team:core")
         .unwrap();
     assert_eq!(team.members.len(), 1);
     assert_eq!(team.members[0].name, "carol");
     assert!(
         expanded
             .iter()
-            .any(|t| t.tuple.as_ref().unwrap().relation == "owner"),
+            .any(|t| t.tuple.as_option().unwrap().relation == "owner"),
         "the repository owner writes everywhere"
     );
 
@@ -121,12 +121,12 @@ async fn check_expand_and_lookup_explain_access() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .paths;
     assert_eq!(paths, ["pub"]);
 
     // A non-owner may ask about itself, not about others.
-    let mut carol = acl.as_principal(&Principal::human("carol")).await;
+    let carol = acl.as_principal(&Principal::human("carol")).await;
     let mine = carol
         .access
         .check(pb::CheckRequest {
@@ -137,7 +137,7 @@ async fn check_expand_and_lookup_explain_access() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert!(!mine.allowed);
     let err = carol
         .access
@@ -148,13 +148,13 @@ async fn check_expand_and_lookup_explain_access() {
         })
         .await
         .unwrap_err();
-    assert_eq!(err.code(), Code::PermissionDenied);
+    assert_eq!(err.code, Code::PermissionDenied);
     acl.server.stop().await;
 }
 
 #[tokio::test]
 async fn unknown_subjects_and_relations_are_invalid() {
-    let mut acl = Acl::start().await;
+    let acl = Acl::start().await;
     for (relation, subject) in [
         ("reader", "user:nobody"),
         ("contributor", "*"),
@@ -165,49 +165,45 @@ async fn unknown_subjects_and_relations_are_invalid() {
             .access
             .add_relation(pb::AddRelationRequest {
                 operation_id: Bytes::new(),
-                relation: tuple("", relation, subject),
+                relation: (tuple("", relation, subject)).into(),
             })
             .await
             .unwrap_err();
-        assert_eq!(err.code(), Code::InvalidArgument, "{relation} {subject}");
+        assert_eq!(err.code, Code::InvalidArgument, "{relation} {subject}");
     }
     acl.server.stop().await;
 }
 
 #[tokio::test]
 async fn a_relation_version_from_the_future_is_refused() {
-    let mut acl = Acl::start().await;
+    let acl = Acl::start().await;
     let granted = acl
         .owner
         .access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
-            relation: tuple("pub", "reader", &format!("principal:{}", bob().id)),
+            relation: (tuple("pub", "reader", &format!("principal:{}", bob().id))).into(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let token = acl.server.token_for(&bob());
     let channel = connect(&acl.server.grpc).await;
     let root = acl.at_version();
     let read = |seen: i64| {
         let root = root.clone();
-        let mut repo = RepoServiceClient::new(channel.clone());
+        let repo = RepoServiceClient::authed(channel.clone(), Bearer(Some(token.clone())));
         let header = format!("{}={seen}", granted.repo_id);
-        let token = token.clone();
         async move {
-            let mut request = Request::new(pb::ListDirRequest {
+            let request = pb::ListDirRequest {
                 repo: "acl".into(),
-                root: Some(root),
+                root: root.into(),
                 path: "pub".into(),
-            });
-            let md = request.metadata_mut();
-            md.insert(
-                "authorization",
-                MetadataValue::try_from(format!("Bearer {token}")).unwrap(),
-            );
-            md.insert("x-rill-relations", header.parse().unwrap());
-            repo.list_dir(request).await.map(|_| ())
+            };
+            let options = CallOptions::default().with_header("x-rill-relations", header);
+            repo.list_dir_with_options(request, options)
+                .await
+                .map(|_| ())
         }
     };
     read(granted.relation_version).await.unwrap();
@@ -215,7 +211,7 @@ async fn a_relation_version_from_the_future_is_refused() {
         read(granted.relation_version + 1000)
             .await
             .unwrap_err()
-            .code(),
+            .code,
         Code::InvalidArgument
     );
     acl.server.stop().await;

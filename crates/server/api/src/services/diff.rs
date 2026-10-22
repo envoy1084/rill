@@ -35,7 +35,7 @@ impl DiffOptions {
     /// Options from the common request fields.
     pub fn new(
         paths: &[String],
-        format: i32,
+        format: buffa::EnumValue<pb::DiffFormat>,
         context_lines: u32,
         limit: u32,
         filter: PathFilter,
@@ -44,8 +44,8 @@ impl DiffOptions {
             .iter()
             .map(RepoPathBuf::new)
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        let format = match pb::DiffFormat::try_from(format) {
-            Ok(pb::DiffFormat::Unified) => pb::DiffFormat::Unified,
+        let format = match format.as_known() {
+            Some(pb::DiffFormat::Unified) => pb::DiffFormat::Unified,
             _ => pb::DiffFormat::Structured,
         };
         Ok(DiffOptions {
@@ -111,12 +111,12 @@ pub async fn file_diffs(
         };
         out.push(pb::FileDiff {
             path: entry.path.to_string(),
-            before: Some(file_state_to_proto(&entry.before)),
-            after: Some(file_state_to_proto(&entry.after)),
+            before: file_state_to_proto(&entry.before).into(),
+            after: file_state_to_proto(&entry.after).into(),
             hunks,
             unified,
             binary,
-            conflict,
+            conflict: conflict.into(),
         });
     }
     Ok((out, truncated))
@@ -162,11 +162,12 @@ pub fn hunk_proto(hunk: &Hunk) -> pb::DiffHunk {
             .lines
             .iter()
             .map(|l| pb::DiffLine {
-                op: match l.tag {
+                op: (match l.tag {
                     LineTag::Context => pb::diff_line::Op::Context,
                     LineTag::Removed => pb::diff_line::Op::Delete,
                     LineTag::Added => pb::diff_line::Op::Insert,
-                } as i32,
+                })
+                .into(),
                 text: l.text.clone(),
             })
             .collect(),

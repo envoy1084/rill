@@ -24,7 +24,7 @@ impl RepoClient {
     pub async fn tree(&self, hash: TreeHash) -> Result<Tree> {
         let grant = self.grants().for_hash(&hash);
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetTreeRequest {
                 repo: self.repo.clone(),
                 hash: hash_to_proto(&hash),
@@ -33,7 +33,7 @@ impl RepoClient {
             async move { svc.get_tree(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         let tree: Tree = required("get_tree.tree", resp.tree)?.try_into()?;
         self.grants().record(
             &resp.read_grant,
@@ -50,16 +50,16 @@ impl RepoClient {
     /// [`RepoClient::list_dir`] with the directory's tree hash.
     pub async fn list_dir_full(&self, root: &Root, path: &RepoPath) -> Result<DirListing> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ListDirRequest {
                 repo: self.repo.clone(),
-                root: Some(root.to_proto()),
+                root: root.to_proto().into(),
                 path: path.to_string(),
             };
             async move { svc.list_dir(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         let entries = resp
             .entries
             .into_iter()
@@ -82,17 +82,17 @@ impl RepoClient {
     /// The entry at `path` under `root`, or `None` if it does not exist.
     pub async fn resolve_path(&self, root: &Root, path: &RepoPath) -> Result<Option<EntryKind>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ResolvePathRequest {
                 repo: self.repo.clone(),
-                root: Some(root.to_proto()),
+                root: root.to_proto().into(),
                 path: path.to_string(),
             };
             async move { svc.resolve_path(request).await }
         })
         .await?
-        .into_inner();
-        match resp.entry {
+        .into_owned();
+        match resp.entry.into_option() {
             None => Ok(None),
             Some(e) => {
                 let kind = TreeEntry::try_from(e)?.kind;
@@ -109,11 +109,11 @@ impl RepoClient {
         match self.resolve_path(root, path).await? {
             Some(EntryKind::File { content, .. }) => self.get_blob(&content).await,
             Some(EntryKind::Dir { .. }) => Err(Error::Status {
-                code: tonic::Code::FailedPrecondition,
+                code: connectrpc::ErrorCode::FailedPrecondition,
                 message: format!("{path} is a directory"),
             }),
             None => Err(Error::Status {
-                code: tonic::Code::NotFound,
+                code: connectrpc::ErrorCode::NotFound,
                 message: format!("{path} does not exist at {root}"),
             }),
         }

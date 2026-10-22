@@ -3,13 +3,14 @@
 use std::sync::Arc;
 
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::checks_service_server::ChecksService;
+use rill_proto::rill::v1::ChecksService;
 use rill_runtime::state::AppState;
-use tonic::{Request, Response, Status};
 
 use super::runs::RunStream;
+use crate::services::Call;
+use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 
-type GrpcResult<T> = std::result::Result<Response<T>, Status>;
+type GrpcResult<T> = std::result::Result<Response<T>, ConnectError>;
 
 /// The checks service.
 #[derive(Clone)]
@@ -24,89 +25,116 @@ impl ChecksSvc {
 }
 
 fn reply<T>(result: rill_runtime::error::Result<T>) -> GrpcResult<T> {
-    result.map(Response::new).map_err(Status::from)
+    result.map(Response::new).map_err(ConnectError::from)
 }
 
-#[tonic::async_trait]
+// Handlers return their concrete response types.
+#[allow(refining_impl_trait)]
 impl ChecksService for ChecksSvc {
-    type WatchRunStream = RunStream;
-
     async fn get_test_history(
         &self,
-        request: Request<pb::GetTestHistoryRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetTestHistoryRequest>,
     ) -> GrpcResult<pb::GetTestHistoryResponse> {
+        let request = Call::new(ctx, request);
         reply(self.history(request).await)
     }
 
     async fn list_flaky_tests(
         &self,
-        request: Request<pb::ListFlakyTestsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListFlakyTestsRequest>,
     ) -> GrpcResult<pb::ListFlakyTestsResponse> {
+        let request = Call::new(ctx, request);
         reply(self.flaky(request).await)
     }
 
     async fn list_runs(
         &self,
-        request: Request<pb::ListRunsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListRunsRequest>,
     ) -> GrpcResult<pb::ListRunsResponse> {
+        let request = Call::new(ctx, request);
         reply(self.list_runs(request).await)
     }
 
-    async fn get_run(&self, request: Request<pb::GetRunRequest>) -> GrpcResult<pb::VerifyRun> {
+    async fn get_run(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetRunRequest>,
+    ) -> GrpcResult<pb::VerifyRun> {
+        let request = Call::new(ctx, request);
         reply(self.get_run(request).await)
     }
 
-    async fn watch_run(&self, request: Request<pb::GetRunRequest>) -> GrpcResult<RunStream> {
+    async fn watch_run(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetRunRequest>,
+    ) -> GrpcResult<RunStream> {
+        let request = Call::new(ctx, request);
         reply(self.watch_run(request).await)
     }
 
     async fn read_log(
         &self,
-        request: Request<pb::ReadLogRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ReadLogRequest>,
     ) -> GrpcResult<pb::ReadBytesResponse> {
+        let request = Call::new(ctx, request);
         reply(self.read_log(request).await)
     }
 
     async fn read_artifact(
         &self,
-        request: Request<pb::ReadArtifactRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ReadArtifactRequest>,
     ) -> GrpcResult<pb::ReadBytesResponse> {
+        let request = Call::new(ctx, request);
         reply(self.read_artifact(request).await)
     }
 
     async fn list_nonhermetic(
         &self,
-        request: Request<pb::ListNonhermeticRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListNonhermeticRequest>,
     ) -> GrpcResult<pb::ListNonhermeticResponse> {
+        let request = Call::new(ctx, request);
         reply(self.nonhermetic(request).await)
     }
 
     async fn list_quarantined(
         &self,
-        request: Request<pb::ListQuarantinedRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListQuarantinedRequest>,
     ) -> GrpcResult<pb::ListQuarantinedResponse> {
+        let request = Call::new(ctx, request);
         reply(self.quarantined(request).await)
     }
 
     async fn quarantine(
         &self,
-        request: Request<pb::QuarantineRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::QuarantineRequest>,
     ) -> GrpcResult<pb::QuarantineResponse> {
+        let request = Call::new(ctx, request);
         crate::services::idem::once(&self.state, request, |r| async move {
             self.quarantine_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn release_quarantine(
         &self,
-        request: Request<pb::ReleaseQuarantineRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ReleaseQuarantineRequest>,
     ) -> GrpcResult<pb::ReleaseQuarantineResponse> {
+        let request = Call::new(ctx, request);
         crate::services::idem::once(&self.state, request, |r| async move {
             self.release_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 }

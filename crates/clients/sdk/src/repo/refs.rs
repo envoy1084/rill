@@ -18,7 +18,7 @@ impl RepoClient {
         name: &RefName,
     ) -> Result<(ChangeVersionHash, Option<TrunkSeq>)> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ResolveRefRequest {
                 repo: self.repo.clone(),
                 name: name.to_string(),
@@ -26,7 +26,7 @@ impl RepoClient {
             async move { svc.resolve_ref(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok((
             hash_from_proto("resolve_ref.hash", &resp.hash)?,
             resp.trunk_seq.map(trunk_seq_from_proto),
@@ -42,12 +42,12 @@ impl RepoClient {
             Root::Seq(seq) => {
                 let mut landings = self.trunk_range(*seq, *seq).await?;
                 landings.pop().map(|l| l.hash).ok_or_else(|| Error::Status {
-                    code: tonic::Code::NotFound,
+                    code: connectrpc::ErrorCode::NotFound,
                     message: format!("{seq} is not on trunk"),
                 })
             }
             Root::Tree(h) => Err(Error::Status {
-                code: tonic::Code::InvalidArgument,
+                code: connectrpc::ErrorCode::InvalidArgument,
                 message: format!("tree {h} is not a change version"),
             }),
         }
@@ -56,7 +56,7 @@ impl RepoClient {
     /// Refs whose names start with `prefix` (all refs when `None`).
     pub async fn list_refs(&self, prefix: Option<&str>) -> Result<Vec<RefInfo>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ListRefsRequest {
                 repo: self.repo.clone(),
                 prefix: prefix.map(str::to_string),
@@ -64,7 +64,7 @@ impl RepoClient {
             async move { svc.list_refs(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         resp.refs.into_iter().map(RefInfo::try_from).collect()
     }
 
@@ -82,11 +82,11 @@ impl RepoClient {
             at: at.map(|s| s.get()),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.cut_release(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok((
             RefName::new(resp.r#ref)?,
             hash_from_proto("cut_release.hash", &resp.hash)?,
@@ -123,28 +123,28 @@ impl RepoClient {
         let request = pb::MoveRefRequest {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
-            update: Some(pb::RefUpdate::from(update)),
+            update: pb::RefUpdate::from(update).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.move_ref(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(opt_hash_from_proto("move_ref.hash", resp.hash.as_ref())?)
     }
 
     /// The head of trunk, or `None` for an empty repository.
     pub async fn trunk_head(&self) -> Result<Option<(TrunkSeq, ChangeVersionHash)>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::TrunkHeadRequest {
                 repo: self.repo.clone(),
             };
             async move { svc.trunk_head(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         if resp.hash.is_empty() {
             return Ok(None);
         }
@@ -157,7 +157,7 @@ impl RepoClient {
     /// Landings between two sequence numbers, inclusive.
     pub async fn trunk_range(&self, from: TrunkSeq, to: TrunkSeq) -> Result<Vec<LandEvent>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::TrunkRangeRequest {
                 repo: self.repo.clone(),
                 from: from.get(),
@@ -166,7 +166,7 @@ impl RepoClient {
             async move { svc.trunk_range(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         resp.landings.into_iter().map(LandEvent::try_from).collect()
     }
 }

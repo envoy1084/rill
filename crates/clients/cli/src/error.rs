@@ -1,8 +1,8 @@
 //! The CLI error type: what went wrong, how to say it, and which exit code
 //! it maps to (see [`crate::exit`]).
 
+use rill_sdk::Code;
 use thiserror::Error;
-use tonic::Code;
 
 /// Everything a command can fail with.
 #[derive(Debug, Error)]
@@ -83,9 +83,9 @@ impl CliError {
     }
 }
 
-impl From<tonic::Status> for CliError {
-    fn from(status: tonic::Status) -> Self {
-        CliError::Sdk(rill_sdk::Error::from(status))
+impl From<connectrpc::ConnectError> for CliError {
+    fn from(err: connectrpc::ConnectError) -> Self {
+        CliError::Sdk(rill_sdk::Error::from(err))
     }
 }
 
@@ -123,7 +123,6 @@ fn describe_sdk(e: &rill_sdk::Error) -> String {
                 format!("{what}: {message}")
             }
         }
-        Error::Transport(e) => format!("cannot reach the server: {e}"),
         Error::Config(m) => format!("configuration: {m}"),
         Error::Checkout(m) => format!("checkout: {m}"),
         Error::Conflict { paths, .. } => format!(

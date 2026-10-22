@@ -19,7 +19,7 @@ async fn chain(c: &mut Clients, org: &str) -> Vec<AuditEntry> {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .entries
         .iter()
         .map(|e| postcard::from_bytes(&e.encoded).unwrap())
@@ -36,7 +36,7 @@ async fn verify(
         .list_audit_roots(pb::ListAuditRootsRequest { org: org.into() })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .roots
         .iter()
         .map(|r| postcard::from_bytes(&r.encoded).unwrap())
@@ -46,7 +46,7 @@ async fn verify(
         .list_audit_keys(pb::ListAuditKeysRequest {})
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .keys
         .into_iter()
         .map(|k| (k.id, k.public_key.to_vec()))
@@ -72,12 +72,13 @@ async fn actions_are_chained_sealed_and_tamper_evident() {
     root.access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
-            relation: Some(pb::Relation {
+            relation: (pb::Relation {
                 repo: "audited".into(),
                 path: "src".into(),
                 relation: "reader".into(),
                 subject: format!("principal:{}", Principal::human("ann").id),
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
@@ -98,7 +99,7 @@ async fn actions_are_chained_sealed_and_tamper_evident() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .root
         .expect("the chain grew");
     let entries = chain(&mut root, "default").await;
@@ -156,7 +157,7 @@ async fn actions_are_chained_sealed_and_tamper_evident() {
     assert!(verify(&mut root, "default").await.is_err());
 
     // Only administrators read it.
-    let mut ann = clients(&server, Some(&server.token_for(&Principal::human("ann")))).await;
+    let ann = clients(&server, Some(&server.token_for(&Principal::human("ann")))).await;
     let refused = ann
         .audit
         .list_audit_entries(pb::ListAuditEntriesRequest {
@@ -166,7 +167,7 @@ async fn actions_are_chained_sealed_and_tamper_evident() {
         })
         .await
         .unwrap_err();
-    assert_eq!(refused.code(), Code::PermissionDenied);
+    assert_eq!(refused.code, Code::PermissionDenied);
     server.stop().await;
 }
 
@@ -185,18 +186,18 @@ async fn refusals_are_audited_but_sampled() {
         })
         .await
         .unwrap();
-    let mut eve = clients(&server, Some(&server.token_for(&Principal::human("eve")))).await;
+    let eve = clients(&server, Some(&server.token_for(&Principal::human("eve")))).await;
     for _ in 0..5 {
         let refused = eve
             .repo
             .list_dir(pb::ListDirRequest {
                 repo: "closed".into(),
-                root: None,
+                root: None.into(),
                 path: "src".into(),
             })
             .await
             .unwrap_err();
-        assert_eq!(refused.code(), Code::PermissionDenied);
+        assert_eq!(refused.code, Code::PermissionDenied);
     }
     let mut denied = Vec::new();
     for _ in 0..50 {

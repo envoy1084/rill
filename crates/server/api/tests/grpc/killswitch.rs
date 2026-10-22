@@ -1,7 +1,7 @@
 //! Agent budgets and the kill switch.
 
 use rill_identity::keys::KeyServiceConfig;
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_proto::rill::v1::IdentityServiceClient;
 use rill_runtime::config::IdentityConfig;
 use rill_types::identity::AgentBudgets;
 use rill_types::Principal;
@@ -26,7 +26,7 @@ fn config() -> ServerConfig {
 /// A repository `r` the agent may write.
 async fn repo(server: &TestServer) {
     let root = server.token_for(&Principal::human("root"));
-    let mut c = clients(server, Some(&root)).await;
+    let c = clients(server, Some(&root)).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
             operation_id: Bytes::new(),
@@ -39,12 +39,13 @@ async fn repo(server: &TestServer) {
     c.access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
-            relation: Some(pb::Relation {
+            relation: (pb::Relation {
                 repo: "r".into(),
                 path: String::new(),
                 relation: "writer".into(),
                 subject: format!("principal:{}", Principal::agent("bot").id),
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
@@ -54,11 +55,11 @@ fn edit(i: usize) -> pb::ApplyEditsRequest {
     pb::ApplyEditsRequest {
         operation_id: Bytes::new(),
         repo: "r".into(),
-        base: None,
+        base: None.into(),
         edits: vec![set_edit(&format!("f{i}.txt"), b"x\n")],
         message: format!("v{i}"),
         intent: None,
-        provenance: None,
+        provenance: None.into(),
         change_id: None,
     }
 }
@@ -79,7 +80,7 @@ async fn a_daily_version_budget_is_never_exceeded() {
     let bot = server.token_for(&Principal::agent("bot"));
     let c = clients(&server, Some(&bot)).await;
     let writes = (0..12).map(|i| {
-        let mut repo = c.repo.clone();
+        let repo = c.repo.clone();
         async move { repo.apply_edits(edit(i)).await }
     });
     let results = futures::future::join_all(writes).await;
@@ -88,7 +89,7 @@ async fn a_daily_version_budget_is_never_exceeded() {
     assert!(results
         .iter()
         .filter_map(|r| r.as_ref().err())
-        .all(|e| e.code() == Code::ResourceExhausted));
+        .all(|e| e.code == Code::ResourceExhausted));
     server.stop().await;
 }
 
@@ -105,7 +106,7 @@ async fn a_request_rate_budget_refuses_the_excess() {
     .await;
     let server = TestServer::start_on(config(), stores.clone()).await;
     let bot = server.token_for(&Principal::agent("bot"));
-    let mut c = clients(&server, Some(&bot)).await;
+    let c = clients(&server, Some(&bot)).await;
     let mut codes = Vec::new();
     for _ in 0..5 {
         codes.push(
@@ -113,7 +114,7 @@ async fn a_request_rate_budget_refuses_the_excess() {
                 .who_am_i(pb::WhoAmIRequest {})
                 .await
                 .err()
-                .map(|s| s.code()),
+                .map(|s| s.code),
         );
     }
     let refused = codes
@@ -138,8 +139,8 @@ async fn killing_an_agent_ejects_its_queued_landing() {
     repo(&api).await;
     let bot = api.token_for(&Principal::agent("bot"));
     let root = api.token_for(&Principal::human("root"));
-    let mut agent = clients(&api, Some(&bot)).await;
-    let written = agent.repo.apply_edits(edit(0)).await.unwrap().into_inner();
+    let agent = clients(&api, Some(&bot)).await;
+    let written = agent.repo.apply_edits(edit(0)).await.unwrap().into_owned();
     let change_id = written.version.unwrap().change_id;
     agent
         .review
@@ -150,7 +151,7 @@ async fn killing_an_agent_ejects_its_queued_landing() {
         })
         .await
         .unwrap();
-    let mut human = clients(&api, Some(&root)).await;
+    let human = clients(&api, Some(&root)).await;
     for (label, value) in [("Verified", 1), ("Review", 2)] {
         human
             .review
@@ -176,23 +177,21 @@ async fn killing_an_agent_ejects_its_queued_landing() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .ticket
         .unwrap();
 
-    let killed = IdentityServiceClient::with_interceptor(
-        connect(&api.grpc).await,
-        Bearer(Some(root.clone())),
-    )
-    .kill_switch(pb::KillSwitchRequest {
-        operation_id: Bytes::new(),
-        org: "default".into(),
-        target: Some(pb::kill_switch_request::Target::Agent("bot".into())),
-        reason: "misbehaving".into(),
-    })
-    .await
-    .unwrap()
-    .into_inner();
+    let killed =
+        IdentityServiceClient::authed(connect(&api.grpc).await, Bearer(Some(root.clone())))
+            .kill_switch(pb::KillSwitchRequest {
+                operation_id: Bytes::new(),
+                org: "default".into(),
+                target: Some(pb::kill_switch_request::Target::Agent("bot".into())),
+                reason: "misbehaving".into(),
+            })
+            .await
+            .unwrap()
+            .into_owned();
     assert_eq!(killed.agents_suspended, ["bot"]);
     assert_eq!(
         agent
@@ -200,13 +199,13 @@ async fn killing_an_agent_ejects_its_queued_landing() {
             .who_am_i(pb::WhoAmIRequest {})
             .await
             .unwrap_err()
-            .code(),
+            .code,
         Code::Unauthenticated
     );
 
     // A server with the lander picks the request up and ejects it.
     let workers = TestServer::start_on(config(), stores.clone()).await;
-    let mut human = clients(&workers, Some(&root)).await;
+    let human = clients(&workers, Some(&root)).await;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
     let status = loop {
         let status = human
@@ -217,8 +216,10 @@ async fn killing_an_agent_ejects_its_queued_landing() {
             })
             .await
             .unwrap()
-            .into_inner();
-        let code = pb::LandStatus::try_from(status.ticket.as_ref().unwrap().status).unwrap();
+            .into_owned();
+        let code =
+            rill_proto::convert::known::<pb::LandStatus>(status.ticket.as_option().unwrap().status)
+                .unwrap();
         if !matches!(code, pb::LandStatus::Queued | pb::LandStatus::Rebasing) {
             break status;
         }
@@ -226,7 +227,7 @@ async fn killing_an_agent_ejects_its_queued_landing() {
         tokio::time::sleep(Duration::from_millis(100)).await;
     };
     assert_ne!(
-        pb::LandStatus::try_from(status.ticket.unwrap().status).unwrap(),
+        rill_proto::convert::known::<pb::LandStatus>(status.ticket.unwrap().status).unwrap(),
         pb::LandStatus::Landed
     );
     assert!(

@@ -12,20 +12,21 @@ async fn apply_on(c: &mut Clients, base: Option<&Bytes>, path: &str, body: &str)
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            base: base.map(|v| pb::EditBase {
+            base: (base.map(|v| pb::EditBase {
                 base: Some(pb::edit_base::Base::Root(pb::RootSpec {
                     root: Some(pb::root_spec::Root::VersionHash(v.clone())),
                 })),
-            }),
+            }))
+            .into(),
             edits: vec![set_edit(path, body.as_bytes())],
             message: "edit".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .version
         .unwrap()
         .change_id

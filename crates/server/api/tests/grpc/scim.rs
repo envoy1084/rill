@@ -2,7 +2,7 @@
 //! relation checks, and deprovisioning.
 
 use rill_identity::keys::KeyServiceConfig;
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_proto::rill::v1::IdentityServiceClient;
 use rill_runtime::config::IdentityConfig;
 use rill_types::Principal;
 use serde_json::{json, Value};
@@ -52,8 +52,8 @@ async fn a_provisioning_system_manages_users_and_teams() {
     let a = TestServer::start_on(config(), stores.clone()).await;
     let b = TestServer::start_on(config(), stores.clone()).await;
     let root = a.token_for(&Principal::human("root"));
-    let mut identity =
-        IdentityServiceClient::with_interceptor(connect(&a.grpc).await, Bearer(Some(root.clone())));
+    let identity =
+        IdentityServiceClient::authed(connect(&a.grpc).await, Bearer(Some(root.clone())));
     let created = identity
         .create_scim_credential(pb::CreateScimCredentialRequest {
             operation_id: Bytes::new(),
@@ -61,7 +61,7 @@ async fn a_provisioning_system_manages_users_and_teams() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let scim = ScimClient {
         base: format!("http://{}/scim/v2/default", a.http),
         token: created.token.clone(),
@@ -100,7 +100,7 @@ async fn a_provisioning_system_manages_users_and_teams() {
 
     // A relation granted to a team opens the repository once SCIM puts the
     // user in the group.
-    let mut admin = clients(&a, Some(&root)).await;
+    let admin = clients(&a, Some(&root)).await;
     admin
         .repo
         .create_repo(pb::CreateRepoRequest {
@@ -115,19 +115,20 @@ async fn a_provisioning_system_manages_users_and_teams() {
         .access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
-            relation: Some(pb::Relation {
+            relation: (pb::Relation {
                 repo: "r".into(),
                 path: String::new(),
                 relation: "reader".into(),
                 subject: "team:devs".into(),
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
     let ann_token = a.token_for(&Principal::human("ann"));
     let list = || pb::ListDirRequest {
         repo: "r".into(),
-        root: None,
+        root: None.into(),
         path: String::new(),
     };
     let denied = clients(&b, Some(&ann_token))
@@ -136,7 +137,7 @@ async fn a_provisioning_system_manages_users_and_teams() {
         .list_dir(list())
         .await
         .unwrap_err();
-    assert_eq!(denied.code(), Code::PermissionDenied);
+    assert_eq!(denied.code, Code::PermissionDenied);
     let (status, _) = scim
         .send(
             reqwest::Method::POST,

@@ -6,11 +6,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
+use crate::client::Connection;
+use connectrpc::ErrorCode as Code;
 use parking_lot::RwLock;
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::session_service_client::SessionServiceClient;
-use tonic::transport::Channel;
-use tonic::Code;
 
 use super::source::TokenSource;
 use crate::error::{Error, Result};
@@ -56,11 +55,12 @@ impl WorkloadConfig {
     }
 
     /// Exchange the current workload token for an agent token.
-    pub async fn exchange(&self, channel: Channel) -> Result<pb::SessionGrant> {
+    pub async fn exchange(&self, connection: Connection) -> Result<pb::SessionGrant> {
         let jwt = tokio::fs::read_to_string(&self.token_file)
             .await
             .map_err(|e| Error::config(format!("{}: {e}", self.token_file.display())))?;
-        Ok(SessionServiceClient::new(channel)
+        Ok(connection
+            .sessions()
             .exchange_token(pb::ExchangeTokenRequest {
                 subject_token: jwt.trim().to_string(),
                 subject_token_type: TOKEN_TYPE_JWT.into(),
@@ -69,7 +69,7 @@ impl WorkloadConfig {
                 model: self.model.clone(),
             })
             .await?
-            .into_inner())
+            .into_owned())
     }
 }
 
@@ -80,12 +80,12 @@ pub struct WorkloadSource {
 
 impl WorkloadSource {
     /// Exchange once, then keep renewing in the background until dropped.
-    pub async fn start(config: WorkloadConfig, channel: Channel) -> Result<Arc<Self>> {
-        let grant = config.exchange(channel.clone()).await?;
+    pub async fn start(config: WorkloadConfig, connection: Connection) -> Result<Arc<Self>> {
+        let grant = config.exchange(connection.clone()).await?;
         let source = Arc::new(WorkloadSource {
             grant: RwLock::new(grant),
         });
-        tokio::spawn(renew_forever(Arc::downgrade(&source), config, channel));
+        tokio::spawn(renew_forever(Arc::downgrade(&source), config, connection));
         Ok(source)
     }
 }
@@ -96,7 +96,11 @@ impl TokenSource for WorkloadSource {
     }
 }
 
-async fn renew_forever(source: Weak<WorkloadSource>, config: WorkloadConfig, channel: Channel) {
+async fn renew_forever(
+    source: Weak<WorkloadSource>,
+    config: WorkloadConfig,
+    connection: Connection,
+) {
     let mut backoff = Duration::from_secs(1);
     loop {
         let Some(due_in) = source.upgrade().map(|s| {
@@ -109,7 +113,7 @@ async fn renew_forever(source: Weak<WorkloadSource>, config: WorkloadConfig, cha
         if source.upgrade().is_none() {
             return;
         }
-        match config.exchange(channel.clone()).await {
+        match config.exchange(connection.clone()).await {
             Ok(grant) => {
                 match source.upgrade() {
                     Some(s) => *s.grant.write() = grant,

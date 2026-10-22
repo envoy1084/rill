@@ -38,7 +38,7 @@ fn workspace_roundtrip() {
     full.snapshot = None;
     full.head_op = None;
     let mut w = wire(pb::Workspace::from(&full));
-    w.sparse = None;
+    w.sparse = None.into();
     assert_eq!(Workspace::try_from(w).unwrap(), full);
 }
 
@@ -90,7 +90,7 @@ fn operation_roundtrip_every_kind() {
     }
 
     let bad = pb::Operation {
-        kind: None,
+        kind: None.into(),
         ..pb::Operation::from(Operation {
             id: OperationId::derived("t", "x"),
             workspace: WorkspaceId::derived("t", "w"),

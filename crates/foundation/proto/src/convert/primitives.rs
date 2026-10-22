@@ -1,5 +1,6 @@
 //! Scalar conversions: hashes, ids, paths, timestamps and enum helpers.
 
+use buffa::{EnumValue, Enumeration, MessageField, ProtoBox};
 use bytes::Bytes;
 use rill_types::{
     ChangeId, IntentId, ObjectHash, OperationId, PrincipalId, RefName, RepoId, RepoPathBuf,
@@ -139,21 +140,51 @@ pub fn trunk_seq_from_proto(seq: u64) -> TrunkSeq {
     TrunkSeq(seq)
 }
 
-/// Decode a proto enum `i32`, rejecting unknown values and the zero
+/// Decode a proto enum, rejecting unknown values and the zero
 /// `UNSPECIFIED` sentinel, which is never a valid `rill-types` value.
-pub fn enum_from_proto<E>(field: &'static str, value: i32) -> Result<E>
-where
-    E: TryFrom<i32>,
-{
-    if value == 0 {
-        return Err(ConvertError::BadEnum { field, value });
+pub fn enum_from_proto<E: Enumeration>(
+    field: &'static str,
+    value: impl Into<EnumValue<E>>,
+) -> Result<E> {
+    let value = value.into();
+    match value.as_known() {
+        Some(known) if value.to_i32() != 0 => Ok(known),
+        _ => Err(ConvertError::BadEnum {
+            field,
+            value: value.to_i32(),
+        }),
     }
-    E::try_from(value).map_err(|_| ConvertError::BadEnum { field, value })
+}
+
+/// A proto enum value as the generated enum, or the raw value when this
+/// build does not know it.
+pub fn known<E: Enumeration>(value: impl Into<EnumValue<E>>) -> std::result::Result<E, i32> {
+    let value = value.into();
+    value.as_known().ok_or(value.to_i32())
+}
+
+/// A message field that may be unset: an `Option` or a buffa
+/// `MessageField`.
+pub trait Present<T> {
+    /// The value, if set.
+    fn present(self) -> Option<T>;
+}
+
+impl<T> Present<T> for Option<T> {
+    fn present(self) -> Option<T> {
+        self
+    }
+}
+
+impl<T: Default, P: ProtoBox<T>> Present<T> for MessageField<T, P> {
+    fn present(self) -> Option<T> {
+        self.into_option()
+    }
 }
 
 /// Extract a required message field.
-pub fn required<T>(field: &'static str, value: Option<T>) -> Result<T> {
-    value.ok_or(ConvertError::Missing { field })
+pub fn required<T>(field: &'static str, value: impl Present<T>) -> Result<T> {
+    value.present().ok_or(ConvertError::Missing { field })
 }
 
 #[cfg(test)]
@@ -189,7 +220,7 @@ mod tests {
 
     #[test]
     fn enum_rejects_unspecified() {
-        let r: Result<crate::rill::v1::FileKind> = enum_from_proto("kind", 0);
+        let r: Result<crate::rill::v1::FileKind> = enum_from_proto("kind", EnumValue::from(0));
         assert!(matches!(
             r,
             Err(ConvertError::BadEnum {
@@ -197,9 +228,9 @@ mod tests {
                 value: 0
             })
         ));
-        let r: Result<crate::rill::v1::FileKind> = enum_from_proto("kind", 99);
+        let r: Result<crate::rill::v1::FileKind> = enum_from_proto("kind", EnumValue::from(99));
         assert!(r.is_err());
-        let r: Result<crate::rill::v1::FileKind> = enum_from_proto("kind", 1);
+        let r: Result<crate::rill::v1::FileKind> = enum_from_proto("kind", EnumValue::from(1));
         assert_eq!(r.unwrap(), crate::rill::v1::FileKind::Regular);
     }
 

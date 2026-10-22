@@ -8,23 +8,24 @@ use rill_proto::rill::v1 as pb;
 use rill_types::{TrunkSeq, Versionstamp};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::Status;
 
 use super::stream::{start_from, wait_for_events, EventStream, STREAM_BUFFER};
 use crate::services::common::{self, open};
 use crate::services::repo::RepoSvc;
+use crate::services::Call;
+use connectrpc::ConnectError;
 use rill_runtime::error::Result;
 use rill_runtime::state::RepoContext;
 
 /// How many log entries a replay fetches per store read.
 const REPLAY_PAGE: usize = 512;
 
-type Sender<T> = mpsc::Sender<std::result::Result<T, Status>>;
+type Sender<T> = mpsc::Sender<std::result::Result<T, ConnectError>>;
 
 impl RepoSvc {
     pub(in crate::services::repo) async fn watch_trunk_impl(
         &self,
-        request: tonic::Request<pb::WatchTrunkRequest>,
+        request: Call<pb::WatchTrunkRequest>,
     ) -> Result<EventStream<pb::LandEvent>> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -55,7 +56,7 @@ impl RepoSvc {
             }
             .await;
             if let Err(e) = result {
-                let _ = tx.send(Err(Status::from(e))).await;
+                let _ = tx.send(Err(ConnectError::from(e))).await;
             }
         });
         Ok(Box::pin(ReceiverStream::new(out)))
@@ -63,7 +64,7 @@ impl RepoSvc {
 
     pub(in crate::services::repo) async fn watch_log_impl(
         &self,
-        request: tonic::Request<pb::WatchLogRequest>,
+        request: Call<pb::WatchLogRequest>,
     ) -> Result<EventStream<pb::LogEntry>> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let filter = opened.permit().read_any().await?;
@@ -88,7 +89,7 @@ impl RepoSvc {
             }
             .await;
             if let Err(e) = result {
-                let _ = tx.send(Err(Status::from(e))).await;
+                let _ = tx.send(Err(ConnectError::from(e))).await;
             }
         });
         Ok(Box::pin(ReceiverStream::new(out)))
@@ -137,7 +138,7 @@ async fn drain_log(
             };
             let entry = pb::LogEntry {
                 cursor: Bytes::copy_from_slice(stamp.as_bytes()),
-                info: Some(pb::ChangeInfo::from(info)),
+                info: pb::ChangeInfo::from(info).into(),
             };
             if tx.send(Ok(entry)).await.is_err() {
                 return Ok(false);

@@ -70,14 +70,14 @@ impl RepoClient {
     /// The repository record.
     pub async fn info(&self) -> Result<RepoInfo> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetRepoRequest {
                 repo: self.repo.clone(),
             };
             async move { svc.get_repo(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         rill_proto::convert::required("get_repo.repo", resp.repo)?.try_into()
     }
 }

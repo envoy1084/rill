@@ -25,13 +25,13 @@ fn ts(ms: i64) -> String {
 
 /// Run `rill admin key`.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: KeyCmd) -> Result<()> {
-    let mut svc = ctx.client()?.identity_svc();
+    let svc = ctx.client()?.identity_svc();
     match cmd {
         KeyCmd::List => {
             let keys = svc
                 .list_token_keys(pb::ListTokenKeysRequest {})
                 .await?
-                .into_inner()
+                .into_owned()
                 .keys;
             let value = json!(keys
                 .iter()
@@ -60,7 +60,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: KeyCmd) -> Result<()> {
                     operation_id: Default::default(),
                 })
                 .await?
-                .into_inner();
+                .into_owned();
             ctx.emit(
                 json!({ "key_id": rotated.key_id, "active_from": rotated.active_from }),
                 |out| match rotated.key_id {
@@ -76,7 +76,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: KeyCmd) -> Result<()> {
 
 /// Run `rill admin revoke`.
 pub async fn revoke(ctx: &mut Ctx<'_>, cmd: RevokeCmd) -> Result<()> {
-    let mut svc = ctx.client()?.identity_svc();
+    let svc = ctx.client()?.identity_svc();
     match cmd {
         RevokeCmd::Token(args) => {
             let target = match args.token_id {
@@ -95,7 +95,7 @@ pub async fn revoke(ctx: &mut Ctx<'_>, cmd: RevokeCmd) -> Result<()> {
                     reason: args.reason,
                 })
                 .await?
-                .into_inner();
+                .into_owned();
             ctx.emit(json!({ "revoked": revoked.token_id }), |out| {
                 out.line(format!("revoked {}", revoked.token_id))
             })

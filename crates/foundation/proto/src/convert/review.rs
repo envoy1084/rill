@@ -56,7 +56,7 @@ impl From<&LabelVote> for pb::LabelVote {
         pb::LabelVote {
             label: v.label.clone(),
             value: v.value as i32,
-            voter: Some(pb::Principal::from(&v.voter)),
+            voter: pb::Principal::from(&v.voter).into(),
             version: hash_to_proto(&v.version),
             voted_at: timestamp_to_proto(v.voted_at),
             reason: v.reason.clone(),
@@ -145,7 +145,11 @@ impl From<CommentCategory> for pb::CommentCategory {
 }
 
 /// Decode a `CommentCategory` enum field.
-pub fn comment_category_from_proto(field: &'static str, value: i32) -> Result<CommentCategory> {
+pub fn comment_category_from_proto(
+    field: &'static str,
+    value: impl Into<buffa::EnumValue<pb::CommentCategory>>,
+) -> Result<CommentCategory> {
+    let value = value.into().to_i32();
     let c: pb::CommentCategory = enum_from_proto(field, value)?;
     match c {
         pb::CommentCategory::Discussion => Ok(CommentCategory::Discussion),
@@ -173,10 +177,10 @@ pub fn confidence_from_proto(field: &'static str, value: u32) -> Result<u8> {
 impl From<&Comment> for pb::Comment {
     fn from(c: &Comment) -> Self {
         pb::Comment {
-            author: Some(pb::Principal::from(&c.author)),
+            author: pb::Principal::from(&c.author).into(),
             body: c.body.clone(),
             created_at: timestamp_to_proto(c.created_at),
-            category: c.category.map(|c| pb::CommentCategory::from(c) as i32),
+            category: c.category.map(|c| pb::CommentCategory::from(c).into()),
             confidence: c.confidence.map(u32::from),
         }
     }
@@ -206,10 +210,10 @@ impl From<&Thread> for pb::Thread {
     fn from(t: &Thread) -> Self {
         pb::Thread {
             id: t.id.clone(),
-            anchor: Some(pb::ThreadAnchor::from(&t.anchor)),
+            anchor: pb::ThreadAnchor::from(&t.anchor).into(),
             comments: t.comments.iter().map(pb::Comment::from).collect(),
             resolved: t.resolved,
-            to: t.to.as_ref().map(pb::Principal::from),
+            to: t.to.as_ref().map(pb::Principal::from).into(),
         }
     }
 }
@@ -245,7 +249,11 @@ impl From<ReviewStatus> for pb::ReviewStatus {
 }
 
 /// Decode a `ReviewStatus` enum field.
-pub fn review_status_from_proto(field: &'static str, value: i32) -> Result<ReviewStatus> {
+pub fn review_status_from_proto(
+    field: &'static str,
+    value: impl Into<buffa::EnumValue<pb::ReviewStatus>>,
+) -> Result<ReviewStatus> {
+    let value = value.into().to_i32();
     let s: pb::ReviewStatus = enum_from_proto(field, value)?;
     match s {
         pb::ReviewStatus::Open => Ok(ReviewStatus::Open),
@@ -262,12 +270,12 @@ impl From<&ReviewState> for pb::ReviewState {
         pb::ReviewState {
             change_id: id_to_proto(&r.change_id),
             versions: r.versions.iter().map(hash_to_proto).collect(),
-            status: pb::ReviewStatus::from(r.status) as i32,
+            status: pb::ReviewStatus::from(r.status).into(),
             intent: r.intent.as_ref().map(id_to_proto),
-            owner: Some(pb::Principal::from(&r.owner)),
+            owner: pb::Principal::from(&r.owner).into(),
             votes: r.votes.iter().map(pb::LabelVote::from).collect(),
             threads: r.threads.iter().map(pb::Thread::from).collect(),
-            risk: pb::RiskClass::from(r.risk) as i32,
+            risk: pb::RiskClass::from(r.risk).into(),
             risk_reasons: r.risk_reasons.clone(),
             stack: r.stack.iter().map(id_to_proto).collect(),
             landed_seq: r.landed_seq.map(trunk_seq_to_proto),

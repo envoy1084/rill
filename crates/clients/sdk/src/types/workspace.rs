@@ -103,7 +103,7 @@ impl TryFrom<pb::UpdateBaseResponse> for UpdateBaseResult {
     type Error = Error;
 
     fn try_from(r: pb::UpdateBaseResponse) -> Result<Self> {
-        let rebased = match (r.version_hash, r.version) {
+        let rebased = match (r.version_hash, r.version.into_option()) {
             (Some(h), Some(v)) => Some((
                 hash_from_proto("update_base.version_hash", &h)?,
                 v.try_into()?,

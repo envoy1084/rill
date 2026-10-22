@@ -7,25 +7,25 @@ use rill_types::{
     ChangeId, ObjectHash, OperationKind, Principal, RepoPathBuf, SparseProfile, Timestamp,
     Workspace, WorkspaceId,
 };
-use tonic::Request;
 
 use super::oplog::response_pair;
 use super::WorkspaceSvc;
 use crate::services::common::{self, open, operation_id, resolve_version};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 impl WorkspaceSvc {
     pub(super) async fn create_workspace_impl(
         &self,
-        request: Request<pb::CreateWorkspaceRequest>,
+        request: Call<pb::CreateWorkspaceRequest>,
     ) -> Result<pb::CreateWorkspaceResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
         opened.permit().write(&RepoPathBuf::root()).await?;
-        let base = resolve_version(&opened.repo, req.base.as_ref())
+        let base = resolve_version(&opened.repo, req.base.as_option())
             .await?
             .unwrap_or(ObjectHash::ZERO);
-        let sparse = match req.sparse {
+        let sparse = match req.sparse.into_option() {
             Some(s) => SparseProfile::try_from(s)?,
             None => SparseProfile::full(),
         };
@@ -54,25 +54,25 @@ impl WorkspaceSvc {
             .await?;
         let (workspace, operation) = response_pair(&ws, &op);
         Ok(pb::CreateWorkspaceResponse {
-            workspace,
-            operation,
+            workspace: workspace.into(),
+            operation: operation.into(),
         })
     }
 
     pub(super) async fn get_workspace_impl(
         &self,
-        request: Request<pb::GetWorkspaceRequest>,
+        request: Call<pb::GetWorkspaceRequest>,
     ) -> Result<pb::GetWorkspaceResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let ws = self.load(&opened, &request.get_ref().workspace).await?;
         Ok(pb::GetWorkspaceResponse {
-            workspace: Some(pb::Workspace::from(ws)),
+            workspace: pb::Workspace::from(ws).into(),
         })
     }
 
     pub(super) async fn list_workspaces_impl(
         &self,
-        request: Request<pb::ListWorkspacesRequest>,
+        request: Call<pb::ListWorkspacesRequest>,
     ) -> Result<pb::ListWorkspacesResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
@@ -98,13 +98,13 @@ impl WorkspaceSvc {
 
     pub(super) async fn set_sparse_profile_impl(
         &self,
-        request: Request<pb::SetSparseProfileRequest>,
+        request: Call<pb::SetSparseProfileRequest>,
     ) -> Result<pb::SetSparseProfileResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
         let before = self.load_mut(&opened, &req.workspace).await?;
         let mut ws = before.clone();
-        let profile = match req.sparse {
+        let profile = match req.sparse.into_option() {
             Some(s) => SparseProfile::try_from(s)?,
             None => SparseProfile::full(),
         };
@@ -120,14 +120,14 @@ impl WorkspaceSvc {
             .await?;
         let (workspace, operation) = response_pair(&ws, &op);
         Ok(pb::SetSparseProfileResponse {
-            workspace,
-            operation,
+            workspace: workspace.into(),
+            operation: operation.into(),
         })
     }
 
     pub(super) async fn handoff_impl(
         &self,
-        request: Request<pb::HandoffRequest>,
+        request: Call<pb::HandoffRequest>,
     ) -> Result<pb::HandoffResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
@@ -146,14 +146,14 @@ impl WorkspaceSvc {
             .await?;
         let (workspace, operation) = response_pair(&ws, &op);
         Ok(pb::HandoffResponse {
-            workspace,
-            operation,
+            workspace: workspace.into(),
+            operation: operation.into(),
         })
     }
 
     pub(super) async fn delete_workspace_impl(
         &self,
-        request: Request<pb::DeleteWorkspaceRequest>,
+        request: Call<pb::DeleteWorkspaceRequest>,
     ) -> Result<pb::DeleteWorkspaceResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let ws = self.load_mut(&opened, &request.get_ref().workspace).await?;

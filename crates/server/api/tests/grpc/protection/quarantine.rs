@@ -64,7 +64,7 @@ async fn quarantined_versions_wait_for_an_owner() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .ticket
         .unwrap();
     let mut refused = None;
@@ -77,8 +77,12 @@ async fn quarantined_versions_wait_for_an_owner() {
             })
             .await
             .unwrap()
-            .into_inner();
-        match pb::LandStatus::try_from(status.ticket.as_ref().unwrap().status).unwrap() {
+            .into_owned();
+        match rill_proto::convert::known::<pb::LandStatus>(
+            status.ticket.as_option().unwrap().status,
+        )
+        .unwrap()
+        {
             pb::LandStatus::Landed => panic!("a quarantined version landed"),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 refused = status.error;
@@ -111,7 +115,7 @@ async fn quarantined_versions_wait_for_an_owner() {
         })
         .await
         .unwrap_err();
-    assert_eq!(appended.code(), Code::FailedPrecondition, "{appended:?}");
+    assert_eq!(appended.code, Code::FailedPrecondition, "{appended:?}");
 
     c.protection
         .clear_quarantine(pb::ClearQuarantineRequest {

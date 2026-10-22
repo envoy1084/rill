@@ -81,14 +81,15 @@ pub async fn blob_edit(server: &TestServer, path: &str, bytes: Vec<u8>) -> pb::E
     pb::Edit {
         path: path.into(),
         op: Some(pb::edit::Op::SetContent(pb::SetContent {
-            content: Some(pb::ContentRef {
+            content: (pb::ContentRef {
                 r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
                     hash: Bytes::copy_from_slice(hash.as_bytes()),
                     size,
                 })),
-            }),
-            kind: pb::FileKind::Regular as i32,
-            copy_from: None,
+            })
+            .into(),
+            kind: pb::FileKind::Regular.into(),
+            copy_from: None.into(),
         })),
     }
 }
@@ -96,7 +97,7 @@ pub async fn blob_edit(server: &TestServer, path: &str, bytes: Vec<u8>) -> pb::E
 impl Acl {
     pub async fn start() -> Self {
         let server = TestServer::start(ServerConfig::default()).await;
-        let mut owner = clients(&server, Some(&server.token_for(&alice()))).await;
+        let owner = clients(&server, Some(&server.token_for(&alice()))).await;
         owner
             .repo
             .create_repo(pb::CreateRepoRequest {
@@ -112,19 +113,19 @@ impl Acl {
             .apply_edits(pb::ApplyEditsRequest {
                 operation_id: Bytes::new(),
                 repo: "acl".into(),
-                base: None,
+                base: None.into(),
                 edits: vec![
                     blob_edit(&server, "pub/a.txt", public_bytes()).await,
                     blob_edit(&server, "secret/s.txt", secret_bytes()).await,
                 ],
                 message: "seed".into(),
                 intent: None,
-                provenance: None,
+                provenance: None.into(),
                 change_id: None,
             })
             .await
             .unwrap()
-            .into_inner()
+            .into_owned()
             .hash;
         let repo_id = server
             .state
@@ -149,12 +150,13 @@ impl Acl {
             .access
             .add_relation(pb::AddRelationRequest {
                 operation_id: Bytes::new(),
-                relation: Some(pb::Relation {
+                relation: (pb::Relation {
                     repo: "acl".into(),
                     path: path.into(),
                     relation: relation.into(),
                     subject: format!("principal:{}", who.id),
-                }),
+                })
+                .into(),
             })
             .await
             .unwrap();

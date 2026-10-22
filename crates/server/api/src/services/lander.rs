@@ -11,13 +11,14 @@ use bytes::Bytes;
 use rill_lander::postland::{record_at, VerificationRecord, VerificationStatus as PostStatus};
 use rill_proto::convert::{hash_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::lander_service_server::LanderService;
+use rill_proto::rill::v1::LanderService;
 use rill_types::{Principal, RepoPathBuf, Timestamp, TrunkSeq};
 use serde::{Deserialize, Serialize};
-use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult};
 use super::idem;
+use crate::services::Call;
+use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::{AppState, RepoContext};
 
@@ -86,8 +87,8 @@ async fn verification_result(ctx: &RepoContext, seq: TrunkSeq) -> Result<pb::Ver
     if let Some(r) = &record {
         reports.push(pb::VerificationReport {
             target: "postland".into(),
-            status: post_status_proto(r) as i32,
-            reporter: Some(pb::Principal::from(rill_lander::revert::lander_principal())),
+            status: post_status_proto(r).into(),
+            reporter: pb::Principal::from(rill_lander::revert::lander_principal()).into(),
             reported_at: timestamp_to_proto(r.at),
             details: Some(r.details.clone()),
             artifact: None,
@@ -96,17 +97,17 @@ async fn verification_result(ctx: &RepoContext, seq: TrunkSeq) -> Result<pb::Ver
     for r in &external {
         reports.push(pb::VerificationReport {
             target: r.target.clone(),
-            status: r.status,
-            reporter: Some(pb::Principal::from(&r.reporter)),
+            status: r.status.into(),
+            reporter: pb::Principal::from(&r.reporter).into(),
             reported_at: timestamp_to_proto(r.reported_at),
             details: r.details.clone(),
             artifact: r.artifact.as_ref().map(|a| Bytes::copy_from_slice(a)),
         });
     }
-    let status = aggregate(reports.iter().map(|r| r.status));
+    let status = aggregate(reports.iter().map(|r| r.status.to_i32()));
     Ok(pb::VerificationResult {
         seq: seq.get(),
-        status: status as i32,
+        status: status.into(),
         culprit: record.as_ref().and_then(|r| r.culprit.map(TrunkSeq::get)),
         reports,
     })
@@ -118,7 +119,9 @@ fn aggregate(statuses: impl Iterator<Item = i32>) -> pb::VerificationStatus {
     use pb::VerificationStatus as S;
     let mut result: Option<S> = None;
     for status in statuses {
-        let s = S::try_from(status).unwrap_or(S::Unspecified);
+        let s = buffa::EnumValue::<S>::from(status)
+            .as_known()
+            .unwrap_or(S::Unspecified);
         let rank = |s: S| match s {
             S::Failed | S::Inherited => 5,
             S::Running => 4,
@@ -134,12 +137,15 @@ fn aggregate(statuses: impl Iterator<Item = i32>) -> pb::VerificationStatus {
     result.unwrap_or(S::Pending)
 }
 
-#[tonic::async_trait]
+// Handlers return their concrete response types.
+#[allow(refining_impl_trait)]
 impl LanderService for LanderSvc {
     async fn get_trunk_status(
         &self,
-        request: Request<pb::GetTrunkStatusRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetTrunkStatusRequest>,
     ) -> GrpcResult<pb::GetTrunkStatusResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::GetTrunkStatusResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
@@ -152,7 +158,7 @@ impl LanderService for LanderSvc {
             let mut in_flight = Vec::new();
             for queued in ctx.lander.queue().pending(MAX_LIST).await? {
                 in_flight.push(pb::InFlightLanding {
-                    ticket: Some(common::ticket_proto(&queued.record())),
+                    ticket: common::ticket_proto(&queued.record()).into(),
                     version: hash_to_proto(&queued.request.version),
                 });
             }
@@ -181,13 +187,15 @@ impl LanderService for LanderSvc {
             }))
         }
         .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn list_landings(
         &self,
-        request: Request<pb::ListLandingsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListLandingsRequest>,
     ) -> GrpcResult<pb::ListLandingsResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::ListLandingsResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
@@ -214,13 +222,15 @@ impl LanderService for LanderSvc {
             }))
         }
         .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn get_verification(
         &self,
-        request: Request<pb::GetVerificationRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetVerificationRequest>,
     ) -> GrpcResult<pb::GetVerificationResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::GetVerificationResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
@@ -229,17 +239,19 @@ impl LanderService for LanderSvc {
                 return Err(Error::not_found(format!("nothing landed at {seq}")));
             }
             Ok(Response::new(pb::GetVerificationResponse {
-                result: Some(verification_result(&opened.repo, seq).await?),
+                result: verification_result(&opened.repo, seq).await?.into(),
             }))
         }
         .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn report_verification(
         &self,
-        request: Request<pb::ReportVerificationRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ReportVerificationRequest>,
     ) -> GrpcResult<pb::ReportVerificationResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::ReportVerificationResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
@@ -253,8 +265,8 @@ impl LanderService for LanderSvc {
                 if req.target.is_empty() {
                     return Err(Error::invalid("target is required"));
                 }
-                pb::VerificationStatus::try_from(req.status)
-                    .ok()
+                req.status
+                    .as_known()
                     .filter(|s| *s != pb::VerificationStatus::Unspecified)
                     .ok_or_else(|| {
                         Error::invalid(format!("unknown verification status {}", req.status))
@@ -267,7 +279,7 @@ impl LanderService for LanderSvc {
                 });
                 reports.push(Report {
                     target: req.target.clone(),
-                    status: req.status,
+                    status: req.status.to_i32(),
                     reporter: opened.principal().clone(),
                     reported_at: Timestamp::now(),
                     details: req.details.clone(),
@@ -275,17 +287,19 @@ impl LanderService for LanderSvc {
                 });
                 store_reports(ctx, seq, &reports).await?;
                 Ok(Response::new(pb::ReportVerificationResponse {
-                    result: Some(verification_result(ctx, seq).await?),
+                    result: verification_result(ctx, seq).await?.into(),
                 }))
             })
             .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn revert_seq(
         &self,
-        request: Request<pb::RevertSeqRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::RevertSeqRequest>,
     ) -> GrpcResult<pb::RevertSeqResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::RevertSeqResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
@@ -306,51 +320,64 @@ impl LanderService for LanderSvc {
                 .await?;
                 let landing = common::land_event(&opened.repo, outcome.seq, outcome.hash).await?;
                 Ok(Response::new(pb::RevertSeqResponse {
-                    landing: Some(landing),
-                    version: Some(pb::ChangeVersion::from(outcome.version)),
+                    landing: landing.into(),
+                    version: pb::ChangeVersion::from(outcome.version).into(),
                 }))
             })
             .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn get_trunk_health(
         &self,
-        request: Request<pb::GetTrunkHealthRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetTrunkHealthRequest>,
     ) -> GrpcResult<pb::GetTrunkHealthResponse> {
+        let request = Call::new(ctx, request);
         Ok(Response::new(self.trunk_health_impl(request).await?))
     }
 
     async fn list_incidents(
         &self,
-        request: Request<pb::ListIncidentsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListIncidentsRequest>,
     ) -> GrpcResult<pb::ListIncidentsResponse> {
+        let request = Call::new(ctx, request);
         Ok(Response::new(self.incidents_impl(request).await?))
     }
 
     async fn freeze_trunk(
         &self,
-        request: Request<pb::FreezeTrunkRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::FreezeTrunkRequest>,
     ) -> GrpcResult<pb::FreezeTrunkResponse> {
+        let request = Call::new(ctx, request);
         let result = idem::once(&self.state, request, |r| async move {
             self.freeze_impl(r).await.map(Response::new)
         })
         .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn revert_set(
         &self,
-        request: Request<pb::RevertSetRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::RevertSetRequest>,
     ) -> GrpcResult<pb::RevertSetResponse> {
+        let request = Call::new(ctx, request);
         let result = idem::once(&self.state, request, |r| async move {
             self.revert_set_impl(r).await.map(Response::new)
         })
         .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
-    async fn bisect(&self, request: Request<pb::BisectRequest>) -> GrpcResult<pb::BisectResponse> {
+    async fn bisect(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::BisectRequest>,
+    ) -> GrpcResult<pb::BisectResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::BisectResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
@@ -380,6 +407,6 @@ impl LanderService for LanderSvc {
                 }))
             })
             .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 }

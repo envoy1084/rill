@@ -4,7 +4,7 @@
 
 use base64::Engine;
 use rill_identity::keys::KeyServiceConfig;
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_proto::rill::v1::IdentityServiceClient;
 use rill_runtime::config::IdentityConfig;
 use rill_types::Principal;
 
@@ -97,25 +97,24 @@ async fn people_sign_in_through_keycloak_saml() {
     };
     let server = TestServer::start(config).await;
     let root = server.token_for(&Principal::human("root"));
-    let saved =
-        IdentityServiceClient::with_interceptor(connect(&server.grpc).await, Bearer(Some(root)))
-            .put_identity_provider(pb::PutIdentityProviderRequest {
-                operation_id: Bytes::new(),
-                provider: Some(pb::IdentityProviderSpec {
-                    org: "default".into(),
-                    name: "keycloak-saml".into(),
-                    groups_claim: Some("groups".into()),
-                    auto_provision: true,
-                    saml_metadata: Some(metadata),
-                    saml_sp_entity_id: Some("rill-saml".into()),
-                    ..Default::default()
-                }),
-            })
-            .await
-            .unwrap()
-            .into_inner()
-            .provider
-            .unwrap();
+    let saved = IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(root)))
+        .put_identity_provider(pb::PutIdentityProviderRequest {
+            operation_id: Bytes::new(),
+            provider: Some(pb::IdentityProviderSpec {
+                org: "default".into(),
+                name: "keycloak-saml".into(),
+                groups_claim: Some("groups".into()),
+                auto_provision: true,
+                saml_metadata: Some(metadata),
+                saml_sp_entity_id: Some("rill-saml".into()),
+                ..Default::default()
+            }),
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .provider
+        .unwrap();
     assert!(saved.saml);
     assert_eq!(saved.issuer, issuer, "the issuer is the IdP's entity id");
 

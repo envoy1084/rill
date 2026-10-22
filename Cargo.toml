@@ -54,6 +54,16 @@ futures = "0.3.34"
 async-trait = "0.1.92"
 
 # RPC and HTTP
+# The rill.v1 API: ConnectRPC (gRPC, gRPC-web and Connect from one
+# router) with buffa messages. Pre-1.0, so pinned exactly. tonic and prost
+# remain for REAPI, which Bazel speaks as plain gRPC.
+connectrpc = { version = "=0.9.1", features = ["client", "client-tls", "axum"] }
+connectrpc-build = "=0.9.0"
+buffa-codegen = "=0.9.2"
+connectrpc-health = "=0.9.0"
+connectrpc-reflection = "=0.9.0"
+buffa = { version = "=0.9.2", features = ["json"] }
+buffa-types = { version = "=0.9.2", features = ["json"] }
 tonic = { version = "0.14.6", features = ["transport", "codegen", "tls-aws-lc", "tls-native-roots"] }
 tonic-prost = "0.14.6"
 tonic-prost-build = "0.14.6"
@@ -66,6 +76,7 @@ axum = { version = "0.8.9", features = ["http2"] }
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }
 rustls = { version = "0.23.46", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
 rustls-pki-types = { version = "1.15.1", features = ["std"] }
+rustls-native-certs = "0.8.5"
 rcgen = "0.14.10"
 tower = "0.5.3"
 http = "1.5.0"

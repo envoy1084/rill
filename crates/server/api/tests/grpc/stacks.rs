@@ -13,20 +13,21 @@ async fn change_on(c: &mut Clients, base: &Bytes, path: &str) -> (Bytes, Bytes) 
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            base: Some(pb::EditBase {
+            base: (pb::EditBase {
                 base: Some(pb::edit_base::Base::Root(pb::RootSpec {
                     root: Some(pb::root_spec::Root::VersionHash(base.clone())),
                 })),
-            }),
+            })
+            .into(),
             edits: vec![set_edit(path, path.as_bytes())],
             message: format!("add {path}"),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     (resp.version.unwrap().change_id, resp.hash)
 }
 
@@ -94,16 +95,16 @@ async fn change_on_empty(c: &mut Clients) -> (Bytes, Bytes) {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            base: None,
+            base: None.into(),
             edits: vec![set_edit("README", b"r")],
             message: "base".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     (resp.version.unwrap().change_id, resp.hash)
 }
 
@@ -123,8 +124,12 @@ async fn wait_landed(c: &mut Clients, ticket: &str) -> u64 {
             })
             .await
             .unwrap()
-            .into_inner();
-        match pb::LandStatus::try_from(status.ticket.as_ref().unwrap().status).unwrap() {
+            .into_owned();
+        match rill_proto::convert::known::<pb::LandStatus>(
+            status.ticket.as_option().unwrap().status,
+        )
+        .unwrap()
+        {
             pb::LandStatus::Landed => return status.seq.unwrap(),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 panic!("{ticket} did not land: {:?}", status.error)
@@ -151,7 +156,7 @@ async fn a_declared_stack_lands_as_one_group() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .tickets;
     assert_eq!(
         tickets
@@ -190,7 +195,7 @@ async fn landing_the_bottom_alone_restacks_the_rest_onto_it() {
             })
             .await
             .unwrap()
-            .into_inner()
+            .into_owned()
             .review
             .unwrap();
         if state.versions.len() > 1 {

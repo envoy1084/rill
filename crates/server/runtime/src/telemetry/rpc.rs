@@ -69,7 +69,9 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, request: http::Request<B>) -> Self::Future {
+    fn call(&mut self, mut request: http::Request<B>) -> Self::Future {
+        let recorded = RpcCode::default();
+        request.extensions_mut().insert(recorded.clone());
         let clone = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, clone);
         let metrics = self.metrics.clone();
@@ -95,9 +97,10 @@ where
             async move {
                 let started = Instant::now();
                 let outcome = inner.call(request).await;
-                let code = match &outcome {
-                    Ok(response) => grpc_code(response.headers()),
-                    Err(_) => "transport".to_string(),
+                let code = match (&outcome, recorded.get()) {
+                    (Err(_), _) => "transport".to_string(),
+                    (Ok(_), Some(code)) => code,
+                    (Ok(response), None) => grpc_code(response.headers()),
                 };
                 metrics
                     .rpc_duration
@@ -123,6 +126,23 @@ where
             }
             .instrument(span),
         )
+    }
+}
+
+/// Where the RPC stack records a failed call's code (`NotFound`). The
+/// Connect protocol carries it in the body, not a header this layer can
+/// read; gRPC calls that record nothing are read from `grpc-status`.
+#[derive(Clone, Default)]
+pub struct RpcCode(std::sync::Arc<std::sync::OnceLock<String>>);
+
+impl RpcCode {
+    /// Record the call's code; the first one recorded stands.
+    pub fn set(&self, code: impl Into<String>) {
+        let _ = self.0.set(code.into());
+    }
+
+    fn get(&self) -> Option<String> {
+        self.0.get().cloned()
     }
 }
 

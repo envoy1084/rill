@@ -31,15 +31,15 @@ impl RepoClient {
         let request = pb::CreateChangeVersionRequest {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
-            version: Some(pb::ChangeVersion::from(version)),
+            version: pb::ChangeVersion::from(version).into(),
             signatures: signatures.into_iter().map(pb::Signature::from).collect(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.create_change_version(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(hash_from_proto("create_change_version.hash", &resp.hash)?)
     }
 
@@ -70,20 +70,20 @@ impl RepoClient {
         let request = pb::ApplyEditsRequest {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
-            base: Some(base.to_proto()),
+            base: base.to_proto().into(),
             edits: wire,
             message: opts.message,
             intent: opts.intent.as_ref().map(id_to_proto),
-            provenance: Some(pb::Provenance::from(&opts.provenance)),
+            provenance: pb::Provenance::from(&opts.provenance).into(),
             change_id: opts.change_id.as_ref().map(id_to_proto),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.apply_edits(request).await }
         })
         .await?
-        .into_inner();
-        VersionResult::from_parts(&resp.hash, resp.version)
+        .into_owned();
+        VersionResult::from_parts(&resp.hash, resp.version.into_option())
     }
 
     async fn edit_to_proto(&self, edit: Edit) -> Result<pb::Edit> {
@@ -126,12 +126,12 @@ impl RepoClient {
             new_parent: hash_to_proto(&new_parent),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.rebase(request).await }
         })
         .await?
-        .into_inner();
-        VersionResult::from_parts(&resp.hash, resp.version)
+        .into_owned();
+        VersionResult::from_parts(&resp.hash, resp.version.into_option())
     }
 
     /// Merge two versions into a new change.
@@ -160,15 +160,15 @@ impl RepoClient {
             right: hash_to_proto(&right),
             message: opts.message,
             intent: opts.intent.as_ref().map(id_to_proto),
-            provenance: Some(pb::Provenance::from(&opts.provenance)),
+            provenance: pb::Provenance::from(&opts.provenance).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.merge(request).await }
         })
         .await?
-        .into_inner();
-        VersionResult::from_parts(&resp.hash, resp.version)
+        .into_owned();
+        VersionResult::from_parts(&resp.hash, resp.version.into_option())
     }
 
     /// Resolve conflicted paths of a version, producing a new version.
@@ -209,14 +209,14 @@ impl RepoClient {
             repo: self.repo.clone(),
             hash: hash_to_proto(&hash),
             resolutions: wire,
-            provenance: Some(pb::Provenance::from(&provenance)),
+            provenance: pb::Provenance::from(&provenance).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.resolve(request).await }
         })
         .await?
-        .into_inner();
-        VersionResult::from_parts(&resp.hash, resp.version)
+        .into_owned();
+        VersionResult::from_parts(&resp.hash, resp.version.into_option())
     }
 }

@@ -4,15 +4,17 @@ use std::collections::{BTreeMap, VecDeque};
 use std::sync::Mutex;
 
 use bytes::Bytes;
+use connectrpc::{
+    ConnectError, InboundStream, RequestContext, Response, ServiceRequest, ServiceStream,
+};
 use futures::stream::BoxStream;
 use rill_proto::convert::{hash_to_proto, id_to_proto};
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::review_service_server::ReviewService;
+use rill_proto::rill::v1::ReviewService;
 use rill_types::{ChangeId, Principal};
-use tonic::{Request, Response, Status};
 
 use super::fixtures::fake_hash;
-use super::rpc::{unimplemented_rpcs, BoxFut, RpcResult};
+use super::rpc::{unimplemented_rpcs, Request, RpcResult};
 
 /// Review service whose land tickets follow a scripted status sequence.
 #[derive(Default)]
@@ -37,7 +39,7 @@ impl MockReview {
         pb::LandTicket {
             id: id.to_string(),
             change_id,
-            status: status as i32,
+            status: status.into(),
             requested_at: 1,
         }
     }
@@ -46,12 +48,12 @@ impl MockReview {
         pb::ReviewState {
             change_id,
             versions: vec![hash_to_proto(&fake_hash("v1"))],
-            status: pb::ReviewStatus::Open as i32,
+            status: pb::ReviewStatus::Open.into(),
             intent: None,
-            owner: Some(pb::Principal::from(Principal::human("alice"))),
+            owner: (pb::Principal::from(Principal::human("alice"))).into(),
             votes: vec![],
             threads: vec![],
-            risk: pb::RiskClass::Normal as i32,
+            risk: pb::RiskClass::Normal.into(),
             risk_reasons: vec![],
             stack,
             landed_seq: None,
@@ -62,26 +64,29 @@ impl MockReview {
     }
 }
 
-#[tonic::async_trait]
+// The mocks return concrete types.
+#[allow(refining_impl_trait)]
 impl ReviewService for MockReview {
-    type WatchReviewStream = BoxStream<'static, Result<pb::ReviewEvent, Status>>;
-
     async fn submit_for_review(
         &self,
-        req: Request<pb::SubmitForReviewRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::SubmitForReviewRequest>,
     ) -> RpcResult<pb::SubmitForReviewResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
         let id: ChangeId = rill_proto::convert::id_from_proto("change_id", &req.change_id)?;
         self.submitted.lock().unwrap().push(id);
         Ok(Response::new(pb::SubmitForReviewResponse {
-            review: Some(Self::review_state(req.change_id, vec![])),
+            review: Self::review_state(req.change_id, vec![]).into(),
         }))
     }
 
     async fn set_stack(
         &self,
-        req: Request<pb::SetStackRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::SetStackRequest>,
     ) -> RpcResult<pb::SetStackResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
         let ids: Vec<ChangeId> =
             rill_proto::convert::ids_from_proto("change_ids", &req.change_ids)?;
@@ -97,24 +102,29 @@ impl ReviewService for MockReview {
 
     async fn request_land(
         &self,
-        req: Request<pb::RequestLandRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::RequestLandRequest>,
     ) -> RpcResult<pb::RequestLandResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
         let id: ChangeId = rill_proto::convert::id_from_proto("change_id", &req.change_id)?;
         self.land_requests.lock().unwrap().push(id);
         Ok(Response::new(pb::RequestLandResponse {
-            ticket: Some(self.ticket(
+            ticket: (self.ticket(
                 &format!("ticket-{id}"),
                 req.change_id,
                 pb::LandStatus::Queued,
-            )),
+            ))
+            .into(),
         }))
     }
 
     async fn request_land_stack(
         &self,
-        req: Request<pb::RequestLandStackRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::RequestLandStackRequest>,
     ) -> RpcResult<pb::RequestLandStackResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
         let id: ChangeId = rill_proto::convert::id_from_proto("change_id", &req.change_id)?;
         let stack = self
@@ -146,8 +156,10 @@ impl ReviewService for MockReview {
 
     async fn get_land_status(
         &self,
-        req: Request<pb::GetLandStatusRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::GetLandStatusRequest>,
     ) -> RpcResult<pb::GetLandStatusResponse> {
+        let req = Request::new(ctx, req);
         let ticket = req.into_inner().ticket;
         *self.polls.lock().unwrap() += 1;
         let status = {
@@ -163,7 +175,7 @@ impl ReviewService for MockReview {
         Ok(Response::new(pb::GetLandStatusResponse {
             position: None,
             eta_ms: None,
-            ticket: Some(self.ticket(&ticket, change_id, status)),
+            ticket: self.ticket(&ticket, change_id, status).into(),
             seq: landed.then_some(7),
             landed_hash: landed.then(|| hash_to_proto(&fake_hash("landed"))),
             error: (status == pb::LandStatus::Failed).then(|| "boom".to_string()),
@@ -179,6 +191,6 @@ impl ReviewService for MockReview {
         resolve_thread(pb::ResolveThreadRequest) -> pb::ResolveThreadResponse;
         evaluate_submit(pb::EvaluateSubmitRequest) -> pb::EvaluateSubmitResponse;
         abandon(pb::AbandonRequest) -> pb::AbandonResponse;
-        watch_review(pb::WatchReviewRequest) -> Self::WatchReviewStream;
+        watch_review(pb::WatchReviewRequest) -> ServiceStream<pb::ReviewEvent>;
     }
 }

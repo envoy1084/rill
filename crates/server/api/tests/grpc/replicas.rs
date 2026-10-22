@@ -35,11 +35,11 @@ async fn servers_sharing_a_store_serve_any_request() {
     let edit = |path: &str, body: &[u8]| pb::ApplyEditsRequest {
         operation_id: Bytes::new(),
         repo: repo.into(),
-        base: None,
+        base: None.into(),
         edits: vec![set_edit(path, body)],
         message: path.into(),
         intent: None,
-        provenance: None,
+        provenance: None.into(),
         change_id: None,
     };
     let first = ca
@@ -47,7 +47,7 @@ async fn servers_sharing_a_store_serve_any_request() {
         .apply_edits(edit("a.txt", b"needle in a\n"))
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let change_id = first.version.unwrap().change_id;
 
     // Written on one server, landed by whichever holds the lease, and
@@ -60,7 +60,7 @@ async fn servers_sharing_a_store_serve_any_request() {
             .repo
             .grep(pb::GrepRequest {
                 repo: repo.into(),
-                root: Some(trunk()),
+                root: trunk().into(),
                 pattern: "needle".into(),
                 case_insensitive: false,
                 path_globs: vec![],
@@ -69,7 +69,7 @@ async fn servers_sharing_a_store_serve_any_request() {
             })
             .await
             .unwrap()
-            .into_inner()
+            .into_owned()
             .hits;
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].path, "a.txt");
@@ -81,7 +81,7 @@ async fn servers_sharing_a_store_serve_any_request() {
         .apply_edits(edit("b.txt", b"b\n"))
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let change = second.version.unwrap().change_id;
     cb.review
         .submit_for_review(pb::SubmitForReviewRequest {
@@ -101,7 +101,7 @@ async fn servers_sharing_a_store_serve_any_request() {
         .unwrap();
     let review = cb.review.clone();
     eventually("the other server enforces the new policy", || {
-        let mut review = review.clone();
+        let review = review.clone();
         let change = change.clone();
         async move {
             let decision = review
@@ -111,7 +111,7 @@ async fn servers_sharing_a_store_serve_any_request() {
                 })
                 .await
                 .unwrap()
-                .into_inner()
+                .into_owned()
                 .decision
                 .unwrap();
             !decision.allowed

@@ -10,18 +10,18 @@ use rill_types::{
     ChangeId, ChangeVersionHash, GroupMode, Line, RefName, RepoPathBuf, ReviewState, ReviewStatus,
     RiskClass,
 };
-use tonic::Request;
 
 use super::reviews::change_id;
 use super::ReviewSvc;
 use crate::services::budget;
 use crate::services::common::{self, open, Opened};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 impl ReviewSvc {
     pub(super) async fn request_land_impl(
         &self,
-        request: Request<pb::RequestLandRequest>,
+        request: Call<pb::RequestLandRequest>,
     ) -> Result<pb::RequestLandResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().land().await?;
@@ -35,13 +35,13 @@ impl ReviewSvc {
             .await?;
         let (proto, _) = common::ticket_status(&opened.repo, ticket).await?;
         Ok(pb::RequestLandResponse {
-            ticket: Some(proto),
+            ticket: proto.into(),
         })
     }
 
     pub(super) async fn request_land_stack_impl(
         &self,
-        request: Request<pb::RequestLandStackRequest>,
+        request: Call<pb::RequestLandStackRequest>,
     ) -> Result<pb::RequestLandStackResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().land().await?;
@@ -98,7 +98,7 @@ impl ReviewSvc {
 
     pub(super) async fn get_land_status_impl(
         &self,
-        request: Request<pb::GetLandStatusRequest>,
+        request: Call<pb::GetLandStatusRequest>,
     ) -> Result<pb::GetLandStatusResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
@@ -140,7 +140,7 @@ impl ReviewSvc {
             None
         };
         Ok(pb::GetLandStatusResponse {
-            ticket: Some(proto),
+            ticket: proto.into(),
             seq,
             landed_hash,
             error,
@@ -220,5 +220,5 @@ fn land_request(
 }
 
 fn status_is_queued(ticket: &pb::LandTicket) -> bool {
-    ticket.status == pb::LandStatus::Queued as i32
+    ticket.status == pb::LandStatus::Queued
 }

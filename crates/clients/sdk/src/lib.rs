@@ -48,6 +48,7 @@ pub use admin::AdminClient;
 pub use audit::AuditClient;
 pub use client::Client;
 pub use config::{ClientConfig, SessionConfig, TlsOptions};
+pub use connectrpc::ErrorCode as Code;
 pub use error::{Error, Result};
 pub use intent::IntentClient;
 pub use lander::LanderClient;
@@ -56,7 +57,6 @@ pub use repo::{RepoClient, WatchStart};
 pub use review::ReviewClient;
 pub use stack::{Backoff, StackClient};
 pub use stream::EventStream;
-pub use tonic::Code;
 pub use types::*;
 pub use workspace::WorkspaceClient;
 

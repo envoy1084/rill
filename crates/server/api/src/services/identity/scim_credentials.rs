@@ -5,9 +5,9 @@ use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::identity::ScimCredential;
 use rill_types::Timestamp;
-use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -27,7 +27,7 @@ fn info(c: &ScimCredential) -> pb::ScimCredentialInfo {
     pb::ScimCredentialInfo {
         org: c.org.clone(),
         id: c.id.clone(),
-        created_by: Some(pb::Principal::from(&c.created_by)),
+        created_by: pb::Principal::from(&c.created_by).into(),
         created_at: timestamp_to_proto(c.created_at),
         revoked_at: c.revoked_at.map(timestamp_to_proto),
     }
@@ -35,7 +35,7 @@ fn info(c: &ScimCredential) -> pb::ScimCredentialInfo {
 
 pub async fn create(
     state: &AppState,
-    request: Request<pb::CreateScimCredentialRequest>,
+    request: Call<pb::CreateScimCredentialRequest>,
 ) -> Result<pb::CreateScimCredentialResponse> {
     let ctx = caller(&request)?;
     let org = request.into_inner().org;
@@ -61,14 +61,14 @@ pub async fn create(
         .await?;
     tracing::info!(by = %ctx.principal, org = %credential.org, credential = %id, "SCIM credential created");
     Ok(pb::CreateScimCredentialResponse {
-        credential: Some(info(&credential)),
+        credential: info(&credential).into(),
         token: format!("{TOKEN_PREFIX}{id}.{secret}"),
     })
 }
 
 pub async fn list(
     state: &AppState,
-    request: Request<pb::ListScimCredentialsRequest>,
+    request: Call<pb::ListScimCredentialsRequest>,
 ) -> Result<pb::ListScimCredentialsResponse> {
     let ctx = caller(&request)?;
     let org = request.into_inner().org;
@@ -81,7 +81,7 @@ pub async fn list(
 
 pub async fn revoke(
     state: &AppState,
-    request: Request<pb::RevokeScimCredentialRequest>,
+    request: Call<pb::RevokeScimCredentialRequest>,
 ) -> Result<pb::RevokeScimCredentialResponse> {
     let ctx = caller(&request)?;
     let req = request.into_inner();

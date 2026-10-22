@@ -42,19 +42,19 @@ pub struct TargetArg {
 /// Run a quarantine subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
     let repo = ctx.repo_name()?;
-    let mut svc = ctx.client()?.checks_svc();
+    let svc = ctx.client()?.checks_svc();
     match cmd {
         QuarantineCmd::List => {
             let targets = svc
                 .list_quarantined(pb::ListQuarantinedRequest { repo })
                 .await?
-                .into_inner()
+                .into_owned()
                 .targets;
             ctx.emit(
                 j!({ "targets": targets.iter().map(|t| j!({
                     "target": t.target,
                     "since": t.since,
-                    "by": t.by.as_ref().map(|p| p.name.clone()),
+                    "by": t.by.as_option().map(|p| p.name.clone()),
                     "reason": t.reason,
                     "intent": t.intent.as_ref().map(hex::encode),
                 })).collect::<Vec<_>>() }),
@@ -64,7 +64,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
                         table.row(vec![
                             t.target.clone(),
                             when(&Timestamp::from_millis(t.since)),
-                            t.by.as_ref().map(|p| p.name.clone()).unwrap_or_default(),
+                            t.by.as_option().map(|p| p.name.clone()).unwrap_or_default(),
                             t.reason.clone(),
                         ]);
                     }
@@ -81,7 +81,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
                     reason: args.reason,
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .added;
             ctx.emit(j!({ "target": args.target, "added": added }), |out| {
                 out.line(match added {
@@ -98,7 +98,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
                     target: args.target.clone(),
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .released;
             ctx.emit(j!({ "target": args.target, "released": released }), |out| {
                 out.line(match released {

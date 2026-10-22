@@ -189,10 +189,10 @@ async fn no_token_means_no_header_and_status_codes_survive() {
     assert_eq!(h.repo.auth_headers.lock().unwrap().as_slice(), &[None]);
 
     let err = h.client.repo("missing").info().await.unwrap_err();
-    assert_eq!(err.code(), Some(tonic::Code::NotFound));
+    assert_eq!(err.code(), Some(rill_sdk::Code::NotFound));
 
     let err = h.client.repo("main").list_refs(None).await.unwrap_err();
-    assert_eq!(err.code(), Some(tonic::Code::Unimplemented));
+    assert_eq!(err.code(), Some(rill_sdk::Code::Unimplemented));
 }
 
 #[tokio::test]

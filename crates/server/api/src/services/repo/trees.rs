@@ -9,12 +9,14 @@ use rill_proto::convert::{hash_from_proto, hash_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_store::ObjectStore;
 use rill_types::{ContentRef, ObjectKind, RepoPathBuf};
-use tonic::{Status, Streaming};
 
 use super::RepoSvc;
 use crate::grants::{self, GrantBuilder};
+use crate::services::call::next_message;
 use crate::services::common::{hash, open, path, resolve_root};
 use crate::services::diff::{file_diffs, DiffOptions};
+use crate::services::Call;
+use connectrpc::{ConnectError, InboundStream};
 use rill_runtime::error::{Error, Result};
 
 /// Size of each `GetBlob` chunk.
@@ -22,12 +24,12 @@ pub const BLOB_CHUNK: usize = 256 * 1024;
 
 /// Server stream of blob chunks.
 pub type BlobStream =
-    Pin<Box<dyn Stream<Item = std::result::Result<pb::BlobChunk, Status>> + Send>>;
+    Pin<Box<dyn Stream<Item = std::result::Result<pb::BlobChunk, ConnectError>> + Send>>;
 
 impl RepoSvc {
     pub(super) async fn get_tree_impl(
         &self,
-        request: tonic::Request<pb::GetTreeRequest>,
+        request: Call<pb::GetTreeRequest>,
     ) -> Result<pb::GetTreeResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -44,14 +46,14 @@ impl RepoSvc {
             }
         }
         Ok(pb::GetTreeResponse {
-            tree: Some(pb::Tree::from(&*tree)),
+            tree: pb::Tree::from(&*tree).into(),
             read_grant: grant.sign(&opened)?,
         })
     }
 
     pub(super) async fn list_dir_impl(
         &self,
-        request: tonic::Request<pb::ListDirRequest>,
+        request: Call<pb::ListDirRequest>,
     ) -> Result<pb::ListDirResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -61,7 +63,7 @@ impl RepoSvc {
             opened.permit().read(&path).await?;
         }
         let ctx = &opened.repo;
-        let resolved = resolve_root(ctx, req.root.as_ref()).await?;
+        let resolved = resolve_root(ctx, req.root.as_option()).await?;
         let dir = ctx
             .trees
             .dir_hash(resolved.root, &path)
@@ -95,7 +97,7 @@ impl RepoSvc {
             };
             entries.push(pb::NamedTreeEntry {
                 name,
-                entry: Some(pb::TreeEntry::from(rill_types::TreeEntry { kind })),
+                entry: (pb::TreeEntry::from(rill_types::TreeEntry { kind })).into(),
             });
         }
         Ok(pb::ListDirResponse {
@@ -107,27 +109,27 @@ impl RepoSvc {
 
     pub(super) async fn resolve_path_impl(
         &self,
-        request: tonic::Request<pb::ResolvePathRequest>,
+        request: Call<pb::ResolvePathRequest>,
     ) -> Result<pb::ResolvePathResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
         let path = path("path", &req.path)?;
         opened.permit().read(&path).await?;
-        let resolved = resolve_root(&opened.repo, req.root.as_ref()).await?;
+        let resolved = resolve_root(&opened.repo, req.root.as_option()).await?;
         let entry = opened.repo.trees.lookup(resolved.root, &path).await?;
         let mut grant = GrantBuilder::new(opened.permit().read_filter().await?);
         if let Some(kind) = &entry {
             grant_entry(&mut grant, kind, &path);
         }
         Ok(pb::ResolvePathResponse {
-            entry: entry.map(|kind| pb::TreeEntry::from(rill_types::TreeEntry { kind })),
+            entry: (entry.map(|kind| pb::TreeEntry::from(rill_types::TreeEntry { kind }))).into(),
             read_grant: grant.sign(&opened)?,
         })
     }
 
     pub(super) async fn get_blob_impl(
         &self,
-        request: tonic::Request<pb::GetBlobRequest>,
+        request: Call<pb::GetBlobRequest>,
     ) -> Result<BlobStream> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -152,7 +154,7 @@ impl RepoSvc {
         // so a large file is never held whole.
         let parts = content_parts(objects, &content, offset, length).await?;
         let chunks = parts.flat_map(|part| {
-            let pieces: Vec<std::result::Result<pb::BlobChunk, Status>> = match part {
+            let pieces: Vec<std::result::Result<pb::BlobChunk, ConnectError>> = match part {
                 Ok(part) => (0..part.len())
                     .step_by(BLOB_CHUNK)
                     .map(|start| {
@@ -161,7 +163,7 @@ impl RepoSvc {
                         })
                     })
                     .collect(),
-                Err(e) => vec![Err(Status::from(Error::from(e)))],
+                Err(e) => vec![Err(ConnectError::from(Error::from(e)))],
             };
             futures::stream::iter(pieces)
         });
@@ -170,13 +172,13 @@ impl RepoSvc {
 
     pub(super) async fn put_blob_impl(
         &self,
-        request: tonic::Request<Streaming<pb::PutBlobRequest>>,
+        request: Call<InboundStream<pb::PutBlobRequest>>,
     ) -> Result<pb::PutBlobResponse> {
         let ctx = crate::auth::caller(&request)?;
         let mut stream = request.into_inner();
         // The header comes first, so permission is checked before any data
         // is accepted.
-        let header = match stream.message().await? {
+        let header = match next_message(&mut stream).await? {
             Some(pb::PutBlobRequest {
                 msg: Some(pb::put_blob_request::Msg::Header(h)),
             }) => h,
@@ -188,7 +190,7 @@ impl RepoSvc {
         opened.permit().write_any().await?;
 
         let parts = futures::stream::unfold(stream, |mut stream| async move {
-            match stream.message().await {
+            match next_message(&mut stream).await {
                 Ok(Some(pb::PutBlobRequest {
                     msg: Some(pb::put_blob_request::Msg::Data(data)),
                 })) => Some((Ok(data), stream)),
@@ -201,7 +203,7 @@ impl RepoSvc {
                 Ok(Some(pb::PutBlobRequest { msg: None })) => Some((Ok(Bytes::new()), stream)),
                 Ok(None) => None,
                 Err(status) => Some((
-                    Err(rill_core::Error::Upload(status.message().to_string())),
+                    Err(rill_core::Error::Upload(status.message.unwrap_or_default())),
                     stream,
                 )),
             }
@@ -228,13 +230,13 @@ impl RepoSvc {
             }
         }
         Ok(pb::PutBlobResponse {
-            content: Some(pb::ContentRef::from(stored.content)),
+            content: pb::ContentRef::from(stored.content).into(),
         })
     }
 
     pub(super) async fn has_objects_impl(
         &self,
-        request: tonic::Request<pb::HasObjectsRequest>,
+        request: Call<pb::HasObjectsRequest>,
     ) -> Result<pb::HasObjectsResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -242,8 +244,9 @@ impl RepoSvc {
         opened.permit().write_any().await?;
         let mut items = Vec::with_capacity(req.objects.len());
         for o in &req.objects {
-            let kind = pb::ObjectKind::try_from(o.kind)
-                .ok()
+            let kind = o
+                .kind
+                .as_known()
                 .and_then(|k| ObjectKind::from_u8(k as u8))
                 .ok_or_else(|| Error::invalid(format!("unknown object kind {}", o.kind)))?;
             items.push((kind, hash_from_proto("objects.hash", &o.hash)?));
@@ -254,14 +257,14 @@ impl RepoSvc {
 
     pub(super) async fn diff_impl(
         &self,
-        request: tonic::Request<pb::DiffRequest>,
+        request: Call<pb::DiffRequest>,
     ) -> Result<pb::DiffResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
         let filter = opened.permit().read_any().await?;
         let ctx = &opened.repo;
-        let base = resolve_root(ctx, req.base.as_ref()).await?;
-        let target = resolve_root(ctx, req.target.as_ref()).await?;
+        let base = resolve_root(ctx, req.base.as_option()).await?;
+        let target = resolve_root(ctx, req.target.as_option()).await?;
         let target_cv = match target.version {
             Some(v) => Some(ctx.derive.change(&v).await?),
             None => None,
@@ -292,7 +295,7 @@ impl RepoSvc {
 
     pub(super) async fn merge_base_impl(
         &self,
-        request: tonic::Request<pb::MergeBaseRequest>,
+        request: Call<pb::MergeBaseRequest>,
     ) -> Result<pb::MergeBaseResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -307,7 +310,7 @@ impl RepoSvc {
 
     pub(super) async fn is_ancestor_impl(
         &self,
-        request: tonic::Request<pb::IsAncestorRequest>,
+        request: Call<pb::IsAncestorRequest>,
     ) -> Result<pb::IsAncestorResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -370,10 +373,14 @@ pub(crate) fn grant_diffs(grant: &mut GrantBuilder, files: &[pb::FileDiff]) {
         let Ok(path) = RepoPathBuf::new(file.path.as_str()) else {
             continue;
         };
-        for state in [&file.before, &file.after].into_iter().flatten() {
+        for state in [&file.before, &file.after]
+            .into_iter()
+            .filter_map(|s| s.as_option())
+        {
             if let Some(content) = state
                 .content
                 .clone()
+                .into_option()
                 .and_then(|c| ContentRef::try_from(c).ok())
             {
                 grant.content(&content, &path);

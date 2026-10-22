@@ -108,7 +108,7 @@ flowchart LR
   `ArcSwap`). `rill-exec` reaches the lander the same way, through the
   `Verifier` trait (`ExecVerifier`).
 - Layering is strict: lower crates never depend on higher ones, no crate
-  below `rill-proto` depends on tonic, and only `rill-api` depends on
+  below `rill-proto` depends on the RPC stack, and only `rill-api` depends on
   axum. See [crates and layering](crates-and-layering.md).
 
 **Search**

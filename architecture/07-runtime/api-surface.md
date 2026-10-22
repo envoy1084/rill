@@ -1,36 +1,46 @@
 # API surface
 
-The server exposes two wire surfaces. The first is the `rill.v1` gRPC
-package, generated from protobuf in `rill-proto`. The second is a small HTTP
-protocol for content-addressed objects that a cache or CDN can sit in front
-of. `rill-proto` also holds the conversions between wire messages and
-`rill-types`, so no crate below it depends on tonic or prost.
+The server exposes two wire surfaces. The first is the `rill.v1` package,
+generated from protobuf in `rill-proto` and served over the Connect
+protocol, gRPC and gRPC-web from the same handlers. The second is a small
+HTTP protocol for content-addressed objects that a cache or CDN can sit in
+front of. `rill-proto` also holds the conversions between wire messages and
+`rill-types`, so no crate below it depends on the protobuf runtime.
 
 ## Build
 
 ```mermaid
 flowchart LR
     P[proto/rill/v1/*.proto] -->|protox| FDS[FileDescriptorSet]
-    FDS -->|tonic-prost-build| Gen[rill::v1 messages, servers, clients]
+    FDS -->|connectrpc-build, buffa| Gen[rill::v1 messages, service traits, clients]
     FDS -->|include_bytes| Refl[FILE_DESCRIPTOR_SET]
     T[rill-types] <-->|convert| Gen
     Gen --> S[rill-api]
     Gen --> C[rill-sdk]
 ```
 
-`build.rs` compiles the nine `.proto` files with `protox`, so no `protoc`
-binary is needed. It writes the descriptor set that
-`rill_proto::FILE_DESCRIPTOR_SET` embeds for gRPC reflection. It configures
-`.btree_map(".rill.v1")` and `.bytes(".rill.v1")`, so maps are ordered and
-byte fields are `bytes::Bytes`, as in `rill-types`. It generates both server
-and client stubs.
+`build.rs` compiles the `.proto` files with `protox`, so no `protoc` binary
+is needed, and hands the descriptor set to `connectrpc-build` (ADR 017),
+which generates buffa messages, a trait per service and a client per
+service. `rill_proto::FILE_DESCRIPTOR_SET` embeds the set for reflection and
+`rill_proto::SERVICES` names every service. Byte fields are `bytes::Bytes`,
+maps are ordered and oneof variants are stored inline, as in `rill-types`;
+an optional sub-message is a `MessageField` and an enum an `EnumValue`
+(`rill_proto::convert::known` reads one). Each message's oneofs are under
+its name (`pb::event::Kind`). Unknown fields are dropped.
 
-## gRPC services
+## Services
 
-The server registers the Rill services and the REAPI services behind `AuthLayer`
-([server](server.md#request-path)) and `SessionService`, which signs callers
-in, without it. It also registers `tonic-reflection` and
-`tonic-health`, which report every service as serving.
+One axum router serves the API listener. The Rill services sit in a
+`connectrpc` router behind two interceptors: `RecordCodes`, which records a
+failed call's code for the RPC metrics, and `AuthInterceptor`, which
+resolves the caller ([server](server.md#request-path)) and refuses a bad
+token in whichever protocol the client spoke; `SessionService`, health
+(`grpc.health.v1`, every service serving until the server drains) and
+reflection need no token. REAPI's tonic services are mounted on the same
+router behind the tower `AuthLayer`. Handlers implement the generated
+traits; each takes the call into a `Call<T>` (the owned message and the
+request context) before its body runs.
 
 | Service | Proto | Handler | Covers |
 | --- | --- | --- | --- |
@@ -175,14 +185,15 @@ precondition), 409 (already exists or aborted), 503, and 500 for the rest.
 
 ## Input limits
 
-Every input is bounded. Exceeding a gRPC limit answers `OUT_OF_RANGE`
-(message size) or `INVALID_ARGUMENT`; exceeding an HTTP limit answers 413.
+Every input is bounded. A request over the size limit answers
+`RESOURCE_EXHAUSTED`, a bad value `INVALID_ARGUMENT`; exceeding an object
+HTTP limit answers 413.
 
 | Limit | Value | Where |
 | --- | --- | --- |
-| gRPC request message | 16 MiB | `serve.rs` `MAX_REQUEST_BYTES`, every service |
-| gRPC response message | 64 MiB | `MAX_RESPONSE_BYTES` |
-| Requests in flight per connection | 1024 | `MAX_CONCURRENT_PER_CONNECTION` |
+| Request body and message | 16 MiB | `serve.rs` `MAX_REQUEST_BYTES`, every service |
+| REAPI response message | 64 MiB | `MAX_RESPONSE_BYTES` |
+| Streams per HTTP/2 connection (TLS) | 1024 | `MAX_CONCURRENT_PER_CONNECTION` |
 | Paths changed by one version | 100,000 | `limits.rs` `MAX_FILES_PER_CHANGE`; also edits per `ApplyEdits`, checked before any work |
 | Encoded version | 8 MiB | `MAX_CHANGE_BYTES` |
 | Version message | 64 KiB | `MAX_MESSAGE_BYTES` |
@@ -198,10 +209,10 @@ Every input is bounded. Exceeding a gRPC limit answers `OUT_OF_RANGE`
 
 ### Rate limits
 
-Every authenticated request, gRPC or object HTTP, is counted against its
+Every authenticated request, API or object HTTP, is counted against its
 principal's token bucket (`auth/rate.rs`, a keyed GCRA limiter from
 `governor`): `[rate_limit] per_principal_per_sec` (1000; 0 turns it off)
-refilling a bucket of `burst` (2000). Past it, gRPC answers
+refilling a bucket of `burst` (2000). Past it, the API answers
 `RESOURCE_EXHAUSTED` and HTTP 429, both with `retry-after` in seconds.
 Buckets are per server and idle ones are dropped every minute. A
 registered agent's `requests_per_minute` budget is a second bucket of that

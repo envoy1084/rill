@@ -36,7 +36,7 @@ impl From<&Principal> for pb::Principal {
     fn from(p: &Principal) -> Self {
         pb::Principal {
             id: id_to_proto(&p.id),
-            kind: pb::PrincipalKind::from(p.kind) as i32,
+            kind: pb::PrincipalKind::from(p.kind).into(),
             name: p.name.clone(),
             identity: p.identity.clone(),
         }
@@ -70,7 +70,7 @@ impl From<&Provenance> for pb::Provenance {
             model: p.model.clone(),
             session: p.session.clone(),
             prompt_ref: p.prompt_ref.clone(),
-            sponsor: p.sponsor.as_ref().map(pb::Principal::from),
+            sponsor: p.sponsor.as_ref().map(pb::Principal::from).into(),
             resolved_by: p.resolved_by.clone(),
             extra: p.extra.clone(),
         }
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn principal_rejects_unspecified_kind() {
         let mut wire = pb::Principal::from(Principal::human("a"));
-        wire.kind = 0;
+        wire.kind = 0.into();
         assert!(matches!(
             Principal::try_from(wire),
             Err(ConvertError::BadEnum {

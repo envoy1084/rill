@@ -86,8 +86,8 @@ fn record_json(r: &pb::RedactionRecord) -> serde_json::Value {
         "org": r.org,
         "hash": hex::encode(&r.hash),
         "reason": r.reason,
-        "requested_by": r.requested_by.as_ref().map(|p| p.name.clone()),
-        "approved_by": r.approved_by.as_ref().map(|p| p.name.clone()),
+        "requested_by": r.requested_by.as_option().map(|p| p.name.clone()),
+        "approved_by": r.approved_by.as_option().map(|p| p.name.clone()),
         "applied_at": r.applied_at,
     })
 }
@@ -110,7 +110,7 @@ fn show(ctx: &mut Ctx<'_>, record: Option<pb::RedactionRecord>) -> Result<()> {
 
 /// Run a protection subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
-    let mut svc = ctx.client()?.protection_svc();
+    let svc = ctx.client()?.protection_svc();
     match cmd {
         ProtectCmd::Redact(a) => {
             let kind: ObjectKind = a
@@ -121,13 +121,13 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
                 .request_redaction(pb::RequestRedactionRequest {
                     operation_id: Default::default(),
                     org: a.org.org,
-                    kind: kind as i32,
+                    kind: (kind as i32).into(),
                     hash: hash(&a.hash)?.as_bytes().to_vec().into(),
                     reason: a.reason,
                 })
                 .await?
-                .into_inner();
-            show(ctx, response.redaction)
+                .into_owned();
+            show(ctx, response.redaction.into_option())
         }
         ProtectCmd::Approve(a) => {
             let response = svc
@@ -137,14 +137,14 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
                     id: a.id,
                 })
                 .await?
-                .into_inner();
-            show(ctx, response.redaction)
+                .into_owned();
+            show(ctx, response.redaction.into_option())
         }
         ProtectCmd::Redactions(o) => {
             let list = svc
                 .list_redactions(pb::ListRedactionsRequest { org: o.org })
                 .await?
-                .into_inner()
+                .into_owned()
                 .redactions;
             ctx.emit(
                 j!({ "redactions": list.iter().map(record_json).collect::<Vec<_>>() }),
@@ -156,7 +156,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
                             r.id.clone(),
                             hex::encode(&r.hash),
                             r.requested_by
-                                .as_ref()
+                                .as_option()
                                 .map(|p| p.name.clone())
                                 .unwrap_or_default(),
                             r.applied_at
@@ -189,7 +189,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
                     rewrap: a.rewrap,
                 })
                 .await?
-                .into_inner();
+                .into_owned();
             ctx.emit(
                 j!({ "key_id": response.key_id, "active_from": response.active_from, "rewrapped": response.rewrapped }),
                 |out| match (a.rewrap, response.key_id) {

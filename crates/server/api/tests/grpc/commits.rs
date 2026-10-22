@@ -5,7 +5,7 @@ use super::*;
 #[tokio::test]
 async fn commits_enforce_path_rules() {
     let server = TestServer::start(dev_config()).await;
-    let mut c = clients(&server, None).await;
+    let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
             operation_id: Bytes::new(),
@@ -16,27 +16,27 @@ async fn commits_enforce_path_rules() {
         .await
         .unwrap();
     let edit = |path: &'static str| {
-        let mut repo = c.repo.clone();
+        let repo = c.repo.clone();
         async move {
             repo.apply_edits(pb::ApplyEditsRequest {
                 operation_id: Bytes::new(),
                 repo: "win".into(),
-                base: None,
+                base: None.into(),
                 edits: vec![set_edit(path, b"x\n")],
                 message: path.into(),
                 intent: None,
-                provenance: None,
+                provenance: None.into(),
                 change_id: None,
             })
             .await
         }
     };
     assert_eq!(
-        edit("src/CON.txt").await.unwrap_err().code(),
+        edit("src/CON.txt").await.unwrap_err().code,
         Code::InvalidArgument
     );
     assert_eq!(
-        edit(".rill/checkout.toml").await.unwrap_err().code(),
+        edit(".rill/checkout.toml").await.unwrap_err().code,
         Code::InvalidArgument
     );
     edit("README.md").await.unwrap();
@@ -45,21 +45,21 @@ async fn commits_enforce_path_rules() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "win".into(),
-            base: None,
+            base: None.into(),
             edits: vec![set_edit("README.md", b"x\n"), set_edit("readme.md", b"y\n")],
             message: "case".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await;
-    assert_eq!(first.unwrap_err().code(), Code::InvalidArgument);
+    assert_eq!(first.unwrap_err().code, Code::InvalidArgument);
 }
 
 #[tokio::test]
 async fn server_stamps_authorship_and_attests_commits() {
     let server = TestServer::start(dev_config()).await;
-    let mut c = clients(&server, None).await;
+    let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
             operation_id: Bytes::new(),
@@ -102,12 +102,12 @@ async fn server_stamps_authorship_and_attests_commits() {
         .create_change_version(pb::CreateChangeVersionRequest {
             operation_id: Bytes::new(),
             repo: "auth".into(),
-            version: Some(pb::ChangeVersion::from(claimed)),
+            version: pb::ChangeVersion::from(claimed).into(),
             signatures: Vec::new(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
 
     let got = c
         .repo
@@ -117,7 +117,7 @@ async fn server_stamps_authorship_and_attests_commits() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let stored = rill_types::ChangeVersion::try_from(got.version.unwrap()).unwrap();
     assert_eq!(stored.author.name, "dev");
     assert!(stored.created_at.millis() > 1);
@@ -139,7 +139,7 @@ async fn server_stamps_authorship_and_attests_commits() {
         .health(pb::HealthRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let attestation = got
         .signatures
         .into_iter()

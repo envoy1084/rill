@@ -1,37 +1,101 @@
-//! Authenticated gRPC clients for every service.
+//! Authenticated clients for every service.
 
-use std::time::Duration;
-
-use rill_proto::rill::v1::access_service_client::AccessServiceClient;
-use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
-use rill_proto::rill::v1::audit_service_client::AuditServiceClient;
-use rill_proto::rill::v1::protection_service_client::ProtectionServiceClient;
-use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
-use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
-use rill_proto::rill::v1::secret_service_client::SecretServiceClient;
-use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
-use tonic::metadata::MetadataValue;
-use tonic::service::interceptor::InterceptedService;
-use tonic::service::Interceptor;
-use tonic::transport::Channel;
-use tonic::{Request, Status};
+use connectrpc::client::{ClientConfig, HttpClient};
+use rill_proto::rill::v1::{
+    AccessServiceClient, AdminServiceClient, AuditServiceClient, ChecksServiceClient,
+    IdentityServiceClient, IntentServiceClient, LanderServiceClient, ProtectionServiceClient,
+    RepoServiceClient, ReviewServiceClient, SecretServiceClient, SessionServiceClient,
+    WorkspaceServiceClient,
+};
 
 use super::server::TestServer;
 
+/// The bearer token a client sends, if any.
 #[derive(Clone)]
 pub(crate) struct Bearer(pub(crate) Option<String>);
 
-impl Interceptor for Bearer {
-    fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
+/// The transport every test client runs over.
+pub(crate) type Svc = HttpClient;
+
+/// A server endpoint to build clients against.
+#[derive(Clone)]
+pub(crate) struct Conn {
+    http: HttpClient,
+    uri: http::Uri,
+}
+
+/// A connection to `endpoint` (opened by the first call).
+pub(crate) async fn connect(endpoint: &str) -> Conn {
+    Conn {
+        http: HttpClient::plaintext_http2_only(),
+        uri: endpoint.parse().expect("test endpoints are valid"),
+    }
+}
+
+/// A raw gRPC channel to `endpoint`, for calling any RPC by name.
+pub(crate) async fn channel(endpoint: &str) -> tonic::transport::Channel {
+    tonic::transport::Channel::from_shared(endpoint.to_string())
+        .unwrap()
+        .connect()
+        .await
+        .unwrap()
+}
+
+/// Sends a bearer token on REAPI (tonic) calls.
+#[derive(Clone)]
+pub(crate) struct ReapiBearer(pub(crate) Option<String>);
+
+impl tonic::service::Interceptor for ReapiBearer {
+    fn call(
+        &mut self,
+        mut request: tonic::Request<()>,
+    ) -> Result<tonic::Request<()>, tonic::Status> {
         if let Some(token) = &self.0 {
-            let value = MetadataValue::try_from(format!("Bearer {token}")).unwrap();
+            let value = format!("Bearer {token}").parse().unwrap();
             request.metadata_mut().insert("authorization", value);
         }
         Ok(request)
     }
 }
 
-pub(crate) type Svc = InterceptedService<Channel, Bearer>;
+/// The transport REAPI test clients run over.
+pub(crate) type ReapiSvc =
+    tonic::service::interceptor::InterceptedService<tonic::transport::Channel, ReapiBearer>;
+
+/// A generated client that sends `bearer` on every call.
+pub(crate) trait Authed: Sized {
+    fn authed(conn: Conn, bearer: Bearer) -> Self;
+}
+
+macro_rules! authed {
+    ($($client:ident),* $(,)?) => {
+        $(impl Authed for $client<Svc> {
+            fn authed(conn: Conn, bearer: Bearer) -> Self {
+                let mut config = ClientConfig::new(conn.uri);
+                if let Some(token) = bearer.0 {
+                    config = config.with_default_header("authorization", format!("Bearer {token}"));
+                }
+                $client::new(conn.http, config)
+            }
+        })*
+    };
+}
+
+authed!(
+    AccessServiceClient,
+    AdminServiceClient,
+    AuditServiceClient,
+    ChecksServiceClient,
+    IdentityServiceClient,
+    IntentServiceClient,
+    LanderServiceClient,
+    ProtectionServiceClient,
+    RepoServiceClient,
+    ReviewServiceClient,
+    SecretServiceClient,
+    SessionServiceClient,
+    WorkspaceServiceClient,
+);
 
 pub(crate) struct Clients {
     pub(crate) repo: RepoServiceClient<Svc>,
@@ -48,36 +112,47 @@ pub(crate) async fn clients(server: &TestServer, token: Option<&str>) -> Clients
     clients_at(&server.grpc, token).await
 }
 
-/// A channel to `endpoint`, retried while the server starts.
-pub(crate) async fn connect(endpoint: &str) -> Channel {
-    let mut last = None;
-    for _ in 0..50 {
-        match Channel::from_shared(endpoint.to_string())
-            .unwrap()
-            .connect()
-            .await
-        {
-            Ok(c) => return c,
-            Err(e) => {
-                last = Some(e);
-                tokio::time::sleep(Duration::from_millis(50)).await;
-            }
-        }
-    }
-    panic!("could not connect to {endpoint}: {last:?}");
-}
-
 pub(crate) async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
     let channel = connect(endpoint).await;
     let bearer = Bearer(token.map(str::to_owned));
     Clients {
-        repo: RepoServiceClient::with_interceptor(channel.clone(), bearer.clone()),
-        access: AccessServiceClient::with_interceptor(channel.clone(), bearer.clone()),
-        audit: AuditServiceClient::with_interceptor(channel.clone(), bearer.clone()),
-        protection: ProtectionServiceClient::with_interceptor(channel.clone(), bearer.clone()),
-        workspace: WorkspaceServiceClient::with_interceptor(channel.clone(), bearer.clone()),
-        review: ReviewServiceClient::with_interceptor(channel.clone(), bearer.clone()),
-        admin: AdminServiceClient::with_interceptor(channel.clone(), bearer.clone()),
-        secrets: SecretServiceClient::with_interceptor(channel, bearer),
+        repo: RepoServiceClient::authed(channel.clone(), bearer.clone()),
+        access: AccessServiceClient::authed(channel.clone(), bearer.clone()),
+        audit: AuditServiceClient::authed(channel.clone(), bearer.clone()),
+        protection: ProtectionServiceClient::authed(channel.clone(), bearer.clone()),
+        workspace: WorkspaceServiceClient::authed(channel.clone(), bearer.clone()),
+        review: ReviewServiceClient::authed(channel.clone(), bearer.clone()),
+        admin: AdminServiceClient::authed(channel.clone(), bearer.clone()),
+        secrets: SecretServiceClient::authed(channel, bearer),
+    }
+}
+
+/// A server stream's messages, owned. A failure ends it.
+pub(crate) trait Messages<W> {
+    fn messages(self) -> futures::stream::BoxStream<'static, Result<W, connectrpc::ConnectError>>;
+}
+
+type Body = <HttpClient as connectrpc::client::ClientTransport>::ResponseBody;
+
+impl<V, W> Messages<W> for connectrpc::client::ServerStream<Body, V>
+where
+    V: buffa::MessageView<'static, Owned = W> + Send + 'static,
+    W: buffa::view::HasMessageView<View<'static> = V>
+        + buffa::Message
+        + connectrpc::JsonDeserialize
+        + Send
+        + 'static,
+{
+    fn messages(self) -> futures::stream::BoxStream<'static, Result<W, connectrpc::ConnectError>> {
+        use futures::StreamExt;
+        futures::stream::unfold(Some(self), |state| async move {
+            let mut stream = state?;
+            match stream.message::<W>().await {
+                Ok(Some(msg)) => Some((Ok(msg.to_owned_message()), Some(stream))),
+                Ok(None) => None,
+                Err(e) => Some((Err(e), None)),
+            }
+        })
+        .boxed()
     }
 }

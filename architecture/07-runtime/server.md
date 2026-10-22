@@ -1,7 +1,8 @@
 # Server
 
 `rill-api` is the one process that owns every repository. It serves the
-`rill.v1` gRPC API and the HTTP object protocol, and runs the background
+`rill.v1` API (Connect, gRPC and gRPC-web, with REAPI beside it) and the
+HTTP object protocol, and runs the background
 workers for each repository. The crate is a library; `rill dev` and
 `rill api` in `rill-cli` build a `ServerConfig` and call `rill_api::run`.
 
@@ -16,7 +17,7 @@ flowchart TD
     AS --> RR[RepoRegistry]
     RR -->|get / resolve| RC[RepoContext per repository]
     RC --> W[workers::spawn_repo_workers]
-    Run --> G[serve_grpc: tonic + AuthLayer]
+    Run --> G[serve_grpc: connectrpc + AuthInterceptor; REAPI tonic + AuthLayer]
     Run --> H[serve_http: axum objects router]
 ```
 
@@ -61,7 +62,7 @@ subscribers are unaffected.
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant A as AuthLayer
+    participant A as AuthInterceptor
     participant H as Handler
     participant R as RepoRegistry
     participant P as Permit
@@ -74,10 +75,14 @@ sequenceDiagram
     H->>H: one call into a lower crate, encode reply
 ```
 
-`AuthLayer` (`auth/layer.rs`) is a tower layer, not a tonic interceptor,
-because authentication may need the store and interceptors are synchronous.
-It wraps seven services; `SessionService`, gRPC reflection and `tonic-health` are
-not wrapped. In `authenticate`, a request without a bearer token acts as the
+`AuthInterceptor` (`auth/interceptor.rs`) is a `connectrpc` interceptor:
+it runs after the request head is parsed and before the message is decoded,
+can await the store, and fails a call in the protocol the client spoke
+(Connect, gRPC or gRPC-web). It stores the `AuthContext` in the call's
+extensions, where `auth::caller` reads it. `SessionService`, health and
+reflection pass without a token. REAPI's tonic services get the same
+treatment from `AuthLayer` (`auth/layer.rs`), a tower layer.
+In `authenticate`, a request without a bearer token acts as the
 human `dev` in dev mode and is `UNAUTHENTICATED` otherwise. A token must
 authenticate even in dev mode: a dev server's static table first, then the
 identity view, which verifies the signature against the key ring and
@@ -108,9 +113,11 @@ change fails the request, updates review and publishes `VersionCreated`.
 ## Error mapping
 
 Every lower crate's error converts into `rill_api::Error` (`error.rs`).
-`Error::code()` picks the gRPC code from the meaning of the variant, not from
-the crate that produced it. The status message is the error's `Display`
-text, and `INTERNAL` errors are logged at error level.
+`Error::code()` picks the code from the meaning of the variant, not from
+the crate that produced it; it converts into a `ConnectError` (and a tonic
+`Status` for REAPI) with the error's `Display` text as the message and
+`retry-after` when the caller should wait. `INTERNAL` errors are logged at
+error level.
 
 | Code | Typical sources |
 | --- | --- |
@@ -129,15 +136,16 @@ The object protocol reuses this mapping through `ObjectError`; see
 ## Startup and shutdown
 
 `run` binds both listeners (port 0 picks a free port, reported by
-`Listeners::addrs`), calls `build_state`, then `serve_until` serves gRPC and
-HTTP until the signal (ctrl-c in the binary). Accepted connections set
+`Listeners::addrs`), calls `build_state`, then `serve_until` serves the API
+and object HTTP (both through axum, with HTTP/2 offered over TLS by ALPN
+and cleartext HTTP/2 by prior knowledge) until the signal (ctrl-c in the binary). Accepted connections set
 `TCP_NODELAY`: with Nagle's algorithm a response spanning several segments
 waits for the client's delayed ACK, which added 40 ms to every log page on
 Linux. Shutdown follows `[shutdown]`
 (`state/lifecycle.rs`, `shutdown.rs`):
 
-1. **Drain.** `/readyz` answers 503 `draining` and gRPC health reports
-   `NOT_SERVING`, so load balancers send traffic elsewhere; requests are
+1. **Drain.** `/readyz` answers 503 `draining` and the health service
+   (`grpc.health.v1`) reports `NOT_SERVING`, so load balancers send traffic elsewhere; requests are
    still served for `drain_secs` (5; 0 in `rill dev`).
 2. **Stop.** The stop token is cancelled: listeners stop accepting and
    finish in-flight requests, watch streams end (clients resume from their

@@ -3,8 +3,10 @@
 
 use super::*;
 
-async fn next_event(watch: &mut tonic::Streaming<pb::EventEnvelope>) -> (Bytes, pb::event::Kind) {
-    let envelope = tokio::time::timeout(Duration::from_secs(5), watch.message())
+async fn next_event(
+    watch: &mut futures::stream::BoxStream<'static, Result<pb::EventEnvelope, ConnectError>>,
+) -> (Bytes, pb::event::Kind) {
+    let envelope = tokio::time::timeout(Duration::from_secs(5), watch.next())
         .await
         .expect("an event")
         .unwrap()
@@ -39,7 +41,7 @@ async fn watch_events_sees_each_change_once_and_resumes() {
         .watch_events(watch(Some(Bytes::new()), vec![]))
         .await
         .unwrap()
-        .into_inner();
+        .messages();
     let mut refs = c
         .repo
         .watch_refs(pb::WatchRefsRequest {
@@ -48,23 +50,23 @@ async fn watch_events_sees_each_change_once_and_resumes() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .messages();
 
     let created = c
         .repo
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: repo.into(),
-            base: None,
+            base: None.into(),
             edits: vec![set_edit("a.txt", b"a\n")],
             message: "a".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let change_id = created.version.unwrap().change_id;
     land(&mut c, repo, change_id.clone()).await;
 
@@ -85,7 +87,7 @@ async fn watch_events_sees_each_change_once_and_resumes() {
     assert_eq!(stored, 1, "one event per stored version");
     assert!(seen.windows(2).all(|w| w[0].0 < w[1].0), "cursors increase");
 
-    let trunk = tokio::time::timeout(Duration::from_secs(5), refs.message())
+    let trunk = tokio::time::timeout(Duration::from_secs(5), refs.next())
         .await
         .unwrap()
         .unwrap()
@@ -98,7 +100,7 @@ async fn watch_events_sees_each_change_once_and_resumes() {
         .watch_events(watch(Some(seen[0].0.clone()), vec![]))
         .await
         .unwrap()
-        .into_inner();
+        .messages();
     assert_eq!(next_event(&mut resumed).await, seen[1].clone());
 
     let mut landed_only = c
@@ -106,7 +108,7 @@ async fn watch_events_sees_each_change_once_and_resumes() {
         .watch_events(watch(Some(Bytes::new()), vec!["landed".into()]))
         .await
         .unwrap()
-        .into_inner();
+        .messages();
     let (_, kind) = next_event(&mut landed_only).await;
     assert!(matches!(kind, Kind::Landed(l) if l.seq == 1));
     server.stop().await;

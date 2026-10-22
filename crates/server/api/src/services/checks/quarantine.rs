@@ -4,16 +4,16 @@ use rill_exec::history::{Quarantine, TestHistory};
 use rill_proto::convert::{id_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::Timestamp;
-use tonic::Request;
 
 use super::service::ChecksSvc;
 use crate::services::common::open;
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 impl ChecksSvc {
     pub(super) async fn quarantined(
         &self,
-        request: Request<pb::ListQuarantinedRequest>,
+        request: Call<pb::ListQuarantinedRequest>,
     ) -> Result<pb::ListQuarantinedResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -26,7 +26,7 @@ impl ChecksSvc {
                 .map(|q| pb::QuarantinedTarget {
                     target: q.target,
                     since: timestamp_to_proto(q.since),
-                    by: Some(q.by.into()),
+                    by: pb::Principal::from(q.by).into(),
                     reason: q.reason,
                     intent: q.intent.map(|i| id_to_proto(&i)),
                 })
@@ -36,7 +36,7 @@ impl ChecksSvc {
 
     pub(super) async fn quarantine_impl(
         &self,
-        request: Request<pb::QuarantineRequest>,
+        request: Call<pb::QuarantineRequest>,
     ) -> Result<pb::QuarantineResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().admin().await?;
@@ -56,7 +56,7 @@ impl ChecksSvc {
 
     pub(super) async fn release_impl(
         &self,
-        request: Request<pb::ReleaseQuarantineRequest>,
+        request: Call<pb::ReleaseQuarantineRequest>,
     ) -> Result<pb::ReleaseQuarantineResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().admin().await?;

@@ -4,13 +4,15 @@ mod authenticator;
 mod context;
 pub mod http;
 mod instance;
+mod interceptor;
 mod layer;
 mod permit;
 mod worker;
 
 pub use authenticator::authenticate;
-pub use context::{bearer_token, caller, dev_context, dev_principal, DEV_PRINCIPAL};
+pub use context::{bearer_token, caller, dev_context, dev_principal, Extended, DEV_PRINCIPAL};
 pub use instance::{administers_org, require_instance_admin, require_org_admin};
+pub use interceptor::AuthInterceptor;
 pub use layer::{AuthLayer, AuthService};
 pub use permit::Permit;
 pub use worker::{is_worker, worker_context, ExecWorker, WORKER_PRINCIPAL};

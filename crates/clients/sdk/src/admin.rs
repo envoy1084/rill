@@ -26,12 +26,12 @@ impl AdminClient {
     /// The caller's identity and capabilities.
     pub async fn whoami(&self) -> Result<WhoAmI> {
         crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::WhoAmIRequest {};
             async move { svc.who_am_i(request).await }
         })
         .await?
-        .into_inner()
+        .into_owned()
         .try_into()
     }
 
@@ -50,14 +50,14 @@ impl AdminClient {
             operation_id: id_to_proto(&op),
             capabilities: request.capabilities.iter().map(|c| c.to_proto()).collect(),
             expires_at: request.expires_at.map(|t| t.millis()),
-            for_principal: request.for_principal.map(pb::Principal::from),
+            for_principal: request.for_principal.map(pb::Principal::from).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.issue_token(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(IssuedToken {
             token: resp.token,
             expires_at: timestamp_from_proto(resp.expires_at),
@@ -67,14 +67,14 @@ impl AdminClient {
     /// A named policy.
     pub async fn policy(&self, name: &str) -> Result<Policy> {
         crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetPolicyRequest {
                 name: name.to_string(),
             };
             async move { svc.get_policy(request).await }
         })
         .await?
-        .into_inner()
+        .into_owned()
         .try_into()
     }
 
@@ -97,11 +97,11 @@ impl AdminClient {
             text: text.to_string(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.set_policy(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(timestamp_from_proto(resp.updated_at))
     }
 
@@ -120,11 +120,11 @@ impl AdminClient {
             version: rill_proto::convert::hash_to_proto(&version),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.append_trunk(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(rill_types::TrunkSeq(resp.seq))
     }
 
@@ -136,35 +136,35 @@ impl AdminClient {
             description: description.map(str::to_string),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.create_org(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(rill_proto::convert::required("create_org.org", resp.org)?.into())
     }
 
     /// Every org.
     pub async fn list_orgs(&self) -> Result<Vec<OrgInfo>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ListOrgsRequest {};
             async move { svc.list_orgs(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(resp.orgs.into_iter().map(OrgInfo::from).collect())
     }
 
     /// Server health.
     pub async fn health(&self) -> Result<Health> {
         Ok(crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::HealthRequest {};
             async move { svc.health(request).await }
         })
         .await?
-        .into_inner()
+        .into_owned()
         .into())
     }
 }

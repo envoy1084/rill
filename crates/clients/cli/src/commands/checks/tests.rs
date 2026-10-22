@@ -31,7 +31,9 @@ pub struct HistoryArgs {
 }
 
 pub(super) fn outcome(value: i32) -> &'static str {
-    match pb::TestOutcome::try_from(value).unwrap_or(pb::TestOutcome::Unspecified) {
+    match rill_proto::convert::known::<pb::TestOutcome>(value)
+        .unwrap_or(pb::TestOutcome::Unspecified)
+    {
         pb::TestOutcome::Passed => "passed",
         pb::TestOutcome::Failed => "failed",
         pb::TestOutcome::Skipped => "skipped",
@@ -47,14 +49,14 @@ fn flaky_json(t: &pb::FlakyTest) -> serde_json::Value {
         "runs": t.runs,
         "failures": t.failures,
         "flips": t.flips,
-        "last": outcome(t.last),
+        "last": outcome(t.last.to_i32()),
     })
 }
 
 /// `rill checks flaky`.
 pub async fn flaky(ctx: &mut Ctx<'_>, a: FlakyArgs) -> Result<()> {
     let repo = ctx.repo_name()?;
-    let mut svc = ctx.client()?.checks_svc();
+    let svc = ctx.client()?.checks_svc();
     let tests = svc
         .list_flaky_tests(pb::ListFlakyTestsRequest {
             repo,
@@ -62,7 +64,7 @@ pub async fn flaky(ctx: &mut Ctx<'_>, a: FlakyArgs) -> Result<()> {
             limit: a.limit,
         })
         .await?
-        .into_inner()
+        .into_owned()
         .tests;
     ctx.emit(
         j!({ "tests": tests.iter().map(flaky_json).collect::<Vec<_>>() }),
@@ -73,7 +75,7 @@ pub async fn flaky(ctx: &mut Ctx<'_>, a: FlakyArgs) -> Result<()> {
                     format!("{:.2}", t.score),
                     format!("{:.1}", t.flips),
                     format!("{:.1}", t.runs),
-                    outcome(t.last).into(),
+                    outcome(t.last.to_i32()).into(),
                     t.target.clone(),
                 ]);
             }
@@ -85,7 +87,7 @@ pub async fn flaky(ctx: &mut Ctx<'_>, a: FlakyArgs) -> Result<()> {
 /// `rill checks history`.
 pub async fn history(ctx: &mut Ctx<'_>, a: HistoryArgs) -> Result<()> {
     let repo = ctx.repo_name()?;
-    let mut svc = ctx.client()?.checks_svc();
+    let svc = ctx.client()?.checks_svc();
     let response = svc
         .get_test_history(pb::GetTestHistoryRequest {
             repo,
@@ -93,13 +95,13 @@ pub async fn history(ctx: &mut Ctx<'_>, a: HistoryArgs) -> Result<()> {
             limit: a.limit,
         })
         .await?
-        .into_inner();
+        .into_owned();
     let runs = response.runs;
     ctx.emit(
         j!({
-            "stats": response.stats.as_ref().map(flaky_json),
+            "stats": response.stats.as_option().map(flaky_json),
             "runs": runs.iter().map(|r| j!({
-                "outcome": outcome(r.outcome),
+                "outcome": outcome(r.outcome.to_i32()),
                 "retried": r.retried,
                 "duration_ms": r.duration_ms,
                 "action": hex::encode(&r.action),
@@ -110,7 +112,7 @@ pub async fn history(ctx: &mut Ctx<'_>, a: HistoryArgs) -> Result<()> {
             })).collect::<Vec<_>>(),
         }),
         |out| {
-            if let Some(stats) = &response.stats {
+            if let Some(stats) = response.stats.as_option() {
                 out.line(format!("flake score {:.2}", stats.score))?;
             }
             let mut table = Table::new(&["WHEN", "OUTCOME", "MS", "STAGE", "ACTION", "WORKER"]);
@@ -119,7 +121,7 @@ pub async fn history(ctx: &mut Ctx<'_>, a: HistoryArgs) -> Result<()> {
                     when(&Timestamp::from_millis(r.at)),
                     format!(
                         "{}{}",
-                        outcome(r.outcome),
+                        outcome(r.outcome.to_i32()),
                         if r.retried { " (retried)" } else { "" }
                     ),
                     r.duration_ms.map(|d| d.to_string()).unwrap_or_default(),
@@ -141,7 +143,7 @@ pub async fn nonhermetic(ctx: &mut Ctx<'_>) -> Result<()> {
         .checks_svc()
         .list_nonhermetic(pb::ListNonhermeticRequest { repo })
         .await?
-        .into_inner()
+        .into_owned()
         .steps;
     ctx.emit(
         j!({ "steps": steps.iter().map(|s| j!({

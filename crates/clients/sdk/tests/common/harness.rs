@@ -2,11 +2,8 @@
 
 use std::sync::Arc;
 
-use rill_proto::rill::v1::repo_service_server::RepoServiceServer;
-use rill_proto::rill::v1::review_service_server::ReviewServiceServer;
 use rill_sdk::{Client, ClientConfig};
 use tokio::net::TcpListener;
-use tokio_stream::wrappers::TcpListenerStream;
 
 use super::mock_repo::MockRepo;
 use super::mock_review::MockReview;
@@ -26,13 +23,16 @@ impl Harness {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let (repo_s, review_s) = (repo.clone(), review.clone());
+        let router = connectrpc::Router::new()
+            .add_service(repo_s)
+            .add_service(review_s);
         tokio::spawn(async move {
-            tonic::transport::Server::builder()
-                .add_service(RepoServiceServer::from_arc(repo_s))
-                .add_service(ReviewServiceServer::from_arc(review_s))
-                .serve_with_incoming(TcpListenerStream::new(listener))
-                .await
-                .unwrap();
+            axum::serve(
+                listener,
+                axum::Router::new().fallback_service(router.into_axum_service()),
+            )
+            .await
+            .unwrap();
         });
         let endpoint = format!("http://{addr}");
         let mut config = ClientConfig::new(endpoint.clone());

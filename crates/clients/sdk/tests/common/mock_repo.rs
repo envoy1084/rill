@@ -4,10 +4,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Mutex;
 
 use bytes::Bytes;
+use connectrpc::ConnectError as Status;
 use rill_proto::convert::hash_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{FileKind, ObjectHash, ObjectKind, INLINE_THRESHOLD};
-use tonic::{Request, Status};
+
+use super::rpc::Request;
 
 use super::rpc::hex;
 
@@ -120,8 +122,8 @@ impl MockRepo {
     pub(super) fn entry(&self, file: &MockFile) -> pb::TreeEntry {
         pb::TreeEntry {
             kind: Some(pb::tree_entry::Kind::File(pb::tree_entry::File {
-                content: Some(self.content_ref(&file.bytes)),
-                kind: pb::FileKind::from(file.kind) as i32,
+                content: self.content_ref(&file.bytes).into(),
+                kind: pb::FileKind::from(file.kind).into(),
             })),
         }
     }

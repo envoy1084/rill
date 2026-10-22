@@ -3,15 +3,15 @@
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::Timestamp;
-use tonic::Request;
 
 use crate::auth::{caller, require_instance_admin};
+use crate::services::Call;
 use rill_runtime::error::Result;
 use rill_runtime::state::AppState;
 
 pub async fn rotate(
     state: &AppState,
-    request: Request<pb::RotateTokenKeysRequest>,
+    request: Call<pb::RotateTokenKeysRequest>,
 ) -> Result<pb::RotateTokenKeysResponse> {
     let ctx = caller(&request)?;
     require_instance_admin(state, &ctx)?;
@@ -28,7 +28,7 @@ pub async fn rotate(
 
 pub async fn list(
     state: &AppState,
-    request: Request<pb::ListTokenKeysRequest>,
+    request: Call<pb::ListTokenKeysRequest>,
 ) -> Result<pb::ListTokenKeysResponse> {
     let ctx = caller(&request)?;
     require_instance_admin(state, &ctx)?;

@@ -3,11 +3,11 @@
 use rill_exec::history::{FlakyTarget, TestHistory, RUNS_KEPT};
 use rill_proto::rill::v1 as pb;
 use rill_types::Timestamp;
-use tonic::Request;
 
 use super::convert;
 use super::service::ChecksSvc;
 use crate::services::common::open;
+use crate::services::Call;
 use rill_runtime::error::Result;
 
 /// Default page of runs.
@@ -19,7 +19,7 @@ const DEFAULT_FLAKY: usize = 50;
 impl ChecksSvc {
     pub(super) async fn history(
         &self,
-        request: Request<pb::GetTestHistoryRequest>,
+        request: Call<pb::GetTestHistoryRequest>,
     ) -> Result<pb::GetTestHistoryResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -39,13 +39,13 @@ impl ChecksSvc {
         });
         Ok(pb::GetTestHistoryResponse {
             runs: runs.into_iter().map(convert::test_run).collect(),
-            stats,
+            stats: stats.into(),
         })
     }
 
     pub(super) async fn flaky(
         &self,
-        request: Request<pb::ListFlakyTestsRequest>,
+        request: Call<pb::ListFlakyTestsRequest>,
     ) -> Result<pb::ListFlakyTestsResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -75,7 +75,7 @@ impl ChecksSvc {
 impl ChecksSvc {
     pub(super) async fn nonhermetic(
         &self,
-        request: Request<pb::ListNonhermeticRequest>,
+        request: Call<pb::ListNonhermeticRequest>,
     ) -> Result<pb::ListNonhermeticResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;

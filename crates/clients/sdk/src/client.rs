@@ -1,26 +1,19 @@
-//! The connected client: one channel, six generated service clients, and
-//! a bearer-token interceptor.
+//! The connected client: one pooled HTTP/2 connection, the generated
+//! service clients over it, and the headers every call carries.
 
 use std::sync::Arc;
 use std::time::Duration;
 
-use rill_proto::rill::v1::access_service_client::AccessServiceClient;
-use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
-use rill_proto::rill::v1::audit_service_client::AuditServiceClient;
-use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
-use rill_proto::rill::v1::intent_service_client::IntentServiceClient;
-use rill_proto::rill::v1::lander_service_client::LanderServiceClient;
-use rill_proto::rill::v1::protection_service_client::ProtectionServiceClient;
-use rill_proto::rill::v1::repo_service_client::RepoServiceClient;
-use rill_proto::rill::v1::review_service_client::ReviewServiceClient;
-use rill_proto::rill::v1::secret_service_client::SecretServiceClient;
-use rill_proto::rill::v1::workspace_service_client::WorkspaceServiceClient;
-use tonic::metadata::MetadataValue;
-use tonic::service::interceptor::InterceptedService;
-use tonic::service::Interceptor;
-use tonic::transport::{Channel, Endpoint};
-use tonic::{Request, Status};
+use connectrpc::client::{ClientBody, ClientTransport, HttpClient};
+use connectrpc::ConnectError;
+use futures::future::BoxFuture;
+use http::{HeaderValue, Uri};
+use rill_proto::rill::v1::{
+    AccessServiceClient, AdminServiceClient, AuditServiceClient, ChecksServiceClient,
+    IdentityServiceClient, IntentServiceClient, LanderServiceClient, ProtectionServiceClient,
+    RepoServiceClient, ReviewServiceClient, SecretServiceClient, SessionServiceClient,
+    WorkspaceServiceClient,
+};
 
 use crate::access::AccessClient;
 use crate::admin::AdminClient;
@@ -53,44 +46,94 @@ impl RelationsSeen {
     }
 }
 
-/// Attaches `authorization: Bearer <token>` to every outgoing request, the
-/// token read from the client's token source each time, and the relation
-/// versions the client has seen.
+/// The headers every call carries: `authorization: Bearer <token>`, the
+/// token read from the client's token source each time, the relation
+/// versions the client has seen, and a request id.
 #[derive(Clone)]
-pub struct AuthInterceptor {
+pub struct CallHeaders {
     source: Option<Arc<dyn TokenSource>>,
     seen: RelationsSeen,
 }
 
-impl std::fmt::Debug for AuthInterceptor {
+impl std::fmt::Debug for CallHeaders {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AuthInterceptor")
+        f.debug_struct("CallHeaders")
             .field("has_source", &self.source.is_some())
             .finish()
     }
 }
 
-impl Interceptor for AuthInterceptor {
-    fn call(&mut self, mut request: Request<()>) -> std::result::Result<Request<()>, Status> {
+impl CallHeaders {
+    fn apply(&self, headers: &mut http::HeaderMap) -> std::result::Result<(), ConnectError> {
         if let Some(token) = self.source.as_ref().and_then(|s| s.token()) {
-            let header: MetadataValue<tonic::metadata::Ascii> =
-                format!("Bearer {token}")
-                    .parse()
-                    .map_err(|_| Status::unauthenticated("token contains non-ASCII characters"))?;
-            request.metadata_mut().insert("authorization", header);
+            let value = HeaderValue::try_from(format!("Bearer {token}")).map_err(|_| {
+                ConnectError::unauthenticated("token contains non-ASCII characters")
+            })?;
+            headers.insert(http::header::AUTHORIZATION, value);
         }
-        if let Some(value) = self.seen.header().and_then(|h| h.parse().ok()) {
-            request.metadata_mut().insert("x-rill-relations", value);
+        if let Some(value) = self
+            .seen
+            .header()
+            .and_then(|h| HeaderValue::try_from(h).ok())
+        {
+            headers.insert("x-rill-relations", value);
         }
         // An id per request, so a failure here and the server's log lines
         // for it can be matched.
-        if !request.metadata().contains_key("x-request-id") {
+        if !headers.contains_key("x-request-id") {
             let id = hex::encode(&rill_types::ids::random_id()[..8]);
-            if let Ok(value) = id.parse() {
-                request.metadata_mut().insert("x-request-id", value);
+            if let Ok(value) = HeaderValue::try_from(id) {
+                headers.insert("x-request-id", value);
             }
         }
-        Ok(request)
+        Ok(())
+    }
+}
+
+/// The body of a response on the SDK transport.
+pub type ResponseBody = <HttpClient as ClientTransport>::ResponseBody;
+
+/// The transport every generated client runs over: the pooled connection,
+/// with [`CallHeaders`] set on each request.
+#[derive(Clone)]
+pub struct Transport {
+    http: HttpClient,
+    headers: Option<CallHeaders>,
+    user_agent: HeaderValue,
+}
+
+impl ClientTransport for Transport {
+    type ResponseBody = ResponseBody;
+    type Error = ConnectError;
+
+    fn send(
+        &self,
+        mut request: http::Request<ClientBody>,
+    ) -> BoxFuture<'static, std::result::Result<http::Response<Self::ResponseBody>, ConnectError>>
+    {
+        if let Some(headers) = &self.headers {
+            if let Err(e) = headers.apply(request.headers_mut()) {
+                return Box::pin(async move { Err(e) });
+            }
+        }
+        request
+            .headers_mut()
+            .insert(http::header::USER_AGENT, self.user_agent.clone());
+        self.http.send(request)
+    }
+}
+
+/// A connection to a server without credentials, for signing in.
+#[derive(Clone)]
+pub struct Connection {
+    transport: Transport,
+    config: connectrpc::client::ClientConfig,
+}
+
+impl Connection {
+    /// The session service, which needs no token.
+    pub fn sessions(&self) -> SessionServiceClient<Transport> {
+        SessionServiceClient::new(self.transport.clone(), self.config.clone())
     }
 }
 
@@ -103,12 +146,10 @@ const RETRY_BUDGET: Duration = Duration::from_secs(20);
 /// claim of a server that died mid-request). Reads have no effect and the
 /// server runs an identified operation at most once, so retrying cannot
 /// repeat an effect.
-pub(crate) async fn retry_idempotent<T, F, Fut>(
-    call: F,
-) -> std::result::Result<tonic::Response<T>, Status>
+pub(crate) async fn retry_idempotent<T, F, Fut>(call: F) -> std::result::Result<T, ConnectError>
 where
     F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = std::result::Result<tonic::Response<T>, Status>>,
+    Fut: std::future::Future<Output = std::result::Result<T, ConnectError>>,
 {
     use backon::Retryable;
     let schedule = backon::ExponentialBuilder::default()
@@ -119,47 +160,44 @@ where
         .without_max_times();
     call.retry(schedule)
         .sleep(tokio::time::sleep)
-        .when(|status: &Status| status.code() == tonic::Code::Unavailable)
-        .notify(|status, _| tracing::debug!(error = %status, "retrying an idempotent call"))
+        .when(|e: &ConnectError| e.code == connectrpc::ErrorCode::Unavailable)
+        .notify(|e, _| tracing::debug!(error = %e, "retrying an idempotent call"))
         .await
 }
 
-/// The transport every generated client runs over.
-pub type Svc = InterceptedService<Channel, AuthInterceptor>;
-
 /// Generated repo client over the SDK transport.
-pub type RepoSvc = RepoServiceClient<Svc>;
+pub type RepoSvc = RepoServiceClient<Transport>;
 /// Generated workspace client over the SDK transport.
-pub type WorkspaceSvc = WorkspaceServiceClient<Svc>;
+pub type WorkspaceSvc = WorkspaceServiceClient<Transport>;
 /// Generated review client over the SDK transport.
-pub type ReviewSvc = ReviewServiceClient<Svc>;
+pub type ReviewSvc = ReviewServiceClient<Transport>;
 /// Generated intent client over the SDK transport.
-pub type IntentSvc = IntentServiceClient<Svc>;
+pub type IntentSvc = IntentServiceClient<Transport>;
 /// Generated lander client over the SDK transport.
-pub type LanderSvc = LanderServiceClient<Svc>;
+pub type LanderSvc = LanderServiceClient<Transport>;
 /// Generated admin client over the SDK transport.
-pub type AdminSvc = AdminServiceClient<Svc>;
+pub type AdminSvc = AdminServiceClient<Transport>;
 /// Generated audit client over the SDK transport.
-pub type AuditSvc = AuditServiceClient<Svc>;
+pub type AuditSvc = AuditServiceClient<Transport>;
 /// Generated protection client over the SDK transport.
-pub type ProtectionSvc = ProtectionServiceClient<Svc>;
+pub type ProtectionSvc = ProtectionServiceClient<Transport>;
 /// Generated secret client over the SDK transport.
-pub type SecretSvc = SecretServiceClient<Svc>;
+pub type SecretSvc = SecretServiceClient<Transport>;
 /// Generated checks client over the SDK transport.
-pub type ChecksSvc = ChecksServiceClient<Svc>;
+pub type ChecksSvc = ChecksServiceClient<Transport>;
 /// Generated access client over the SDK transport.
-pub type AccessSvc = AccessServiceClient<Svc>;
+pub type AccessSvc = AccessServiceClient<Transport>;
 /// Generated identity client over the SDK transport.
-pub type IdentitySvc = IdentityServiceClient<Svc>;
+pub type IdentitySvc = IdentityServiceClient<Transport>;
 
 /// A connection to one Rill server.
 ///
-/// Cloning is cheap: every clone shares the underlying HTTP/2 channel.
+/// Cloning is cheap: every clone shares the underlying connection pool.
 #[derive(Clone)]
 pub struct Client {
     config: ClientConfig,
-    channel: Channel,
-    auth: AuthInterceptor,
+    connection: Connection,
+    headers: CallHeaders,
     grants: crate::grants::ReadGrants,
 }
 
@@ -173,19 +211,18 @@ impl std::fmt::Debug for Client {
 }
 
 impl Client {
-    /// Connect to the configured endpoint. The connection is established
-    /// eagerly so configuration errors surface here rather than on the
-    /// first request.
+    /// Connect to the configured endpoint. A workload credential is
+    /// exchanged for a session here; otherwise the connection is opened by
+    /// the first request.
     pub async fn connect(config: ClientConfig) -> Result<Self> {
-        let endpoint = Self::endpoint(&config)?;
-        let channel = endpoint.connect().await?;
+        let connection = Self::connection(&config)?;
         if config.token.is_none() && config.session.is_none() {
             if let Some(workload) = config.workload.clone() {
-                let source = WorkloadSource::start(workload, channel.clone()).await?;
+                let source = WorkloadSource::start(workload, connection.clone()).await?;
                 return Ok(Client {
                     config,
-                    channel,
-                    auth: AuthInterceptor {
+                    connection,
+                    headers: CallHeaders {
                         source: Some(source),
                         seen: RelationsSeen::default(),
                     },
@@ -193,21 +230,19 @@ impl Client {
                 });
             }
         }
-        Self::with_channel(config, channel)
+        Self::with_connection(config, connection)
     }
 
-    /// Like [`Client::connect`] but defers the TCP connection to the first
-    /// request.
+    /// Like [`Client::connect`], for configurations without a workload
+    /// credential, without awaiting anything.
     pub fn connect_lazy(config: ClientConfig) -> Result<Self> {
-        let endpoint = Self::endpoint(&config)?;
-        let channel = endpoint.connect_lazy();
-        Self::with_channel(config, channel)
+        let connection = Self::connection(&config)?;
+        Self::with_connection(config, connection)
     }
 
-    /// Build a client over an existing channel (tests, custom transports).
-    /// A stored session starts refreshing itself here; an explicit token
-    /// wins over it.
-    pub fn with_channel(config: ClientConfig, channel: Channel) -> Result<Self> {
+    /// Build a client over an existing connection. A stored session starts
+    /// refreshing itself here; an explicit token wins over it.
+    pub fn with_connection(config: ClientConfig, connection: Connection) -> Result<Self> {
         let source: Option<Arc<dyn TokenSource>> = match (&config.token, &config.session) {
             (Some(token), _) => {
                 if !token.is_ascii() {
@@ -217,7 +252,7 @@ impl Client {
             }
             (None, Some(session)) => Some(SessionSource::start(
                 session.credentials.clone(),
-                channel.clone(),
+                connection.clone(),
                 session.store.clone(),
             )),
             (None, None) if config.workload.is_some() => {
@@ -227,14 +262,14 @@ impl Client {
             }
             (None, None) => None,
         };
-        let auth = AuthInterceptor {
+        let headers = CallHeaders {
             source,
             seen: RelationsSeen::default(),
         };
         Ok(Client {
             config,
-            channel,
-            auth,
+            connection,
+            headers,
             grants: Default::default(),
         })
     }
@@ -244,23 +279,36 @@ impl Client {
         Self::connect(ClientConfig::from_env()?).await
     }
 
-    fn endpoint(config: &ClientConfig) -> Result<Endpoint> {
-        let mut endpoint = Endpoint::from_shared(config.endpoint.clone())
-            .map_err(|e| Error::config(format!("invalid endpoint {:?}: {e}", config.endpoint)))?
-            .user_agent(config.user_agent.clone())
-            .map_err(|e| Error::config(format!("invalid user agent: {e}")))?
-            .connect_timeout(Duration::from_secs(10))
-            .tcp_keepalive(Some(Duration::from_secs(30)))
-            .http2_keep_alive_interval(Duration::from_secs(30));
+    /// The pooled connection `config` describes, without credentials.
+    pub fn connection(config: &ClientConfig) -> Result<Connection> {
+        let uri: Uri = config
+            .endpoint
+            .parse()
+            .map_err(|e| Error::config(format!("invalid endpoint {:?}: {e}", config.endpoint)))?;
+        let http = match uri.scheme_str() {
+            Some("https") => HttpClient::with_tls(Arc::new(tls_config(&config.tls)?)),
+            Some("http") => HttpClient::plaintext_http2_only(),
+            _ => {
+                return Err(Error::config(format!(
+                    "endpoint {:?} must start with http:// or https://",
+                    config.endpoint
+                )))
+            }
+        };
+        let user_agent = HeaderValue::try_from(config.user_agent.clone())
+            .map_err(|e| Error::config(format!("invalid user agent: {e}")))?;
+        let mut call = connectrpc::client::ClientConfig::new(uri);
         if let Some(t) = config.timeout {
-            endpoint = endpoint.timeout(t);
+            call = call.with_default_timeout(t);
         }
-        if config.endpoint.starts_with("https://") {
-            endpoint = endpoint
-                .tls_config(tls_config(&config.tls)?)
-                .map_err(|e| Error::config(format!("tls: {e}")))?;
-        }
-        Ok(endpoint)
+        Ok(Connection {
+            transport: Transport {
+                http,
+                headers: None,
+                user_agent,
+            },
+            config: call,
+        })
     }
 
     /// The configuration this client was built from.
@@ -295,103 +343,133 @@ impl Client {
 
     /// Relation versions this client has seen; shared by its clones.
     pub fn relations_seen(&self) -> &RelationsSeen {
-        &self.auth.seen
+        &self.headers.seen
     }
 
-    /// The underlying channel, for services the SDK does not wrap.
-    pub fn channel(&self) -> Channel {
-        self.channel.clone()
+    /// The connection, without this client's credentials (signing in).
+    pub fn connection_without_credentials(&self) -> Connection {
+        self.connection.clone()
     }
 
-    fn svc(&self) -> Svc {
-        InterceptedService::new(self.channel.clone(), self.auth.clone())
+    /// The transport carrying this client's credentials, for services the
+    /// SDK does not wrap.
+    pub fn transport(&self) -> Transport {
+        Transport {
+            headers: Some(self.headers.clone()),
+            ..self.connection.transport.clone()
+        }
+    }
+
+    /// The per-call configuration (endpoint, protocol, timeout).
+    pub fn call_config(&self) -> connectrpc::client::ClientConfig {
+        self.connection.config.clone()
     }
 
     /// A fresh generated repo client.
     pub fn repo_svc(&self) -> RepoSvc {
-        RepoServiceClient::new(self.svc())
+        RepoServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated workspace client.
     pub fn workspace_svc(&self) -> WorkspaceSvc {
-        WorkspaceServiceClient::new(self.svc())
+        WorkspaceServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated review client.
     pub fn review_svc(&self) -> ReviewSvc {
-        ReviewServiceClient::new(self.svc())
+        ReviewServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated intent client.
     pub fn intent_svc(&self) -> IntentSvc {
-        IntentServiceClient::new(self.svc())
+        IntentServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated lander client.
     pub fn lander_svc(&self) -> LanderSvc {
-        LanderServiceClient::new(self.svc())
+        LanderServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated admin client.
     pub fn admin_svc(&self) -> AdminSvc {
-        AdminServiceClient::new(self.svc())
+        AdminServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated audit client.
     pub fn audit_svc(&self) -> AuditSvc {
-        AuditServiceClient::new(self.svc())
+        AuditServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated protection client.
     pub fn protection_svc(&self) -> ProtectionSvc {
-        ProtectionServiceClient::new(self.svc())
+        ProtectionServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated checks client.
     pub fn checks_svc(&self) -> ChecksSvc {
-        ChecksServiceClient::new(self.svc())
+        ChecksServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated secret client.
     pub fn secret_svc(&self) -> SecretSvc {
-        SecretServiceClient::new(self.svc())
+        SecretServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated access client.
     pub fn access_svc(&self) -> AccessSvc {
-        AccessServiceClient::new(self.svc())
+        AccessServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated identity client.
     pub fn identity_svc(&self) -> IdentitySvc {
-        IdentityServiceClient::new(self.svc())
+        IdentityServiceClient::new(self.transport(), self.call_config())
     }
 }
 
 /// TLS for an `https://` endpoint: the system's roots plus any configured
 /// CA, and a client certificate when one is configured.
-fn tls_config(tls: &crate::config::TlsOptions) -> Result<tonic::transport::ClientTlsConfig> {
-    let read = |path: &std::path::Path| {
-        std::fs::read(path)
-            .map_err(|e| Error::config(format!("tls: reading {}: {e}", path.display())))
+fn tls_config(tls: &crate::config::TlsOptions) -> Result<rustls::ClientConfig> {
+    use rustls_pki_types::pem::PemObject;
+    use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+    let pem_err = |path: &std::path::Path, e: rustls_pki_types::pem::Error| {
+        Error::config(format!("tls: {}: {e}", path.display()))
     };
-    let mut config = tonic::transport::ClientTlsConfig::new().with_native_roots();
-    if let Some(ca) = &tls.ca_file {
-        config = config.ca_certificate(tonic::transport::Certificate::from_pem(read(ca)?));
+    let mut roots = rustls::RootCertStore::empty();
+    for cert in rustls_native_certs::load_native_certs().certs {
+        // A certificate the platform store holds but rustls rejects is
+        // skipped, as every other client does.
+        let _ = roots.add(cert);
     }
-    match (&tls.client_cert, &tls.client_key) {
-        (Some(cert), Some(key)) => {
-            config = config.identity(tonic::transport::Identity::from_pem(
-                read(cert)?,
-                read(key)?,
-            ));
+    if let Some(ca) = &tls.ca_file {
+        for cert in CertificateDer::pem_file_iter(ca).map_err(|e| pem_err(ca, e))? {
+            roots
+                .add(cert.map_err(|e| pem_err(ca, e))?)
+                .map_err(|e| Error::config(format!("tls: {}: {e}", ca.display())))?;
         }
-        (None, None) => {}
+    }
+    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+    let builder = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|e| Error::config(format!("tls: {e}")))?
+        .with_root_certificates(roots);
+    let mut config = match (&tls.client_cert, &tls.client_key) {
+        (Some(cert), Some(key)) => {
+            let certs = CertificateDer::pem_file_iter(cert)
+                .map_err(|e| pem_err(cert, e))?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|e| pem_err(cert, e))?;
+            let key = PrivateKeyDer::from_pem_file(key).map_err(|e| pem_err(key, e))?;
+            builder
+                .with_client_auth_cert(certs, key)
+                .map_err(|e| Error::config(format!("tls: {e}")))?
+        }
+        (None, None) => builder.with_no_client_auth(),
         _ => {
             return Err(Error::config(
                 "a client certificate needs both RILL_CLIENT_CERT and RILL_CLIENT_KEY",
             ))
         }
-    }
+    };
+    config.alpn_protocols = vec![b"h2".to_vec()];
     Ok(config)
 }

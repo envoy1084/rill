@@ -75,7 +75,7 @@ pub(crate) async fn request_land(
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .ticket
         .unwrap();
     for _ in 0..200 {
@@ -87,8 +87,12 @@ pub(crate) async fn request_land(
             })
             .await
             .unwrap()
-            .into_inner();
-        match pb::LandStatus::try_from(status.ticket.as_ref().unwrap().status).unwrap() {
+            .into_owned();
+        match rill_proto::convert::known::<pb::LandStatus>(
+            status.ticket.as_option().unwrap().status,
+        )
+        .unwrap()
+        {
             pb::LandStatus::Landed => return Ok(status.seq.unwrap()),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 return Err(status.error.unwrap_or_default())

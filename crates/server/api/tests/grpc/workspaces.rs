@@ -5,7 +5,7 @@ use super::*;
 #[tokio::test]
 async fn undo_restores_every_field_and_undoing_it_redoes() {
     let server = TestServer::start(dev_config()).await;
-    let mut c = clients(&server, None).await;
+    let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
             operation_id: Bytes::new(),
@@ -21,12 +21,12 @@ async fn undo_restores_every_field_and_undoing_it_redoes() {
             operation_id: Bytes::new(),
             repo: "ws".into(),
             name: "w".into(),
-            base: None,
-            sparse: None,
+            base: None.into(),
+            sparse: None.into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .workspace
         .unwrap();
     let narrowed = c
@@ -35,14 +35,15 @@ async fn undo_restores_every_field_and_undoing_it_redoes() {
             operation_id: Bytes::new(),
             repo: "ws".into(),
             workspace: ws.id.clone(),
-            sparse: Some(pb::SparseProfile {
+            sparse: (pb::SparseProfile {
                 include: vec!["src".into()],
                 exclude: vec![],
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(
         narrowed.workspace.unwrap().sparse.unwrap().include,
         vec!["src"]
@@ -54,8 +55,13 @@ async fn undo_restores_every_field_and_undoing_it_redoes() {
         workspace: ws.id.clone(),
         target,
     };
-    let undone = c.workspace.undo(undo(None)).await.unwrap().into_inner();
-    let sparse = undone.workspace.unwrap().sparse.unwrap_or_default();
+    let undone = c.workspace.undo(undo(None)).await.unwrap().into_owned();
+    let sparse = undone
+        .workspace
+        .unwrap()
+        .sparse
+        .into_option()
+        .unwrap_or_default();
     assert!(
         sparse.include.is_empty(),
         "sparse profile restored: {sparse:?}"
@@ -67,7 +73,7 @@ async fn undo_restores_every_field_and_undoing_it_redoes() {
         .undo(undo(Some(undo_op)))
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(
         redone.workspace.unwrap().sparse.unwrap().include,
         vec!["src"]

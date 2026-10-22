@@ -4,10 +4,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Mutex;
 
 use bytes::Bytes;
+use connectrpc::ConnectError as Status;
 use rill_proto::convert::hash_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{ObjectHash, ObjectKind, INLINE_THRESHOLD};
-use tonic::Status;
 
 /// Root label -> path -> bytes.
 pub type Trees = HashMap<String, BTreeMap<String, Bytes>>;
@@ -70,8 +70,8 @@ impl MockRepo {
     pub(super) fn entry(&self, bytes: &Bytes) -> pb::TreeEntry {
         pb::TreeEntry {
             kind: Some(pb::tree_entry::Kind::File(pb::tree_entry::File {
-                content: Some(self.content_ref(bytes)),
-                kind: pb::FileKind::Regular as i32,
+                content: self.content_ref(bytes).into(),
+                kind: pb::FileKind::Regular.into(),
             })),
         }
     }

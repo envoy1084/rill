@@ -104,7 +104,7 @@ fn change_version_minimal_roundtrip() {
     };
     let mut wire_cv = wire(pb::ChangeVersion::from(&cv));
     // Clients may omit provenance entirely.
-    wire_cv.provenance = None;
+    wire_cv.provenance = None.into();
     assert_eq!(ChangeVersion::try_from(wire_cv).unwrap(), cv);
 }
 
@@ -122,7 +122,7 @@ fn change_version_errors_name_fields() {
     );
 
     let mut bad = pb::ChangeVersion::from(sample_change_version());
-    bad.author = None;
+    bad.author = None.into();
     assert_eq!(
         ChangeVersion::try_from(bad).unwrap_err(),
         ConvertError::missing("change_version.author")
@@ -144,9 +144,9 @@ fn change_version_errors_name_fields() {
         "x".into(),
         pb::FileChange {
             change: Some(pb::file_change::Change::Set(pb::file_change::Set {
-                content: Some(pb::ContentRef::from(ContentRef::inline(Vec::new()))),
-                kind: 0,
-                copy_from: None,
+                content: pb::ContentRef::from(ContentRef::inline(Vec::new())).into(),
+                kind: 0.into(),
+                copy_from: None.into(),
             })),
         },
     );

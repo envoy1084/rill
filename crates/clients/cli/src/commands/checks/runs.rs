@@ -4,7 +4,6 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use clap::Args;
-use futures::StreamExt;
 use rill_proto::rill::v1 as pb;
 use rill_types::Timestamp;
 use serde_json::json as j;
@@ -65,7 +64,7 @@ pub struct ArtifactArgs {
 }
 
 fn state(value: i32) -> &'static str {
-    match pb::StepState::try_from(value).unwrap_or(pb::StepState::Unspecified) {
+    match rill_proto::convert::known::<pb::StepState>(value).unwrap_or(pb::StepState::Unspecified) {
         pb::StepState::Queued => "queued",
         pb::StepState::Running => "running",
         pb::StepState::Passed => "passed",
@@ -99,7 +98,7 @@ fn run_json(run: &pb::VerifyRun) -> serde_json::Value {
             "index": s.index,
             "name": s.name,
             "shard": (s.shards > 0).then_some((s.shard, s.shards)),
-            "state": state(s.state),
+            "state": state(s.state.to_i32()),
             "exit_code": s.exit_code,
             "error": s.error,
             "cached": s.cached,
@@ -127,7 +126,7 @@ fn print_run(ctx: &mut Ctx<'_>, run: &pb::VerifyRun) -> Result<()> {
                 0 => s.name.clone(),
                 n => format!("{} {}/{n}", s.name, s.shard),
             };
-            let mut what = state(s.state).to_string();
+            let mut what = state(s.state.to_i32()).to_string();
             if let Some(code) = s.exit_code.filter(|c| *c != 0) {
                 what.push_str(&format!(" ({code})"));
             }
@@ -163,7 +162,7 @@ pub async fn list(ctx: &mut Ctx<'_>, a: RunsArgs) -> Result<()> {
             limit: a.limit,
         })
         .await?
-        .into_inner()
+        .into_owned()
         .runs;
     ctx.emit(
         j!({ "runs": runs.iter().map(run_json).collect::<Vec<_>>() }),
@@ -188,15 +187,15 @@ pub async fn list(ctx: &mut Ctx<'_>, a: RunsArgs) -> Result<()> {
 /// `rill checks run`.
 pub async fn show(ctx: &mut Ctx<'_>, a: RunArgs) -> Result<()> {
     let repo = ctx.repo_name()?;
-    let mut svc = ctx.client()?.checks_svc();
+    let svc = ctx.client()?.checks_svc();
     let request = pb::GetRunRequest { repo, run: a.run };
     if !a.watch {
-        let run = svc.get_run(request).await?.into_inner();
+        let run = svc.get_run(request).await?.into_owned();
         return print_run(ctx, &run);
     }
-    let mut stream = svc.watch_run(request).await?.into_inner();
-    while let Some(run) = stream.next().await {
-        print_run(ctx, &run?)?;
+    let mut stream = svc.watch_run(request).await?;
+    while let Some(run) = stream.message::<pb::VerifyRun>().await? {
+        print_run(ctx, &run.to_owned_message())?;
     }
     Ok(())
 }
@@ -234,16 +233,16 @@ pub async fn log(ctx: &mut Ctx<'_>, a: LogArgs) -> Result<()> {
     copy(
         start,
         |offset| {
-            let mut svc = svc.clone();
+            let svc = svc.clone();
             let request = pb::ReadLogRequest {
                 repo: repo.clone(),
                 run: a.run.clone(),
                 step: a.step,
-                stream: stream as i32,
+                stream: stream.into(),
                 offset,
                 limit: 0,
             };
-            async move { Ok(svc.read_log(request).await?.into_inner()) }
+            async move { Ok(svc.read_log(request).await?.into_owned()) }
         },
         &mut stdout,
     )
@@ -264,7 +263,7 @@ pub async fn artifact(ctx: &mut Ctx<'_>, a: ArtifactArgs) -> Result<()> {
     copy(
         0,
         |offset| {
-            let mut svc = svc.clone();
+            let svc = svc.clone();
             let request = pb::ReadArtifactRequest {
                 repo: repo.clone(),
                 run: a.run.clone(),
@@ -273,7 +272,7 @@ pub async fn artifact(ctx: &mut Ctx<'_>, a: ArtifactArgs) -> Result<()> {
                 offset,
                 limit: 0,
             };
-            async move { Ok(svc.read_artifact(request).await?.into_inner()) }
+            async move { Ok(svc.read_artifact(request).await?.into_owned()) }
         },
         out.as_mut(),
     )

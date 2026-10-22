@@ -8,6 +8,7 @@ use rill_types::{ObjectHash, RefName, RefUpdate, RepoPathBuf, TrunkSeq};
 use super::RepoSvc;
 use crate::auth::caller;
 use crate::services::common::{self, hash, open};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 /// Longest a `WaitDerived` call blocks.
@@ -17,18 +18,18 @@ const WAIT_POLL: std::time::Duration = std::time::Duration::from_millis(50);
 impl RepoSvc {
     pub(super) async fn get_repo_impl(
         &self,
-        request: tonic::Request<pb::GetRepoRequest>,
+        request: Call<pb::GetRepoRequest>,
     ) -> Result<pb::GetRepoResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
         Ok(pb::GetRepoResponse {
-            repo: Some(common::repo_proto(&opened.repo).await?),
+            repo: common::repo_proto(&opened.repo).await?.into(),
         })
     }
 
     pub(super) async fn list_repos_impl(
         &self,
-        request: tonic::Request<pb::ListReposRequest>,
+        request: Call<pb::ListReposRequest>,
     ) -> Result<pb::ListReposResponse> {
         let ctx = caller(&request)?;
         let limit = common::limit(request.get_ref().limit, 100, 10_000);
@@ -54,7 +55,7 @@ impl RepoSvc {
     /// bootstrap state (see `auth::permit`).
     pub(super) async fn create_repo_impl(
         &self,
-        request: tonic::Request<pb::CreateRepoRequest>,
+        request: Call<pb::CreateRepoRequest>,
     ) -> Result<pb::CreateRepoResponse> {
         let ctx = caller(&request)?;
         let req = request.get_ref();
@@ -83,13 +84,13 @@ impl RepoSvc {
             .await?;
         tracing::info!(repo = %req.repo, owner = %ctx.principal, "repository created");
         Ok(pb::CreateRepoResponse {
-            repo: Some(common::repo_proto(&repo).await?),
+            repo: common::repo_proto(&repo).await?.into(),
         })
     }
 
     pub(super) async fn resolve_ref_impl(
         &self,
-        request: tonic::Request<pb::ResolveRefRequest>,
+        request: Call<pb::ResolveRefRequest>,
     ) -> Result<pb::ResolveRefResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -118,7 +119,7 @@ impl RepoSvc {
 
     pub(super) async fn list_refs_impl(
         &self,
-        request: tonic::Request<pb::ListRefsRequest>,
+        request: Call<pb::ListRefsRequest>,
     ) -> Result<pb::ListRefsResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -150,7 +151,7 @@ impl RepoSvc {
     /// Cut `release/<name>` at a trunk position: repository owners only.
     pub(super) async fn cut_release_impl(
         &self,
-        request: tonic::Request<pb::CutReleaseRequest>,
+        request: Call<pb::CutReleaseRequest>,
     ) -> Result<pb::CutReleaseResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().admin().await?;
@@ -190,7 +191,7 @@ impl RepoSvc {
     /// are refused.
     pub(super) async fn move_ref_impl(
         &self,
-        request: tonic::Request<pb::MoveRefRequest>,
+        request: Call<pb::MoveRefRequest>,
     ) -> Result<pb::MoveRefResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().write(&RepoPathBuf::root()).await?;
@@ -246,7 +247,7 @@ impl RepoSvc {
 
     pub(super) async fn trunk_head_impl(
         &self,
-        request: tonic::Request<pb::TrunkHeadRequest>,
+        request: Call<pb::TrunkHeadRequest>,
     ) -> Result<pb::TrunkHeadResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -264,7 +265,7 @@ impl RepoSvc {
 
     pub(super) async fn trunk_range_impl(
         &self,
-        request: tonic::Request<pb::TrunkRangeRequest>,
+        request: Call<pb::TrunkRangeRequest>,
     ) -> Result<pb::TrunkRangeResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read_any().await?;
@@ -286,7 +287,7 @@ impl RepoSvc {
 
     pub(super) async fn get_derived_impl(
         &self,
-        request: tonic::Request<pb::GetDerivedRequest>,
+        request: Call<pb::GetDerivedRequest>,
     ) -> Result<pb::GetDerivedResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
@@ -303,7 +304,7 @@ impl RepoSvc {
 
     pub(super) async fn wait_derived_impl(
         &self,
-        request: tonic::Request<pb::WaitDerivedRequest>,
+        request: Call<pb::WaitDerivedRequest>,
     ) -> Result<pb::WaitDerivedResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;

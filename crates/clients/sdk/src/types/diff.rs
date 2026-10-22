@@ -76,14 +76,14 @@ impl TryFrom<pb::DiffLine> for DiffLine {
     type Error = Error;
 
     fn try_from(l: pb::DiffLine) -> Result<Self> {
-        let op = match pb::diff_line::Op::try_from(l.op) {
+        let op = match rill_proto::convert::known::<pb::diff_line::Op>(l.op) {
             Ok(pb::diff_line::Op::Context) => DiffOp::Context,
             Ok(pb::diff_line::Op::Insert) => DiffOp::Insert,
             Ok(pb::diff_line::Op::Delete) => DiffOp::Delete,
             _ => {
                 return Err(rill_proto::ConvertError::BadEnum {
                     field: "diff_line.op",
-                    value: l.op,
+                    value: l.op.to_i32(),
                 }
                 .into())
             }

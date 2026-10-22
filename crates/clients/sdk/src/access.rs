@@ -28,14 +28,14 @@ impl AccessClient {
     pub async fn grant(&self, relation: &Relation) -> Result<()> {
         let request = pb::AddRelationRequest {
             operation_id: id_to_proto(&OperationId::new()),
-            relation: Some(relation.to_proto()),
+            relation: relation.to_proto().into(),
         };
         let resp = retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.add_relation(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         self.client
             .relations_seen()
             .observe(&resp.repo_id, resp.relation_version);
@@ -46,14 +46,14 @@ impl AccessClient {
     pub async fn revoke(&self, relation: &Relation) -> Result<()> {
         let request = pb::RemoveRelationRequest {
             operation_id: id_to_proto(&OperationId::new()),
-            relation: Some(relation.to_proto()),
+            relation: relation.to_proto().into(),
         };
         let resp = retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.remove_relation(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         self.client
             .relations_seen()
             .observe(&resp.repo_id, resp.relation_version);
@@ -69,11 +69,11 @@ impl AccessClient {
             relation: filter.relation,
         };
         let resp = retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.list_relations(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(resp.relations.into_iter().map(Relation::from).collect())
     }
 
@@ -93,11 +93,11 @@ impl AccessClient {
             subject: subject.map(String::from),
         };
         let resp = retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.check(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(AccessCheck {
             allowed: resp.allowed,
             because: resp.because.into_iter().map(Relation::from).collect(),
@@ -118,11 +118,11 @@ impl AccessClient {
             relation: relation.to_string(),
         };
         let resp = retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.expand(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(resp
             .tuples
             .into_iter()
@@ -154,11 +154,11 @@ impl AccessClient {
             subject: subject.map(String::from),
         };
         let resp = retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.lookup_paths(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(resp.paths)
     }
 }

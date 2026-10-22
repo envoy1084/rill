@@ -1,6 +1,6 @@
 //! Requests with real inputs for RPCs that validate before they authorize.
 
-use prost::Message;
+use buffa::Message;
 use rill_types::{ObjectHash, RepoPathBuf, Timestamp};
 
 use super::super::fixture::*;
@@ -20,12 +20,12 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
     let body = match name.trim_start_matches("rill.v1.") {
         "AccessService/AddRelation" => pb::AddRelationRequest {
             operation_id: Bytes::new(),
-            relation: Some(tuple()),
+            relation: tuple().into(),
         }
         .encode_to_vec(),
         "AccessService/RemoveRelation" => pb::RemoveRelationRequest {
             operation_id: Bytes::new(),
-            relation: Some(tuple()),
+            relation: tuple().into(),
         }
         .encode_to_vec(),
         "AdminService/GetPolicy" => pb::GetPolicyRequest {
@@ -51,23 +51,25 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
         .encode_to_vec(),
         "IdentityService/PutIdentityProvider" => pb::PutIdentityProviderRequest {
             operation_id: Bytes::new(),
-            provider: Some(pb::IdentityProviderSpec {
+            provider: (pb::IdentityProviderSpec {
                 org: "default".into(),
                 name: "p".into(),
                 issuer: "https://idp.example".into(),
                 client_id: "c".into(),
                 ..Default::default()
-            }),
+            })
+            .into(),
         }
         .encode_to_vec(),
         "IdentityService/PutWorkloadIssuer" => pb::PutWorkloadIssuerRequest {
             operation_id: Bytes::new(),
-            issuer: Some(pb::WorkloadIssuerSpec {
+            issuer: (pb::WorkloadIssuerSpec {
                 org: "default".into(),
                 name: "k8s".into(),
                 issuer: "https://k8s.example".into(),
                 ..Default::default()
-            }),
+            })
+            .into(),
         }
         .encode_to_vec(),
         "RepoService/PutBlob" => pb::PutBlobRequest {
@@ -115,7 +117,7 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
             pb::CreateChangeVersionRequest {
                 operation_id: Bytes::new(),
                 repo: "acl".into(),
-                version: Some(pb::ChangeVersion::from(cv)),
+                version: pb::ChangeVersion::from(cv).into(),
                 signatures: Vec::new(),
             }
             .encode_to_vec()

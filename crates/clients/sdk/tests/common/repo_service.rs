@@ -3,33 +3,35 @@
 use std::collections::BTreeMap;
 
 use bytes::Bytes;
+use connectrpc::{
+    ConnectError, InboundStream, RequestContext, Response, ServiceRequest, ServiceStream,
+};
 use futures::stream::BoxStream;
 use rill_proto::convert::{hash_from_proto, hash_to_proto, id_to_proto};
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::repo_service_server::RepoService;
+use rill_proto::rill::v1::RepoService;
 use rill_types::{ChangeId, ObjectHash, ObjectKind, Principal};
-use tonic::{Request, Response, Status, Streaming};
 
 use super::fixtures::{fake_hash, sample_info};
 use super::mock_repo::MockRepo;
-use super::rpc::{hex, unimplemented_rpcs, BoxFut, RpcResult};
+use super::rpc::{hex, next_message, unimplemented_rpcs, Request, RpcResult};
 
-#[tonic::async_trait]
+// The mocks return concrete types.
+#[allow(refining_impl_trait)]
 impl RepoService for MockRepo {
-    type GetBlobStream = BoxStream<'static, Result<pb::BlobChunk, Status>>;
-    type WatchRefsStream = BoxStream<'static, Result<pb::RefEvent, Status>>;
-    type WatchTrunkStream = BoxStream<'static, Result<pb::LandEvent, Status>>;
-    type WatchLogStream = BoxStream<'static, Result<pb::LogEntry, Status>>;
-    type WatchEventsStream = BoxStream<'static, Result<pb::EventEnvelope, Status>>;
-
-    async fn get_repo(&self, req: Request<pb::GetRepoRequest>) -> RpcResult<pb::GetRepoResponse> {
+    async fn get_repo(
+        &self,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::GetRepoRequest>,
+    ) -> RpcResult<pb::GetRepoResponse> {
+        let req = Request::new(ctx, req);
         self.record_auth(&req);
         let name = req.into_inner().repo;
         if name == "missing" {
-            return Err(Status::not_found("no such repo"));
+            return Err(ConnectError::not_found("no such repo"));
         }
         Ok(Response::new(pb::GetRepoResponse {
-            repo: Some(pb::Repo {
+            repo: (pb::Repo {
                 id: id_to_proto(&rill_types::RepoId::derived("test", &name)),
                 name,
                 description: Some("mock".into()),
@@ -37,21 +39,29 @@ impl RepoService for MockRepo {
                 trunk_head_seq: self.trunk.lock().unwrap().0,
                 windows_safe: false,
                 org: "default".into(),
-            }),
+            })
+            .into(),
         }))
     }
 
     async fn get_change_versions(
         &self,
-        req: Request<pb::GetChangeVersionsRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::GetChangeVersionsRequest>,
     ) -> RpcResult<pb::GetChangeVersionsResponse> {
+        let req = Request::new(ctx, req);
         let id = hex(&req.into_inner().change_id);
         Ok(Response::new(pb::GetChangeVersionsResponse {
             versions: vec![sample_info(&id, None)],
         }))
     }
 
-    async fn log(&self, req: Request<pb::LogRequest>) -> RpcResult<pb::LogResponse> {
+    async fn log(
+        &self,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::LogRequest>,
+    ) -> RpcResult<pb::LogResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
         let entries: Vec<_> = self
             .log
@@ -67,9 +77,14 @@ impl RepoService for MockRepo {
         }))
     }
 
-    async fn list_dir(&self, req: Request<pb::ListDirRequest>) -> RpcResult<pb::ListDirResponse> {
+    async fn list_dir(
+        &self,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::ListDirRequest>,
+    ) -> RpcResult<pb::ListDirResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
-        let tree = self.tree(req.root.as_ref())?;
+        let tree = self.tree(req.root.as_option())?;
         let prefix = if req.path.is_empty() {
             String::new()
         } else {
@@ -85,7 +100,7 @@ impl RepoService for MockRepo {
                     entries.entry(dir.to_string()).or_insert(pb::TreeEntry {
                         kind: Some(pb::tree_entry::Kind::Dir(pb::tree_entry::Dir {
                             hash: hash_to_proto(&fake_hash(&format!("{prefix}{dir}"))),
-                            summary: Some(pb::DirSummary::default()),
+                            summary: pb::DirSummary::default().into(),
                         })),
                     });
                 }
@@ -100,7 +115,7 @@ impl RepoService for MockRepo {
                 .into_iter()
                 .map(|(name, entry)| pb::NamedTreeEntry {
                     name,
-                    entry: Some(entry),
+                    entry: entry.into(),
                 })
                 .collect(),
             read_grant: String::new(),
@@ -109,19 +124,26 @@ impl RepoService for MockRepo {
 
     async fn resolve_path(
         &self,
-        req: Request<pb::ResolvePathRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::ResolvePathRequest>,
     ) -> RpcResult<pb::ResolvePathResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
-        let tree = self.tree(req.root.as_ref())?;
+        let tree = self.tree(req.root.as_option())?;
         Ok(Response::new(pb::ResolvePathResponse {
-            entry: tree.get(&req.path).map(|f| self.entry(f)),
+            entry: (tree.get(&req.path).map(|f| self.entry(f))).into(),
             read_grant: String::new(),
         }))
     }
 
-    async fn get_blob(&self, req: Request<pb::GetBlobRequest>) -> RpcResult<Self::GetBlobStream> {
+    async fn get_blob(
+        &self,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::GetBlobRequest>,
+    ) -> RpcResult<ServiceStream<pb::BlobChunk>> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
-        let hash = match req.content.and_then(|c| c.r#ref) {
+        let hash = match req.content.into_option().and_then(|c| c.r#ref) {
             Some(pb::content_ref::Ref::Blob(b)) | Some(pb::content_ref::Ref::Chunked(b)) => {
                 hash_from_proto("hash", &b.hash)?
             }
@@ -129,7 +151,7 @@ impl RepoService for MockRepo {
                 let chunk = pb::BlobChunk { data: bytes };
                 return Ok(Response::new(Box::pin(tokio_stream::once(Ok(chunk)))));
             }
-            None => return Err(Status::invalid_argument("missing content")),
+            None => return Err(ConnectError::invalid_argument("missing content")),
         };
         let bytes = self
             .blobs
@@ -137,7 +159,7 @@ impl RepoService for MockRepo {
             .unwrap()
             .get(&hash)
             .cloned()
-            .ok_or_else(|| Status::not_found("blob"))?;
+            .ok_or_else(|| ConnectError::not_found("blob"))?;
         let chunk_size = self.chunk_size;
         let chunks: Vec<_> = (0..bytes.len())
             .step_by(chunk_size)
@@ -152,27 +174,29 @@ impl RepoService for MockRepo {
 
     async fn put_blob(
         &self,
-        req: Request<Streaming<pb::PutBlobRequest>>,
+        ctx: RequestContext,
+        requests: InboundStream<pb::PutBlobRequest>,
     ) -> RpcResult<pb::PutBlobResponse> {
+        let req = Request::with_message(ctx, requests);
         let mut stream = req.into_inner();
         let mut data = Vec::new();
         let mut messages = 0usize;
         let mut saw_header = false;
-        while let Some(msg) = stream.message().await? {
+        while let Some(msg) = next_message(&mut stream).await? {
             messages += 1;
             match msg.msg {
                 Some(pb::put_blob_request::Msg::Header(h)) => {
                     saw_header = true;
                     if h.repo.is_empty() || h.operation_id.len() != 16 {
-                        return Err(Status::invalid_argument("bad header"));
+                        return Err(ConnectError::invalid_argument("bad header"));
                     }
                 }
                 Some(pb::put_blob_request::Msg::Data(d)) => data.extend_from_slice(&d),
-                None => return Err(Status::invalid_argument("empty message")),
+                None => return Err(ConnectError::invalid_argument("empty message")),
             }
         }
         if !saw_header {
-            return Err(Status::invalid_argument("no header"));
+            return Err(ConnectError::invalid_argument("no header"));
         }
         self.put_requests.lock().unwrap().push(messages);
         let bytes = Bytes::from(data);
@@ -180,26 +204,29 @@ impl RepoService for MockRepo {
         let size = bytes.len() as u64;
         self.blobs.lock().unwrap().insert(hash, bytes);
         Ok(Response::new(pb::PutBlobResponse {
-            content: Some(pb::ContentRef {
+            content: (pb::ContentRef {
                 r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
                     hash: hash_to_proto(&hash),
                     size,
                 })),
-            }),
+            })
+            .into(),
         }))
     }
 
     async fn apply_edits(
         &self,
-        req: Request<pb::ApplyEditsRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::ApplyEditsRequest>,
     ) -> RpcResult<pb::ApplyEditsResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
         self.applied.lock().unwrap().push(req.clone());
         let failing = self.unavailable.load(std::sync::atomic::Ordering::SeqCst);
         if failing > 0 {
             self.unavailable
                 .store(failing - 1, std::sync::atomic::Ordering::SeqCst);
-            return Err(Status::unavailable("server going away"));
+            return Err(ConnectError::unavailable("server going away"));
         }
         let mut file_changes = BTreeMap::new();
         for edit in &req.edits {
@@ -208,7 +235,7 @@ impl RepoService for MockRepo {
                     pb::file_change::Change::Set(pb::file_change::Set {
                         content: set.content.clone(),
                         kind: set.kind,
-                        copy_from: None,
+                        copy_from: None.into(),
                     })
                 }
                 Some(pb::edit::Op::Delete(_)) => {
@@ -216,14 +243,15 @@ impl RepoService for MockRepo {
                 }
                 Some(pb::edit::Op::Patch(p)) => {
                     pb::file_change::Change::Set(pb::file_change::Set {
-                        content: Some(pb::ContentRef {
+                        content: (pb::ContentRef {
                             r#ref: Some(pb::content_ref::Ref::Inline(Bytes::from(p.clone()))),
-                        }),
-                        kind: pb::FileKind::Regular as i32,
-                        copy_from: None,
+                        })
+                        .into(),
+                        kind: pb::FileKind::Regular.into(),
+                        copy_from: None.into(),
                     })
                 }
-                None => return Err(Status::invalid_argument("edit without op")),
+                None => return Err(ConnectError::invalid_argument("edit without op")),
             };
             file_changes.insert(
                 edit.path.clone(),
@@ -242,7 +270,7 @@ impl RepoService for MockRepo {
             predecessor: None,
             subtree_changes: BTreeMap::new(),
             file_changes,
-            author: Some(pb::Principal::from(Principal::human("alice"))),
+            author: (pb::Principal::from(Principal::human("alice"))).into(),
             provenance: req.provenance.clone(),
             intent: req.intent.clone(),
             message: req.message.clone(),
@@ -252,11 +280,16 @@ impl RepoService for MockRepo {
         let hash = fake_hash(&format!("apply:{}:{}", req.message, req.edits.len()));
         Ok(Response::new(pb::ApplyEditsResponse {
             hash: hash_to_proto(&hash),
-            version: Some(version),
+            version: version.into(),
         }))
     }
 
-    async fn rebase(&self, req: Request<pb::RebaseRequest>) -> RpcResult<pb::RebaseResponse> {
+    async fn rebase(
+        &self,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::RebaseRequest>,
+    ) -> RpcResult<pb::RebaseResponse> {
+        let req = Request::new(ctx, req);
         let req = req.into_inner();
         let from = hash_from_proto("hash", &req.hash)?;
         let onto = hash_from_proto("new_parent", &req.new_parent)?;
@@ -264,29 +297,32 @@ impl RepoService for MockRepo {
         let new_hash = fake_hash(&format!("rebase:{from}:{onto}"));
         Ok(Response::new(pb::RebaseResponse {
             hash: hash_to_proto(&new_hash),
-            version: Some(pb::ChangeVersion {
+            version: (pb::ChangeVersion {
                 change_id: id_to_proto(&ChangeId::derived("rebase", &from.to_hex())),
                 parents: vec![req.new_parent],
                 predecessor: Some(req.hash),
                 subtree_changes: BTreeMap::new(),
                 file_changes: BTreeMap::new(),
-                author: Some(pb::Principal::from(Principal::human("alice"))),
-                provenance: None,
+                author: (pb::Principal::from(Principal::human("alice"))).into(),
+                provenance: None.into(),
                 intent: None,
                 message: "rebased".into(),
                 created_at: 1,
                 extra: BTreeMap::new(),
-            }),
+            })
+            .into(),
         }))
     }
 
     async fn resolve_ref(
         &self,
-        req: Request<pb::ResolveRefRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::ResolveRefRequest>,
     ) -> RpcResult<pb::ResolveRefResponse> {
+        let req = Request::new(ctx, req);
         let name = req.into_inner().name;
         if name != "trunk" {
-            return Err(Status::not_found(format!("ref {name}")));
+            return Err(ConnectError::not_found(format!("ref {name}")));
         }
         let (seq, hash) = *self.trunk.lock().unwrap();
         Ok(Response::new(pb::ResolveRefResponse {
@@ -297,8 +333,10 @@ impl RepoService for MockRepo {
 
     async fn trunk_head(
         &self,
-        req: Request<pb::TrunkHeadRequest>,
+        ctx: RequestContext,
+        req: ServiceRequest<'_, pb::TrunkHeadRequest>,
     ) -> RpcResult<pb::TrunkHeadResponse> {
+        let req = Request::new(ctx, req);
         self.record_auth(&req);
         let (seq, hash) = *self.trunk.lock().unwrap();
         Ok(Response::new(pb::TrunkHeadResponse {
@@ -309,14 +347,16 @@ impl RepoService for MockRepo {
 
     async fn watch_trunk(
         &self,
-        _req: Request<pb::WatchTrunkRequest>,
-    ) -> RpcResult<Self::WatchTrunkStream> {
+        ctx: RequestContext,
+        _req: ServiceRequest<'_, pb::WatchTrunkRequest>,
+    ) -> RpcResult<ServiceStream<pb::LandEvent>> {
+        let _req = Request::new(ctx, _req);
         let events = (1..=3u64).map(|seq| {
             Ok(pb::LandEvent {
                 seq,
                 hash: hash_to_proto(&fake_hash(&format!("land{seq}"))),
                 change_id: id_to_proto(&ChangeId::derived("land", &seq.to_string())),
-                landed_by: Some(pb::Principal::from(Principal::service("lander"))),
+                landed_by: (pb::Principal::from(Principal::service("lander"))).into(),
                 at: seq as i64,
                 reverts_seq: None,
             })
@@ -344,9 +384,9 @@ impl RepoService for MockRepo {
         move_ref(pb::MoveRefRequest) -> pb::MoveRefResponse;
         cut_release(pb::CutReleaseRequest) -> pb::CutReleaseResponse;
         trunk_range(pb::TrunkRangeRequest) -> pb::TrunkRangeResponse;
-        watch_refs(pb::WatchRefsRequest) -> Self::WatchRefsStream;
-        watch_log(pb::WatchLogRequest) -> Self::WatchLogStream;
-        watch_events(pb::WatchEventsRequest) -> Self::WatchEventsStream;
+        watch_refs(pb::WatchRefsRequest) -> ServiceStream<pb::RefEvent>;
+        watch_log(pb::WatchLogRequest) -> ServiceStream<pb::LogEntry>;
+        watch_events(pb::WatchEventsRequest) -> ServiceStream<pb::EventEnvelope>;
         get_derived(pb::GetDerivedRequest) -> pb::GetDerivedResponse;
         wait_derived(pb::WaitDerivedRequest) -> pb::WaitDerivedResponse;
     }

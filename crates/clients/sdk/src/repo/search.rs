@@ -11,10 +11,10 @@ impl RepoClient {
     /// trigram index. Paths the caller may not read are never returned.
     pub async fn grep(&self, root: &Root, query: &GrepQuery) -> Result<GrepResult> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GrepRequest {
                 repo: self.repo.clone(),
-                root: Some(root.to_proto()),
+                root: root.to_proto().into(),
                 pattern: query.pattern.clone(),
                 case_insensitive: query.case_insensitive,
                 path_globs: query.path_globs.clone(),
@@ -24,7 +24,7 @@ impl RepoClient {
             async move { svc.grep(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         GrepResult::from_proto(resp)
     }
 }

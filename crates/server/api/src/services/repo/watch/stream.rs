@@ -11,13 +11,13 @@ use rill_events::Start;
 use rill_types::{Event, Versionstamp};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::Status;
 
+use connectrpc::ConnectError;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::RepoContext;
 
 /// A boxed server stream.
-pub type EventStream<T> = Pin<Box<dyn Stream<Item = std::result::Result<T, Status>> + Send>>;
+pub type EventStream<T> = Pin<Box<dyn Stream<Item = std::result::Result<T, ConnectError>> + Send>>;
 
 /// Buffer between the producer task and the gRPC stream.
 pub(super) const STREAM_BUFFER: usize = 256;
@@ -62,7 +62,7 @@ where
             let item = match item {
                 Ok(None) => continue,
                 Ok(Some(item)) => Ok(item),
-                Err(e) => Err(Status::from(e)),
+                Err(e) => Err(ConnectError::from(e)),
             };
             let failed = item.is_err();
             if tx.send(item).await.is_err() || failed {

@@ -16,18 +16,19 @@ async fn apply(c: &mut Clients, on_trunk: bool, edits: Vec<pb::Edit>) -> Bytes {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            base: on_trunk.then(|| pb::EditBase {
+            base: (on_trunk.then(|| pb::EditBase {
                 base: Some(pb::edit_base::Base::Root(trunk())),
-            }),
+            }))
+            .into(),
             edits,
             message: "edit".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .version
         .unwrap()
         .change_id
@@ -105,7 +106,7 @@ async fn a_plan_step_gets_an_org_secret_set_through_the_api() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .secret
         .unwrap();
     assert_eq!(
@@ -117,7 +118,7 @@ async fn a_plan_step_gets_an_org_secret_set_through_the_api() {
         .list_secrets(pb::ListSecretsRequest { org: String::new() })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .secrets;
     assert_eq!(listed.len(), 1);
 
@@ -144,7 +145,7 @@ secrets = ["DEPLOY_KEY"]
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .deleted;
     assert!(deleted);
     let next = apply(&mut c, true, vec![set_edit("README", b"hi")]).await;
@@ -159,7 +160,7 @@ secrets = ["DEPLOY_KEY"]
 #[cfg(unix)]
 #[tokio::test]
 async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
-    use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
+    use rill_proto::rill::v1::ChecksServiceClient;
 
     let mut config = dev_config();
     config.verify.enabled = true;
@@ -196,7 +197,7 @@ async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
     let _ = std::fs::remove_file(&marker);
 
     let channel = connect(&server.grpc).await;
-    let mut checks = ChecksServiceClient::new(channel);
+    let checks = ChecksServiceClient::authed(channel, Bearer(None));
     let flaky = checks
         .list_flaky_tests(pb::ListFlakyTestsRequest {
             repo: "app".into(),
@@ -205,7 +206,7 @@ async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .tests;
     assert_eq!(flaky.len(), 1, "{flaky:?}");
     assert_eq!(flaky[0].target, "step:racy");
@@ -217,8 +218,8 @@ async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
         })
         .await
         .unwrap()
-        .into_inner();
-    let outcomes: Vec<_> = history.runs.iter().map(|r| r.outcome).collect();
+        .into_owned();
+    let outcomes: Vec<_> = history.runs.iter().map(|r| r.outcome.to_i32()).collect();
     assert_eq!(
         outcomes,
         [
@@ -233,7 +234,7 @@ async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
 #[tokio::test]
 async fn a_failed_runs_steps_logs_and_artifacts_are_readable() {
     use futures::StreamExt;
-    use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
+    use rill_proto::rill::v1::ChecksServiceClient;
 
     let mut config = dev_config();
     config.verify.enabled = true;
@@ -275,18 +276,18 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
         .unwrap_or_else(|| panic!("no run in {refused:?}"))
         .to_string();
 
-    let mut checks = ChecksServiceClient::new(connect(&server.grpc).await);
+    let checks = ChecksServiceClient::authed(connect(&server.grpc).await, Bearer(None));
     let get = pb::GetRunRequest {
         repo: "app".into(),
         run: run_id.clone(),
     };
-    let run = checks.get_run(get.clone()).await.unwrap().into_inner();
+    let run = checks.get_run(get.clone()).await.unwrap().into_owned();
     assert_eq!(run.green, Some(false));
     let step = |name: &str| run.steps.iter().find(|s| s.name == name).unwrap().clone();
     let (build, check) = (step("build"), step("check"));
-    assert_eq!(build.state, pb::StepState::Passed as i32);
+    assert_eq!(build.state, pb::StepState::Passed);
     assert_eq!(
-        (check.state, check.exit_code),
+        (check.state.to_i32(), check.exit_code),
         (pb::StepState::Failed as i32, Some(1))
     );
 
@@ -294,7 +295,7 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
         repo: "app".into(),
         run: run_id.clone(),
         step,
-        stream: stream as i32,
+        stream: stream.into(),
         offset,
         limit: 0,
     };
@@ -302,13 +303,13 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
         .read_log(log(check.index, pb::LogStream::Stderr, 0))
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(stderr.data.as_ref(), b"expected 2, got 3\n");
     let tail = checks
         .read_log(log(check.index, pb::LogStream::Stderr, -3))
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(
         (tail.data.as_ref(), tail.offset, tail.size),
         (&b" 3\n"[..], 15, 18)
@@ -324,7 +325,7 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(artifact.data.as_ref(), b"artifact bytes");
 
     let listed = checks
@@ -335,14 +336,14 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .runs;
     assert_eq!(listed[0].id, run_id);
     let watched: Vec<_> = checks
         .watch_run(get)
         .await
         .unwrap()
-        .into_inner()
+        .messages()
         .collect()
         .await;
     assert_eq!(watched.len(), 1, "a finished run is sent once");
@@ -352,7 +353,7 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
 #[cfg(unix)]
 #[tokio::test]
 async fn a_step_whose_rerun_differs_is_listed_as_nonhermetic() {
-    use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
+    use rill_proto::rill::v1::ChecksServiceClient;
 
     let mut config = dev_config();
     config.verify.enabled = true;
@@ -378,14 +379,14 @@ async fn a_step_whose_rerun_differs_is_listed_as_nonhermetic() {
     .await;
     assert_eq!(land_with(&mut c, "app", change, &[("Owner", 1)]).await, 1);
 
-    let mut checks = ChecksServiceClient::new(connect(&server.grpc).await);
+    let checks = ChecksServiceClient::authed(connect(&server.grpc).await, Bearer(None));
     let mut steps = Vec::new();
     for _ in 0..100 {
         steps = checks
             .list_nonhermetic(pb::ListNonhermeticRequest { repo: "app".into() })
             .await
             .unwrap()
-            .into_inner()
+            .into_owned()
             .steps;
         if !steps.is_empty() {
             break;
@@ -402,9 +403,9 @@ async fn a_step_whose_rerun_differs_is_listed_as_nonhermetic() {
 
 #[tokio::test]
 async fn an_owner_quarantines_a_target_and_lifts_it_again() {
-    use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
+    use rill_proto::rill::v1::ChecksServiceClient;
     let server = TestServer::start(dev_config()).await;
-    let mut c = clients(&server, None).await;
+    let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
             operation_id: Bytes::new(),
@@ -414,7 +415,7 @@ async fn an_owner_quarantines_a_target_and_lifts_it_again() {
         })
         .await
         .unwrap();
-    let mut checks = ChecksServiceClient::new(connect(&server.grpc).await);
+    let checks = ChecksServiceClient::authed(connect(&server.grpc).await, Bearer(None));
     let quarantine = |target: &str| pb::QuarantineRequest {
         operation_id: Bytes::new(),
         repo: "app".into(),
@@ -422,19 +423,19 @@ async fn an_owner_quarantines_a_target_and_lifts_it_again() {
         reason: "flips on unchanged inputs".into(),
     };
     let bad = checks.quarantine(quarantine("unit")).await.unwrap_err();
-    assert_eq!(bad.code(), tonic::Code::InvalidArgument);
+    assert_eq!(bad.code, connectrpc::ErrorCode::InvalidArgument);
     for added in [true, false] {
         let reply = checks
             .quarantine(quarantine("test:core::racy"))
             .await
             .unwrap();
-        assert_eq!(reply.into_inner().added, added);
+        assert_eq!(reply.into_owned().added, added);
     }
     let listed = checks
         .list_quarantined(pb::ListQuarantinedRequest { repo: "app".into() })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .targets;
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].reason, "flips on unchanged inputs");
@@ -448,7 +449,7 @@ async fn an_owner_quarantines_a_target_and_lifts_it_again() {
             .release_quarantine(release())
             .await
             .unwrap()
-            .into_inner()
+            .into_owned()
             .released
     );
     assert!(
@@ -456,7 +457,7 @@ async fn an_owner_quarantines_a_target_and_lifts_it_again() {
             .release_quarantine(release())
             .await
             .unwrap()
-            .into_inner()
+            .into_owned()
             .released
     );
 }
@@ -474,17 +475,18 @@ async fn an_owner_freezes_trunk_and_its_health_says_so() {
         })
         .await
         .unwrap();
-    let lander = rill_proto::rill::v1::lander_service_client::LanderServiceClient::new(
+    let lander = rill_proto::rill::v1::LanderServiceClient::authed(
         connect(&server.grpc).await,
+        Bearer(None),
     );
     let health = |_: &mut Clients| {
-        let mut lander = lander.clone();
+        let lander = lander.clone();
         async move {
             lander
                 .get_trunk_health(pb::GetTrunkHealthRequest { repo: "app".into() })
                 .await
                 .unwrap()
-                .into_inner()
+                .into_owned()
         }
     };
     let fresh = health(&mut c).await;
@@ -502,7 +504,7 @@ async fn an_owner_freezes_trunk_and_its_health_says_so() {
         .freeze_trunk(freeze(true))
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert!(frozen.health.unwrap().frozen);
     let now = health(&mut c).await.health.unwrap();
     assert_eq!(
@@ -519,7 +521,7 @@ async fn an_owner_freezes_trunk_and_its_health_says_so() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .incidents;
     assert!(incidents.is_empty());
 }
@@ -542,23 +544,24 @@ async fn an_owner_previews_and_reverts_everything_an_author_landed() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            base: None,
+            base: None.into(),
             edits: vec![set_edit("agent.txt", b"done by an agent\n")],
             message: "agent work".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .version
         .unwrap()
         .change_id;
     land(&mut c, "app", change).await;
 
-    let mut lander = rill_proto::rill::v1::lander_service_client::LanderServiceClient::new(
+    let lander = rill_proto::rill::v1::LanderServiceClient::authed(
         connect(&server.grpc).await,
+        Bearer(None),
     );
     let select = |apply| pb::RevertSetRequest {
         operation_id: Bytes::new(),
@@ -584,15 +587,15 @@ async fn an_owner_previews_and_reverts_everything_an_author_landed() {
         })
         .await
         .unwrap_err();
-    assert_eq!(range_only.code(), tonic::Code::InvalidArgument);
+    assert_eq!(range_only.code, connectrpc::ErrorCode::InvalidArgument);
 
-    let preview = lander.revert_set(select(false)).await.unwrap().into_inner();
+    let preview = lander.revert_set(select(false)).await.unwrap().into_owned();
     assert_eq!(preview.entries.len(), 1);
     assert_eq!(
         (preview.entries[0].seq, preview.entries[0].ticket.as_ref()),
         (1, None)
     );
-    let applied = lander.revert_set(select(true)).await.unwrap().into_inner();
+    let applied = lander.revert_set(select(true)).await.unwrap().into_owned();
     let ticket = applied.entries[0].ticket.clone().unwrap();
     for _ in 0..100 {
         let status = c
@@ -603,7 +606,7 @@ async fn an_owner_previews_and_reverts_everything_an_author_landed() {
             })
             .await
             .unwrap()
-            .into_inner();
+            .into_owned();
         if status.seq.is_some() {
             assert_eq!(status.seq, Some(2));
             return;

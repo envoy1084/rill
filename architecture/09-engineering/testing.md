@@ -12,8 +12,8 @@ the other backends must match.
 ```mermaid
 flowchart TD
     U[Unit<br/>src/** in every crate] --> I[Crate integration<br/>tests/*.rs over Stores::memory]
-    I --> M[Mock server<br/>rill-sdk, rill-mcp vs hand-written tonic services]
-    I --> G[gRPC smoke<br/>real rill-api on ephemeral ports]
+    I --> M[Mock server<br/>rill-sdk, rill-mcp vs hand-written services]
+    I --> G[API end to end<br/>real rill-api on ephemeral ports]
     G --> E[CLI end-to-end<br/>server + run_cli_with_args]
     I --> X[External<br/>rill-git-import with a real git repo]
 ```
@@ -22,8 +22,8 @@ flowchart TD
 | --- | --- | --- |
 | Unit | one module: encodings, parsers, policy evaluation, hash framing, exit codes | `src/**`; most in `rill-policy`, `rill-core`, `rill-proto`, `rill-search`, `rill-store` |
 | Crate integration | a crate's public API over memory stores | `tests/` in `rill-store`, `rill-core`, `rill-review`, `rill-lander`, `rill-search` |
-| Mock server | SDK and MCP against hand-written tonic services | `rill-sdk/tests`, `rill-mcp/tests` |
-| gRPC end to end | the real server through generated clients and raw HTTP | `rill-api/tests/grpc/` |
+| Mock server | SDK and MCP against hand-written services | `rill-sdk/tests`, `rill-mcp/tests` |
+| API end to end | the real server through generated clients, raw gRPC and Connect JSON over HTTP/1.1 | `rill-api/tests/grpc/` |
 | CLI | the real server driven through the CLI library; clap parsing alone | `rill-cli/tests/cli_e2e.rs`, `rill-cli/tests/landing.rs`, `rill-cli/tests/parse/main.rs` |
 | External | import from a repository built with `git` | `rill-git-import/tests/real_git.rs` |
 
@@ -55,7 +55,8 @@ round trips in `src/convert/roundtrip_tests/`.
   human and an agent principal. The helpers are `root_change`,
   `child_change` and `amend`.
 - **SDK mock** (`rill-sdk/tests/common/mod.rs`): `MockRepo` and `MockReview`
-  are tonic services. Every RPC they do not implement answers
+  implement the generated service traits and are served by a `connectrpc`
+  router. Every RPC they do not implement answers
   `Unimplemented` through the `unimplemented_rpcs!` macro.
   `Harness::start(repo, review, token)` serves them on an ephemeral port and
   builds a `Client`.

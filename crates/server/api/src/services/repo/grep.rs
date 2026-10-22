@@ -5,6 +5,7 @@ use rill_search::SearchQuery;
 
 use super::RepoSvc;
 use crate::services::common::{limit, open, resolve_root};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 const DEFAULT_RESULTS: usize = 200;
@@ -14,7 +15,7 @@ const MAX_CONTEXT: u32 = 20;
 impl RepoSvc {
     pub(super) async fn grep_impl(
         &self,
-        request: tonic::Request<pb::GrepRequest>,
+        request: Call<pb::GrepRequest>,
     ) -> Result<pb::GrepResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -23,7 +24,7 @@ impl RepoSvc {
             return Err(Error::invalid("pattern must not be empty"));
         }
         let ctx = &opened.repo;
-        let resolved = resolve_root(ctx, req.root.as_ref()).await?;
+        let resolved = resolve_root(ctx, req.root.as_option()).await?;
 
         let max = limit(req.max_results, DEFAULT_RESULTS, MAX_RESULTS);
         let query = SearchQuery::new(req.pattern.clone())

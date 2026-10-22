@@ -4,9 +4,9 @@
 use rill_proto::rill::v1 as pb;
 use rill_types::identity::{AccountStatus, AgentRecord, IdentityChange, Sponsor};
 use rill_types::{Principal, SessionId, Timestamp};
-use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -15,7 +15,7 @@ const SESSION_SCAN: usize = 100_000;
 
 pub async fn kill(
     state: &AppState,
-    request: Request<pb::KillSwitchRequest>,
+    request: Call<pb::KillSwitchRequest>,
 ) -> Result<pb::KillSwitchResponse> {
     let ctx = caller(&request)?;
     let req = request.into_inner();

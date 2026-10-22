@@ -1,6 +1,6 @@
 [package]
 name = "rill-sdk"
-description = "Typed client library over the rill.v1 gRPC API, with local working-copy support"
+description = "Typed client library over the rill.v1 API, with local working-copy support"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,7 +15,12 @@ hex = { workspace = true }
 rill-proto = { workspace = true }
 rill-core = { workspace = true }
 rill-merge-syntax = { workspace = true }
-tonic = { workspace = true }
+connectrpc = { workspace = true }
+buffa = { workspace = true }
+http = { workspace = true }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
+rustls-native-certs = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 futures = { workspace = true }
@@ -33,6 +38,11 @@ parking_lot = { workspace = true }
 postcard = { workspace = true }
 
 [dev-dependencies]
+axum = { workspace = true }
+buffa = { workspace = true }
+connectrpc = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }

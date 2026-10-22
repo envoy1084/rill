@@ -1,15 +1,15 @@
 # SDK
 
-`rill-sdk` is the typed Rust client for the `rill.v1` gRPC API. The CLI,
-the MCP server and agents all use it. It returns server results as they are:
-a gRPC status becomes `Error::Status` with its code unchanged. The only local
+`rill-sdk` is the typed Rust client for the `rill.v1` API. The CLI, the MCP
+server and agents all use it. It returns server results as they are: an
+error becomes `Error::Status` with its code unchanged. The only local
 state it manages is a `.rill/` checkout.
 
 ## Shape
 
 ```mermaid
 flowchart LR
-    Cfg[ClientConfig] --> Cl[Client<br/>Channel + AuthInterceptor]
+    Cfg[ClientConfig] --> Cl[Client<br/>Connection + CallHeaders]
     Cl --> Repo[RepoClient]
     Cl --> Admin[AdminClient]
     Cl --> Access[AccessClient]
@@ -21,10 +21,13 @@ flowchart LR
     Repo --> Co[local::Checkout]
 ```
 
-A `Client` is one HTTP/2 `Channel` plus an `AuthInterceptor`. The
-interceptor adds `authorization: Bearer <token>` when a token is set, and
-`x-rill-relations` with the relation versions the client has seen
-(`Client::relations_seen`, shared by clones). `AccessClient::grant` and
+A `Client` is one pooled `connectrpc` connection plus `CallHeaders`, which
+the SDK's `Transport` sets on every request: `authorization: Bearer
+<token>` when a token is set, `x-rill-relations` with the relation versions
+the client has seen (`Client::relations_seen`, shared by clones), and an
+`x-request-id`. Calls use the Connect protocol over HTTP/2: cleartext
+endpoints by prior knowledge, `https://` ones by ALPN, trusting the system
+roots plus `ca_file`, with an optional client certificate. `AccessClient::grant` and
 `revoke` record the version they produce, so every server honours a change
 on the client's next request
 ([permissions](../05-policy/permissions.md#consistency-across-servers)).
@@ -36,12 +39,15 @@ puts the repository on every request and hands out the per-service clients.
 Inputs and outputs are `rill-types` values where one exists. Otherwise they
 are small structs in `types/`.
 
-`Client::connect` dials eagerly, so a bad endpoint fails at once.
-`connect_lazy` connects on first use; the CLI and MCP server use it so
-`--help`, `initialize` and `tools/list` work with no server running.
-`with_channel` wraps an existing `Channel` for tests. The endpoint uses a
-10 s connect timeout, 30 s TCP and HTTP/2 keepalives, and the per-request
-`timeout` from the config. Streams ignore that timeout.
+Nothing is dialled until the first request; a bad endpoint fails there.
+`Client::connect` first exchanges a workload credential when one is
+configured; `connect_lazy` awaits nothing, so the CLI and MCP server answer
+`--help`, `initialize` and `tools/list` with no server running.
+`with_connection` builds a client over an existing `Connection`, and
+`connection_without_credentials` hands one to sign-in. Calls get the
+`timeout` from the config. `repo_svc()`, `workspace_svc()` and the others
+return fresh generated clients; `transport()` and `call_config()` build
+any other.
 
 ## Configuration
 

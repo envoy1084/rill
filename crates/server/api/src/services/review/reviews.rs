@@ -6,10 +6,10 @@ use rill_proto::convert::{
 };
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeId, RepoPathBuf, ReviewStatus, ThreadAnchor};
-use tonic::Request;
 
 use super::ReviewSvc;
 use crate::services::common::{self, open};
+use crate::services::Call;
 use rill_runtime::error::Result;
 
 pub(super) fn change_id(bytes: &[u8]) -> Result<ChangeId> {
@@ -23,21 +23,21 @@ pub(super) fn review_response(state: rill_types::ReviewState) -> pb::ReviewState
 impl ReviewSvc {
     pub(super) async fn get_review_impl(
         &self,
-        request: Request<pb::GetReviewRequest>,
+        request: Call<pb::GetReviewRequest>,
     ) -> Result<pb::GetReviewResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
         let id = change_id(&request.get_ref().change_id)?;
         let state = opened.repo.review().get(&id).await?;
         Ok(pb::GetReviewResponse {
-            review: Some(review_response(state)),
+            review: review_response(state).into(),
             labels: opened.repo.labels.iter().map(pb::Label::from).collect(),
         })
     }
 
     pub(super) async fn list_reviews_impl(
         &self,
-        request: Request<pb::ListReviewsRequest>,
+        request: Call<pb::ListReviewsRequest>,
     ) -> Result<pb::ListReviewsResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
@@ -68,20 +68,20 @@ impl ReviewSvc {
 
     pub(super) async fn submit_for_review_impl(
         &self,
-        request: Request<pb::SubmitForReviewRequest>,
+        request: Call<pb::SubmitForReviewRequest>,
     ) -> Result<pb::SubmitForReviewResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().write_any().await?;
         let id = change_id(&request.get_ref().change_id)?;
         let state = opened.repo.review().submit(&id, opened.principal()).await?;
         Ok(pb::SubmitForReviewResponse {
-            review: Some(review_response(state)),
+            review: review_response(state).into(),
         })
     }
 
     pub(super) async fn set_stack_impl(
         &self,
-        request: Request<pb::SetStackRequest>,
+        request: Call<pb::SetStackRequest>,
     ) -> Result<pb::SetStackResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().write_any().await?;
@@ -94,7 +94,7 @@ impl ReviewSvc {
 
     pub(super) async fn evaluate_submit_impl(
         &self,
-        request: Request<pb::EvaluateSubmitRequest>,
+        request: Call<pb::EvaluateSubmitRequest>,
     ) -> Result<pb::EvaluateSubmitResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
@@ -103,19 +103,20 @@ impl ReviewSvc {
         let state = review.get(&id).await?;
         let decision = review.evaluate_for(&state, opened.principal()).await?;
         Ok(pb::EvaluateSubmitResponse {
-            decision: Some(pb::SubmitDecision {
+            decision: (pb::SubmitDecision {
                 allowed: decision.allowed,
                 reasons: decision.reasons,
                 matched_policies: decision.matched_policies,
-                risk: pb::RiskClass::from(state.risk) as i32,
+                risk: pb::RiskClass::from(state.risk).into(),
                 risk_reasons: state.risk_reasons,
-            }),
+            })
+            .into(),
         })
     }
 
     pub(super) async fn abandon_impl(
         &self,
-        request: Request<pb::AbandonRequest>,
+        request: Call<pb::AbandonRequest>,
     ) -> Result<pb::AbandonResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().write_any().await?;
@@ -139,7 +140,7 @@ impl ReviewSvc {
                 .await?;
         }
         Ok(pb::AbandonResponse {
-            review: Some(review_response(state)),
+            review: review_response(state).into(),
         })
     }
 }

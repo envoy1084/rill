@@ -3,11 +3,11 @@
 use rill_proto::convert::opt_id_from_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{OperationId, OperationKind, Workspace};
-use tonic::Request;
 
 use super::oplog::response_pair;
 use super::WorkspaceSvc;
 use crate::services::common::{self, open, operation_id};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 /// Default page size for operation listings.
@@ -17,7 +17,7 @@ const MAX_OPS_LIMIT: usize = 1000;
 impl WorkspaceSvc {
     pub(super) async fn undo_impl(
         &self,
-        request: Request<pb::UndoRequest>,
+        request: Call<pb::UndoRequest>,
     ) -> Result<pb::UndoResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
@@ -65,14 +65,14 @@ impl WorkspaceSvc {
             .await?;
         let (workspace, operation) = response_pair(&ws, &op);
         Ok(pb::UndoResponse {
-            workspace,
-            operation,
+            workspace: workspace.into(),
+            operation: operation.into(),
         })
     }
 
     pub(super) async fn list_operations_impl(
         &self,
-        request: Request<pb::ListOperationsRequest>,
+        request: Call<pb::ListOperationsRequest>,
     ) -> Result<pb::ListOperationsResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.get_ref();

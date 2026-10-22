@@ -6,17 +6,18 @@ use std::sync::Arc;
 use rill_identity::signin::{RefreshToken, SessionTokens};
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::session_service_server::SessionService;
-use tonic::{Request, Response, Status};
+use rill_proto::rill::v1::SessionService;
 
+use crate::services::Call;
 use crate::signin::flows;
+use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::error::Error;
 use rill_runtime::state::AppState;
 
 const TOKEN_TYPE_ID: &str = "urn:ietf:params:oauth:token-type:id_token";
 const TOKEN_TYPE_JWT: &str = "urn:ietf:params:oauth:token-type:jwt";
 
-type GrpcResult<T> = std::result::Result<Response<T>, Status>;
+type GrpcResult<T> = std::result::Result<Response<T>, ConnectError>;
 
 /// The session service.
 #[derive(Clone)]
@@ -36,17 +37,20 @@ fn grant(tokens: SessionTokens) -> pb::SessionGrant {
         expires_at: timestamp_to_proto(tokens.expires_at),
         refresh_token: Some(tokens.refresh_token.to_string()),
         session: tokens.session.id.to_string(),
-        principal: Some(pb::Principal::from(&tokens.session.principal)),
+        principal: pb::Principal::from(&tokens.session.principal).into(),
         org: tokens.session.org,
     }
 }
 
-#[tonic::async_trait]
+// Handlers return their concrete response types.
+#[allow(refining_impl_trait)]
 impl SessionService for SessionSvc {
     async fn list_sign_in_providers(
         &self,
-        request: Request<pb::ListSignInProvidersRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListSignInProvidersRequest>,
     ) -> GrpcResult<pb::ListSignInProvidersResponse> {
+        let request = Call::new(ctx, request);
         let org = request.into_inner().org;
         let org = if org.is_empty() {
             rill_store::DEFAULT_ORG.to_string()
@@ -55,7 +59,7 @@ impl SessionService for SessionSvc {
         };
         let providers = flows::sign_in_providers(&self.state, &org)
             .await
-            .map_err(Status::from)?;
+            .map_err(ConnectError::from)?;
         Ok(Response::new(pb::ListSignInProvidersResponse {
             providers: providers
                 .into_iter()
@@ -74,8 +78,10 @@ impl SessionService for SessionSvc {
 
     async fn exchange_token(
         &self,
-        request: Request<pb::ExchangeTokenRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ExchangeTokenRequest>,
     ) -> GrpcResult<pb::SessionGrant> {
+        let request = Call::new(ctx, request);
         let req = request.into_inner();
         let result = match req.subject_token_type.as_str() {
             TOKEN_TYPE_ID => flows::exchange_id_token(&self.state, &req.subject_token)
@@ -100,7 +106,7 @@ impl SessionService for SessionSvc {
                     expires_at: timestamp_to_proto(g.expires_at),
                     refresh_token: None,
                     session: g.session.id.to_string(),
-                    principal: Some(pb::Principal::from(&g.session.principal)),
+                    principal: pb::Principal::from(&g.session.principal).into(),
                     org: g.session.org,
                 })
             }
@@ -108,13 +114,15 @@ impl SessionService for SessionSvc {
                 "unsupported subject_token_type {other:?}"
             ))),
         };
-        result.map(Response::new).map_err(Status::from)
+        result.map(Response::new).map_err(ConnectError::from)
     }
 
     async fn refresh_session(
         &self,
-        request: Request<pb::RefreshSessionRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::RefreshSessionRequest>,
     ) -> GrpcResult<pb::SessionGrant> {
+        let request = Call::new(ctx, request);
         let result = async {
             let token: RefreshToken = request.get_ref().refresh_token.parse()?;
             flows::refresh_live(&self.state, &token).await
@@ -122,6 +130,6 @@ impl SessionService for SessionSvc {
         .await;
         result
             .map(|t| Response::new(grant(t)))
-            .map_err(Status::from)
+            .map_err(ConnectError::from)
     }
 }

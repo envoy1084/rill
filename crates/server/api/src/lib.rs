@@ -13,6 +13,7 @@
 pub mod auth;
 pub mod grants;
 pub mod objects;
+mod rpc_codes;
 pub mod scim;
 mod serve;
 pub mod services;

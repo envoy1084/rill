@@ -16,12 +16,13 @@ use super::commit::commit_version;
 use super::trees::{check_content_exists, content_bytes};
 use super::RepoSvc;
 use crate::services::common::{self, hash, open, path, provenance, resolve_root, Opened};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 impl RepoSvc {
     pub(super) async fn create_change_version_impl(
         &self,
-        request: tonic::Request<pb::CreateChangeVersionRequest>,
+        request: Call<pb::CreateChangeVersionRequest>,
     ) -> Result<pb::CreateChangeVersionResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().write_any().await?;
@@ -56,7 +57,7 @@ impl RepoSvc {
 
     pub(super) async fn apply_edits_impl(
         &self,
-        request: tonic::Request<pb::ApplyEditsRequest>,
+        request: Call<pb::ApplyEditsRequest>,
     ) -> Result<pb::ApplyEditsResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
@@ -64,11 +65,11 @@ impl RepoSvc {
         let objects = ctx.repo.objects();
 
         let amend: Option<ChangeId> = opt_id_from_proto("change_id", req.change_id.as_ref())?;
-        let base = edit_base(&opened, req.base.as_ref(), amend).await?;
+        let base = edit_base(&opened, req.base.as_option(), amend).await?;
 
         let mut builder = ChangeBuilder::new(opened.principal().clone())
             .message(req.message)
-            .provenance(provenance(req.provenance)?);
+            .provenance(provenance(req.provenance.into_option())?);
         if let Some(id) = base.change_id {
             builder = builder.change_id(id);
         }
@@ -121,13 +122,13 @@ impl RepoSvc {
         let (hash, cv) = commit_version(&opened, cv).await?;
         Ok(pb::ApplyEditsResponse {
             hash: hash_to_proto(&hash),
-            version: Some(pb::ChangeVersion::from(cv)),
+            version: pb::ChangeVersion::from(cv).into(),
         })
     }
 
     pub(super) async fn rebase_impl(
         &self,
-        request: tonic::Request<pb::RebaseRequest>,
+        request: Call<pb::RebaseRequest>,
     ) -> Result<pb::RebaseResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.get_ref();
@@ -138,13 +139,13 @@ impl RepoSvc {
         let (hash, cv) = commit_version(&opened, rebased).await?;
         Ok(pb::RebaseResponse {
             hash: hash_to_proto(&hash),
-            version: Some(pb::ChangeVersion::from(cv)),
+            version: pb::ChangeVersion::from(cv).into(),
         })
     }
 
     pub(super) async fn merge_impl(
         &self,
-        request: tonic::Request<pb::MergeRequest>,
+        request: Call<pb::MergeRequest>,
     ) -> Result<pb::MergeResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
@@ -152,7 +153,7 @@ impl RepoSvc {
         let left = hash("left", &req.left)?;
         let right = hash("right", &req.right)?;
         let mut options = MergeChangeOptions::new(opened.principal().clone(), req.message);
-        options.provenance = provenance(req.provenance)?;
+        options.provenance = provenance(req.provenance.into_option())?;
         let mut merged = merge_changes(
             &opened.repo.derive,
             &opened.repo.graph,
@@ -165,13 +166,13 @@ impl RepoSvc {
         let (hash, cv) = commit_version(&opened, merged).await?;
         Ok(pb::MergeResponse {
             hash: hash_to_proto(&hash),
-            version: Some(pb::ChangeVersion::from(cv)),
+            version: pb::ChangeVersion::from(cv).into(),
         })
     }
 
     pub(super) async fn resolve_impl(
         &self,
-        request: tonic::Request<pb::ResolveRequest>,
+        request: Call<pb::ResolveRequest>,
     ) -> Result<pb::ResolveResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().write_any().await?;
@@ -205,7 +206,7 @@ impl RepoSvc {
             };
             cv.file_changes.insert(path, change);
         }
-        let mut prov = provenance(req.provenance)?;
+        let mut prov = provenance(req.provenance.into_option())?;
         merge_provenance(&mut prov, &cv.provenance);
         prov.resolved_by = Some(opened.permit().resolved_by().to_string());
         cv.provenance = prov;
@@ -214,7 +215,7 @@ impl RepoSvc {
         let (hash, cv) = commit_version(&opened, cv).await?;
         Ok(pb::ResolveResponse {
             hash: hash_to_proto(&hash),
-            version: Some(pb::ChangeVersion::from(cv)),
+            version: pb::ChangeVersion::from(cv).into(),
         })
     }
 }
@@ -295,7 +296,7 @@ async fn set_content(
     };
     let kind = rill_proto::convert::file_kind_from_proto("set_content.kind", set.kind)
         .unwrap_or(FileKind::Regular);
-    let copy_from = match set.copy_from {
+    let copy_from = match set.copy_from.into_option() {
         Some(c) => Some(rill_types::objects::change::CopySource::try_from(c)?),
         None => None,
     };

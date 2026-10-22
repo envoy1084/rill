@@ -3,9 +3,9 @@
 use rill_proto::rill::v1 as pb;
 use rill_types::identity::{IssuerKeys, WorkloadIssuer};
 use rill_types::Timestamp;
-use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -25,7 +25,7 @@ fn spec(i: &WorkloadIssuer) -> pb::WorkloadIssuerSpec {
 
 pub async fn put(
     state: &AppState,
-    request: Request<pb::PutWorkloadIssuerRequest>,
+    request: Call<pb::PutWorkloadIssuerRequest>,
 ) -> Result<pb::PutWorkloadIssuerResponse> {
     let ctx = caller(&request)?;
     let s = request
@@ -65,13 +65,13 @@ pub async fn put(
         .await?;
     tracing::info!(by = %ctx.principal, org = %issuer.org, issuer = %issuer.issuer, "workload issuer trusted");
     Ok(pb::PutWorkloadIssuerResponse {
-        issuer: Some(spec(&issuer)),
+        issuer: spec(&issuer).into(),
     })
 }
 
 pub async fn list(
     state: &AppState,
-    request: Request<pb::ListWorkloadIssuersRequest>,
+    request: Call<pb::ListWorkloadIssuersRequest>,
 ) -> Result<pb::ListWorkloadIssuersResponse> {
     let ctx = caller(&request)?;
     let org = request.into_inner().org;
@@ -84,7 +84,7 @@ pub async fn list(
 
 pub async fn delete(
     state: &AppState,
-    request: Request<pb::DeleteWorkloadIssuerRequest>,
+    request: Call<pb::DeleteWorkloadIssuerRequest>,
 ) -> Result<pb::DeleteWorkloadIssuerResponse> {
     let ctx = caller(&request)?;
     let req = request.into_inner();

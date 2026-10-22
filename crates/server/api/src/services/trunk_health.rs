@@ -5,10 +5,10 @@ use rill_lander::healing::Selector;
 use rill_proto::convert::{hash_to_proto, id_from_proto, id_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{Incident, Resolution, TrunkHealth, TrunkSeq};
-use tonic::Request;
 
 use super::common::open;
 use super::lander::LanderSvc;
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 /// Incidents in a page by default.
@@ -18,7 +18,7 @@ const MAX_INCIDENTS: usize = 1000;
 impl LanderSvc {
     pub(super) async fn trunk_health_impl(
         &self,
-        request: Request<pb::GetTrunkHealthRequest>,
+        request: Call<pb::GetTrunkHealthRequest>,
     ) -> Result<pb::GetTrunkHealthResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened
@@ -28,14 +28,14 @@ impl LanderSvc {
         let health = opened.repo.repo.trunk_health().await?;
         let open = opened.repo.lander.open_incidents().await?;
         Ok(pb::GetTrunkHealthResponse {
-            health: Some(health_to_proto(&health)),
+            health: health_to_proto(&health).into(),
             open: open.iter().map(incident_to_proto).collect(),
         })
     }
 
     pub(super) async fn incidents_impl(
         &self,
-        request: Request<pb::ListIncidentsRequest>,
+        request: Call<pb::ListIncidentsRequest>,
     ) -> Result<pb::ListIncidentsResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened
@@ -54,7 +54,7 @@ impl LanderSvc {
 
     pub(super) async fn freeze_impl(
         &self,
-        request: Request<pb::FreezeTrunkRequest>,
+        request: Call<pb::FreezeTrunkRequest>,
     ) -> Result<pb::FreezeTrunkResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().admin().await?;
@@ -66,7 +66,7 @@ impl LanderSvc {
             .set_frozen(req.frozen, reason, opened.principal())
             .await?;
         Ok(pb::FreezeTrunkResponse {
-            health: Some(health_to_proto(&health)),
+            health: health_to_proto(&health).into(),
         })
     }
 }
@@ -74,7 +74,7 @@ impl LanderSvc {
 impl LanderSvc {
     pub(super) async fn revert_set_impl(
         &self,
-        request: Request<pb::RevertSetRequest>,
+        request: Call<pb::RevertSetRequest>,
     ) -> Result<pb::RevertSetResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().admin().await?;
@@ -156,10 +156,10 @@ fn incident_to_proto(incident: &Incident) -> pb::Incident {
         failures: incident.failures.clone(),
         steps: incident.steps.clone(),
         details: incident.details.clone(),
-        author: Some(incident.author.clone().into()),
+        author: pb::Principal::from(incident.author.clone()).into(),
         session: incident.session.clone(),
         model: incident.model.clone(),
-        sponsor: incident.sponsor.clone().map(Into::into),
+        sponsor: incident.sponsor.clone().map(pb::Principal::from).into(),
         state: incident.state.as_str().into(),
         opened_at: timestamp_to_proto(incident.opened_at),
         updated_at: timestamp_to_proto(incident.updated_at),

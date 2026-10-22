@@ -80,16 +80,16 @@ async fn a_directory_reader_reads_its_directory_and_nothing_else() {
         .apply_edits(rill_proto::rill::v1::ApplyEditsRequest {
             operation_id: Default::default(),
             repo: "acl".into(),
-            base: None,
+            base: None.into(),
             edits: Vec::new(),
             message: "start".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .hash;
     let first = rill_types::ObjectHash::from_slice(&first).unwrap();
     let public = "public\n".repeat(100);

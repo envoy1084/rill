@@ -3,9 +3,9 @@
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_store::OrgConfig;
-use tonic::Request;
 
 use crate::auth::caller;
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -21,7 +21,7 @@ fn org_proto(org: OrgConfig) -> pb::Org {
 /// with its own users, policies and keys.
 pub async fn create(
     state: &AppState,
-    request: Request<pb::CreateOrgRequest>,
+    request: Call<pb::CreateOrgRequest>,
 ) -> Result<pb::CreateOrgResponse> {
     let ctx = caller(&request)?;
     crate::auth::require_instance_admin(state, &ctx)?;
@@ -40,14 +40,14 @@ pub async fn create(
         })?;
     tracing::info!(org = %org.name, by = %ctx.principal, "org created");
     Ok(pb::CreateOrgResponse {
-        org: Some(org_proto(org)),
+        org: org_proto(org).into(),
     })
 }
 
 /// Every org.
 pub async fn list(
     state: &AppState,
-    request: Request<pb::ListOrgsRequest>,
+    request: Call<pb::ListOrgsRequest>,
 ) -> Result<pb::ListOrgsResponse> {
     caller(&request)?;
     Ok(pb::ListOrgsResponse {

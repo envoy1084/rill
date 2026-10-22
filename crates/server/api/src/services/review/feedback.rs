@@ -4,12 +4,12 @@ use rill_proto::convert::{comment_category_from_proto, confidence_from_proto};
 use rill_proto::rill::v1 as pb;
 use rill_review::threads::CommentMeta;
 use rill_types::{ChangeId, Principal, ThreadAnchor};
-use tonic::Request;
 
 use super::owners;
 use super::reviews::{change_id, review_response};
 use super::ReviewSvc;
 use crate::services::common::{self, open, Opened};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 async fn thread_of(opened: &Opened, change_id: &ChangeId, thread_id: &str) -> Result<pb::Thread> {
@@ -25,7 +25,7 @@ async fn thread_of(opened: &Opened, change_id: &ChangeId, thread_id: &str) -> Re
 impl ReviewSvc {
     pub(super) async fn vote_impl(
         &self,
-        request: Request<pb::VoteRequest>,
+        request: Call<pb::VoteRequest>,
     ) -> Result<pb::VoteResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().review().await?;
@@ -56,19 +56,19 @@ impl ReviewSvc {
             )
             .await?;
         Ok(pb::VoteResponse {
-            review: Some(review_response(state)),
+            review: review_response(state).into(),
         })
     }
 
     pub(super) async fn comment_impl(
         &self,
-        request: Request<pb::CommentRequest>,
+        request: Call<pb::CommentRequest>,
     ) -> Result<pb::CommentResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().review().await?;
         let req = request.into_inner();
         let id = change_id(&req.change_id)?;
-        let anchor = match req.anchor {
+        let anchor = match req.anchor.into_option() {
             Some(a) => ThreadAnchor::try_from(a)?,
             None => ThreadAnchor::Change,
         };
@@ -97,13 +97,13 @@ impl ReviewSvc {
         let thread = thread_of(&opened, &id, &thread_id).await?;
         Ok(pb::CommentResponse {
             thread_id,
-            thread: Some(thread),
+            thread: thread.into(),
         })
     }
 
     pub(super) async fn reply_thread_impl(
         &self,
-        request: Request<pb::ReplyThreadRequest>,
+        request: Call<pb::ReplyThreadRequest>,
     ) -> Result<pb::ReplyThreadResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().review().await?;
@@ -126,13 +126,13 @@ impl ReviewSvc {
             .await?;
         let thread = thread_of(&opened, &id, &req.thread_id).await?;
         Ok(pb::ReplyThreadResponse {
-            thread: Some(thread),
+            thread: thread.into(),
         })
     }
 
     pub(super) async fn resolve_thread_impl(
         &self,
-        request: Request<pb::ResolveThreadRequest>,
+        request: Call<pb::ResolveThreadRequest>,
     ) -> Result<pb::ResolveThreadResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().review().await?;
@@ -148,7 +148,7 @@ impl ReviewSvc {
         }
         let thread = thread_of(&opened, &id, &req.thread_id).await?;
         Ok(pb::ResolveThreadResponse {
-            thread: Some(thread),
+            thread: thread.into(),
         })
     }
 }

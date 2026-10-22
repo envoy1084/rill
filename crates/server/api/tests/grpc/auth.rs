@@ -9,7 +9,7 @@ async fn issued_tokens_are_bound_by_relations() {
     let mallory_token = server.token_for(&rill_types::Principal::agent("mallory"));
 
     // No token at all: unauthenticated.
-    let mut anon = clients(&server, None).await;
+    let anon = clients(&server, None).await;
     let err = anon
         .repo
         .list_repos(pb::ListReposRequest {
@@ -18,9 +18,9 @@ async fn issued_tokens_are_bound_by_relations() {
         })
         .await
         .unwrap_err();
-    assert_eq!(err.code(), Code::Unauthenticated);
+    assert_eq!(err.code, Code::Unauthenticated);
 
-    let mut alice = clients(&server, Some(&alice_token)).await;
+    let alice = clients(&server, Some(&alice_token)).await;
     alice
         .repo
         .create_repo(pb::CreateRepoRequest {
@@ -41,22 +41,22 @@ async fn issued_tokens_are_bound_by_relations() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .relations;
     assert_eq!(relations.len(), 1);
     assert_eq!(relations[0].relation, "owner");
 
-    let mut mallory = clients(&server, Some(&mallory_token)).await;
+    let mallory = clients(&server, Some(&mallory_token)).await;
     let err = mallory
         .repo
         .list_dir(pb::ListDirRequest {
             repo: "private".into(),
-            root: None,
+            root: None.into(),
             path: String::new(),
         })
         .await
         .unwrap_err();
-    assert_eq!(err.code(), Code::PermissionDenied);
+    assert_eq!(err.code, Code::PermissionDenied);
     let visible = mallory
         .repo
         .list_repos(pb::ListReposRequest {
@@ -65,7 +65,7 @@ async fn issued_tokens_are_bound_by_relations() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert!(visible.repos.is_empty());
 
     // Granting a reader relation opens reads but not writes.
@@ -73,12 +73,13 @@ async fn issued_tokens_are_bound_by_relations() {
         .access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
-            relation: Some(pb::Relation {
+            relation: (pb::Relation {
                 repo: "private".into(),
                 path: String::new(),
                 relation: "reader".into(),
                 subject: format!("principal:{}", rill_types::Principal::agent("mallory").id),
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
@@ -86,7 +87,7 @@ async fn issued_tokens_are_bound_by_relations() {
         .repo
         .list_dir(pb::ListDirRequest {
             repo: "private".into(),
-            root: None,
+            root: None.into(),
             path: String::new(),
         })
         .await
@@ -96,16 +97,16 @@ async fn issued_tokens_are_bound_by_relations() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "private".into(),
-            base: None,
+            base: None.into(),
             edits: vec![set_edit("x", b"y")],
             message: "nope".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap_err();
-    assert_eq!(err.code(), Code::PermissionDenied);
+    assert_eq!(err.code, Code::PermissionDenied);
 
     // Object protocol honours the same rules.
     let mut stream = TcpStream::connect(server.http).await.unwrap();

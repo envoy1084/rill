@@ -5,8 +5,8 @@
 //! another audience (see `architecture/09-engineering/testing.md`).
 
 use rill_identity::keys::KeyServiceConfig;
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
-use rill_proto::rill::v1::session_service_client::SessionServiceClient;
+use rill_proto::rill::v1::IdentityServiceClient;
+use rill_proto::rill::v1::SessionServiceClient;
 use rill_runtime::config::IdentityConfig;
 use rill_types::identity::{AccountStatus, UserRecord};
 use rill_types::{Principal, Timestamp};
@@ -69,25 +69,25 @@ async fn a_kubernetes_service_account_acts_as_its_agent() {
     };
     let server = TestServer::start_on(config, stores).await;
     let root = server.token_for(&Principal::human("root"));
-    let mut admin =
-        IdentityServiceClient::with_interceptor(connect(&server.grpc).await, Bearer(Some(root)));
+    let admin = IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(root)));
     admin
         .put_workload_issuer(pb::PutWorkloadIssuerRequest {
             operation_id: Bytes::new(),
-            issuer: Some(pb::WorkloadIssuerSpec {
+            issuer: (pb::WorkloadIssuerSpec {
                 org: "default".into(),
                 name: "cluster".into(),
                 issuer: issuer.clone(),
                 keys: Some(pb::workload_issuer_spec::Keys::Jwks(jwks)),
                 audiences: vec!["rill".into()],
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
     admin
         .register_agent(pb::RegisterAgentRequest {
             operation_id: Bytes::new(),
-            agent: Some(pb::AgentSpec {
+            agent: (pb::AgentSpec {
                 org: "default".into(),
                 name: "builder".into(),
                 sponsor: "user:ann".into(),
@@ -95,21 +95,22 @@ async fn a_kubernetes_service_account_acts_as_its_agent() {
                 repos: vec!["*".into()],
                 paths: vec![],
                 models: vec![],
-                budgets: None,
+                budgets: None.into(),
                 workloads: vec![pb::WorkloadBinding {
                     issuer,
                     subject: "system:serviceaccount:rill-test:*".into(),
                     claims: Default::default(),
                 }],
                 expires_at: None,
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
     let exchange = |jwt: String| {
         let grpc = server.grpc.clone();
         async move {
-            SessionServiceClient::new(connect(&grpc).await)
+            SessionServiceClient::authed(connect(&grpc).await, Bearer(None))
                 .exchange_token(pb::ExchangeTokenRequest {
                     subject_token: jwt,
                     subject_token_type: "urn:ietf:params:oauth:token-type:jwt".into(),
@@ -120,14 +121,14 @@ async fn a_kubernetes_service_account_acts_as_its_agent() {
                 .await
         }
     };
-    let grant = exchange(token).await.unwrap().into_inner();
+    let grant = exchange(token).await.unwrap().into_owned();
     let me = clients(&server, Some(&grant.access_token))
         .await
         .admin
         .who_am_i(pb::WhoAmIRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(me.principal.unwrap().name, "builder");
     assert_eq!(me.sponsor.as_deref(), Some("user:ann"));
     assert!(

@@ -1,6 +1,6 @@
 [package]
 name = "rill-proto"
-description = "Protobuf definitions, generated tonic services and conversions for the rill.v1 API"
+description = "Protobuf definitions, generated Connect services and conversions for the rill.v1 API"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,18 +9,25 @@ repository.workspace = true
 
 [dependencies]
 rill-types = { workspace = true }
-tonic = { workspace = true }
-tonic-prost = { workspace = true }
-prost = { workspace = true }
-prost-types = { workspace = true }
+connectrpc = { workspace = true }
+buffa = { workspace = true }
+buffa-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+prost = { workspace = true }
+prost-types = { workspace = true }
+
 [build-dependencies]
-tonic-prost-build = { workspace = true }
+connectrpc-build = { workspace = true }
+buffa-codegen = { workspace = true }
 protox = { workspace = true }
 prost = { workspace = true }
+prost-types = { workspace = true }
 
 [package.metadata.cargo-machete]
-# Used by the generated gRPC code.
-ignored = ["tonic-prost"]
+# Used by the generated code.
+ignored = ["buffa-types", "serde", "serde_json"]

@@ -132,7 +132,7 @@ pub struct KillArgs {
 }
 
 fn agent_json(a: &pb::Agent) -> serde_json::Value {
-    let spec = a.spec.clone().unwrap_or_default();
+    let spec = a.spec.clone().into_option().unwrap_or_default();
     json!({
         "org": spec.org, "name": spec.name, "sponsor": spec.sponsor, "status": a.status,
         "repos": spec.repos, "paths": spec.paths, "models": spec.models,
@@ -161,7 +161,7 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                 .collect::<Result<Vec<_>>>()?;
             svc.register_agent(pb::RegisterAgentRequest {
                 operation_id: Default::default(),
-                agent: Some(pb::AgentSpec {
+                agent: (pb::AgentSpec {
                     org: a.org.org,
                     name: a.name,
                     sponsor: a.sponsor,
@@ -169,32 +169,34 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                     repos: a.repos,
                     paths: a.paths,
                     models: a.models,
-                    budgets: Some(pb::AgentBudgets {
+                    budgets: (pb::AgentBudgets {
                         versions_per_day: a.versions_per_day,
                         lands_per_day: a.lands_per_day,
                         requests_per_minute: a.requests_per_minute,
                         executions_per_day: a.executions_per_day,
-                    }),
+                    })
+                    .into(),
                     workloads,
                     expires_at: None,
-                }),
+                })
+                .into(),
             })
             .await?
-            .into_inner()
+            .into_owned()
             .agent
         }
         AgentCmd::List(o) => {
             let agents = svc
                 .list_agents(pb::ListAgentsRequest { org: o.org })
                 .await?
-                .into_inner()
+                .into_owned()
                 .agents;
             return ctx.emit(
                 json!(agents.iter().map(agent_json).collect::<Vec<_>>()),
                 |out| {
                     let mut table = Table::new(&["NAME", "SPONSOR", "STATUS", "REPOS"]);
                     for a in &agents {
-                        let spec = a.spec.clone().unwrap_or_default();
+                        let spec = a.spec.clone().into_option().unwrap_or_default();
                         table.row(vec![
                             spec.name,
                             spec.sponsor,
@@ -206,13 +208,14 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                 },
             );
         }
-        AgentCmd::Suspend(a) => update(&mut svc, a, true).await?,
-        AgentCmd::Activate(a) => update(&mut svc, a, false).await?,
+        AgentCmd::Suspend(a) => update(&mut svc, a, true).await?.into(),
+        AgentCmd::Activate(a) => update(&mut svc, a, false).await?.into(),
     }
+    .into_option()
     .unwrap_or_default();
     let value = agent_json(&agent);
     ctx.emit(value, |out| {
-        let spec = agent.spec.clone().unwrap_or_default();
+        let spec = agent.spec.clone().into_option().unwrap_or_default();
         out.line(format!(
             "agent {}/{} is {}",
             spec.org, spec.name, agent.status
@@ -225,22 +228,23 @@ async fn update(
     a: AgentArg,
     suspended: bool,
 ) -> Result<Option<pb::Agent>> {
-    Ok(svc
+    Ok((svc
         .update_agent(pb::UpdateAgentRequest {
             operation_id: Default::default(),
             org: a.org.org,
             name: a.name,
             suspended: Some(suspended),
-            spec: None,
+            spec: None.into(),
         })
         .await?
-        .into_inner()
+        .into_owned()
         .agent)
+        .into_option())
 }
 
 /// Run `rill admin trust`.
 pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
-    let mut svc = ctx.client()?.identity_svc();
+    let svc = ctx.client()?.identity_svc();
     match cmd {
         TrustCmd::Add(a) => {
             let keys = match (a.jwks_uri, a.jwks_file) {
@@ -253,17 +257,19 @@ pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
             let saved = svc
                 .put_workload_issuer(pb::PutWorkloadIssuerRequest {
                     operation_id: Default::default(),
-                    issuer: Some(pb::WorkloadIssuerSpec {
+                    issuer: (pb::WorkloadIssuerSpec {
                         org: a.org.org,
                         name: a.name,
                         issuer: a.issuer,
                         keys: Some(keys),
                         audiences: a.audiences,
-                    }),
+                    })
+                    .into(),
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .issuer
+                .into_option()
                 .unwrap_or_default();
             ctx.emit(
                 json!({ "name": saved.name, "issuer": saved.issuer }),
@@ -274,7 +280,7 @@ pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
             let issuers = svc
                 .list_workload_issuers(pb::ListWorkloadIssuersRequest { org: o.org })
                 .await?
-                .into_inner()
+                .into_owned()
                 .issuers;
             let value = json!(issuers
                 .iter()
@@ -300,7 +306,7 @@ pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
                     name: a.name,
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .deleted;
             ctx.emit(json!({ "deleted": deleted }), |out| {
                 out.line(if deleted { "removed" } else { "no such issuer" })
@@ -333,7 +339,7 @@ pub async fn kill(ctx: &mut Ctx<'_>, a: KillArgs) -> Result<()> {
             reason: a.reason,
         })
         .await?
-        .into_inner();
+        .into_owned();
     ctx.emit(
         json!({
             "agents_suspended": done.agents_suspended,

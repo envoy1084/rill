@@ -45,9 +45,9 @@ impl ConvertError {
     }
 }
 
-impl From<ConvertError> for tonic::Status {
+impl From<ConvertError> for connectrpc::ConnectError {
     fn from(err: ConvertError) -> Self {
-        tonic::Status::invalid_argument(err.to_string())
+        connectrpc::ConnectError::invalid_argument(err.to_string())
     }
 }
 

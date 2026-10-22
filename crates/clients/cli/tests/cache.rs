@@ -29,16 +29,16 @@ async fn the_cache_serves_what_grants_name_and_fetches_each_object_once() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Default::default(),
             repo: "acl".into(),
-            base: None,
+            base: None.into(),
             edits: Vec::new(),
             message: "start".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .hash;
     let files = [
         ("pub/a.txt", "a\n".repeat(400)),
@@ -91,12 +91,12 @@ async fn the_cache_serves_what_grants_name_and_fetches_each_object_once() {
         .repo_svc()
         .list_dir(pb::ListDirRequest {
             repo: "acl".into(),
-            root: Some(Root::Version(version).to_proto()),
+            root: Root::Version(version).to_proto().into(),
             path: "pub".into(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let grant = listing.read_grant;
     let token = server.token(&bob);
     let http = reqwest::Client::new();
@@ -167,16 +167,16 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Default::default(),
             repo: "app".into(),
-            base: None,
+            base: None.into(),
             edits: Vec::new(),
             message: "start".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .hash;
     let version = owner
         .repo("app")
@@ -195,12 +195,12 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
         .repo_svc()
         .list_dir(pb::ListDirRequest {
             repo: "app".into(),
-            root: Some(Root::Version(version).to_proto()),
+            root: Root::Version(version).to_proto().into(),
             path: "data".into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .read_grant;
 
     let dir = tempfile::tempdir().unwrap();
@@ -240,13 +240,13 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
         .request_redaction(pb::RequestRedactionRequest {
             operation_id: Default::default(),
             org: "default".into(),
-            kind: ObjectKind::Blob as i32,
+            kind: (ObjectKind::Blob as i32).into(),
             hash: hash.as_bytes().to_vec().into(),
             reason: "customer data".into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .redaction
         .unwrap();
     server
@@ -288,36 +288,39 @@ async fn a_cache_that_cannot_reread_redactions_stops_serving() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Default::default(),
             repo: "app".into(),
-            base: None,
+            base: None.into(),
             edits: vec![pb::Edit {
                 path: "a.txt".into(),
                 op: Some(pb::edit::Op::SetContent(pb::SetContent {
-                    content: Some(pb::ContentRef {
+                    content: (pb::ContentRef {
                         r#ref: Some(pb::content_ref::Ref::Inline(content.clone().into())),
-                    }),
-                    kind: pb::FileKind::Regular as i32,
-                    copy_from: None,
+                    })
+                    .into(),
+                    kind: pb::FileKind::Regular.into(),
+                    copy_from: None.into(),
                 })),
             }],
             message: "a".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .hash;
     let grant = owner
         .repo_svc()
         .list_dir(pb::ListDirRequest {
             repo: "app".into(),
-            root: Some(Root::Version(ObjectHash::from_slice(&version).unwrap()).to_proto()),
+            root: Root::Version(ObjectHash::from_slice(&version).unwrap())
+                .to_proto()
+                .into(),
             path: String::new(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .read_grant;
 
     let dir = tempfile::tempdir().unwrap();

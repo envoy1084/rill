@@ -1,13 +1,14 @@
 //! Running actions: the cache, merging identical requests, and taking an
 //! action back from a worker that vanished.
 
+use crate::common::channel;
 use std::sync::atomic::Ordering;
 
 use rill_reapi_proto::remoteworker::operation_queue_client::OperationQueueClient;
 use rill_reapi_proto::remoteworker::{current_state, desired_state, CurrentState};
 
 use super::fixtures::{digest, exec_clients, run, sync, upload_action, FakeWorker};
-use crate::common::{connect, dev_config, TestServer};
+use crate::common::{dev_config, TestServer};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn an_action_runs_once_then_comes_from_the_cache() {
@@ -83,7 +84,7 @@ async fn an_action_whose_worker_vanished_runs_on_another() {
     let mut client = exec_clients(&server, None).await;
     let pending = tokio::spawn(async move { run(&mut client, &action).await });
 
-    let mut lost = OperationQueueClient::new(connect(&server.grpc).await);
+    let mut lost = OperationQueueClient::new(channel(&server.grpc).await);
     let idle = CurrentState {
         worker_state: Some(current_state::WorkerState::Idle(())),
     };
@@ -125,7 +126,7 @@ async fn a_tiny_blob_written_over_bytestream_is_stored() {
     let mut exec = exec_clients(&server, None).await;
     let blob = b"tiny";
     let d = digest(blob);
-    let mut bytestream = ByteStreamClient::new(connect(&server.grpc).await);
+    let mut bytestream = ByteStreamClient::new(channel(&server.grpc).await);
     let write = WriteRequest {
         resource_name: format!("uploads/u-1/blobs/blake3/{}/{}", d.hash, d.size_bytes),
         write_offset: 0,
@@ -161,7 +162,7 @@ async fn a_progress_report_keeps_the_worker_on_its_action() {
     let mut client = exec_clients(&server, None).await;
     let pending = tokio::spawn(async move { run(&mut client, &action).await });
 
-    let mut worker = OperationQueueClient::new(connect(&server.grpc).await);
+    let mut worker = OperationQueueClient::new(channel(&server.grpc).await);
     let idle = CurrentState {
         worker_state: Some(current_state::WorkerState::Idle(())),
     };

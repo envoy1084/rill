@@ -1,6 +1,6 @@
 //! A path-limited reader probing the directory it cannot read.
 
-use prost::Message;
+use buffa::Message;
 use rill_types::{ObjectHash, ObjectKind};
 
 use super::super::fixture::*;
@@ -15,7 +15,7 @@ use crate::*;
 #[tokio::test(flavor = "multi_thread")]
 async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
     let callers = callers().await;
-    let channel = connect(&callers.acl.server.grpc).await;
+    let channel = channel(&callers.acl.server.grpc).await;
     let token = callers
         .tokens
         .iter()
@@ -35,7 +35,7 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             "RepoService/ListDir",
             pb::ListDirRequest {
                 repo: "acl".into(),
-                root: Some(at.clone()),
+                root: at.clone().into(),
                 path: String::new(),
             }
             .encode_to_vec(),
@@ -44,7 +44,7 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             "RepoService/ListDir",
             pb::ListDirRequest {
                 repo: "acl".into(),
-                root: Some(at.clone()),
+                root: at.clone().into(),
                 path: "secret".into(),
             }
             .encode_to_vec(),
@@ -87,8 +87,8 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             "RepoService/Diff",
             pb::DiffRequest {
                 repo: "acl".into(),
-                base: Some(empty_tree),
-                target: Some(at.clone()),
+                base: empty_tree.into(),
+                target: at.clone().into(),
                 ..Default::default()
             }
             .encode_to_vec(),
@@ -97,7 +97,7 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             "RepoService/Grep",
             pb::GrepRequest {
                 repo: "acl".into(),
-                root: Some(at.clone()),
+                root: at.clone().into(),
                 pattern: CANARY.into(),
                 ..Default::default()
             }
@@ -107,7 +107,7 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             "RepoService/ResolvePath",
             pb::ResolvePathRequest {
                 repo: "acl".into(),
-                root: Some(at.clone()),
+                root: at.clone().into(),
                 path: "secret/s.txt".into(),
             }
             .encode_to_vec(),
@@ -151,12 +151,13 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             "RepoService/GetBlob",
             pb::GetBlobRequest {
                 repo: "acl".into(),
-                content: Some(pb::ContentRef {
+                content: (pb::ContentRef {
                     r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
                         hash: Bytes::copy_from_slice(secret_hash.as_bytes()),
                         size: secret_bytes().len() as u64,
                     })),
-                }),
+                })
+                .into(),
                 ..Default::default()
             }
             .encode_to_vec(),
@@ -166,7 +167,7 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             pb::HasObjectsRequest {
                 repo: "acl".into(),
                 objects: vec![pb::ObjectRef {
-                    kind: pb::ObjectKind::Blob as i32,
+                    kind: pb::ObjectKind::Blob.into(),
                     hash: Bytes::copy_from_slice(secret_hash.as_bytes()),
                 }],
             }

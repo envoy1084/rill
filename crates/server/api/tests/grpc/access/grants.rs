@@ -29,16 +29,16 @@ async fn read_blob(
         .repo
         .get_blob(pb::GetBlobRequest {
             repo: "acl".into(),
-            content: Some(blob_ref(hash, size)),
+            content: blob_ref(hash, size).into(),
             offset: None,
             length: None,
             grant: grant.into(),
         })
         .await
-        .map_err(|s| s.code())?
-        .into_inner();
+        .map_err(|s| s.code)?
+        .messages();
     let mut out = Vec::new();
-    while let Some(chunk) = stream.message().await.map_err(|s| s.code())? {
+    while let Some(chunk) = stream.next().await.transpose().map_err(|s| s.code)? {
         out.extend_from_slice(&chunk.data);
     }
     Ok(out)
@@ -71,35 +71,35 @@ async fn a_path_reader_fetches_only_what_its_listings_granted() {
         .repo
         .list_dir(pb::ListDirRequest {
             repo: "acl".into(),
-            root: Some(acl.at_version()),
+            root: acl.at_version().into(),
             path: String::new(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let names: Vec<_> = root.entries.iter().map(|e| e.name.as_str()).collect();
     assert_eq!(names, ["pub"]);
     let secret_listing = c
         .repo
         .list_dir(pb::ListDirRequest {
             repo: "acl".into(),
-            root: Some(acl.at_version()),
+            root: acl.at_version().into(),
             path: "secret".into(),
         })
         .await
         .unwrap_err();
-    assert_eq!(secret_listing.code(), Code::PermissionDenied);
+    assert_eq!(secret_listing.code, Code::PermissionDenied);
 
     let listing = c
         .repo
         .list_dir(pb::ListDirRequest {
             repo: "acl".into(),
-            root: Some(acl.at_version()),
+            root: acl.at_version().into(),
             path: "pub".into(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let grant = listing.read_grant;
     assert!(!grant.is_empty());
 
@@ -138,12 +138,12 @@ async fn a_path_reader_fetches_only_what_its_listings_granted() {
         .repo
         .list_dir(pb::ListDirRequest {
             repo: "acl".into(),
-            root: Some(acl.at_version()),
+            root: acl.at_version().into(),
             path: "secret".into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .read_grant;
     assert_eq!(
         read_blob(&mut c, &secret, secret_bytes.len() as u64, &owner_grant).await,
@@ -163,7 +163,7 @@ async fn a_path_reader_fetches_only_what_its_listings_granted() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let paths: Vec<_> = version
         .version
         .unwrap()
@@ -179,19 +179,19 @@ async fn a_path_reader_fetches_only_what_its_listings_granted() {
 async fn a_tree_is_granted_only_when_all_of_it_is_readable() {
     let mut acl = Acl::start().await;
     acl.grant("pub", "reader", &bob()).await;
-    let mut c = acl.as_principal(&bob()).await;
+    let c = acl.as_principal(&bob()).await;
     let root = c
         .repo
         .list_dir(pb::ListDirRequest {
             repo: "acl".into(),
-            root: Some(acl.at_version()),
+            root: acl.at_version().into(),
             path: String::new(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let tree = |hash: Bytes, grant: String| {
-        let mut repo = c.repo.clone();
+        let repo = c.repo.clone();
         async move {
             repo.get_tree(pb::GetTreeRequest {
                 repo: "acl".into(),
@@ -206,7 +206,7 @@ async fn a_tree_is_granted_only_when_all_of_it_is_readable() {
         tree(root.tree_hash.clone(), root.read_grant.clone())
             .await
             .unwrap_err()
-            .code(),
+            .code,
         Code::PermissionDenied
     );
     let pub_entry = root.entries[0].entry.clone().unwrap();
@@ -216,7 +216,7 @@ async fn a_tree_is_granted_only_when_all_of_it_is_readable() {
     let got = tree(dir.hash.clone(), root.read_grant.clone())
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(got.tree.unwrap().entries.len(), 1);
     assert!(
         !got.read_grant.is_empty(),

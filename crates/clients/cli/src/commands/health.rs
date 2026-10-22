@@ -57,8 +57,8 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: TrunkCmd) -> Result<()> {
             let reply = svc
                 .get_trunk_health(pb::GetTrunkHealthRequest { repo })
                 .await?
-                .into_inner();
-            let health = reply.health.unwrap_or_default();
+                .into_owned();
+            let health = reply.health.into_option().unwrap_or_default();
             ctx.emit(
                 j!({ "health": health_json(&health), "open": reply.open.iter().map(incident_json).collect::<Vec<_>>() }),
                 |out| {
@@ -85,7 +85,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: TrunkCmd) -> Result<()> {
                     limit: args.limit,
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .incidents;
             ctx.emit(
                 j!({ "incidents": incidents.iter().map(incident_json).collect::<Vec<_>>() }),
@@ -112,8 +112,9 @@ async fn freeze(
             reason,
         })
         .await?
-        .into_inner()
+        .into_owned()
         .health
+        .into_option()
         .unwrap_or_default();
     ctx.emit(j!({ "health": health_json(&health) }), |out| {
         out.line(match frozen {
@@ -144,7 +145,7 @@ fn incidents_table(
             i.state.clone(),
             i.steps.join(", "),
             i.author
-                .as_ref()
+                .as_option()
                 .map(|p| p.name.clone())
                 .unwrap_or_default(),
             when(&Timestamp::from_millis(i.opened_at)),
@@ -178,7 +179,7 @@ fn incident_json(i: &pb::Incident) -> Value {
         "state": i.state,
         "steps": i.steps,
         "failures": i.failures,
-        "author": i.author.as_ref().map(|p| p.name.clone()),
+        "author": i.author.as_option().map(|p| p.name.clone()),
         "session": i.session,
         "model": i.model,
         "opened_at": i.opened_at,
@@ -226,7 +227,7 @@ pub async fn revert_set(ctx: &mut Ctx<'_>, args: crate::commands::land::RevertAr
         .lander_svc()
         .revert_set(request)
         .await?
-        .into_inner()
+        .into_owned()
         .entries;
     let apply = args.apply;
     ctx.emit(

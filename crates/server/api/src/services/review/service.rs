@@ -3,12 +3,13 @@
 use std::sync::Arc;
 
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::review_service_server::ReviewService;
-use tonic::{Request, Response, Status};
+use rill_proto::rill::v1::ReviewService;
 
 use super::ReviewEventStream;
 use crate::services::common::GrpcResult;
 use crate::services::idem;
+use crate::services::Call;
+use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::state::AppState;
 
 /// The review service.
@@ -24,154 +25,184 @@ impl ReviewSvc {
     }
 }
 
-#[tonic::async_trait]
+// Handlers return their concrete response types.
+#[allow(refining_impl_trait)]
 impl ReviewService for ReviewSvc {
     async fn get_review(
         &self,
-        request: Request<pb::GetReviewRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetReviewRequest>,
     ) -> GrpcResult<pb::GetReviewResponse> {
+        let request = Call::new(ctx, request);
         self.get_review_impl(request)
             .await
             .map(Response::new)
-            .map_err(Status::from)
+            .map_err(ConnectError::from)
     }
 
     async fn list_reviews(
         &self,
-        request: Request<pb::ListReviewsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListReviewsRequest>,
     ) -> GrpcResult<pb::ListReviewsResponse> {
+        let request = Call::new(ctx, request);
         self.list_reviews_impl(request)
             .await
             .map(Response::new)
-            .map_err(Status::from)
+            .map_err(ConnectError::from)
     }
 
     async fn submit_for_review(
         &self,
-        request: Request<pb::SubmitForReviewRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::SubmitForReviewRequest>,
     ) -> GrpcResult<pb::SubmitForReviewResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.submit_for_review_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
-    async fn vote(&self, request: Request<pb::VoteRequest>) -> GrpcResult<pb::VoteResponse> {
+    async fn vote(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::VoteRequest>,
+    ) -> GrpcResult<pb::VoteResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.vote_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn comment(
         &self,
-        request: Request<pb::CommentRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::CommentRequest>,
     ) -> GrpcResult<pb::CommentResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.comment_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn reply_thread(
         &self,
-        request: Request<pb::ReplyThreadRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ReplyThreadRequest>,
     ) -> GrpcResult<pb::ReplyThreadResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.reply_thread_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn resolve_thread(
         &self,
-        request: Request<pb::ResolveThreadRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ResolveThreadRequest>,
     ) -> GrpcResult<pb::ResolveThreadResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.resolve_thread_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn set_stack(
         &self,
-        request: Request<pb::SetStackRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::SetStackRequest>,
     ) -> GrpcResult<pb::SetStackResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.set_stack_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn evaluate_submit(
         &self,
-        request: Request<pb::EvaluateSubmitRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::EvaluateSubmitRequest>,
     ) -> GrpcResult<pb::EvaluateSubmitResponse> {
+        let request = Call::new(ctx, request);
         self.evaluate_submit_impl(request)
             .await
             .map(Response::new)
-            .map_err(Status::from)
+            .map_err(ConnectError::from)
     }
 
     async fn abandon(
         &self,
-        request: Request<pb::AbandonRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::AbandonRequest>,
     ) -> GrpcResult<pb::AbandonResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.abandon_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     /// Evaluate the submit policy for the caller and, if it permits,
     /// queue the change's current version for landing.
     async fn request_land(
         &self,
-        request: Request<pb::RequestLandRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::RequestLandRequest>,
     ) -> GrpcResult<pb::RequestLandResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.request_land_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     /// Queue a stack as one ordered group: every change from the lowest
     /// unlanded one up to the given change.
     async fn request_land_stack(
         &self,
-        request: Request<pb::RequestLandStackRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::RequestLandStackRequest>,
     ) -> GrpcResult<pb::RequestLandStackResponse> {
+        let request = Call::new(ctx, request);
         idem::once(&self.state, request, |r| async move {
             self.request_land_stack_impl(r).await.map(Response::new)
         })
         .await
-        .map_err(Status::from)
+        .map_err(ConnectError::from)
     }
 
     async fn get_land_status(
         &self,
-        request: Request<pb::GetLandStatusRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetLandStatusRequest>,
     ) -> GrpcResult<pb::GetLandStatusResponse> {
+        let request = Call::new(ctx, request);
         self.get_land_status_impl(request)
             .await
             .map(Response::new)
-            .map_err(Status::from)
+            .map_err(ConnectError::from)
     }
-
-    type WatchReviewStream = ReviewEventStream;
 
     async fn watch_review(
         &self,
-        request: Request<pb::WatchReviewRequest>,
-    ) -> GrpcResult<Self::WatchReviewStream> {
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::WatchReviewRequest>,
+    ) -> GrpcResult<ReviewEventStream> {
+        let request = Call::new(ctx, request);
         Ok(Response::new(self.watch_review_impl(request).await?))
     }
 }

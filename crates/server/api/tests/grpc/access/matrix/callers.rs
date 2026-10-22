@@ -26,7 +26,7 @@ pub(super) async fn callers() -> Callers {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .version
         .unwrap()
         .change_id;
@@ -56,12 +56,12 @@ pub(super) async fn callers() -> Callers {
             operation_id: Bytes::new(),
             repo: "acl".into(),
             name: "probe".into(),
-            base: None,
-            sparse: None,
+            base: None.into(),
+            sparse: None.into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .workspace
         .unwrap()
         .id;

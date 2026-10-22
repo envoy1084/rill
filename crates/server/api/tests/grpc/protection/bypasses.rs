@@ -37,12 +37,12 @@ fn copies(source: &Bytes, from_path: &str, to: &[String]) -> pb::ChangeVersion {
     pb::ChangeVersion::from(cv)
 }
 
-async fn create(c: &mut Clients, version: pb::ChangeVersion) -> Result<(), Status> {
+async fn create(c: &mut Clients, version: pb::ChangeVersion) -> Result<(), ConnectError> {
     c.repo
         .create_change_version(pb::CreateChangeVersionRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            version: Some(version),
+            version: version.into(),
             signatures: Vec::new(),
         })
         .await
@@ -67,7 +67,7 @@ async fn content_allowed_at_one_path_is_scanned_at_another() {
         .expect("an allowed path");
     let (moved, _) = blob(&server, "src/k.txt", &secret_file()).await;
     let refused = apply(&mut c, "app", vec![moved]).await.unwrap_err();
-    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
+    assert_eq!(refused.code, Code::FailedPrecondition, "{refused:?}");
     server.stop().await;
 }
 
@@ -105,12 +105,12 @@ async fn a_subtree_copy_is_scanned_at_its_destination() {
         .create_change_version(pb::CreateChangeVersionRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            version: Some(pb::ChangeVersion::from(cv)),
+            version: pb::ChangeVersion::from(cv).into(),
             signatures: Vec::new(),
         })
         .await
         .unwrap_err();
-    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
+    assert_eq!(refused.code, Code::FailedPrecondition, "{refused:?}");
     server.stop().await;
 }
 
@@ -128,7 +128,7 @@ async fn a_credential_in_the_message_is_refused() {
     )
     .await
     .unwrap_err();
-    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
+    assert_eq!(refused.code, Code::FailedPrecondition, "{refused:?}");
     server.stop().await;
 }
 
@@ -173,7 +173,7 @@ async fn a_child_of_a_quarantined_version_cannot_reach_trunk() {
         })
         .await
         .unwrap_err();
-    assert_eq!(appended.code(), Code::FailedPrecondition, "{appended:?}");
+    assert_eq!(appended.code, Code::FailedPrecondition, "{appended:?}");
     server.stop().await;
 }
 
@@ -189,12 +189,13 @@ async fn a_copy_from_an_unreadable_path_is_refused_before_it_is_scanned() {
     root.access
         .add_relation(pb::AddRelationRequest {
             operation_id: Bytes::new(),
-            relation: Some(pb::Relation {
+            relation: (pb::Relation {
                 repo: "app".into(),
                 path: "scratch".into(),
                 relation: "writer".into(),
                 subject: format!("principal:{}", bob.id),
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
@@ -202,8 +203,15 @@ async fn a_copy_from_an_unreadable_path_is_refused_before_it_is_scanned() {
     let refused = create(&mut bob, copies(&source, "infra", &["scratch/x".into()]))
         .await
         .unwrap_err();
-    assert_eq!(refused.code(), Code::PermissionDenied, "{refused:?}");
-    assert!(!refused.message().contains("deploy.env"), "{refused:?}");
+    assert_eq!(refused.code, Code::PermissionDenied, "{refused:?}");
+    assert!(
+        !refused
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("deploy.env"),
+        "{refused:?}"
+    );
     server.stop().await;
 }
 
@@ -223,7 +231,7 @@ async fn copied_files_count_toward_the_file_limit() {
     let refused = create(&mut c, copies(&source, "lib", &to))
         .await
         .unwrap_err();
-    assert_eq!(refused.code(), Code::InvalidArgument, "{refused:?}");
+    assert_eq!(refused.code, Code::InvalidArgument, "{refused:?}");
     assert!(
         started.elapsed() < std::time::Duration::from_secs(2),
         "refused before walking"
@@ -244,7 +252,7 @@ async fn a_credential_in_extension_fields_is_refused() {
     cv.extra
         .insert("note".into(), format!("key {AWS_KEY}").into());
     let refused = create(&mut c, cv).await.unwrap_err();
-    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
+    assert_eq!(refused.code, Code::FailedPrecondition, "{refused:?}");
     server.stop().await;
 }
 
@@ -261,7 +269,14 @@ async fn too_many_findings_to_review_are_refused_not_quarantined() {
         .collect();
     let (edit, _) = blob(&server, "aaa/fixtures.txt", fakes.as_bytes()).await;
     let refused = apply(&mut c, "app", vec![edit]).await.unwrap_err();
-    assert_eq!(refused.code(), Code::FailedPrecondition, "{refused:?}");
-    assert!(refused.message().contains("more"), "{refused:?}");
+    assert_eq!(refused.code, Code::FailedPrecondition, "{refused:?}");
+    assert!(
+        refused
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("more"),
+        "{refused:?}"
+    );
     server.stop().await;
 }

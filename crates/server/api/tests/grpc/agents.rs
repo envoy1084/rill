@@ -3,8 +3,8 @@
 
 use rill_identity::keys::KeyServiceConfig;
 use rill_identity::testing::MockIdp;
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
-use rill_proto::rill::v1::session_service_client::SessionServiceClient;
+use rill_proto::rill::v1::IdentityServiceClient;
+use rill_proto::rill::v1::SessionServiceClient;
 use rill_runtime::config::IdentityConfig;
 use rill_types::identity::{AccountStatus, OrgIdentitySettings, UserRecord};
 use rill_types::{Principal, Timestamp};
@@ -26,7 +26,7 @@ fn config() -> ServerConfig {
 }
 
 async fn identity(server: &TestServer, token: &str) -> IdentityServiceClient<Svc> {
-    IdentityServiceClient::with_interceptor(connect(&server.grpc).await, Bearer(Some(token.into())))
+    IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(token.into())))
 }
 
 fn user(name: &str) -> UserRecord {
@@ -57,8 +57,8 @@ async fn exchange(
     server: &TestServer,
     jwt: &str,
     model: Option<&str>,
-) -> Result<pb::SessionGrant, Status> {
-    SessionServiceClient::new(connect(&server.grpc).await)
+) -> Result<pb::SessionGrant, ConnectError> {
+    SessionServiceClient::authed(connect(&server.grpc).await, Bearer(None))
         .exchange_token(pb::ExchangeTokenRequest {
             subject_token: jwt.into(),
             subject_token_type: "urn:ietf:params:oauth:token-type:jwt".into(),
@@ -67,15 +67,15 @@ async fn exchange(
             model: model.map(String::from),
         })
         .await
-        .map(|r| r.into_inner())
+        .map(|r| r.into_owned())
 }
 
 async fn refused_within(server: &TestServer, token: &str) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
     loop {
-        let mut c = clients(server, Some(token)).await;
+        let c = clients(server, Some(token)).await;
         match c.admin.who_am_i(pb::WhoAmIRequest {}).await {
-            Err(s) if s.code() == Code::Unauthenticated => return,
+            Err(s) if s.code == Code::Unauthenticated => return,
             _ => {}
         }
         assert!(tokio::time::Instant::now() < deadline, "still accepted");
@@ -92,7 +92,7 @@ fn spec(name: &str, sponsor: &str, issuer: &str) -> pb::AgentSpec {
         repos: vec!["allowed".into()],
         paths: vec!["src".into()],
         models: vec![],
-        budgets: None,
+        budgets: None.into(),
         workloads: vec![pb::WorkloadBinding {
             issuer: issuer.into(),
             subject: format!("ci:{name}"),
@@ -115,24 +115,25 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
     let a = TestServer::start_on(config(), stores.clone()).await;
     let b = TestServer::start_on(config(), stores.clone()).await;
     let root = a.token_for(&Principal::human("root"));
-    let mut admin = identity(&a, &root).await;
+    let admin = identity(&a, &root).await;
     admin
         .put_workload_issuer(pb::PutWorkloadIssuerRequest {
             operation_id: Bytes::new(),
-            issuer: Some(pb::WorkloadIssuerSpec {
+            issuer: (pb::WorkloadIssuerSpec {
                 org: "default".into(),
                 name: "ci".into(),
                 issuer: idp.issuer().into(),
                 keys: Some(pb::workload_issuer_spec::Keys::Discovery(true)),
                 audiences: vec!["rill".into()],
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
     admin
         .register_agent(pb::RegisterAgentRequest {
             operation_id: Bytes::new(),
-            agent: Some(spec("builder", "user:ann", idp.issuer())),
+            agent: (spec("builder", "user:ann", idp.issuer())).into(),
         })
         .await
         .unwrap();
@@ -152,7 +153,7 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
         .who_am_i(pb::WhoAmIRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(me.principal.unwrap().name, "builder");
     assert_eq!(me.sponsor.as_deref(), Some("user:ann"));
     assert_eq!(me.model.as_deref(), Some("model-a"));
@@ -161,7 +162,7 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
         .is_err());
 
     // Relations would let the agent write anywhere; its registration does not.
-    let mut root_clients = clients(&a, Some(&root)).await;
+    let root_clients = clients(&a, Some(&root)).await;
     for repo in ["allowed", "other"] {
         root_clients
             .repo
@@ -177,25 +178,26 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
             .access
             .add_relation(pb::AddRelationRequest {
                 operation_id: Bytes::new(),
-                relation: Some(pb::Relation {
+                relation: (pb::Relation {
                     repo: repo.to_string(),
                     path: String::new(),
                     relation: "writer".into(),
                     subject: format!("principal:{}", Principal::agent("builder").id),
-                }),
+                })
+                .into(),
             })
             .await
             .unwrap();
     }
-    let mut agent = clients(&b, Some(&token)).await;
+    let agent = clients(&b, Some(&token)).await;
     let write = |repo: &str, path: &str| pb::ApplyEditsRequest {
         operation_id: Bytes::new(),
         repo: repo.into(),
-        base: None,
+        base: None.into(),
         edits: vec![set_edit(path, b"x\n")],
         message: "m".into(),
         intent: None,
-        provenance: None,
+        provenance: None.into(),
         change_id: None,
     };
     let written = agent
@@ -203,7 +205,7 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
         .apply_edits(write("allowed", "src/a.rs"))
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     // The server, not the client, says which session, sponsor and model wrote it.
     let provenance = written.version.unwrap().provenance.unwrap();
     assert_eq!(provenance.session.as_deref(), Some(session.as_str()));
@@ -214,13 +216,13 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
         .apply_edits(write("allowed", "docs/a.md"))
         .await
         .unwrap_err();
-    assert_eq!(outside.code(), Code::PermissionDenied);
+    assert_eq!(outside.code, Code::PermissionDenied);
     let other = agent
         .repo
         .apply_edits(write("other", "src/a.rs"))
         .await
         .unwrap_err();
-    assert_eq!(other.code(), Code::PermissionDenied);
+    assert_eq!(other.code, Code::PermissionDenied);
 
     // Suspending the sponsor stops the agent on every server.
     let ann = stores
@@ -275,7 +277,7 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
             org: "default".into(),
             name: "builder".into(),
             suspended: Some(true),
-            spec: None,
+            spec: None.into(),
         })
         .await
         .unwrap();
@@ -297,28 +299,28 @@ async fn users_register_only_agents_they_sponsor() {
     }
     let server = TestServer::start_on(config(), stores.clone()).await;
     let ann = server.token_for(&Principal::human("ann"));
-    let mut svc = identity(&server, &ann).await;
+    let svc = identity(&server, &ann).await;
     svc.register_agent(pb::RegisterAgentRequest {
         operation_id: Bytes::new(),
-        agent: Some(spec("anns-bot", "user:ann", "https://ci")),
+        agent: (spec("anns-bot", "user:ann", "https://ci")).into(),
     })
     .await
     .unwrap();
     let denied = svc
         .register_agent(pb::RegisterAgentRequest {
             operation_id: Bytes::new(),
-            agent: Some(spec("bobs-bot", "user:bob", "https://ci")),
+            agent: (spec("bobs-bot", "user:bob", "https://ci")).into(),
         })
         .await
         .unwrap_err();
-    assert_eq!(denied.code(), Code::PermissionDenied);
+    assert_eq!(denied.code, Code::PermissionDenied);
     let listed = svc
         .list_agents(pb::ListAgentsRequest {
             org: "default".into(),
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .agents;
     assert_eq!(listed.len(), 1);
     server.stop().await;
@@ -341,18 +343,19 @@ async fn tokens_for_others_go_only_to_agents_one_sponsors() {
         .await
         .register_agent(pb::RegisterAgentRequest {
             operation_id: Bytes::new(),
-            agent: Some(pb::AgentSpec {
+            agent: (pb::AgentSpec {
                 repos: vec!["*".into()],
                 paths: vec![],
                 ..spec("anns-bot", "user:ann", "https://ci")
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
     let issue = |owner: String| {
         let grpc = server.grpc.clone();
         async move {
-            let mut c = clients_at(&grpc, Some(&owner)).await;
+            let c = clients_at(&grpc, Some(&owner)).await;
             let repo = format!("repo-of-{}", &owner[owner.len() - 6..]);
             c.repo
                 .create_repo(pb::CreateRepoRequest {
@@ -372,7 +375,7 @@ async fn tokens_for_others_go_only_to_agents_one_sponsors() {
                         expires_at: None,
                     }],
                     expires_at: None,
-                    for_principal: Some(pb::Principal::from(&Principal::agent("anns-bot"))),
+                    for_principal: (pb::Principal::from(&Principal::agent("anns-bot"))).into(),
                 })
                 .await
         }
@@ -380,7 +383,7 @@ async fn tokens_for_others_go_only_to_agents_one_sponsors() {
     // Mallory owns her repository but does not sponsor the agent.
     let mallory = server.token_for(&Principal::human("mallory"));
     assert_eq!(
-        issue(mallory).await.unwrap_err().code(),
+        issue(mallory).await.unwrap_err().code,
         Code::PermissionDenied
     );
     assert!(issue(ann).await.is_ok());

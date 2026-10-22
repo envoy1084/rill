@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use rill_identity::keys::KeyServiceConfig;
 use rill_identity::testing::{MockIdp, MockUser};
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_proto::rill::v1::IdentityServiceClient;
 use rill_runtime::config::IdentityConfig;
 use rill_types::Principal;
 
@@ -26,10 +26,7 @@ fn config() -> ServerConfig {
 }
 
 async fn identity(server: &TestServer, token: &str) -> IdentityServiceClient<Svc> {
-    IdentityServiceClient::with_interceptor(
-        connect(&server.grpc).await,
-        Bearer(Some(token.to_string())),
-    )
+    IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(token.to_string())))
 }
 
 /// A provider `mock` in the default org, with a confidential client for
@@ -42,7 +39,7 @@ async fn register(server: &TestServer, idp: &MockIdp) {
         .await
         .put_identity_provider(pb::PutIdentityProviderRequest {
             operation_id: Bytes::new(),
-            provider: Some(pb::IdentityProviderSpec {
+            provider: (pb::IdentityProviderSpec {
                 org: "default".into(),
                 name: "mock".into(),
                 issuer: idp.issuer().into(),
@@ -55,7 +52,8 @@ async fn register(server: &TestServer, idp: &MockIdp) {
                 auto_provision: true,
                 saml_metadata: None,
                 saml_sp_entity_id: None,
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
@@ -106,13 +104,13 @@ async fn access_from_cookie(server: &TestServer, cookie: &str) -> reqwest::Respo
         .unwrap()
 }
 
-async fn who(server: &TestServer, token: &str) -> Result<pb::WhoAmIResponse, Status> {
+async fn who(server: &TestServer, token: &str) -> Result<pb::WhoAmIResponse, ConnectError> {
     clients(server, Some(token))
         .await
         .admin
         .who_am_i(pb::WhoAmIRequest {})
         .await
-        .map(|r| r.into_inner())
+        .map(|r| r.into_owned())
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -161,7 +159,7 @@ async fn a_browser_signs_in_through_the_provider() {
         .unwrap();
     assert_eq!(out.status(), 204);
     assert_eq!(
-        who(&server, &access).await.unwrap_err().code(),
+        who(&server, &access).await.unwrap_err().code,
         Code::Unauthenticated
     );
     assert_eq!(access_from_cookie(&server, &rotated).await.status(), 401);
@@ -285,7 +283,7 @@ async fn suspending_a_user_refuses_their_tokens_everywhere() {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     assert_eq!(
-        who(&b, &access).await.unwrap_err().code(),
+        who(&b, &access).await.unwrap_err().code,
         Code::Unauthenticated
     );
     assert_eq!(access_from_cookie(&a, &cookie).await.status(), 401);
@@ -314,7 +312,7 @@ async fn org_admins_manage_only_their_org() {
         .list_identity_providers(list("default"))
         .await
         .unwrap_err();
-    assert_eq!(denied.code(), Code::PermissionDenied);
+    assert_eq!(denied.code, Code::PermissionDenied);
 
     let root = server.token_for(&Principal::human("root"));
     identity(&server, &root)
@@ -329,11 +327,11 @@ async fn org_admins_manage_only_their_org() {
         })
         .await
         .unwrap();
-    let mut dana = identity(&server, &tokens["dana"]).await;
+    let dana = identity(&server, &tokens["dana"]).await;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
     let listed = loop {
         match dana.list_identity_providers(list("default")).await {
-            Ok(r) => break r.into_inner(),
+            Ok(r) => break r.into_owned(),
             Err(_) if tokio::time::Instant::now() < deadline => {
                 tokio::time::sleep(Duration::from_millis(50)).await
             }
@@ -346,6 +344,6 @@ async fn org_admins_manage_only_their_org() {
         .list_identity_providers(list("acme"))
         .await
         .unwrap_err();
-    assert_eq!(other.code(), Code::PermissionDenied);
+    assert_eq!(other.code, Code::PermissionDenied);
     server.stop().await;
 }

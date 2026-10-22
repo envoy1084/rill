@@ -63,7 +63,6 @@ pub fn sdk_code(e: &rill_sdk::Error) -> String {
             }
             out
         }
-        Error::Transport(_) => "transport".into(),
         Error::Convert(_) => "convert".into(),
         Error::Invalid(_) => "invalid".into(),
         Error::Config(_) => "config".into(),
@@ -104,7 +103,7 @@ mod tests {
     #[test]
     fn status_codes_are_snake_case() {
         let err = rill_sdk::Error::Status {
-            code: tonic::Code::FailedPrecondition,
+            code: rill_sdk::Code::FailedPrecondition,
             message: "x".into(),
         };
         assert_eq!(sdk_code(&err), "failed_precondition");

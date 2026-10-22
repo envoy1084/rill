@@ -1,7 +1,7 @@
 //! Revocation and key rotation across servers sharing one store.
 
 use rill_identity::keys::KeyServiceConfig;
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_proto::rill::v1::IdentityServiceClient;
 use rill_runtime::config::IdentityConfig;
 use rill_types::identity::{SessionKind, SessionRecord};
 use rill_types::{Principal, SessionId, Timestamp};
@@ -23,10 +23,7 @@ fn config() -> ServerConfig {
 }
 
 async fn identity(server: &TestServer, token: &str) -> IdentityServiceClient<Svc> {
-    IdentityServiceClient::with_interceptor(
-        connect(&server.grpc).await,
-        Bearer(Some(token.to_string())),
-    )
+    IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(token.to_string())))
 }
 
 /// `who_am_i` with `token` on `server`: the gRPC code it fails with, if any.
@@ -37,7 +34,7 @@ async fn who(server: &TestServer, token: &str) -> Option<Code> {
         .who_am_i(pb::WhoAmIRequest {})
         .await
         .err()
-        .map(|s| s.code())
+        .map(|s| s.code)
 }
 
 async fn refused_within(server: &TestServer, token: &str, limit: Duration) -> Duration {
@@ -85,7 +82,7 @@ async fn a_revoked_token_is_refused_by_every_server() {
         .who_am_i(pb::WhoAmIRequest {})
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .token_id
         .unwrap();
     let by_id = |id: String| pb::RevokeTokenRequest {
@@ -99,7 +96,7 @@ async fn a_revoked_token_is_refused_by_every_server() {
         .revoke_token(by_id(bob_id.clone()))
         .await
         .unwrap_err();
-    assert_eq!(denied.code(), Code::PermissionDenied);
+    assert_eq!(denied.code, Code::PermissionDenied);
     identity(&b, &root)
         .await
         .revoke_token(by_id(bob_id))
@@ -177,7 +174,7 @@ async fn tokens_from_a_rotated_key_verify_on_every_server() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let new_key = rotated.key_id.unwrap();
     // Once the new key activates, servers sign with it and every server
     // verifies both old and new tokens.
@@ -202,7 +199,7 @@ async fn tokens_from_a_rotated_key_verify_on_every_server() {
         .list_token_keys(pb::ListTokenKeysRequest {})
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .keys;
     assert_eq!(listed.len(), 2);
     assert!(listed[0].not_after.is_some(), "the old key retires");

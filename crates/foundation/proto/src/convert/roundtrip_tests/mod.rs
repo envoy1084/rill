@@ -1,4 +1,4 @@
-//! Round-trip tests through both the conversion layer and prost encoding,
+//! Round-trip tests through both the conversion layer and wire encoding,
 //! so that what goes over the wire decodes to an equal `rill-types` value.
 
 mod change;

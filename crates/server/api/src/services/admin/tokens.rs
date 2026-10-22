@@ -4,19 +4,19 @@ use rill_policy::Capability;
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{Principal, Timestamp};
-use tonic::Request;
 
 use super::scopes::{capability_protos, parse_action, parse_scope};
 use super::AdminSvc;
 use crate::auth::caller;
 use crate::services::common;
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
 impl AdminSvc {
     pub(super) async fn who_am_i_impl(
         &self,
-        request: Request<pb::WhoAmIRequest>,
+        request: Call<pb::WhoAmIRequest>,
     ) -> Result<pb::WhoAmIResponse> {
         let ctx = caller(&request)?;
         let (capabilities, token_expires_at) = match &ctx.capability {
@@ -36,7 +36,7 @@ impl AdminSvc {
         let token_expires_at =
             token_expires_at.or_else(|| claims.map(|c| timestamp_to_proto(c.expires_at)));
         Ok(pb::WhoAmIResponse {
-            principal: Some(pb::Principal::from(&ctx.principal)),
+            principal: pb::Principal::from(&ctx.principal).into(),
             teams: ctx.teams.clone(),
             capabilities,
             token_expires_at,
@@ -50,7 +50,7 @@ impl AdminSvc {
 
     pub(super) async fn issue_token_impl(
         &self,
-        request: Request<pb::IssueTokenRequest>,
+        request: Call<pb::IssueTokenRequest>,
     ) -> Result<pb::IssueTokenResponse> {
         let ctx = caller(&request)?;
         let req = request.get_ref();
@@ -84,7 +84,7 @@ impl AdminSvc {
             .resolve(repo_name.as_deref().unwrap_or_default())
             .await?;
         let opened = common::opened(&self.state, ctx.clone(), repo.clone());
-        let principal = match req.for_principal.clone() {
+        let principal = match req.for_principal.clone().into_option() {
             Some(p) => Principal::try_from(p)?,
             None => ctx.principal.clone(),
         };

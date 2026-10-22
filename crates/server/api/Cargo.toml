@@ -46,9 +46,11 @@ tokio-util = { workspace = true }
 futures = { workspace = true }
 
 tonic = { workspace = true }
+connectrpc = { workspace = true }
+connectrpc-health = { workspace = true }
+connectrpc-reflection = { workspace = true }
+buffa = { workspace = true }
 postcard = { workspace = true }
-tonic-reflection = { workspace = true }
-tonic-health = { workspace = true }
 prost = { workspace = true }
 axum = { workspace = true }
 axum-server = { workspace = true }

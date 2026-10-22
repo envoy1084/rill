@@ -47,7 +47,7 @@ pub struct RolesArgs {
 
 fn user_json(u: &pb::User) -> serde_json::Value {
     json!({
-        "org": u.org, "name": u.principal.as_ref().map(|p| p.name.clone()),
+        "org": u.org, "name": u.principal.as_option().map(|p| p.name.clone()),
         "email": u.email, "status": u.status, "roles": u.roles, "teams": u.teams,
         "external": u.external,
     })
@@ -72,14 +72,15 @@ async fn update(
             roles: roles.unwrap_or_default(),
         })
         .await?
-        .into_inner()
+        .into_owned()
         .user
+        .into_option()
         .unwrap_or_default();
     ctx.emit(user_json(&user), |out| {
         out.line(format!(
             "{} is {} ({})",
             user.principal
-                .as_ref()
+                .as_option()
                 .map(|p| p.name.as_str())
                 .unwrap_or_default(),
             user.status,
@@ -101,7 +102,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: UserCmd) -> Result<()> {
                 .identity_svc()
                 .list_users(pb::ListUsersRequest { org: o.org })
                 .await?
-                .into_inner()
+                .into_owned()
                 .users;
             ctx.emit(
                 json!(users.iter().map(user_json).collect::<Vec<_>>()),
@@ -110,7 +111,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: UserCmd) -> Result<()> {
                     for u in &users {
                         table.row(vec![
                             u.principal
-                                .as_ref()
+                                .as_option()
                                 .map(|p| p.name.clone())
                                 .unwrap_or_default(),
                             u.status.clone(),

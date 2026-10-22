@@ -42,7 +42,7 @@ pub async fn login(ctx: &mut Ctx<'_>, args: LoginArgs) -> Result<()> {
     let endpoint = config.endpoint.clone();
     let client = rill_sdk::Client::connect(config).await?;
     let credentials = rill_sdk::auth::login(
-        client.channel(),
+        client.connection_without_credentials(),
         &endpoint,
         &args.org,
         args.provider.as_deref(),

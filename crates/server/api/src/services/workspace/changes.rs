@@ -6,19 +6,19 @@ use rill_proto::convert::{hash_to_proto, id_to_proto, opt_id_from_proto};
 use rill_proto::rill::v1 as pb;
 use rill_store::ObjectStoreExt;
 use rill_types::{ChangeId, Encodable, OperationKind, Timestamp};
-use tonic::Request;
 
 use super::oplog::{base_of, base_root, commit_with_operation, operation, response_pair};
 use super::WorkspaceSvc;
 use crate::services::common::{self, open, operation_id, provenance, resolve_version};
 use crate::services::diff::{file_diffs, DiffOptions};
 use crate::services::repo::version_from_diff;
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 impl WorkspaceSvc {
     pub(super) async fn snapshot_impl(
         &self,
-        request: Request<pb::SnapshotRequest>,
+        request: Call<pb::SnapshotRequest>,
     ) -> Result<pb::SnapshotResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
@@ -39,13 +39,13 @@ impl WorkspaceSvc {
             )
             .await?;
         Ok(pb::SnapshotResponse {
-            operation: Some(pb::Operation::from(op)),
+            operation: pb::Operation::from(op).into(),
         })
     }
 
     pub(super) async fn new_change_impl(
         &self,
-        request: Request<pb::NewChangeRequest>,
+        request: Call<pb::NewChangeRequest>,
     ) -> Result<pb::NewChangeResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
@@ -78,7 +78,7 @@ impl WorkspaceSvc {
             predecessor,
             opened.principal().clone(),
             req.message,
-            provenance(req.provenance)?,
+            provenance(req.provenance.into_option())?,
             opt_id_from_proto("intent", req.intent.as_ref())?,
         );
         let change = cv.change_id;
@@ -96,20 +96,20 @@ impl WorkspaceSvc {
         Ok(pb::NewChangeResponse {
             change_id: id_to_proto(&change),
             version_hash: hash_to_proto(&hash),
-            version: Some(pb::ChangeVersion::from(cv)),
-            operation: Some(pb::Operation::from(op)),
+            version: pb::ChangeVersion::from(cv).into(),
+            operation: pb::Operation::from(op).into(),
         })
     }
 
     pub(super) async fn update_base_impl(
         &self,
-        request: Request<pb::UpdateBaseRequest>,
+        request: Call<pb::UpdateBaseRequest>,
     ) -> Result<pb::UpdateBaseResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.into_inner();
         let before = self.load_mut(&opened, &req.workspace).await?;
         let mut ws = before.clone();
-        let new_base = resolve_version(&opened.repo, req.new_base.as_ref())
+        let new_base = resolve_version(&opened.repo, req.new_base.as_option())
             .await?
             .ok_or_else(|| Error::precondition("the repository has no trunk head yet"))?;
         let from = ws.base;
@@ -148,16 +148,16 @@ impl WorkspaceSvc {
         };
         let (workspace, operation) = response_pair(&ws, &op);
         Ok(pb::UpdateBaseResponse {
-            workspace,
-            operation,
-            version,
+            workspace: workspace.into(),
+            operation: operation.into(),
+            version: version.into(),
             version_hash,
         })
     }
 
     pub(super) async fn workspace_diff_impl(
         &self,
-        request: Request<pb::WorkspaceDiffRequest>,
+        request: Call<pb::WorkspaceDiffRequest>,
     ) -> Result<pb::WorkspaceDiffResponse> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         let req = request.get_ref();

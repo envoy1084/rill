@@ -19,18 +19,19 @@ async fn edit(
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "acl".into(),
-            base: base.map(|root| pb::EditBase {
+            base: (base.map(|root| pb::EditBase {
                 base: Some(pb::edit_base::Base::Root(root)),
-            }),
+            }))
+            .into(),
             edits,
             message: "edit".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
-        .map(|r| r.into_inner().hash)
-        .map_err(|s| s.code())
+        .map(|r| r.into_owned().hash)
+        .map_err(|s| s.code)
 }
 
 #[tokio::test]
@@ -90,7 +91,7 @@ async fn a_merge_is_charged_only_for_what_it_writes() {
             left: mine.clone(),
             right: theirs.clone(),
             message: "merge".into(),
-            provenance: None,
+            provenance: None.into(),
             intent: None,
         })
         .await
@@ -126,12 +127,12 @@ async fn a_merge_is_charged_only_for_what_it_writes() {
         .create_change_version(pb::CreateChangeVersionRequest {
             operation_id: Bytes::new(),
             repo: "acl".into(),
-            version: Some(pb::ChangeVersion::from(forged)),
+            version: pb::ChangeVersion::from(forged).into(),
             signatures: Vec::new(),
         })
         .await
         .unwrap_err();
-    assert_eq!(err.code(), Code::PermissionDenied);
+    assert_eq!(err.code, Code::PermissionDenied);
     acl.server.stop().await;
 }
 
@@ -143,7 +144,7 @@ async fn change_of(c: &mut Clients, version: &Bytes) -> Bytes {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .version
         .unwrap()
         .change_id
@@ -162,7 +163,7 @@ async fn vote(c: &mut Clients, change: &Bytes, label: &str, value: i32) -> Resul
         })
         .await
         .map(|_| ())
-        .map_err(|s| s.code())
+        .map_err(|s| s.code)
 }
 
 #[tokio::test]
@@ -195,12 +196,13 @@ async fn a_revoke_between_commit_and_land_keeps_the_change_off_trunk() {
         .access
         .remove_relation(pb::RemoveRelationRequest {
             operation_id: Bytes::new(),
-            relation: Some(pb::Relation {
+            relation: (pb::Relation {
                 repo: "acl".into(),
                 path: "pub".into(),
                 relation: "writer".into(),
                 subject: format!("principal:{}", bob().id),
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
@@ -215,7 +217,7 @@ async fn a_revoke_between_commit_and_land_keeps_the_change_off_trunk() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .ticket
         .unwrap();
     let mut error = None;
@@ -229,8 +231,12 @@ async fn a_revoke_between_commit_and_land_keeps_the_change_off_trunk() {
             })
             .await
             .unwrap()
-            .into_inner();
-        match pb::LandStatus::try_from(status.ticket.as_ref().unwrap().status).unwrap() {
+            .into_owned();
+        match rill_proto::convert::known::<pb::LandStatus>(
+            status.ticket.as_option().unwrap().status,
+        )
+        .unwrap()
+        {
             pb::LandStatus::Landed => panic!("a revoked author's change landed"),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 error = status.error;

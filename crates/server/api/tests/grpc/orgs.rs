@@ -9,8 +9,8 @@ async fn repositories_are_addressed_within_their_org() {
     let server = TestServer::start(config).await;
     let alice_token = server.token_for(&rill_types::Principal::human("alice"));
     let bot_token = server.token_for(&rill_types::Principal::agent("bot"));
-    let mut alice = clients(&server, Some(&alice_token)).await;
-    let mut bot = clients(&server, Some(&bot_token)).await;
+    let alice = clients(&server, Some(&alice_token)).await;
+    let bot = clients(&server, Some(&bot_token)).await;
 
     let create_org = |name: &str| pb::CreateOrgRequest {
         operation_id: Bytes::new(),
@@ -22,14 +22,14 @@ async fn repositories_are_addressed_within_their_org() {
         .create_org(create_org("botcorp"))
         .await
         .unwrap_err();
-    assert_eq!(err.code(), Code::PermissionDenied);
+    assert_eq!(err.code, Code::PermissionDenied);
     alice.admin.create_org(create_org("acme")).await.unwrap();
     let dup = alice
         .admin
         .create_org(create_org("acme"))
         .await
         .unwrap_err();
-    assert_eq!(dup.code(), Code::AlreadyExists);
+    assert_eq!(dup.code, Code::AlreadyExists);
 
     let create_repo = |repo: &str| pb::CreateRepoRequest {
         operation_id: Bytes::new(),
@@ -42,13 +42,13 @@ async fn repositories_are_addressed_within_their_org() {
         .create_repo(create_repo("ghost/app"))
         .await
         .unwrap_err();
-    assert_eq!(missing.code(), Code::NotFound);
+    assert_eq!(missing.code, Code::NotFound);
     let scoped = alice
         .repo
         .create_repo(create_repo("acme/app"))
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .repo
         .unwrap();
     let plain = alice
@@ -56,7 +56,7 @@ async fn repositories_are_addressed_within_their_org() {
         .create_repo(create_repo("app"))
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .repo
         .unwrap();
     assert_eq!(
@@ -70,11 +70,11 @@ async fn repositories_are_addressed_within_their_org() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "acme/app".into(),
-            base: None,
+            base: None.into(),
             edits: vec![set_edit("README.md", b"acme\n")],
             message: "first".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
@@ -83,12 +83,12 @@ async fn repositories_are_addressed_within_their_org() {
         .repo
         .list_dir(pb::ListDirRequest {
             repo: "app".into(),
-            root: None,
+            root: None.into(),
             path: String::new(),
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert!(
         listed.entries.is_empty(),
         "the default org's app is untouched"
@@ -99,7 +99,7 @@ async fn repositories_are_addressed_within_their_org() {
         .list_orgs(pb::ListOrgsRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let names: Vec<_> = orgs.orgs.iter().map(|o| o.name.as_str()).collect();
     assert_eq!(names, vec!["acme", "default"]);
     server.stop().await;

@@ -1,26 +1,23 @@
 //! SDK error type.
 
+use connectrpc::ErrorCode as Code;
 use rill_types::{ChangeId, ChangeVersionHash, RepoPathBuf};
 use thiserror::Error;
-use tonic::Code;
 
 /// Everything that can go wrong talking to a Rill server or working with a
 /// local checkout.
 #[derive(Debug, Error)]
 pub enum Error {
-    /// The server answered with a gRPC status. The code is preserved so
-    /// callers can branch on `NotFound`, `AlreadyExists`, `Aborted`, ...
+    /// The server answered with an error, or the connection failed
+    /// (`Unavailable`). The code is preserved so callers can branch on
+    /// `NotFound`, `AlreadyExists`, `Aborted`, ...
     #[error("{code:?}: {message}")]
     Status {
-        /// gRPC status code.
+        /// Error code (the gRPC codes).
         code: Code,
         /// Server-provided message.
         message: String,
     },
-
-    /// The connection could not be established or was lost.
-    #[error("transport error: {0}")]
-    Transport(#[from] tonic::transport::Error),
 
     /// A wire message could not be decoded into a `rill-types` value.
     #[error("conversion error: {0}")]
@@ -71,7 +68,7 @@ pub enum Error {
 }
 
 impl Error {
-    /// The gRPC code, if this error came from a status.
+    /// The error code, if the server or the connection reported one.
     pub fn code(&self) -> Option<Code> {
         match self {
             Error::Status { code, .. } => Some(*code),
@@ -95,11 +92,11 @@ impl Error {
     }
 }
 
-impl From<tonic::Status> for Error {
-    fn from(status: tonic::Status) -> Self {
+impl From<connectrpc::ConnectError> for Error {
+    fn from(err: connectrpc::ConnectError) -> Self {
         Error::Status {
-            code: status.code(),
-            message: status.message().to_string(),
+            code: err.code,
+            message: err.message.unwrap_or_default(),
         }
     }
 }
@@ -113,7 +110,7 @@ mod tests {
 
     #[test]
     fn status_mapping_preserves_code() {
-        let err: Error = tonic::Status::not_found("no such repo").into();
+        let err: Error = connectrpc::ConnectError::not_found("no such repo").into();
         assert!(err.is_not_found());
         assert_eq!(err.code(), Some(Code::NotFound));
         assert_eq!(err.to_string(), "NotFound: no such repo");

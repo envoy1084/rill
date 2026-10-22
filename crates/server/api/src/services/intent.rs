@@ -8,12 +8,13 @@ use rill_proto::convert::{
     risk_from_proto,
 };
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::intent_service_server::IntentService;
+use rill_proto::rill::v1::IntentService;
 use rill_types::{ChangeId, Intent, IntentId, IntentKind, IntentStatus, RepoPathBuf, Timestamp};
-use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult, Opened};
 use super::idem;
+use crate::services::Call;
+use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -40,12 +41,15 @@ async fn load(opened: &Opened, id: &[u8]) -> Result<Intent> {
         .ok_or_else(|| Error::not_found(format!("intent {id}")))
 }
 
-#[tonic::async_trait]
+// Handlers return their concrete response types.
+#[allow(refining_impl_trait)]
 impl IntentService for IntentSvc {
     async fn create_intent(
         &self,
-        request: Request<pb::CreateIntentRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::CreateIntentRequest>,
     ) -> GrpcResult<pb::CreateIntentResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::CreateIntentResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
@@ -73,33 +77,37 @@ impl IntentService for IntentSvc {
                     .put_intent(&intent, opened.principal())
                     .await?;
                 Ok(Response::new(pb::CreateIntentResponse {
-                    intent: Some(pb::Intent::from(intent)),
+                    intent: pb::Intent::from(intent).into(),
                 }))
             })
             .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn get_intent(
         &self,
-        request: Request<pb::GetIntentRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetIntentRequest>,
     ) -> GrpcResult<pb::GetIntentResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::GetIntentResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let intent = load(&opened, &request.get_ref().id).await?;
             Ok(Response::new(pb::GetIntentResponse {
-                intent: Some(pb::Intent::from(intent)),
+                intent: pb::Intent::from(intent).into(),
             }))
         }
         .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn update_intent(
         &self,
-        request: Request<pb::UpdateIntentRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::UpdateIntentRequest>,
     ) -> GrpcResult<pb::UpdateIntentResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::UpdateIntentResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
@@ -138,17 +146,19 @@ impl IntentService for IntentSvc {
                     .put_intent(&intent, opened.principal())
                     .await?;
                 Ok(Response::new(pb::UpdateIntentResponse {
-                    intent: Some(pb::Intent::from(intent)),
+                    intent: pb::Intent::from(intent).into(),
                 }))
             })
             .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     async fn list_intents(
         &self,
-        request: Request<pb::ListIntentsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListIntentsRequest>,
     ) -> GrpcResult<pb::ListIntentsResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::ListIntentsResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
@@ -182,15 +192,17 @@ impl IntentService for IntentSvc {
             }))
         }
         .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     /// Link a change to an intent on both sides: the intent's change list
     /// and, when the change is under review, the review's intent.
     async fn link_change(
         &self,
-        request: Request<pb::LinkChangeRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::LinkChangeRequest>,
     ) -> GrpcResult<pb::LinkChangeResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::LinkChangeResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
@@ -232,11 +244,11 @@ impl IntentService for IntentSvc {
                     }
                 }
                 Ok(Response::new(pb::LinkChangeResponse {
-                    intent: Some(pb::Intent::from(intent)),
+                    intent: pb::Intent::from(intent).into(),
                 }))
             })
             .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 
     /// Token-overlap (Jaccard) similarity over title and body. Good
@@ -244,8 +256,10 @@ impl IntentService for IntentSvc {
     /// the upgrade path when a vector index is available.
     async fn find_similar_intents(
         &self,
-        request: Request<pb::FindSimilarIntentsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::FindSimilarIntentsRequest>,
     ) -> GrpcResult<pb::FindSimilarIntentsResponse> {
+        let request = Call::new(ctx, request);
         let result: rill_runtime::error::Result<Response<pb::FindSimilarIntentsResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
@@ -277,14 +291,14 @@ impl IntentService for IntentSvc {
                 results: scored
                     .into_iter()
                     .map(|(score, intent)| pb::ScoredIntent {
-                        intent: Some(pb::Intent::from(intent)),
+                        intent: pb::Intent::from(intent).into(),
                         score,
                     })
                     .collect(),
             }))
         }
         .await;
-        result.map_err(Status::from)
+        result.map_err(ConnectError::from)
     }
 }
 

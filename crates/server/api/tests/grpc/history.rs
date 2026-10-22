@@ -5,7 +5,7 @@ use super::*;
 #[tokio::test]
 async fn log_pages_cover_history_without_gaps_or_repeats() {
     let server = TestServer::start(dev_config()).await;
-    let mut c = clients(&server, None).await;
+    let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
             operation_id: Bytes::new(),
@@ -27,16 +27,16 @@ async fn log_pages_cover_history_without_gaps_or_repeats() {
             .apply_edits(pb::ApplyEditsRequest {
                 operation_id: Bytes::new(),
                 repo: "h".into(),
-                base,
+                base: base.into(),
                 edits: vec![set_edit("f.txt", format!("{i}\n").as_bytes())],
                 message: format!("v{i}"),
                 intent: None,
-                provenance: None,
+                provenance: None.into(),
                 change_id: None,
             })
             .await
             .unwrap()
-            .into_inner();
+            .into_owned();
         chain.push(version.hash);
     }
 
@@ -47,16 +47,17 @@ async fn log_pages_cover_history_without_gaps_or_repeats() {
             .repo
             .log(pb::LogRequest {
                 repo: "h".into(),
-                start: Some(pb::RootSpec {
+                start: (pb::RootSpec {
                     root: Some(pb::root_spec::Root::VersionHash(hash)),
-                }),
+                })
+                .into(),
                 limit: 2,
                 path: None,
                 first_parent: false,
             })
             .await
             .unwrap()
-            .into_inner();
+            .into_owned();
         assert!(page.entries.len() <= 2);
         walked.extend(page.entries.into_iter().map(|e| e.hash));
         start = page.next_start;

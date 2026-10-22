@@ -53,22 +53,22 @@ impl WorkspaceClient {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
             name: name.to_string(),
-            base: base.map(|b| b.to_proto()),
-            sparse: Some(pb::SparseProfile::from(sparse)),
+            base: (base.map(|b| b.to_proto())).into(),
+            sparse: pb::SparseProfile::from(sparse).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.create_workspace(request).await }
         })
         .await?
-        .into_inner();
-        WorkspaceOp::from_parts(resp.workspace, resp.operation)
+        .into_owned();
+        WorkspaceOp::from_parts(resp.workspace.into_option(), resp.operation.into_option())
     }
 
     /// A workspace by id.
     pub async fn get(&self, workspace: WorkspaceId) -> Result<Workspace> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetWorkspaceRequest {
                 repo: self.repo.clone(),
                 workspace: id_to_proto(&workspace),
@@ -76,7 +76,7 @@ impl WorkspaceClient {
             async move { svc.get_workspace(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("get_workspace.workspace", resp.workspace)?.try_into()?)
     }
 
@@ -89,11 +89,11 @@ impl WorkspaceClient {
             page_token: filter.page_token,
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.list_workspaces(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         let items = resp
             .workspaces
             .into_iter()
@@ -123,15 +123,15 @@ impl WorkspaceClient {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
             workspace: id_to_proto(&workspace),
-            sparse: Some(pb::SparseProfile::from(sparse)),
+            sparse: pb::SparseProfile::from(sparse).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.set_sparse_profile(request).await }
         })
         .await?
-        .into_inner();
-        WorkspaceOp::from_parts(resp.workspace, resp.operation)
+        .into_owned();
+        WorkspaceOp::from_parts(resp.workspace.into_option(), resp.operation.into_option())
     }
 
     /// Record an uploaded tree as the workspace's current snapshot.
@@ -154,11 +154,11 @@ impl WorkspaceClient {
             tree_hash: hash_to_proto(&tree),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.snapshot(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("snapshot.operation", resp.operation)?.try_into()?)
     }
 
@@ -185,14 +185,14 @@ impl WorkspaceClient {
             workspace: id_to_proto(&workspace),
             message: change.message,
             intent: change.intent.as_ref().map(id_to_proto),
-            provenance: Some(pb::Provenance::from(&change.provenance)),
+            provenance: pb::Provenance::from(&change.provenance).into(),
         };
         crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.new_change(request).await }
         })
         .await?
-        .into_inner()
+        .into_owned()
         .try_into()
     }
 
@@ -218,14 +218,14 @@ impl WorkspaceClient {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
             workspace: id_to_proto(&workspace),
-            new_base: new_base.map(|b| b.to_proto()),
+            new_base: (new_base.map(|b| b.to_proto())).into(),
         };
         crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.update_base(request).await }
         })
         .await?
-        .into_inner()
+        .into_owned()
         .try_into()
     }
 
@@ -246,15 +246,15 @@ impl WorkspaceClient {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
             workspace: id_to_proto(&workspace),
-            to: Some(pb::Principal::from(to)),
+            to: pb::Principal::from(to).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.handoff(request).await }
         })
         .await?
-        .into_inner();
-        WorkspaceOp::from_parts(resp.workspace, resp.operation)
+        .into_owned();
+        WorkspaceOp::from_parts(resp.workspace.into_option(), resp.operation.into_option())
     }
 
     /// Undo an operation (the head operation when `None`).
@@ -281,12 +281,12 @@ impl WorkspaceClient {
             target: target.as_ref().map(id_to_proto),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.undo(request).await }
         })
         .await?
-        .into_inner();
-        WorkspaceOp::from_parts(resp.workspace, resp.operation)
+        .into_owned();
+        WorkspaceOp::from_parts(resp.workspace.into_option(), resp.operation.into_option())
     }
 
     /// The operation log, newest first, continuing from `before`.
@@ -297,7 +297,7 @@ impl WorkspaceClient {
         before: Option<OperationId>,
     ) -> Result<Vec<Operation>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ListOperationsRequest {
                 repo: self.repo.clone(),
                 workspace: id_to_proto(&workspace),
@@ -307,7 +307,7 @@ impl WorkspaceClient {
             async move { svc.list_operations(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         resp.operations
             .into_iter()
             .map(|o| Operation::try_from(o).map_err(Into::into))
@@ -327,7 +327,7 @@ impl WorkspaceClient {
             workspace: id_to_proto(&workspace),
         };
         crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.delete_workspace(request).await }
         })
         .await?;
@@ -343,18 +343,18 @@ impl WorkspaceClient {
         context_lines: u32,
     ) -> Result<Vec<FileDiff>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::WorkspaceDiffRequest {
                 repo: self.repo.clone(),
                 workspace: id_to_proto(&workspace),
                 paths: paths.iter().map(|p| p.to_string()).collect(),
-                format: format.to_proto(),
+                format: format.to_proto().into(),
                 context_lines,
             };
             async move { svc.workspace_diff(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         resp.files.into_iter().map(FileDiff::try_from).collect()
     }
 }

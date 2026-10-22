@@ -23,7 +23,7 @@ pub enum ScimCmd {
 
 /// Run `rill admin scim`.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: ScimCmd) -> Result<()> {
-    let mut svc = ctx.client()?.identity_svc();
+    let svc = ctx.client()?.identity_svc();
     match cmd {
         ScimCmd::Create(o) => {
             let created = svc
@@ -32,7 +32,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ScimCmd) -> Result<()> {
                     org: o.org.clone(),
                 })
                 .await?
-                .into_inner();
+                .into_owned();
             let id = created.credential.map(|c| c.id).unwrap_or_default();
             ctx.emit(
                 json!({ "id": id, "token": created.token, "org": o.org }),
@@ -46,7 +46,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ScimCmd) -> Result<()> {
             let credentials = svc
                 .list_scim_credentials(pb::ListScimCredentialsRequest { org: o.org })
                 .await?
-                .into_inner()
+                .into_owned()
                 .credentials;
             let value = json!(credentials
                 .iter()

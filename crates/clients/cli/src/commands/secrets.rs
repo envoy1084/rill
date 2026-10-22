@@ -62,7 +62,7 @@ fn secret_json(s: &pb::SecretInfo) -> serde_json::Value {
         "repos": s.repos,
         "trunk_only": s.trunk_only,
         "updated_at": s.updated_at,
-        "updated_by": s.updated_by.as_ref().map(|p| p.name.clone()),
+        "updated_by": s.updated_by.as_option().map(|p| p.name.clone()),
     })
 }
 
@@ -88,7 +88,7 @@ fn read_value(from_file: Option<PathBuf>) -> Result<Vec<u8>> {
 
 /// Run a secret subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
-    let mut svc = ctx.client()?.secret_svc();
+    let svc = ctx.client()?.secret_svc();
     match cmd {
         SecretCmd::Set(a) => {
             let value = read_value(a.from_file)?;
@@ -102,7 +102,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
                     trunk_only: a.trunk_only,
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .secret
                 .ok_or_else(|| CliError::conflict("the server returned no secret"))?;
             ctx.emit(secret_json(&secret), |out| {
@@ -113,7 +113,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
             let list = svc
                 .list_secrets(pb::ListSecretsRequest { org: o.org })
                 .await?
-                .into_inner()
+                .into_owned()
                 .secrets;
             ctx.emit(
                 j!({ "secrets": list.iter().map(secret_json).collect::<Vec<_>>() }),
@@ -130,7 +130,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
                             s.trunk_only.to_string(),
                             when(&Timestamp::from_millis(s.updated_at)),
                             s.updated_by
-                                .as_ref()
+                                .as_option()
                                 .map(|p| p.name.clone())
                                 .unwrap_or_default(),
                         ]);
@@ -147,7 +147,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
                     name: a.name.clone(),
                 })
                 .await?
-                .into_inner()
+                .into_owned()
                 .deleted;
             ctx.emit(j!({ "deleted": deleted }), |out| {
                 out.line(if deleted {

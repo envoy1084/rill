@@ -10,6 +10,7 @@ use super::reviews::change_id;
 use super::ReviewSvc;
 use crate::services::common::{self, open};
 use crate::services::repo::forward;
+use crate::services::Call;
 use rill_runtime::error::Result;
 use rill_runtime::state::RepoContext;
 
@@ -19,7 +20,7 @@ pub type ReviewEventStream = crate::services::repo::EventStream<pb::ReviewEvent>
 impl ReviewSvc {
     pub(super) async fn watch_review_impl(
         &self,
-        request: tonic::Request<pb::WatchReviewRequest>,
+        request: Call<pb::WatchReviewRequest>,
     ) -> Result<ReviewEventStream> {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
@@ -53,7 +54,7 @@ async fn from_event(
     event: Event,
 ) -> Option<pb::ReviewEvent> {
     use pb::review_event::Event as E;
-    let status = |s: ReviewStatus| E::StatusChanged(pb::ReviewStatus::from(s) as i32);
+    let status = |s: ReviewStatus| E::StatusChanged(pb::ReviewStatus::from(s).into());
     let mapped = match event.kind {
         EventKind::ReviewSubmitted { .. } => status(ReviewStatus::Open),
         EventKind::StatusChanged { to, .. } => status(to),

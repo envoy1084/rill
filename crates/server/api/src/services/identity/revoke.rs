@@ -3,9 +3,9 @@
 use rill_proto::rill::v1 as pb;
 use rill_types::identity::{IdentityChange, Revocation};
 use rill_types::{SessionId, Timestamp, TokenId};
-use tonic::Request;
 
 use crate::auth::{caller, require_instance_admin};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -13,7 +13,7 @@ use rill_runtime::state::AppState;
 /// (administrators).
 pub async fn token(
     state: &AppState,
-    request: Request<pb::RevokeTokenRequest>,
+    request: Call<pb::RevokeTokenRequest>,
 ) -> Result<pb::RevokeTokenResponse> {
     let ctx = caller(&request)?;
     let req = request.into_inner();
@@ -63,7 +63,7 @@ pub async fn token(
 /// End a session: the caller's own, or any for administrators.
 pub async fn session(
     state: &AppState,
-    request: Request<pb::RevokeSessionRequest>,
+    request: Call<pb::RevokeSessionRequest>,
 ) -> Result<pb::RevokeSessionResponse> {
     let ctx = caller(&request)?;
     let id: SessionId = request

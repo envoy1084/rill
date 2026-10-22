@@ -4,11 +4,10 @@
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
+use crate::client::{Connection, Transport};
+use connectrpc::ErrorCode as Code;
 use parking_lot::RwLock;
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::session_service_client::SessionServiceClient;
-use tonic::transport::Channel;
-use tonic::Code;
 
 use super::store::{CredentialStore, Credentials};
 
@@ -39,11 +38,11 @@ pub struct SessionSource {
 }
 
 impl SessionSource {
-    /// Start refreshing `credentials` over `channel`, saving rotations to
+    /// Start refreshing `credentials` over `connection`, saving rotations to
     /// `store`. Needs a tokio runtime.
     pub fn start(
         credentials: Credentials,
-        channel: Channel,
+        connection: Connection,
         store: Option<Arc<dyn CredentialStore>>,
     ) -> Arc<Self> {
         let source = Arc::new(SessionSource {
@@ -51,7 +50,7 @@ impl SessionSource {
         });
         tokio::spawn(refresh_forever(
             Arc::downgrade(&source),
-            SessionServiceClient::new(channel),
+            connection.sessions(),
             store,
         ));
         source
@@ -71,7 +70,7 @@ impl TokenSource for SessionSource {
 
 async fn refresh_forever(
     source: Weak<SessionSource>,
-    mut client: SessionServiceClient<Channel>,
+    client: rill_proto::rill::v1::SessionServiceClient<Transport>,
     store: Option<Arc<dyn CredentialStore>>,
 ) {
     let mut backoff = Duration::from_secs(1);
@@ -95,7 +94,7 @@ async fn refresh_forever(
             .await
         {
             Ok(grant) => {
-                let next = current.renewed(grant.into_inner());
+                let next = current.renewed(grant.into_owned());
                 if let Some(store) = &store {
                     if let Err(e) = store.save(&next) {
                         tracing::warn!(error = %e, "saving refreshed credentials failed");
@@ -107,7 +106,7 @@ async fn refresh_forever(
                 }
                 backoff = Duration::from_secs(1);
             }
-            Err(status) if status.code() == Code::Unavailable => {
+            Err(status) if status.code == Code::Unavailable => {
                 tokio::time::sleep(backoff).await;
                 backoff = (backoff * 2).min(Duration::from_secs(30));
             }

@@ -4,7 +4,6 @@ use bytes::{Bytes, BytesMut};
 use rill_proto::convert::{hash_to_proto, id_to_proto, required};
 use rill_proto::rill::v1 as pb;
 use rill_types::{ContentRef, FileKind, ObjectHash, ObjectKind, OperationId, INLINE_THRESHOLD};
-use tokio_stream::StreamExt;
 
 use super::RepoClient;
 use crate::error::Result;
@@ -40,22 +39,21 @@ impl RepoClient {
             .map(|h| self.grants().for_hash(&h))
             .unwrap_or_default();
         let mut stream = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetBlobRequest {
                 repo: self.repo.clone(),
-                content: Some(pb::ContentRef::from(content)),
+                content: pb::ContentRef::from(content).into(),
                 offset,
                 length,
                 grant: grant.clone(),
             };
             async move { svc.get_blob(request).await }
         })
-        .await?
-        .into_inner();
+        .await?;
         let capacity = length.unwrap_or_else(|| content.size()) as usize;
         let mut out = BytesMut::with_capacity(capacity);
-        while let Some(chunk) = stream.next().await {
-            out.extend_from_slice(&chunk?.data);
+        while let Some(chunk) = stream.message::<pb::BlobChunk>().await? {
+            out.extend_from_slice(&chunk.to_owned_message().data);
         }
         Ok(out.freeze())
     }
@@ -86,11 +84,11 @@ impl RepoClient {
                 }
             });
             let stream = tokio_stream::iter(std::iter::once(header.clone()).chain(chunks));
-            let mut svc = self.svc();
+            let svc = self.svc();
             async move { svc.put_blob(stream).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("put_blob.content", resp.content)?.try_into()?)
     }
 
@@ -107,13 +105,13 @@ impl RepoClient {
     /// Which of the given objects the server already has, in order.
     pub async fn has_objects(&self, objects: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::HasObjectsRequest {
                 repo: self.repo.clone(),
                 objects: objects
                     .iter()
                     .map(|(kind, hash)| pb::ObjectRef {
-                        kind: object_kind_to_proto(*kind) as i32,
+                        kind: object_kind_to_proto(*kind).into(),
                         hash: hash_to_proto(hash),
                     })
                     .collect(),
@@ -121,7 +119,7 @@ impl RepoClient {
             async move { svc.has_objects(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(resp.present)
     }
 }

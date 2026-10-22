@@ -4,16 +4,16 @@ use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::identity::{AccountStatus, OrgRole, UserRecord};
 use rill_types::Timestamp;
-use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
 pub fn user_proto(u: &UserRecord) -> pb::User {
     pb::User {
         org: u.org.clone(),
-        principal: Some(pb::Principal::from(&u.principal)),
+        principal: pb::Principal::from(&u.principal).into(),
         email: u.email.clone(),
         display_name: u.display_name.clone(),
         status: match u.status {
@@ -48,7 +48,7 @@ fn parse_role(name: &str) -> Result<OrgRole> {
 
 pub async fn list(
     state: &AppState,
-    request: Request<pb::ListUsersRequest>,
+    request: Call<pb::ListUsersRequest>,
 ) -> Result<pb::ListUsersResponse> {
     let ctx = caller(&request)?;
     let org = &request.get_ref().org;
@@ -61,7 +61,7 @@ pub async fn list(
 
 pub async fn update(
     state: &AppState,
-    request: Request<pb::UpdateUserRequest>,
+    request: Call<pb::UpdateUserRequest>,
 ) -> Result<pb::UpdateUserResponse> {
     let ctx = caller(&request)?;
     let req = request.into_inner();
@@ -93,6 +93,6 @@ pub async fn update(
     store.update_user(&before, &after, &ctx.principal).await?;
     tracing::info!(by = %ctx.principal, user = %after.principal, org = %after.org, status = ?after.status, "user updated");
     Ok(pb::UpdateUserResponse {
-        user: Some(user_proto(&after)),
+        user: user_proto(&after).into(),
     })
 }

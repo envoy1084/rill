@@ -70,16 +70,16 @@ async fn main() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Default::default(),
             repo: args.repo.clone(),
-            base: None,
+            base: None.into(),
             edits: Vec::new(),
             message: "start".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .expect("start")
-        .into_inner()
+        .into_owned()
         .hash;
     let mut edits = Vec::new();
     for d in 0..args.dirs {
@@ -117,12 +117,12 @@ async fn main() {
             .repo_svc()
             .list_dir(pb::ListDirRequest {
                 repo: args.repo.clone(),
-                root: Some(Root::Version(version).to_proto()),
+                root: Root::Version(version).to_proto().into(),
                 path: format!("d{d}"),
             })
             .await
             .expect("list")
-            .into_inner();
+            .into_owned();
         let hashes = (0..args.files_per_dir)
             .map(|f| ObjectHash::digest(ObjectKind::Blob, &content(d, f, args.file_bytes)))
             .collect();

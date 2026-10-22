@@ -33,7 +33,7 @@ impl LanderClient {
     /// landings.
     pub async fn trunk_status(&self, recent_limit: u32) -> Result<TrunkStatus> {
         crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetTrunkStatusRequest {
                 repo: self.repo.clone(),
                 recent_limit,
@@ -41,7 +41,7 @@ impl LanderClient {
             async move { svc.get_trunk_status(request).await }
         })
         .await?
-        .into_inner()
+        .into_owned()
         .try_into()
     }
 
@@ -49,7 +49,7 @@ impl LanderClient {
     /// each paired with its verification record.
     pub async fn landings(&self, limit: u32, before_seq: Option<TrunkSeq>) -> Result<Vec<Landing>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::ListLandingsRequest {
                 repo: self.repo.clone(),
                 limit,
@@ -58,7 +58,7 @@ impl LanderClient {
             async move { svc.list_landings(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         let mut verifications: BTreeMap<TrunkSeq, VerificationRecord> = resp
             .verifications
             .into_iter()
@@ -80,7 +80,7 @@ impl LanderClient {
     /// Verification state of one landed sequence.
     pub async fn verification(&self, seq: TrunkSeq) -> Result<VerificationRecord> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetVerificationRequest {
                 repo: self.repo.clone(),
                 seq: seq.get(),
@@ -88,7 +88,7 @@ impl LanderClient {
             async move { svc.get_verification(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         required("get_verification.result", resp.result)?.try_into()
     }
 
@@ -115,16 +115,16 @@ impl LanderClient {
             repo: self.repo.clone(),
             seq: seq.get(),
             target: report.target,
-            status: report.status.to_proto(),
+            status: report.status.to_proto().into(),
             details: report.details,
             artifact: report.artifact.as_ref().map(hash_to_proto),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.report_verification(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         required("report_verification.result", resp.result)?.try_into()
     }
 
@@ -147,11 +147,11 @@ impl LanderClient {
             reason: reason.to_string(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.revert_seq(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(RevertResult {
             landing: required("revert_seq.landing", resp.landing)?.try_into()?,
             version: required("revert_seq.version", resp.version)?.try_into()?,
@@ -181,11 +181,11 @@ impl LanderClient {
             target: target.to_string(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.bisect(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(BisectResult {
             culprit: resp.culprit.map(TrunkSeq),
             tested: resp

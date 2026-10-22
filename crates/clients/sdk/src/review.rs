@@ -32,7 +32,7 @@ impl ReviewClient {
     /// The review state of a change with the repository's labels.
     pub async fn get(&self, change_id: ChangeId) -> Result<ReviewInfo> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetReviewRequest {
                 repo: self.repo.clone(),
                 change_id: id_to_proto(&change_id),
@@ -40,7 +40,7 @@ impl ReviewClient {
             async move { svc.get_review(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(ReviewInfo {
             review: required("get_review.review", resp.review)?.try_into()?,
             labels: resp
@@ -58,7 +58,7 @@ impl ReviewClient {
             status: filter
                 .status
                 .into_iter()
-                .map(|s| pb::ReviewStatus::from(s) as i32)
+                .map(|s| pb::ReviewStatus::from(s).into())
                 .collect(),
             owner: filter.owner.as_ref().map(id_to_proto),
             intent: filter.intent.as_ref().map(id_to_proto),
@@ -66,11 +66,11 @@ impl ReviewClient {
             page_token: filter.page_token,
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.list_reviews(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         let items = convert_states(resp.reviews)?;
         Ok(Page::new(items, resp.next_page_token))
     }
@@ -92,11 +92,11 @@ impl ReviewClient {
             change_id: id_to_proto(&change_id),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.submit_for_review(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("submit_for_review.review", resp.review)?.try_into()?)
     }
 
@@ -134,11 +134,11 @@ impl ReviewClient {
             version: version.as_ref().map(hash_to_proto),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.vote(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("vote.review", resp.review)?.try_into()?)
     }
 
@@ -159,20 +159,20 @@ impl ReviewClient {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
             change_id: id_to_proto(&change_id),
-            anchor: Some(pb::ThreadAnchor::from(&comment.anchor)),
+            anchor: pb::ThreadAnchor::from(&comment.anchor).into(),
             body: comment.body,
             category: comment
                 .category
-                .map(|c| pb::CommentCategory::from(c) as i32),
+                .map(|c| pb::CommentCategory::from(c).into()),
             confidence: comment.confidence.map(u32::from),
-            to: comment.to.map(pb::Principal::from),
+            to: comment.to.map(pb::Principal::from).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.comment(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(NewThread {
             thread_id: resp.thread_id,
             thread: required("comment.thread", resp.thread)?.try_into()?,
@@ -204,15 +204,15 @@ impl ReviewClient {
             change_id: id_to_proto(&change_id),
             thread_id: thread_id.to_string(),
             body: reply.body,
-            category: reply.category.map(|c| pb::CommentCategory::from(c) as i32),
+            category: reply.category.map(|c| pb::CommentCategory::from(c).into()),
             confidence: reply.confidence.map(u32::from),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.reply_thread(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("reply_thread.thread", resp.thread)?.try_into()?)
     }
 
@@ -243,11 +243,11 @@ impl ReviewClient {
             resolved,
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.resolve_thread(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("resolve_thread.thread", resp.thread)?.try_into()?)
     }
 
@@ -268,18 +268,18 @@ impl ReviewClient {
             change_ids: change_ids.iter().map(id_to_proto).collect(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.set_stack(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         convert_states(resp.reviews)
     }
 
     /// Evaluate submit rules without landing.
     pub async fn evaluate_submit(&self, change_id: ChangeId) -> Result<SubmitDecision> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::EvaluateSubmitRequest {
                 repo: self.repo.clone(),
                 change_id: id_to_proto(&change_id),
@@ -287,7 +287,7 @@ impl ReviewClient {
             async move { svc.evaluate_submit(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         required("evaluate_submit.decision", resp.decision)?.try_into()
     }
 
@@ -315,11 +315,11 @@ impl ReviewClient {
             reason,
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.abandon(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(required("abandon.review", resp.review)?.try_into()?)
     }
 
@@ -351,11 +351,11 @@ impl ReviewClient {
             onto: onto.map(str::to_string),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.request_land(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         required("request_land.ticket", resp.ticket)?.try_into()
     }
 
@@ -377,18 +377,18 @@ impl ReviewClient {
             onto: onto.map(str::to_string),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (mut svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.svc(), request.clone());
             async move { svc.request_land_stack(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         resp.tickets.into_iter().map(LandTicket::try_from).collect()
     }
 
     /// Where a landing is, by ticket id.
     pub async fn land_status(&self, ticket: &str) -> Result<LandProgress> {
         crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetLandStatusRequest {
                 repo: self.repo.clone(),
                 ticket: ticket.to_string(),
@@ -396,7 +396,7 @@ impl ReviewClient {
             async move { svc.get_land_status(request).await }
         })
         .await?
-        .into_inner()
+        .into_owned()
         .try_into()
     }
 
@@ -408,8 +408,7 @@ impl ReviewClient {
                 repo: self.repo.clone(),
                 change_id: id_to_proto(&change_id),
             })
-            .await?
-            .into_inner();
+            .await?;
         Ok(watch_stream(stream))
     }
 }

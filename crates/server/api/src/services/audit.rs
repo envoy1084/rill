@@ -8,15 +8,16 @@ use std::time::Duration;
 use futures::Stream;
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::audit_service_server::AuditService;
+use rill_proto::rill::v1::AuditService;
 use rill_types::audit::{AuditEntry, AuditOutcome, AuditRoot, INSTANCE_AUDIT};
-use tonic::{Request, Response, Status};
 
 use crate::auth::{caller, require_instance_admin, require_org_admin};
+use crate::services::Call;
+use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
-type GrpcResult<T> = std::result::Result<Response<T>, Status>;
+type GrpcResult<T> = std::result::Result<Response<T>, ConnectError>;
 
 const DEFAULT_LIMIT: usize = 500;
 const MAX_LIMIT: usize = 5000;
@@ -36,7 +37,7 @@ impl AuditSvc {
 }
 
 /// The org a request names, once the caller may read its audit log.
-async fn authorized<T>(state: &AppState, request: &Request<T>, org: &str) -> Result<String> {
+async fn authorized<T>(state: &AppState, request: &Call<T>, org: &str) -> Result<String> {
     let ctx = caller(request)?;
     let org = if org.is_empty() {
         rill_store::DEFAULT_ORG.to_string()
@@ -67,7 +68,7 @@ fn entry_proto(entry: &AuditEntry) -> Result<pb::AuditEntryRecord> {
         seq: entry.seq,
         org: r.org.clone(),
         at: timestamp_to_proto(r.at),
-        actor: Some(pb::Principal::from(r.actor.clone())),
+        actor: pb::Principal::from(r.actor.clone()).into(),
         action: r.action.clone(),
         target: r.target.clone(),
         allowed,
@@ -92,14 +93,17 @@ fn root_proto(root: &AuditRoot) -> Result<pb::AuditRootRecord> {
 }
 
 type EntryStream =
-    Pin<Box<dyn Stream<Item = std::result::Result<pb::AuditEntryRecord, Status>> + Send>>;
+    Pin<Box<dyn Stream<Item = std::result::Result<pb::AuditEntryRecord, ConnectError>> + Send>>;
 
-#[tonic::async_trait]
+// Handlers return their concrete response types.
+#[allow(refining_impl_trait)]
 impl AuditService for AuditSvc {
     async fn list_audit_entries(
         &self,
-        request: Request<pb::ListAuditEntriesRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListAuditEntriesRequest>,
     ) -> GrpcResult<pb::ListAuditEntriesResponse> {
+        let request = Call::new(ctx, request);
         let result: Result<_> = async {
             let req = request.get_ref();
             let org = authorized(&self.state, &request, &req.org).await?;
@@ -120,13 +124,15 @@ impl AuditService for AuditSvc {
             })
         }
         .await;
-        result.map(Response::new).map_err(Status::from)
+        result.map(Response::new).map_err(ConnectError::from)
     }
 
     async fn list_audit_roots(
         &self,
-        request: Request<pb::ListAuditRootsRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListAuditRootsRequest>,
     ) -> GrpcResult<pb::ListAuditRootsResponse> {
+        let request = Call::new(ctx, request);
         let result: Result<_> = async {
             let org = authorized(&self.state, &request, &request.get_ref().org).await?;
             let roots = self
@@ -141,29 +147,33 @@ impl AuditService for AuditSvc {
             Ok(pb::ListAuditRootsResponse { roots })
         }
         .await;
-        result.map(Response::new).map_err(Status::from)
+        result.map(Response::new).map_err(ConnectError::from)
     }
 
     async fn seal_audit(
         &self,
-        request: Request<pb::SealAuditRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::SealAuditRequest>,
     ) -> GrpcResult<pb::SealAuditResponse> {
+        let request = Call::new(ctx, request);
         let result: Result<_> = async {
             let org = authorized(&self.state, &request, &request.get_ref().org).await?;
             rill_runtime::audit::worker::catch_up(&self.state).await?;
             let root = rill_runtime::audit::seal::seal(&self.state, &org).await?;
             Ok(pb::SealAuditResponse {
-                root: root.as_ref().map(root_proto).transpose()?,
+                root: root.as_ref().map(root_proto).transpose()?.into(),
             })
         }
         .await;
-        result.map(Response::new).map_err(Status::from)
+        result.map(Response::new).map_err(ConnectError::from)
     }
 
     async fn list_audit_keys(
         &self,
-        request: Request<pb::ListAuditKeysRequest>,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListAuditKeysRequest>,
     ) -> GrpcResult<pb::ListAuditKeysResponse> {
+        let request = Call::new(ctx, request);
         caller(&request)?;
         let keys = self
             .state
@@ -178,15 +188,15 @@ impl AuditService for AuditSvc {
         Ok(Response::new(pb::ListAuditKeysResponse { keys }))
     }
 
-    type WatchAuditStream = EntryStream;
-
     async fn watch_audit(
         &self,
-        request: Request<pb::WatchAuditRequest>,
-    ) -> GrpcResult<Self::WatchAuditStream> {
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::WatchAuditRequest>,
+    ) -> GrpcResult<EntryStream> {
+        let request = Call::new(ctx, request);
         let org = authorized(&self.state, &request, &request.get_ref().org)
             .await
-            .map_err(Status::from)?;
+            .map_err(ConnectError::from)?;
         let mut after = request.get_ref().after_seq;
         let audit = self.state.stores.audit();
         let shutdown = self.state.lifecycle.draining.clone();
@@ -196,13 +206,13 @@ impl AuditService for AuditSvc {
                 let page = match audit.entries(&org, after, DEFAULT_LIMIT).await {
                     Ok(page) => page,
                     Err(e) => {
-                        let _ = tx.send(Err(Status::from(Error::from(e)))).await;
+                        let _ = tx.send(Err(ConnectError::from(Error::from(e)))).await;
                         return;
                     }
                 };
                 for entry in &page {
                     after = entry.seq;
-                    let item = entry_proto(entry).map_err(Status::from);
+                    let item = entry_proto(entry).map_err(ConnectError::from);
                     if tx.send(item).await.is_err() {
                         return;
                     }

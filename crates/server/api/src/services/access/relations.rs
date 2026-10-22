@@ -4,10 +4,10 @@ use rill_policy::rebac::{dir_object, dir_of_object};
 use rill_policy::Relation;
 use rill_proto::rill::v1 as pb;
 use rill_types::RepoPathBuf;
-use tonic::Request;
 
 use super::subjects;
 use crate::services::common::{open, Opened};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -52,7 +52,7 @@ pub(super) fn to_proto(
 /// org administrators) may change its tuples.
 async fn change<T>(
     state: &AppState,
-    request: &Request<T>,
+    request: &Call<T>,
     rel: Option<pb::Relation>,
 ) -> Result<(Opened, String, Relation, rill_policy::Subject)> {
     let rel = rel.ok_or_else(|| Error::invalid("relation is required"))?;
@@ -69,10 +69,10 @@ async fn change<T>(
 
 pub async fn add(
     state: &AppState,
-    request: Request<pb::AddRelationRequest>,
+    request: Call<pb::AddRelationRequest>,
 ) -> Result<pb::AddRelationResponse> {
     let rel = request.get_ref().relation.clone();
-    let (opened, object, relation, subject) = change(state, &request, rel).await?;
+    let (opened, object, relation, subject) = change(state, &request, rel.into_option()).await?;
     let version = opened
         .repo
         .authorizer
@@ -87,10 +87,10 @@ pub async fn add(
 
 pub async fn remove(
     state: &AppState,
-    request: Request<pb::RemoveRelationRequest>,
+    request: Call<pb::RemoveRelationRequest>,
 ) -> Result<pb::RemoveRelationResponse> {
     let rel = request.get_ref().relation.clone();
-    let (opened, object, relation, subject) = change(state, &request, rel).await?;
+    let (opened, object, relation, subject) = change(state, &request, rel.into_option()).await?;
     let version = opened
         .repo
         .authorizer
@@ -107,7 +107,7 @@ pub async fn remove(
 /// see them all.
 pub async fn list(
     state: &AppState,
-    request: Request<pb::ListRelationsRequest>,
+    request: Call<pb::ListRelationsRequest>,
 ) -> Result<pb::ListRelationsResponse> {
     let req = request.get_ref();
     let opened = open(state, &request, &req.repo).await?;

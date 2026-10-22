@@ -30,6 +30,10 @@ tracing-subscriber = { workspace = true }
 clap = { workspace = true }
 
 [dev-dependencies]
+axum = { workspace = true }
+buffa = { workspace = true }
+connectrpc = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
 rill-proto = { workspace = true }
-tonic = { workspace = true }
 tokio-stream = { workspace = true }

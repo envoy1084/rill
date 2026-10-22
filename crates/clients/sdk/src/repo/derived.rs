@@ -16,7 +16,7 @@ impl RepoClient {
     /// `Unavailable` when it has not been computed yet.
     pub async fn derived(&self, kind: &str, hash: ObjectHash) -> Result<Bytes> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::GetDerivedRequest {
                 repo: self.repo.clone(),
                 kind: kind.to_string(),
@@ -25,7 +25,7 @@ impl RepoClient {
             async move { svc.get_derived(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(resp.data)
     }
 
@@ -37,7 +37,7 @@ impl RepoClient {
         timeout: Duration,
     ) -> Result<Derived> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::WaitDerivedRequest {
                 repo: self.repo.clone(),
                 kind: kind.to_string(),
@@ -47,7 +47,7 @@ impl RepoClient {
             async move { svc.wait_derived(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         match (resp.ready, resp.data) {
             (true, Some(data)) => Ok(Derived::Ready(data)),
             (true, None) => Ok(Derived::Ready(Bytes::new())),

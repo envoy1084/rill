@@ -3,26 +3,14 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use rill_proto::rill::v1::access_service_server::AccessServiceServer;
-use rill_proto::rill::v1::admin_service_server::AdminServiceServer;
-use rill_proto::rill::v1::audit_service_server::AuditServiceServer;
-use rill_proto::rill::v1::checks_service_server::ChecksServiceServer;
-use rill_proto::rill::v1::identity_service_server::IdentityServiceServer;
-use rill_proto::rill::v1::intent_service_server::IntentServiceServer;
-use rill_proto::rill::v1::lander_service_server::LanderServiceServer;
-use rill_proto::rill::v1::protection_service_server::ProtectionServiceServer;
-use rill_proto::rill::v1::repo_service_server::RepoServiceServer;
-use rill_proto::rill::v1::review_service_server::ReviewServiceServer;
-use rill_proto::rill::v1::secret_service_server::SecretServiceServer;
-use rill_proto::rill::v1::session_service_server::SessionServiceServer;
-use rill_proto::rill::v1::workspace_service_server::WorkspaceServiceServer;
+use connectrpc::{ConnectRpcService, Limits};
+use connectrpc_health::StaticChecker;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tonic::server::NamedService;
-use tonic::transport::server::TcpIncoming;
 use tower::Layer;
 
-use crate::auth::{AuthLayer, AuthService};
+use crate::auth::{AuthInterceptor, AuthLayer, AuthService};
 use crate::objects;
 use rill_reapi_proto::bytestream::byte_stream_server::ByteStreamServer;
 use rill_reapi_proto::reapi::action_cache_server::ActionCacheServer;
@@ -38,15 +26,15 @@ use crate::services::{
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
-/// Largest gRPC request message: a change version (8 MiB) with room for
-/// its envelope; blobs stream in smaller pieces.
+/// Largest request message: a change version (8 MiB) with room for its
+/// envelope; blobs stream in smaller pieces.
 pub const MAX_REQUEST_BYTES: usize = 16 << 20;
-/// Largest gRPC response message; listings and diffs stay well under it.
+/// Largest REAPI response message; listings and diffs stay well under it.
 pub const MAX_RESPONSE_BYTES: usize = 64 << 20;
-/// Requests one connection may have in flight.
-pub const MAX_CONCURRENT_PER_CONNECTION: usize = 1024;
+/// Requests one HTTP/2 connection may have in flight.
+pub const MAX_CONCURRENT_PER_CONNECTION: u32 = 1024;
 
-/// A generated service with the message size limits.
+/// A generated REAPI service with the message size limits.
 macro_rules! limits {
     ($svc:expr) => {
         $svc.max_decoding_message_size(MAX_REQUEST_BYTES)
@@ -61,7 +49,7 @@ impl<S: NamedService> NamedService for AuthService<S> {
 
 /// The two listeners a server runs on.
 pub struct Listeners {
-    /// gRPC API.
+    /// The API: Connect, gRPC and gRPC-web, and REAPI.
     pub grpc: TcpListener,
     /// Object protocol and health.
     pub http: TcpListener,
@@ -177,108 +165,86 @@ async fn reap_execution(state: Arc<AppState>, shutdown: CancellationToken) {
     }
 }
 
-async fn serve_grpc(
-    state: Arc<AppState>,
-    listener: TcpListener,
-    shutdown: CancellationToken,
-) -> Result<()> {
-    let auth = AuthLayer::new(state.clone());
-    let reflection = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(rill_proto::FILE_DESCRIPTOR_SET)
-        .build_v1()
-        .map_err(|e| Error::Transport(format!("reflection: {e}")))?;
-    let (health_reporter, health) = tonic_health::server::health_reporter();
-    set_health(&health_reporter, true).await;
-    let reporter = health_reporter.clone();
-    let draining = state.lifecycle.draining.clone();
-    tokio::spawn(async move {
-        draining.cancelled().await;
-        set_health(&reporter, false).await;
-    });
+/// The Rill API services, health and reflection, behind the auth
+/// interceptor.
+fn connect_service(state: &Arc<AppState>) -> Result<(ConnectRpcService, Arc<StaticChecker>)> {
+    let router = connectrpc::Router::new()
+        .add_service(Arc::new(SessionSvc::new(state.clone())))
+        .add_service(Arc::new(RepoSvc::new(state.clone())))
+        .add_service(Arc::new(WorkspaceSvc::new(state.clone())))
+        .add_service(Arc::new(ReviewSvc::new(state.clone())))
+        .add_service(Arc::new(IntentSvc::new(state.clone())))
+        .add_service(Arc::new(LanderSvc::new(state.clone())))
+        .add_service(Arc::new(IdentitySvc::new(state.clone())))
+        .add_service(Arc::new(AccessSvc::new(state.clone())))
+        .add_service(Arc::new(AuditSvc::new(state.clone())))
+        .add_service(Arc::new(ProtectionSvc::new(state.clone())))
+        .add_service(Arc::new(SecretSvc::new(state.clone())))
+        .add_service(Arc::new(ChecksSvc::new(state.clone())))
+        .add_service(Arc::new(AdminSvc::new(state.clone())));
+    let services: Vec<String> = rill_proto::SERVICES.iter().map(|s| s.to_string()).collect();
+    let (router, health) = connectrpc_health::install_static(router, services);
+    let reflector = connectrpc_reflection::Reflector::from_descriptor_set_bytes(
+        rill_proto::FILE_DESCRIPTOR_SET,
+    )
+    .map_err(|e| Error::Transport(format!("reflection: {e}")))?;
+    let router = connectrpc_reflection::install(router, reflector);
+    let service = ConnectRpcService::new(router)
+        .with_limits(
+            Limits::default()
+                .with_max_request_body_size(MAX_REQUEST_BYTES)
+                .with_max_message_size(MAX_REQUEST_BYTES),
+        )
+        .with_interceptor(crate::rpc_codes::RecordCodes)
+        .with_interceptor(AuthInterceptor::new(state.clone()));
+    Ok((service, health))
+}
 
-    let mut builder = tonic::transport::Server::builder()
-        .concurrency_limit_per_connection(MAX_CONCURRENT_PER_CONNECTION)
-        .layer(rill_runtime::telemetry::TelemetryLayer::new(
-            state.metrics.clone(),
-        ));
-    if let Some(tls) = &state.config.tls {
-        builder = builder
-            .tls_config(crate::tls::grpc(tls)?)
-            .map_err(|e| Error::Config(format!("tls: {e}")))?;
-    }
+/// REAPI for Bazel and the execution workers, on tonic.
+fn reapi_routes(state: &Arc<AppState>) -> axum::Router {
+    let auth = AuthLayer::new(state.clone());
     let exec = ExecSvc::new(state.clone());
-    builder
-        .add_service(reflection)
-        .add_service(health)
-        // Signing in needs no token; each RPC checks what it is given.
-        .add_service(limits!(SessionServiceServer::new(SessionSvc::new(
-            state.clone()
-        ))))
-        .add_service(auth.layer(limits!(RepoServiceServer::new(RepoSvc::new(state.clone())))))
-        .add_service(
-            auth.layer(limits!(WorkspaceServiceServer::new(WorkspaceSvc::new(
-                state.clone()
-            )))),
-        )
-        .add_service(auth.layer(limits!(ReviewServiceServer::new(ReviewSvc::new(
-            state.clone()
-        )))))
-        .add_service(auth.layer(limits!(IntentServiceServer::new(IntentSvc::new(
-            state.clone()
-        )))))
-        .add_service(auth.layer(limits!(LanderServiceServer::new(LanderSvc::new(
-            state.clone()
-        )))))
-        .add_service(
-            auth.layer(limits!(IdentityServiceServer::new(IdentitySvc::new(
-                state.clone()
-            )))),
-        )
-        .add_service(auth.layer(limits!(AccessServiceServer::new(AccessSvc::new(
-            state.clone()
-        )))))
-        .add_service(auth.layer(limits!(AuditServiceServer::new(AuditSvc::new(
-            state.clone()
-        )))))
-        .add_service(
-            auth.layer(limits!(ProtectionServiceServer::new(ProtectionSvc::new(
-                state.clone()
-            )))),
-        )
-        .add_service(auth.layer(limits!(SecretServiceServer::new(SecretSvc::new(
-            state.clone()
-        )))))
-        .add_service(auth.layer(limits!(ChecksServiceServer::new(ChecksSvc::new(
-            state.clone()
-        )))))
-        .add_service(auth.layer(limits!(ExecutionServer::new(exec.clone()))))
+    tonic::service::Routes::new(auth.layer(limits!(ExecutionServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(ActionCacheServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(ContentAddressableStorageServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(CapabilitiesServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(ByteStreamServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(OperationQueueServer::new(exec))))
-        .add_service(auth.layer(limits!(AdminServiceServer::new(AdminSvc::new(state)))))
-        .serve_with_incoming_shutdown(grpc_incoming(listener), shutdown.cancelled_owned())
-        .await
-        .map_err(|e| Error::Transport(format!("gRPC server: {e}")))
+        .into_axum_router()
 }
 
-/// Connections on the gRPC listener, sent without Nagle's delay: a
-/// response spanning several segments otherwise waits on the client's
-/// delayed ACK, 40 ms on Linux.
-fn grpc_incoming(listener: TcpListener) -> TcpIncoming {
-    TcpIncoming::from(listener).with_nodelay(Some(true))
-}
-
-async fn serve_http(
+async fn serve_grpc(
     state: Arc<AppState>,
     listener: TcpListener,
     shutdown: CancellationToken,
 ) -> Result<()> {
-    let router = objects::router(state.clone(), state.config.roles.api);
-    let Some(tls) = &state.config.tls else {
+    let (connect, health) = connect_service(&state)?;
+    let draining = state.lifecycle.draining.clone();
+    let reporter = health.clone();
+    tokio::spawn(async move {
+        draining.cancelled().await;
+        reporter.shutdown();
+    });
+    let router = reapi_routes(&state).fallback_service(connect).layer(
+        rill_runtime::telemetry::TelemetryLayer::new(state.metrics.clone()),
+    );
+    serve_router(router, listener, state.config.tls.as_ref(), shutdown, "API").await
+}
+
+/// Serve `router` on `listener` (HTTP/1.1 and cleartext or TLS HTTP/2)
+/// until `shutdown`, then drain.
+async fn serve_router(
+    router: axum::Router,
+    listener: TcpListener,
+    tls: Option<&rill_runtime::config::TlsConfig>,
+    shutdown: CancellationToken,
+    what: &'static str,
+) -> Result<()> {
+    let Some(tls) = tls else {
         use axum::serve::ListenerExt;
         let listener = listener.tap_io(|tcp| {
+            // A response spanning several segments otherwise waits on the
+            // client's delayed ACK, 40 ms on Linux.
             if let Err(e) = tcp.set_nodelay(true) {
                 tracing::debug!(error = %e, "setting TCP_NODELAY failed");
             }
@@ -286,7 +252,7 @@ async fn serve_http(
         return axum::serve(listener, router)
             .with_graceful_shutdown(shutdown.cancelled_owned())
             .await
-            .map_err(|e| Error::Transport(format!("HTTP server: {e}")));
+            .map_err(|e| Error::Transport(format!("{what} server: {e}")));
     };
     let config = crate::tls::http(tls)?;
     let handle = axum_server::Handle::new();
@@ -297,55 +263,32 @@ async fn serve_http(
     });
     let listener = listener
         .into_std()
-        .map_err(|e| Error::Transport(format!("HTTP listener: {e}")))?;
-    axum_server::from_tcp_rustls(listener, config)
-        .map_err(|e| Error::Transport(format!("HTTP listener: {e}")))?
-        .handle(handle)
+        .map_err(|e| Error::Transport(format!("{what} listener: {e}")))?;
+    let mut server = axum_server::from_tcp_rustls(listener, config)
+        .map_err(|e| Error::Transport(format!("{what} listener: {e}")))?
+        .handle(handle);
+    server
+        .http_builder()
+        .http2()
+        .max_concurrent_streams(MAX_CONCURRENT_PER_CONNECTION);
+    server
         .serve(router.into_make_service())
         .await
-        .map_err(|e| Error::Transport(format!("HTTP server: {e}")))
+        .map_err(|e| Error::Transport(format!("{what} server: {e}")))
 }
 
-/// Report every service serving, or not serving once the process drains.
-async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bool) {
-    let status = if serving {
-        tonic_health::ServingStatus::Serving
-    } else {
-        tonic_health::ServingStatus::NotServing
-    };
-    for name in [
-        "",
-        <RepoServiceServer<RepoSvc> as tonic::server::NamedService>::NAME,
-        <WorkspaceServiceServer<WorkspaceSvc> as tonic::server::NamedService>::NAME,
-        <ReviewServiceServer<ReviewSvc> as tonic::server::NamedService>::NAME,
-        <IntentServiceServer<IntentSvc> as tonic::server::NamedService>::NAME,
-        <LanderServiceServer<LanderSvc> as tonic::server::NamedService>::NAME,
-        <AdminServiceServer<AdminSvc> as tonic::server::NamedService>::NAME,
-        <AccessServiceServer<AccessSvc> as tonic::server::NamedService>::NAME,
-        <AuditServiceServer<AuditSvc> as tonic::server::NamedService>::NAME,
-        <ProtectionServiceServer<ProtectionSvc> as tonic::server::NamedService>::NAME,
-        <SecretServiceServer<SecretSvc> as tonic::server::NamedService>::NAME,
-        <ChecksServiceServer<ChecksSvc> as tonic::server::NamedService>::NAME,
-        <IdentityServiceServer<IdentitySvc> as tonic::server::NamedService>::NAME,
-        <SessionServiceServer<SessionSvc> as tonic::server::NamedService>::NAME,
-    ] {
-        reporter.set_service_status(name, status).await;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use tokio_stream::StreamExt;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn grpc_connections_disable_nagle() {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let mut incoming = grpc_incoming(listener);
-        let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
-        let accepted = incoming.next().await.unwrap().unwrap();
-        assert!(accepted.nodelay().unwrap());
-    }
+async fn serve_http(
+    state: Arc<AppState>,
+    listener: TcpListener,
+    shutdown: CancellationToken,
+) -> Result<()> {
+    let router = objects::router(state.clone(), state.config.roles.api);
+    serve_router(
+        router,
+        listener,
+        state.config.tls.as_ref(),
+        shutdown,
+        "HTTP",
+    )
+    .await
 }

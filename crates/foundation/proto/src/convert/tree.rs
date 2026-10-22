@@ -34,12 +34,12 @@ impl From<&TreeEntry> for pb::TreeEntry {
     fn from(e: &TreeEntry) -> Self {
         let kind = match &e.kind {
             EntryKind::File { content, kind } => pb::tree_entry::Kind::File(pb::tree_entry::File {
-                content: Some(pb::ContentRef::from(content)),
-                kind: pb::FileKind::from(*kind) as i32,
+                content: pb::ContentRef::from(content).into(),
+                kind: pb::FileKind::from(*kind).into(),
             }),
             EntryKind::Dir { hash, summary } => pb::tree_entry::Kind::Dir(pb::tree_entry::Dir {
                 hash: hash_to_proto(hash),
-                summary: Some(pb::DirSummary::from(*summary)),
+                summary: pb::DirSummary::from(*summary).into(),
             }),
         };
         pb::TreeEntry { kind: Some(kind) }

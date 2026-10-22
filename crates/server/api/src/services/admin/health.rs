@@ -1,16 +1,16 @@
 //! Health probes of the server's dependencies.
 
 use rill_proto::rill::v1 as pb;
-use tonic::Request;
 
 use super::AdminSvc;
+use crate::services::Call;
 use rill_runtime::error::Result;
 use rill_runtime::state::AppState;
 
 impl AdminSvc {
     pub(super) async fn health_impl(
         &self,
-        _request: Request<pb::HealthRequest>,
+        _request: Call<pb::HealthRequest>,
     ) -> Result<pb::HealthResponse> {
         let components = health_components(&self.state).await;
         Ok(pb::HealthResponse {

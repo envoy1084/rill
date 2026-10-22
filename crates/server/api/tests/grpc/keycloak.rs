@@ -5,8 +5,8 @@
 use std::collections::HashMap;
 
 use rill_identity::keys::KeyServiceConfig;
-use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
-use rill_proto::rill::v1::session_service_client::SessionServiceClient;
+use rill_proto::rill::v1::IdentityServiceClient;
+use rill_proto::rill::v1::SessionServiceClient;
 use rill_runtime::config::IdentityConfig;
 use rill_types::Principal;
 
@@ -68,10 +68,10 @@ async fn people_sign_in_through_keycloak() {
     };
     let server = TestServer::start(config).await;
     let root = server.token_for(&Principal::human("root"));
-    IdentityServiceClient::with_interceptor(connect(&server.grpc).await, Bearer(Some(root)))
+    IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(root)))
         .put_identity_provider(pb::PutIdentityProviderRequest {
             operation_id: Bytes::new(),
-            provider: Some(pb::IdentityProviderSpec {
+            provider: (pb::IdentityProviderSpec {
                 org: "default".into(),
                 name: "keycloak".into(),
                 issuer: issuer.clone(),
@@ -84,7 +84,8 @@ async fn people_sign_in_through_keycloak() {
                 auto_provision: true,
                 saml_metadata: None,
                 saml_sp_entity_id: None,
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap();
@@ -109,7 +110,7 @@ async fn people_sign_in_through_keycloak() {
         .json()
         .await
         .unwrap();
-    let grant = SessionServiceClient::new(connect(&server.grpc).await)
+    let grant = SessionServiceClient::authed(connect(&server.grpc).await, Bearer(None))
         .exchange_token(pb::ExchangeTokenRequest {
             subject_token: tokens["id_token"].as_str().unwrap().into(),
             subject_token_type: "urn:ietf:params:oauth:token-type:id_token".into(),
@@ -119,14 +120,14 @@ async fn people_sign_in_through_keycloak() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let me = clients(&server, Some(&grant.access_token))
         .await
         .admin
         .who_am_i(pb::WhoAmIRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(me.principal.unwrap().name, "alice");
     assert_eq!(me.teams, ["devs"], "groups become teams");
 
@@ -188,7 +189,7 @@ async fn people_sign_in_through_keycloak() {
         .who_am_i(pb::WhoAmIRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(me.principal.unwrap().name, "bob");
     server.stop().await;
 }

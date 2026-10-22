@@ -2,7 +2,8 @@
 
 use rill_policy::AuthContext;
 use rill_types::Principal;
-use tonic::Request;
+
+use crate::services::Call;
 
 use rill_runtime::error::{Error, Result};
 
@@ -42,10 +43,29 @@ pub fn relations_seen(header: Option<&str>) -> Vec<(rill_types::RepoId, i64)> {
         .collect()
 }
 
+/// A request the auth middleware can attach a caller to: a Rill API call
+/// or a REAPI (tonic) request.
+pub trait Extended {
+    /// The request's extensions.
+    fn extensions(&self) -> &http::Extensions;
+}
+
+impl<T> Extended for Call<T> {
+    fn extensions(&self) -> &http::Extensions {
+        Call::extensions(self)
+    }
+}
+
+impl<T> Extended for tonic::Request<T> {
+    fn extensions(&self) -> &http::Extensions {
+        tonic::Request::extensions(self)
+    }
+}
+
 /// The caller the auth middleware attached to a request. Missing means the
 /// middleware did not run, which is a server wiring bug, not a client
 /// error; it is still reported as `UNAUTHENTICATED` so nothing proceeds.
-pub fn caller<T>(request: &Request<T>) -> Result<AuthContext> {
+pub fn caller(request: &impl Extended) -> Result<AuthContext> {
     request
         .extensions()
         .get::<AuthContext>()
@@ -78,10 +98,14 @@ mod tests {
 
     #[test]
     fn missing_caller_is_unauthenticated() {
-        let req = Request::new(());
+        let ctx = connectrpc::RequestContext::new(http::HeaderMap::new());
+        let req = Call::with_message(ctx, ());
         assert!(matches!(caller(&req), Err(Error::Unauthenticated(_))));
-        let mut req = Request::new(());
-        req.extensions_mut().insert(dev_context());
+        let mut extensions = http::Extensions::new();
+        extensions.insert(dev_context());
+        let ctx =
+            connectrpc::RequestContext::new(http::HeaderMap::new()).with_extensions(extensions);
+        let req = Call::with_message(ctx, ());
         assert_eq!(caller(&req).unwrap().principal, dev_principal());
     }
 }

@@ -3,11 +3,11 @@
 use rill_policy::{Relation, Subject};
 use rill_proto::rill::v1 as pb;
 use rill_types::RepoPathBuf;
-use tonic::Request;
 
 use super::relations::{object, relation, to_proto};
 use super::subjects;
 use crate::services::common::{open, Opened};
+use crate::services::Call;
 use rill_runtime::error::Result;
 use rill_runtime::state::AppState;
 
@@ -21,10 +21,7 @@ async fn snapshot(opened: &Opened) -> Result<std::sync::Arc<rill_policy::rebac::
 
 /// Whether the subject holds the relation, and why. Asking about oneself
 /// needs nothing beyond being able to name the repository.
-pub async fn check(
-    state: &AppState,
-    request: Request<pb::CheckRequest>,
-) -> Result<pb::CheckResponse> {
+pub async fn check(state: &AppState, request: Call<pb::CheckRequest>) -> Result<pb::CheckResponse> {
     let req = request.get_ref();
     let opened = open(state, &request, &req.repo).await?;
     let (principal, teams) =
@@ -66,7 +63,7 @@ pub async fn check(
 /// team subjects. Owners only.
 pub async fn expand(
     state: &AppState,
-    request: Request<pb::ExpandRequest>,
+    request: Call<pb::ExpandRequest>,
 ) -> Result<pb::ExpandResponse> {
     let req = request.get_ref();
     let opened = open(state, &request, &req.repo).await?;
@@ -87,12 +84,13 @@ pub async fn expand(
     let tuples = grants
         .into_iter()
         .map(|t| pb::ExpandedTuple {
-            tuple: Some(to_proto(
+            tuple: (to_proto(
                 &opened,
                 &t.object,
                 t.relation.as_str(),
                 &t.subject.to_string(),
-            )),
+            ))
+            .into(),
             members: match &t.subject {
                 Subject::Team(team) => users
                     .iter()
@@ -112,7 +110,7 @@ pub async fn expand(
 /// The directories where the subject holds the relation.
 pub async fn lookup_paths(
     state: &AppState,
-    request: Request<pb::LookupPathsRequest>,
+    request: Call<pb::LookupPathsRequest>,
 ) -> Result<pb::LookupPathsResponse> {
     let req = request.get_ref();
     let opened = open(state, &request, &req.repo).await?;

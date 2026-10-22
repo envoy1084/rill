@@ -1,6 +1,7 @@
 //! Searches of roots the index has not reached yet.
 
 use super::*;
+use connectrpc::client::CallOptions;
 
 /// Concurrent searches of one unindexed root queue one index job, and a
 /// cancelled search does not keep later ones from asking again. Every
@@ -13,7 +14,7 @@ async fn concurrent_searches_of_one_root_share_an_index_job() {
     let mut config = dev_config();
     config.roles.workers = false;
     let server = TestServer::start_on(config, stores.clone()).await;
-    let mut c = clients(&server, None).await;
+    let c = clients(&server, None).await;
     let created = c
         .repo
         .create_repo(pb::CreateRepoRequest {
@@ -24,7 +25,7 @@ async fn concurrent_searches_of_one_root_share_an_index_job() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     let id: [u8; 16] = created.repo.unwrap().id.as_ref().try_into().unwrap();
     let queue = rill_jobs::Queue::new(
         stores.repo(rill_types::RepoId::from_bytes(id)),
@@ -35,33 +36,34 @@ async fn concurrent_searches_of_one_root_share_an_index_job() {
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "r".into(),
-            base: None,
+            base: None.into(),
             edits: vec![set_edit("a.txt", b"needle\n")],
             message: "a".into(),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
 
     let wave = || {
         let searches = (0..20).map(|_| {
-            let mut repo = c.repo.clone();
-            let mut request = Request::new(pb::GrepRequest {
+            let repo = c.repo.clone();
+            let request = pb::GrepRequest {
                 repo: "r".into(),
-                root: Some(pb::RootSpec {
+                root: (pb::RootSpec {
                     root: Some(pb::root_spec::Root::VersionHash(version.hash.clone())),
-                }),
+                })
+                .into(),
                 pattern: "needle".into(),
                 case_insensitive: false,
                 path_globs: vec![],
                 max_results: 0,
                 context_lines: 0,
-            });
-            request.set_timeout(Duration::from_millis(500));
-            async move { repo.grep(request).await }
+            };
+            let options = CallOptions::default().with_timeout(Duration::from_millis(500));
+            async move { repo.grep_with_options(request, options).await }
         });
         futures::future::join_all(searches)
     };

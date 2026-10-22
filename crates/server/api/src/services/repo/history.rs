@@ -10,6 +10,7 @@ use rill_types::{ChangeId, ChangeVersionHash, FileChange, TrunkSeq};
 use super::{visible, RepoSvc};
 use crate::grants::GrantBuilder;
 use crate::services::common::{self, hash, limit, open, path, resolve_version};
+use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 /// Default and maximum page sizes for history walks.
@@ -19,7 +20,7 @@ const MAX_LOG_LIMIT: usize = 10_000;
 impl RepoSvc {
     pub(super) async fn get_change_version_impl(
         &self,
-        request: tonic::Request<pb::GetChangeVersionRequest>,
+        request: Call<pb::GetChangeVersionRequest>,
     ) -> Result<pb::GetChangeVersionResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -47,7 +48,7 @@ impl RepoSvc {
         }
         let signatures = opened.repo.repo.get_signatures(&hash).await?;
         Ok(pb::GetChangeVersionResponse {
-            version: Some(pb::ChangeVersion::from(cv)),
+            version: pb::ChangeVersion::from(cv).into(),
             signatures: signatures.into_iter().map(pb::Signature::from).collect(),
             read_grant: grant.sign(&opened)?,
         })
@@ -55,7 +56,7 @@ impl RepoSvc {
 
     pub(super) async fn get_change_info_impl(
         &self,
-        request: tonic::Request<pb::GetChangeInfoRequest>,
+        request: Call<pb::GetChangeInfoRequest>,
     ) -> Result<pb::GetChangeInfoResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -65,13 +66,13 @@ impl RepoSvc {
             .await?
             .ok_or_else(|| Error::not_found(format!("change version {hash}")))?;
         Ok(pb::GetChangeInfoResponse {
-            info: Some(pb::ChangeInfo::from(info)),
+            info: pb::ChangeInfo::from(info).into(),
         })
     }
 
     pub(super) async fn get_change_versions_impl(
         &self,
-        request: tonic::Request<pb::GetChangeVersionsRequest>,
+        request: Call<pb::GetChangeVersionsRequest>,
     ) -> Result<pb::GetChangeVersionsResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -86,16 +87,13 @@ impl RepoSvc {
         Ok(pb::GetChangeVersionsResponse { versions })
     }
 
-    pub(super) async fn log_impl(
-        &self,
-        request: tonic::Request<pb::LogRequest>,
-    ) -> Result<pb::LogResponse> {
+    pub(super) async fn log_impl(&self, request: Call<pb::LogRequest>) -> Result<pb::LogResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
         let filter = opened.permit().read_any().await?;
         let ctx = &opened.repo;
         let limit = limit(req.limit, DEFAULT_LOG_LIMIT, MAX_LOG_LIMIT);
-        let Some(start) = resolve_version(ctx, req.start.as_ref()).await? else {
+        let Some(start) = resolve_version(ctx, req.start.as_option()).await? else {
             return Ok(pb::LogResponse {
                 entries: Vec::new(),
                 next_start: None,
@@ -163,7 +161,7 @@ impl RepoSvc {
 
     pub(super) async fn path_history_impl(
         &self,
-        request: tonic::Request<pb::PathHistoryRequest>,
+        request: Call<pb::PathHistoryRequest>,
     ) -> Result<pb::PathHistoryResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -171,7 +169,7 @@ impl RepoSvc {
         opened.permit().read(&path).await?;
         let ctx = &opened.repo;
         let limit = limit(req.limit, DEFAULT_LOG_LIMIT, MAX_LOG_LIMIT);
-        let Some(start) = resolve_version(ctx, req.start.as_ref()).await? else {
+        let Some(start) = resolve_version(ctx, req.start.as_option()).await? else {
             return Ok(pb::PathHistoryResponse {
                 entries: Vec::new(),
                 next_start: None,
@@ -205,9 +203,9 @@ impl RepoSvc {
                 }
             };
             entries.push(pb::PathHistoryEntry {
-                info: Some(common::change_info(ctx, hash).await?),
+                info: common::change_info(ctx, hash).await?.into(),
                 path: path.to_string(),
-                change: Some(pb::FileChange::from(change)),
+                change: pb::FileChange::from(change).into(),
             });
         }
         Ok(pb::PathHistoryResponse {
@@ -218,7 +216,7 @@ impl RepoSvc {
 
     pub(super) async fn blame_impl(
         &self,
-        request: tonic::Request<pb::BlameRequest>,
+        request: Call<pb::BlameRequest>,
     ) -> Result<pb::BlameResponse> {
         let req = request.get_ref();
         let opened = open(&self.state, &request, &req.repo).await?;
@@ -248,7 +246,7 @@ impl RepoSvc {
             lines.push(pb::BlameLine {
                 line_no: i as u32 + 1,
                 version: hash_to_proto(&line.version),
-                author: Some(pb::Principal::from(&line.author)),
+                author: pb::Principal::from(&line.author).into(),
                 trunk_seq: trunk_seq.map(TrunkSeq::get),
                 text: texts
                     .get(i)

@@ -107,7 +107,7 @@ line through `emit_json_line`.
 
 Errors go to stderr. With `--json` an error is printed as
 `{"error": {code, message, exit}}`. `code` comes from `CliError::code`. For
-SDK errors it is `rill_mcp::error::sdk_code`, the snake_case gRPC code.
+SDK errors it is `rill_mcp::error::sdk_code`, the snake_case error code.
 
 | Exit | Meaning |
 | --- | --- |

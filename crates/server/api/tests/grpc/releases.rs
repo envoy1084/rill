@@ -12,20 +12,21 @@ async fn change_on(c: &mut Clients, base: Option<Bytes>, path: &str, body: &str)
         .apply_edits(pb::ApplyEditsRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            base: base.map(|b| pb::EditBase {
+            base: (base.map(|b| pb::EditBase {
                 base: Some(pb::edit_base::Base::Root(pb::RootSpec {
                     root: Some(pb::root_spec::Root::VersionHash(b)),
                 })),
-            }),
+            }))
+            .into(),
             edits: vec![set_edit(path, body.as_bytes())],
             message: format!("edit {path}"),
             intent: None,
-            provenance: None,
+            provenance: None.into(),
             change_id: None,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .version
         .unwrap()
         .change_id
@@ -56,7 +57,7 @@ async fn a_release_is_cut_and_landed_on_only_through_its_lander() {
         })
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!((cut.r#ref.as_str(), cut.trunk_seq), ("release/1.0", 1));
 
     // Trunk moves on; a fix based on the release lands on it alone.
@@ -74,7 +75,7 @@ async fn a_release_is_cut_and_landed_on_only_through_its_lander() {
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .ticket
         .unwrap();
     let status = wait(&mut c, &ticket.id).await;
@@ -108,15 +109,16 @@ async fn a_release_is_cut_and_landed_on_only_through_its_lander() {
         .move_ref(pb::MoveRefRequest {
             operation_id: Bytes::new(),
             repo: "app".into(),
-            update: Some(pb::RefUpdate {
+            update: (pb::RefUpdate {
                 name: "release/1.0".into(),
                 expected: Some(Bytes::copy_from_slice(head.as_bytes())),
                 target: Some(cut.hash.clone()),
-            }),
+            })
+            .into(),
         })
         .await
         .unwrap_err();
-    assert_eq!(moved.code(), tonic::Code::PermissionDenied);
+    assert_eq!(moved.code, connectrpc::ErrorCode::PermissionDenied);
 
     let other = change_on(&mut c, Some(cut.hash.clone()), "OTHER", "x\n").await;
     approve(&mut c, &other).await;
@@ -130,7 +132,7 @@ async fn a_release_is_cut_and_landed_on_only_through_its_lander() {
         })
         .await
         .unwrap_err();
-    assert_eq!(missing.code(), tonic::Code::NotFound);
+    assert_eq!(missing.code, connectrpc::ErrorCode::NotFound);
 }
 
 async fn approve(c: &mut Clients, change_id: &Bytes) {
@@ -168,8 +170,12 @@ async fn wait(c: &mut Clients, ticket: &str) -> pb::GetLandStatusResponse {
             })
             .await
             .unwrap()
-            .into_inner();
-        match pb::LandStatus::try_from(status.ticket.as_ref().unwrap().status).unwrap() {
+            .into_owned();
+        match rill_proto::convert::known::<pb::LandStatus>(
+            status.ticket.as_option().unwrap().status,
+        )
+        .unwrap()
+        {
             pb::LandStatus::Landed => return status,
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 panic!("{ticket} did not land: {:?}", status.error)

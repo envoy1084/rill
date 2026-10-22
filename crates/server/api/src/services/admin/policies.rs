@@ -3,17 +3,17 @@
 use rill_proto::convert::timestamp_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{RepoPathBuf, Timestamp};
-use tonic::Request;
 
 use super::scopes::parse_policy_name;
 use super::AdminSvc;
+use crate::services::Call;
 use rill_runtime::error::Result;
 use rill_runtime::state::policy::{self, StoredPolicy};
 
 impl AdminSvc {
     pub(super) async fn get_policy_impl(
         &self,
-        request: Request<pb::GetPolicyRequest>,
+        request: Call<pb::GetPolicyRequest>,
     ) -> Result<pb::GetPolicyResponse> {
         let (repo, name) = parse_policy_name(&request.get_ref().name)?;
         let opened = self.open_named(&request, &repo).await?;
@@ -30,13 +30,13 @@ impl AdminSvc {
             name: request.get_ref().name.clone(),
             text: stored.text,
             updated_at: timestamp_to_proto(stored.updated_at),
-            updated_by: Some(pb::Principal::from(stored.updated_by)),
+            updated_by: pb::Principal::from(stored.updated_by).into(),
         })
     }
 
     pub(super) async fn set_policy_impl(
         &self,
-        request: Request<pb::SetPolicyRequest>,
+        request: Call<pb::SetPolicyRequest>,
     ) -> Result<pb::SetPolicyResponse> {
         let (repo, name) = parse_policy_name(&request.get_ref().name)?;
         let opened = self.open_named(&request, &repo).await?;

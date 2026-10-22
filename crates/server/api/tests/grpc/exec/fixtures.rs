@@ -19,7 +19,7 @@ use rill_reapi_proto::remoteworker::{
     current_state, desired_state, CurrentState, SynchronizeRequest,
 };
 
-use crate::common::{connect, Bearer, Svc, TestServer};
+use crate::common::{channel, ReapiBearer, ReapiSvc, TestServer};
 
 pub(crate) fn digest(bytes: &[u8]) -> Digest {
     Digest {
@@ -29,17 +29,17 @@ pub(crate) fn digest(bytes: &[u8]) -> Digest {
 }
 
 pub(crate) struct Exec {
-    pub(crate) cas: ContentAddressableStorageClient<Svc>,
-    pub(crate) execution: ExecutionClient<Svc>,
-    pub(crate) cache: ActionCacheClient<Svc>,
+    pub(crate) cas: ContentAddressableStorageClient<ReapiSvc>,
+    pub(crate) execution: ExecutionClient<ReapiSvc>,
+    pub(crate) cache: ActionCacheClient<ReapiSvc>,
 }
 
 pub(crate) async fn exec_clients(server: &TestServer, token: Option<&str>) -> Exec {
-    let channel = connect(&server.grpc).await;
+    let channel = channel(&server.grpc).await;
     let svc = || {
         tonic::service::interceptor::InterceptedService::new(
             channel.clone(),
-            Bearer(token.map(String::from)),
+            ReapiBearer(token.map(String::from)),
         )
     };
     Exec {
@@ -134,11 +134,11 @@ impl FakeWorker {
         let token = token.map(String::from);
         let name = name.to_string();
         let task = tokio::spawn(async move {
-            let channel = connect(&endpoint).await;
+            let channel = channel(&endpoint).await;
             let svc = || {
                 tonic::service::interceptor::InterceptedService::new(
                     channel.clone(),
-                    Bearer(token.clone()),
+                    ReapiBearer(token.clone()),
                 )
             };
             let mut queue = OperationQueueClient::new(svc());

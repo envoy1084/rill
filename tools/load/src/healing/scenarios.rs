@@ -189,7 +189,7 @@ pub async fn flaky_test(trunk: &Trunk, _slo: &Slo) -> anyhow::Result<Value> {
             repo: trunk.name.clone(),
         })
         .await?
-        .into_inner()
+        .into_owned()
         .targets
         .into_iter()
         .map(|t| t.target)

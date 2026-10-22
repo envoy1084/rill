@@ -139,7 +139,7 @@ impl LandStatus {
     }
 
     fn from_proto(value: i32) -> Result<Self> {
-        match pb::LandStatus::try_from(value) {
+        match rill_proto::convert::known::<pb::LandStatus>(value) {
             Ok(pb::LandStatus::Queued) => Ok(LandStatus::Queued),
             Ok(pb::LandStatus::Rebasing) => Ok(LandStatus::Rebasing),
             Ok(pb::LandStatus::Landed) => Ok(LandStatus::Landed),
@@ -174,7 +174,7 @@ impl TryFrom<pb::LandTicket> for LandTicket {
         Ok(LandTicket {
             id: t.id,
             change_id: id_from_proto("land_ticket.change_id", &t.change_id)?,
-            status: LandStatus::from_proto(t.status)?,
+            status: LandStatus::from_proto(t.status.to_i32())?,
             requested_at: timestamp_from_proto(t.requested_at),
         })
     }

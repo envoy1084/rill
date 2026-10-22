@@ -34,20 +34,20 @@ impl RepoClient {
         opts: DiffOptions,
     ) -> Result<DiffResult> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::DiffRequest {
                 repo: self.repo.clone(),
-                base: Some(base.to_proto()),
-                target: Some(target.to_proto()),
+                base: base.to_proto().into(),
+                target: target.to_proto().into(),
                 paths: opts.paths.iter().map(|p| p.to_string()).collect(),
-                format: opts.format.to_proto(),
+                format: opts.format.to_proto().into(),
                 context_lines: opts.context_lines,
                 limit: opts.limit,
             };
             async move { svc.diff(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         let files: Vec<FileDiff> = resp
             .files
             .into_iter()
@@ -74,7 +74,7 @@ impl RepoClient {
         b: ChangeVersionHash,
     ) -> Result<Vec<ChangeVersionHash>> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::MergeBaseRequest {
                 repo: self.repo.clone(),
                 a: hash_to_proto(&a),
@@ -83,7 +83,7 @@ impl RepoClient {
             async move { svc.merge_base(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(hashes_from_proto("merge_base.bases", &resp.bases)?)
     }
 
@@ -94,7 +94,7 @@ impl RepoClient {
         descendant: ChangeVersionHash,
     ) -> Result<bool> {
         let resp = crate::client::retry_idempotent(|| {
-            let mut svc = self.svc();
+            let svc = self.svc();
             let request = pb::IsAncestorRequest {
                 repo: self.repo.clone(),
                 ancestor: hash_to_proto(&ancestor),
@@ -103,7 +103,7 @@ impl RepoClient {
             async move { svc.is_ancestor(request).await }
         })
         .await?
-        .into_inner();
+        .into_owned();
         Ok(resp.is_ancestor)
     }
 }

@@ -40,7 +40,11 @@ impl TryFrom<pb::RiskClass> for RiskClass {
 }
 
 /// Decode a `RiskClass` enum field.
-pub fn risk_from_proto(field: &'static str, value: i32) -> Result<RiskClass> {
+pub fn risk_from_proto(
+    field: &'static str,
+    value: impl Into<buffa::EnumValue<pb::RiskClass>>,
+) -> Result<RiskClass> {
+    let value = value.into().to_i32();
     let r: pb::RiskClass = enum_from_proto(field, value)?;
     RiskClass::try_from(r).map_err(|_| ConvertError::BadEnum { field, value })
 }
@@ -59,7 +63,11 @@ impl From<IntentKind> for pb::IntentKind {
 }
 
 /// Decode an `IntentKind` enum field.
-pub fn intent_kind_from_proto(field: &'static str, value: i32) -> Result<IntentKind> {
+pub fn intent_kind_from_proto(
+    field: &'static str,
+    value: impl Into<buffa::EnumValue<pb::IntentKind>>,
+) -> Result<IntentKind> {
+    let value = value.into().to_i32();
     let k: pb::IntentKind = enum_from_proto(field, value)?;
     match k {
         pb::IntentKind::Feature => Ok(IntentKind::Feature),
@@ -84,7 +92,11 @@ impl From<IntentStatus> for pb::IntentStatus {
 }
 
 /// Decode an `IntentStatus` enum field.
-pub fn intent_status_from_proto(field: &'static str, value: i32) -> Result<IntentStatus> {
+pub fn intent_status_from_proto(
+    field: &'static str,
+    value: impl Into<buffa::EnumValue<pb::IntentStatus>>,
+) -> Result<IntentStatus> {
+    let value = value.into().to_i32();
     let s: pb::IntentStatus = enum_from_proto(field, value)?;
     match s {
         pb::IntentStatus::Open => Ok(IntentStatus::Open),
@@ -101,11 +113,11 @@ impl From<&Intent> for pb::Intent {
             id: id_to_proto(&i.id),
             title: i.title.clone(),
             body: i.body.clone(),
-            kind: pb::IntentKind::from(i.kind) as i32,
-            status: pb::IntentStatus::from(i.status) as i32,
-            owner: Some(pb::Principal::from(&i.owner)),
+            kind: pb::IntentKind::from(i.kind).into(),
+            status: pb::IntentStatus::from(i.status).into(),
+            owner: pb::Principal::from(&i.owner).into(),
             parent: i.parent.as_ref().map(id_to_proto),
-            risk_override: i.risk_override.map(|r| pb::RiskClass::from(r) as i32),
+            risk_override: i.risk_override.map(|r| pb::RiskClass::from(r).into()),
             changes: i.changes.iter().map(id_to_proto).collect(),
             created_at: timestamp_to_proto(i.created_at),
             updated_at: timestamp_to_proto(i.updated_at),
