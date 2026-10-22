@@ -26,6 +26,7 @@ impl Verifier for ExecVerifier {
     async fn verify(&self, request: VerifyRequest) -> rill_lander::Result<VerificationOutcome> {
         let target = Target {
             root: request.root,
+            version: request.version,
             base: request.base,
             risk: request.risk,
             priority: match request.stage {
@@ -52,6 +53,9 @@ impl Verifier for ExecVerifier {
             }
         }
         let mut details = outcome.summary();
+        if let Some(run) = &outcome.run {
+            details.push_str(&format!(" (run {run})"));
+        }
         if let Some(excerpt) = &outcome.excerpt {
             details.push('\n');
             details.push_str(excerpt);

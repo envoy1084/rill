@@ -5,6 +5,7 @@ mod compile;
 pub mod graph;
 mod outcome;
 mod plan;
+mod progress;
 mod run;
 mod select;
 mod submit;

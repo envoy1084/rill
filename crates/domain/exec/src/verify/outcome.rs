@@ -49,6 +49,8 @@ pub struct StepResult {
     pub duration: Option<Duration>,
     /// Test cases from the step's JUnit report.
     pub tests: Vec<TestCaseResult>,
+    /// Output files it produced (artifacts), by path.
+    pub outputs: Vec<(String, BlobDigest)>,
 }
 
 impl StepResult {
@@ -65,6 +67,7 @@ impl StepResult {
             worker: None,
             duration: None,
             tests: Vec::new(),
+            outputs: Vec::new(),
         }
     }
 
@@ -85,6 +88,8 @@ pub struct VerificationOutcome {
     pub steps: Vec<StepResult>,
     /// The end of the first failure's output.
     pub excerpt: Option<String>,
+    /// The run recording it, when runs are kept.
+    pub run: Option<String>,
 }
 
 impl VerificationOutcome {

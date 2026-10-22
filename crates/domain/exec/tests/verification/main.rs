@@ -7,5 +7,6 @@ mod fixture;
 mod graph;
 mod history;
 mod running;
+mod runs;
 mod secrets;
 mod selection;

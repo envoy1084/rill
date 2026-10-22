@@ -122,13 +122,15 @@ and `nextest --partition` scripts read.
 4. stops at the first step that does not pass, and keeps the last 4 KiB of
    its standard error (or output) as the excerpt.
 
-`VerificationOutcome { green, steps, excerpt }` lists each step or shard
+`VerificationOutcome { green, steps, excerpt, run }` lists each step or shard
 as `Passed`, `Failed { exit_code }`, `TimedOut`, `Error` (the action could
 not run), `Unaffected` or `NotGating`, with whether it was cached, its
 action, output digests, worker and duration. `summary()` is the one line
 the lander records, for example
 `step "unit" shard 2/4 failed with exit code 1; 3 passed (1 cached)`.
-Only successful results enter the action cache.
+Only successful results enter the action cache. With a `RunStore`
+(`with_runs`) each verification is also recorded as a run, step by step
+as it progresses ([checks](checks.md#runs)).
 
 Pre-land requests run at `High` priority, post-land at `Normal`.
 

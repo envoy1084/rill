@@ -6,6 +6,7 @@ use arc_swap::ArcSwap;
 use rill_core::tree::DEFAULT_TREE_CACHE;
 use rill_core::{CommitGraph, DeriveManager, TreeOps};
 use rill_exec::history::TestHistory;
+use rill_exec::runs::RunStore;
 use rill_exec::PlanRunner;
 use rill_lander::{AlwaysGreen, Lander, PostLandVerifier, Verifier};
 use rill_policy::Authorizer;
@@ -82,7 +83,11 @@ impl RepoRegistry {
                     &config.name,
                     trees.clone(),
                     self.config.verify.platform.clone(),
-                ),
+                )
+                .with_runs(RunStore::new(
+                    repo.clone(),
+                    std::time::Duration::from_secs(self.config.verify.retention_days * 24 * 3600),
+                )),
                 TestHistory::new(repo.clone()),
             )),
             false => Arc::new(AlwaysGreen),

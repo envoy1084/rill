@@ -10,6 +10,7 @@
 pub mod error;
 pub mod history;
 pub mod remote;
+pub mod runs;
 pub mod sandbox;
 pub mod verify;
 pub mod worker;

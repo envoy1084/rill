@@ -31,7 +31,7 @@ impl PlanRunner {
         let action = actions
             .pop()
             .ok_or_else(|| Error::InvalidAction("a graph query compiled to nothing".into()))?;
-        let (step, result) = self.submit(action, priority).await?;
+        let (step, result) = self.submit(action, priority, None).await?;
         if !step.status.is_ok() {
             return Ok(Err(step));
         }

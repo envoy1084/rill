@@ -8,6 +8,117 @@ service ChecksService {
   rpc GetTestHistory(GetTestHistoryRequest) returns (GetTestHistoryResponse);
   // Targets whose outcome changes on unchanged inputs, flakiest first.
   rpc ListFlakyTests(ListFlakyTestsRequest) returns (ListFlakyTestsResponse);
+  // Verification runs, newest first, all or of one version.
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+  rpc GetRun(GetRunRequest) returns (VerifyRun);
+  // The run now and after every change, until it ends.
+  rpc WatchRun(GetRunRequest) returns (stream VerifyRun);
+  // A byte range of a step's standard output or error.
+  rpc ReadLog(ReadLogRequest) returns (ReadBytesResponse);
+  // A byte range of a file a step produced.
+  rpc ReadArtifact(ReadArtifactRequest) returns (ReadBytesResponse);
+}
+
+enum StepState {
+  STEP_STATE_UNSPECIFIED = 0;
+  STEP_STATE_QUEUED = 1;
+  STEP_STATE_RUNNING = 2;
+  STEP_STATE_PASSED = 3;
+  STEP_STATE_FAILED = 4;
+  STEP_STATE_TIMED_OUT = 5;
+  // It could not run.
+  STEP_STATE_ERROR = 6;
+  // Not run: the change touched none of its inputs.
+  STEP_STATE_UNAFFECTED = 7;
+  // Not run: it does not gate the change's risk class.
+  STEP_STATE_NOT_GATING = 8;
+}
+
+message Artifact {
+  string path = 1;
+  uint64 size = 2;
+}
+
+message RunStep {
+  // Its index in the run, for ReadLog and ReadArtifact.
+  uint32 index = 1;
+  string name = 2;
+  // 1-based shard and shard count, 0 when not sharded.
+  uint32 shard = 3;
+  uint32 shards = 4;
+  StepState state = 5;
+  optional int32 exit_code = 6;
+  // Why it could not run.
+  string error = 7;
+  bool cached = 8;
+  uint64 stdout_size = 9;
+  uint64 stderr_size = 10;
+  repeated Artifact artifacts = 11;
+  string worker = 12;
+  optional uint64 duration_ms = 13;
+}
+
+message VerifyRun {
+  string id = 1;
+  bytes version = 2;
+  // Verification of trunk, after landing.
+  bool trunk = 3;
+  int64 started_at = 4;
+  // Unset while it runs.
+  optional bool green = 5;
+  string summary = 6;
+  optional int64 finished_at = 7;
+  // Empty in listings.
+  repeated RunStep steps = 8;
+}
+
+message ListRunsRequest {
+  string repo = 1;
+  // Only runs of this version.
+  bytes version = 2;
+  // Default 20.
+  uint32 limit = 3;
+}
+message ListRunsResponse {
+  repeated VerifyRun runs = 1;
+}
+
+message GetRunRequest {
+  string repo = 1;
+  string run = 2;
+}
+
+enum LogStream {
+  LOG_STREAM_UNSPECIFIED = 0;
+  LOG_STREAM_STDOUT = 1;
+  LOG_STREAM_STDERR = 2;
+}
+
+message ReadLogRequest {
+  string repo = 1;
+  string run = 2;
+  uint32 step = 3;
+  LogStream stream = 4;
+  // A negative offset counts from the end: -4096 is the last 4 KiB.
+  int64 offset = 5;
+  // Default and most 1 MiB.
+  uint32 limit = 6;
+}
+
+message ReadArtifactRequest {
+  string repo = 1;
+  string run = 2;
+  uint32 step = 3;
+  string path = 4;
+  int64 offset = 5;
+  uint32 limit = 6;
+}
+
+message ReadBytesResponse {
+  bytes data = 1;
+  // Where `data` starts, and the whole size.
+  uint64 offset = 2;
+  uint64 size = 3;
 }
 
 enum TestOutcome {

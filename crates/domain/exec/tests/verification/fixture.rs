@@ -15,6 +15,7 @@ use tokio::task::JoinHandle;
 
 pub struct Fixture {
     pub trees: TreeOps,
+    pub runs: rill_exec::runs::RunStore,
     pub runner: PlanRunner,
     pub scheduler: Arc<Scheduler>,
     worker: JoinHandle<()>,
@@ -54,15 +55,19 @@ impl Fixture {
             &Default::default(),
         );
         let worker = tokio::spawn(worker.run(std::future::pending()));
+        let runs =
+            rill_exec::runs::RunStore::new(repo.clone(), Duration::from_secs(30 * 24 * 3600));
         let runner = PlanRunner::new(
             scheduler.clone(),
             rill_store::DEFAULT_ORG,
             "app",
             trees.clone(),
             Default::default(),
-        );
+        )
+        .with_runs(runs.clone());
         Fixture {
             trees,
+            runs,
             runner,
             scheduler,
             worker,
@@ -101,6 +106,7 @@ impl Fixture {
     ) -> VerificationOutcome {
         let target = Target {
             root,
+            version: rill_types::ObjectHash::ZERO,
             base,
             risk: None,
             priority: Priority::Normal,

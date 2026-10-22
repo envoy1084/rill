@@ -9,10 +9,12 @@ use rill_reapi_proto::reapi::{ActionResult, ExecuteResponse};
 
 use super::compile::CompiledAction;
 use super::outcome::{StepResult, StepStatus};
+use super::progress::Progress;
 use super::run::PlanRunner;
 use crate::error::{Error, Result};
 use crate::history::{parse_junit, TestCaseResult};
 use crate::remote::{BlobDigest, Stage, Submission};
+use crate::runs::StepRecord;
 
 /// How long one wait for an operation lasts before it is read again.
 const WAIT: Duration = Duration::from_secs(30);
@@ -26,6 +28,7 @@ impl PlanRunner {
         &self,
         compiled: CompiledAction,
         priority: Priority,
+        progress: Option<(&Progress, u32)>,
     ) -> Result<(StepResult, Option<ActionResult>)> {
         let mut result = StepResult {
             action: Some(compiled.action),
@@ -43,6 +46,13 @@ impl PlanRunner {
             result.tests = self.report(junit.as_deref(), &cached).await?;
             return Ok((result, Some(cached)));
         }
+        let pending =
+            |running| StepRecord::pending(&compiled.step, compiled.shard, compiled.action, running);
+        let queued = pending(false);
+        let running = pending(true);
+        if let Some((progress, index)) = progress {
+            progress.write(index, &queued).await;
+        }
         let submitted = self
             .scheduler
             .submit(
@@ -57,7 +67,8 @@ impl PlanRunner {
                 },
             )
             .await?;
-        let response = self.wait(&submitted.operation.id).await?;
+        let on_running = progress.map(|(progress, index)| (progress, index, &running));
+        let response = self.wait(&submitted.operation.id, on_running).await?;
         result.cached = response.cached_result;
         if let Some(action_result) = &response.result {
             fill(&mut result, action_result);
@@ -76,8 +87,14 @@ impl PlanRunner {
         Ok((result, response.result))
     }
 
-    /// The response of operation `id` once it completes.
-    async fn wait(&self, id: &str) -> Result<ExecuteResponse> {
+    /// The response of operation `id` once it completes, writing
+    /// `on_running` to the run when a worker takes it.
+    async fn wait(
+        &self,
+        id: &str,
+        on_running: Option<(&Progress, u32, &StepRecord)>,
+    ) -> Result<ExecuteResponse> {
+        let mut reported = false;
         loop {
             let seen = self.scheduler.operation_updates(&self.space, id).await?;
             let op = self
@@ -85,6 +102,12 @@ impl PlanRunner {
                 .operation(&self.space, id)
                 .await?
                 .ok_or_else(|| Error::InvalidAction(format!("operation {id} vanished")))?;
+            if op.stage == Stage::Executing && !reported {
+                if let Some((progress, index, record)) = on_running {
+                    progress.write(index, record).await;
+                }
+                reported = true;
+            }
             if op.stage == Stage::Completed {
                 let bytes = op.response.unwrap_or_default();
                 return ExecuteResponse::decode(bytes)
@@ -155,6 +178,14 @@ fn fill(result: &mut StepResult, action: &ActionResult) {
         .stderr_digest
         .as_ref()
         .and_then(|d| BlobDigest::parse(d).ok());
+    result.outputs = action
+        .output_files
+        .iter()
+        .filter_map(|f| {
+            let digest = BlobDigest::parse(f.digest.as_ref()?).ok()?;
+            Some((f.path.clone(), digest))
+        })
+        .collect();
     if let Some(meta) = &action.execution_metadata {
         result.worker = Some(meta.worker.clone()).filter(|w| !w.is_empty());
         result.duration = match (

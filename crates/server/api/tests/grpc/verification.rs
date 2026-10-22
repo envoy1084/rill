@@ -228,3 +228,123 @@ async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
     );
     server.stop().await;
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_failed_runs_steps_logs_and_artifacts_are_readable() {
+    use futures::StreamExt;
+    use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
+
+    let mut config = dev_config();
+    config.verify.enabled = true;
+    config.exec.local.workers = 2;
+    let server = TestServer::start(config).await;
+    let mut c = clients(&server, None).await;
+    c.repo
+        .create_repo(pb::CreateRepoRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            description: None,
+            windows_safe: false,
+        })
+        .await
+        .unwrap();
+    let plan = r#"
+[[step]]
+name = "build"
+command = ["sh", "-c", "mkdir -p out && printf 'artifact bytes' > out/app && echo built"]
+outputs = ["out/app"]
+
+[[step]]
+name = "check"
+command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
+"#;
+    let change = apply(
+        &mut c,
+        false,
+        vec![set_edit(".rill/verify.toml", plan.as_bytes())],
+    )
+    .await;
+    let refused = try_land_with(&mut c, "app", change, &[("Owner", 1)])
+        .await
+        .unwrap_err();
+    let run_id = refused
+        .split("(run ")
+        .nth(1)
+        .and_then(|rest| rest.split(')').next())
+        .unwrap_or_else(|| panic!("no run in {refused:?}"))
+        .to_string();
+
+    let mut checks = ChecksServiceClient::new(connect(&server.grpc).await);
+    let get = pb::GetRunRequest {
+        repo: "app".into(),
+        run: run_id.clone(),
+    };
+    let run = checks.get_run(get.clone()).await.unwrap().into_inner();
+    assert_eq!(run.green, Some(false));
+    let step = |name: &str| run.steps.iter().find(|s| s.name == name).unwrap().clone();
+    let (build, check) = (step("build"), step("check"));
+    assert_eq!(build.state, pb::StepState::Passed as i32);
+    assert_eq!(
+        (check.state, check.exit_code),
+        (pb::StepState::Failed as i32, Some(1))
+    );
+
+    let log = |step: u32, stream: pb::LogStream, offset: i64| pb::ReadLogRequest {
+        repo: "app".into(),
+        run: run_id.clone(),
+        step,
+        stream: stream as i32,
+        offset,
+        limit: 0,
+    };
+    let stderr = checks
+        .read_log(log(check.index, pb::LogStream::Stderr, 0))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(stderr.data.as_ref(), b"expected 2, got 3\n");
+    let tail = checks
+        .read_log(log(check.index, pb::LogStream::Stderr, -3))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(
+        (tail.data.as_ref(), tail.offset, tail.size),
+        (&b" 3\n"[..], 15, 18)
+    );
+    let artifact = checks
+        .read_artifact(pb::ReadArtifactRequest {
+            repo: "app".into(),
+            run: run_id.clone(),
+            step: build.index,
+            path: "out/app".into(),
+            offset: 0,
+            limit: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(artifact.data.as_ref(), b"artifact bytes");
+
+    let listed = checks
+        .list_runs(pb::ListRunsRequest {
+            repo: "app".into(),
+            version: Bytes::new(),
+            limit: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .runs;
+    assert_eq!(listed[0].id, run_id);
+    let watched: Vec<_> = checks
+        .watch_run(get)
+        .await
+        .unwrap()
+        .into_inner()
+        .collect()
+        .await;
+    assert_eq!(watched.len(), 1, "a finished run is sent once");
+    server.stop().await;
+}

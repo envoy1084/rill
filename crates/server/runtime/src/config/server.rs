@@ -215,7 +215,7 @@ impl Default for ShutdownConfig {
 }
 
 /// Pre-land verification configuration.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct VerifyConfig {
     /// Run `.rill/verify.toml` through remote execution before landing.
@@ -224,6 +224,19 @@ pub struct VerifyConfig {
     /// Platform properties every step asks for, matching the workers that
     /// should run them; a step's own `platform` adds to these.
     pub platform: BTreeMap<String, String>,
+    /// Days a verification run, and so its logs and artifacts, stays
+    /// readable.
+    pub retention_days: u64,
+}
+
+impl Default for VerifyConfig {
+    fn default() -> Self {
+        VerifyConfig {
+            enabled: false,
+            platform: BTreeMap::new(),
+            retention_days: 30,
+        }
+    }
 }
 
 /// Post-land verification worker configuration.

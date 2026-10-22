@@ -1,19 +1,57 @@
 # Checks
 
-What verification ran, kept so people and agents can see it after the
-fact: every step and test case's outcome, and how flaky each is. The
+What verification ran, kept so people and agents can follow it while it
+runs and read it after: each run's steps with their logs and artifacts,
+every step and test case's outcome over time, and how flaky each is. The
 checks themselves are compiled and run by [exec](exec.md);
 `ChecksService` reads what they left behind.
 
 ```mermaid
 flowchart LR
+  pr[PlanRunner] -->|progress| rs[RunStore]
+  rs --> vrun[(vrun, vrstep: runs and steps)]
   ev[ExecVerifier] -->|outcome| runs[test_runs]
   runs --> hist[TestHistory]
   hist --> trun[(trun: recent runs)]
   hist --> tstat[(tstat: flake stats)]
   api[ChecksService] --> hist
+  api --> rs
+  api -->|byte ranges| cas[(org execution space)]
   cli[rill checks] --> api
 ```
+
+## Runs
+
+Every verification is a run (`rill-exec/runs/`), recorded by
+`PlanRunner` as it goes, so a run can be watched while it runs:
+
+* `vrun/(id)`: the header: version, whether it is trunk (post-land),
+  start, and once it ends whether it was green and its one-line summary.
+  Ids are the inverted start time and four random bytes, so runs list
+  newest first. `vrunv/(version, id)` finds a version's runs.
+* `vrstep/(id, index)`: one record per step or shard, indexed in the
+  order steps were selected: `Queued` when submitted, `Running` when a
+  worker takes the action (the operation's stage), then `Done` with how it
+  ended (`Passed`, `Failed`, `TimedOut`, `Error`, `Unaffected`,
+  `NotGating`), its action, the digests of standard output and error, its
+  output files (artifacts), worker and duration. Steps skipped by
+  selection are recorded at once.
+* `vrunc/(id)`: a counter every write moves, which watchers wait on.
+
+A failure to write progress is logged and never fails verification. The
+lander's details end with `(run <id>)`, so a refused landing names the
+run to read.
+
+**Retention.** `[verify] retention_days` (30) bounds how long runs stay:
+each new run first deletes up to 32 of the oldest runs started before
+it. The logs and artifacts themselves are content in the org's execution
+space; once no run refers to them they are garbage for the store's
+collector (data lifecycle phase), which does not exist yet.
+
+**Logs and artifacts** are read by byte range from the execution space
+(1 MiB per call; a negative offset counts from the end, so `-4096` is the
+last 4 KiB). Output is complete when a step ends: workers upload it then,
+so a running step has no log yet.
 
 ## Test history
 
@@ -64,16 +102,29 @@ drifts back down.
 
 `ChecksService` (repository read access):
 
+* `ListRuns(repo, version?, limit = 20)`, `GetRun(repo, run)`, and
+  `WatchRun`, which sends the run now and after every change until it
+  ends (a stopping server ends the stream);
+* `ReadLog(repo, run, step, stdout|stderr, offset, limit)` and
+  `ReadArtifact(repo, run, step, path, offset, limit)`;
 * `GetTestHistory(repo, target, limit)`: recent runs, newest first, and
   the target's score;
 * `ListFlakyTests(repo, min_score = 0.1, limit = 50)`: targets at or above
   the score, flakiest first.
 
-`rill checks flaky [--min-score] [--limit]` and `rill checks history
-<target> [--limit]` print them.
+`rill checks runs [--version]`, `rill checks run <id> [--watch]`, `rill
+checks log <run> <step> [--stderr] [--tail BYTES]`, `rill checks artifact
+<run> <step> <path> [-o FILE]`, `rill checks flaky [--min-score]
+[--limit]` and `rill checks history <target> [--limit]` use them.
 
 ## Limitations
 
+* Logs are readable when a step ends, not line by line while it runs:
+  Buildbarn's worker uploads output on completion.
+* Retention removes run records, not bytes; reclaiming unreferenced logs
+  and artifacts waits for the store's garbage collector.
+* A repository that stops verifying keeps its last runs until it runs
+  again, since expiry happens as runs start.
 * Flake scores are reported, not acted on: retries of flaky targets and
   quarantine come with post-land v1.
 * `ListFlakyTests` reads every target's statistics; fine for thousands of
@@ -85,10 +136,11 @@ drifts back down.
 
 ## Code
 
+* [runs/](../../crates/domain/exec/src/runs/mod.rs): [record.rs](../../crates/domain/exec/src/runs/record.rs), [store.rs](../../crates/domain/exec/src/runs/store.rs); progress [verify/progress.rs](../../crates/domain/exec/src/verify/progress.rs)
 * [history/](../../crates/domain/exec/src/history/mod.rs): [outcome.rs](../../crates/domain/exec/src/history/outcome.rs), [junit.rs](../../crates/domain/exec/src/history/junit.rs), [score.rs](../../crates/domain/exec/src/history/score.rs), [store.rs](../../crates/domain/exec/src/history/store.rs)
 * Recording: [workers/verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [verify/outcome.rs](../../crates/domain/exec/src/verify/outcome.rs)
-* Service: [services/checks.rs](../../crates/server/api/src/services/checks.rs), [checks.proto](../../crates/foundation/proto/proto/rill/v1/checks.proto); CLI [commands/checks.rs](../../crates/clients/cli/src/commands/checks.rs)
-* Tests: [tests/verification/history.rs](../../crates/domain/exec/tests/verification/history.rs), [grpc verification](../../crates/server/api/tests/grpc/verification.rs)
+* Service: [services/checks/](../../crates/server/api/src/services/checks/mod.rs), [checks.proto](../../crates/foundation/proto/proto/rill/v1/checks.proto); CLI [commands/checks/](../../crates/clients/cli/src/commands/checks/mod.rs)
+* Tests: [tests/verification/runs.rs](../../crates/domain/exec/tests/verification/runs.rs), [tests/verification/history.rs](../../crates/domain/exec/tests/verification/history.rs), [grpc verification](../../crates/server/api/tests/grpc/verification.rs)
 
 ---
 ← Previous: [Remote execution](remote-execution.md) · [Index](../index.md) · Next: [Git import and export](git-import.md) →

@@ -102,6 +102,15 @@ pub const EXEC_SECRET: &str = "xsec";
 /// `(trun, ns, repo, target, newest first, id)` → one run of a test or
 /// verification step
 pub const TEST_RUN: &str = "trun";
+/// `(vrun, ns, repo, run)` → a verification run's header; run ids sort
+/// newest first
+pub const VERIFY_RUN: &str = "vrun";
+/// `(vrstep, ns, repo, run, index)` → one step of a verification run
+pub const VERIFY_RUN_STEP: &str = "vrstep";
+/// `(vrunv, ns, repo, version, run)` → the runs that verified a version
+pub const VERIFY_RUN_VERSION: &str = "vrunv";
+/// `(vrunc, ns, repo, run)` → counter moved by every update of the run
+pub const VERIFY_RUN_COUNT: &str = "vrunc";
 /// `(tstat, ns, repo, target)` → a test's decayed run, failure and flip
 /// counts
 pub const TEST_STATS: &str = "tstat";

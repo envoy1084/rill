@@ -212,6 +212,40 @@ impl RepoKeys {
         self.row(table::EXEC_SECRET_COMMAND, &digest.as_bytes().as_slice())
     }
 
+    pub fn verify_run(&self, run: &str) -> Bytes {
+        self.row(table::VERIFY_RUN, &run)
+    }
+
+    /// The prefix of every verification run, newest first.
+    pub fn verify_runs(&self) -> Bytes {
+        self.table(table::VERIFY_RUN)
+    }
+
+    pub fn verify_run_step(&self, run: &str, index: u32) -> Bytes {
+        self.row(table::VERIFY_RUN_STEP, &(run, index as i64))
+    }
+
+    /// The prefix of a run's steps, in order.
+    pub fn verify_run_steps(&self, run: &str) -> Bytes {
+        self.row(table::VERIFY_RUN_STEP, &(run,))
+    }
+
+    pub fn verify_run_of_version(&self, version: &ObjectHash, run: &str) -> Bytes {
+        self.row(
+            table::VERIFY_RUN_VERSION,
+            &(version.as_bytes().as_slice(), run),
+        )
+    }
+
+    /// The prefix of the runs of `version`, newest first.
+    pub fn verify_runs_of_version(&self, version: &ObjectHash) -> Bytes {
+        self.row(table::VERIFY_RUN_VERSION, &(version.as_bytes().as_slice(),))
+    }
+
+    pub fn verify_run_count(&self, run: &str) -> Bytes {
+        self.row(table::VERIFY_RUN_COUNT, &run)
+    }
+
     /// A run of `target` at `at_millis`; later runs sort first.
     pub fn test_run(&self, target: &str, at_millis: i64, id: &[u8]) -> Bytes {
         self.row(table::TEST_RUN, &(target, i64::MAX - at_millis, id))

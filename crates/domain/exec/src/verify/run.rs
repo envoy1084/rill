@@ -9,15 +9,17 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use rill_core::diff::diff_trees;
 use rill_core::TreeOps;
 use rill_jobs::Priority;
-use rill_types::{RiskClass, TreeHash};
+use rill_types::{ObjectHash, RiskClass, TreeHash};
 
 use super::compile::{compile, ExtraFile};
 use super::graph::{affected_targets, GraphSpec};
 use super::outcome::{StepResult, StepStatus, VerificationOutcome};
 use super::plan::{load_plan, Step};
+use super::progress::Progress;
 use super::select::{select, Selection};
 use crate::error::Result;
 use crate::remote::{ExecSpace, Scheduler};
+use crate::runs::{RunStore, StepRecord};
 
 /// The file, in a step's working directory, listing affected targets.
 pub const AFFECTED_FILE: &str = ".rill-affected-targets";
@@ -28,6 +30,8 @@ pub const AFFECTED_ENV: &str = "RILL_AFFECTED_TARGETS";
 #[derive(Debug, Clone)]
 pub struct Target {
     pub root: TreeHash,
+    /// The version whose root it is, for the run record.
+    pub version: ObjectHash,
     /// The tree the change was made against. Steps whose inputs did not
     /// change since it are not run; `None` runs every step.
     pub base: Option<TreeHash>,
@@ -47,6 +51,7 @@ pub struct PlanRunner {
     pub(crate) platform: BTreeMap<String, String>,
     pub(crate) repo: String,
     pub(crate) requester: String,
+    pub(crate) runs: Option<RunStore>,
 }
 
 impl PlanRunner {
@@ -66,7 +71,14 @@ impl PlanRunner {
             platform,
             repo: repo.to_string(),
             requester: format!("verify:{repo}"),
+            runs: None,
         }
+    }
+
+    /// Record each verification as a run in `runs`.
+    pub fn with_runs(mut self, runs: RunStore) -> Self {
+        self.runs = Some(runs);
+        self
     }
 
     /// Verify `target` by its own plan. A tree without a plan is green;
@@ -78,6 +90,11 @@ impl PlanRunner {
                 ..Default::default()
             });
         };
+        let run = match &self.runs {
+            Some(runs) => Some(runs.start(target.version, target.trunk).await?),
+            None => None,
+        };
+        let progress = Progress::new(run);
         let changed = match target.base {
             Some(base) => Some(
                 diff_trees(&self.trees, Some(base), Some(target.root))
@@ -101,6 +118,9 @@ impl PlanRunner {
                 }
             }
         }
+        for skipped in &steps {
+            progress.ended(skipped).await;
+        }
 
         for step in &selected {
             if step.secrets.is_empty() {
@@ -111,8 +131,10 @@ impl PlanRunner {
                 .secret_refusal(&self.space.org, &step.secrets, &self.repo, target.trunk)
                 .await?;
             if let Some(reason) = refusal {
-                steps.push(StepResult::skipped(&step.name, StepStatus::Error(reason)));
-                return self.finish(false, steps).await;
+                let refused = StepResult::skipped(&step.name, StepStatus::Error(reason));
+                progress.ended(&refused).await;
+                steps.push(refused);
+                return self.finish(false, steps, &progress).await;
             }
         }
 
@@ -121,8 +143,9 @@ impl PlanRunner {
                 match self.affected(graph, target).await? {
                     Ok(list) => list,
                     Err(failed) => {
+                        progress.ended(&failed).await;
                         steps.push(failed);
-                        return self.finish(false, steps).await;
+                        return self.finish(false, steps, &progress).await;
                     }
                 }
             }
@@ -133,7 +156,9 @@ impl PlanRunner {
         for step in selected {
             let extra = if step.affected_targets {
                 if affected.is_empty() {
-                    steps.push(StepResult::skipped(&step.name, StepStatus::Unaffected));
+                    let skipped = StepResult::skipped(&step.name, StepStatus::Unaffected);
+                    progress.ended(&skipped).await;
+                    steps.push(skipped);
                     continue;
                 }
                 Some(ExtraFile {
@@ -156,18 +181,26 @@ impl PlanRunner {
         let mut running = FuturesUnordered::new();
         while let Some(actions) = compiling.next().await {
             for action in actions? {
-                running.push(self.submit(action, target.priority));
+                let index = progress.index();
+                let progress = &progress;
+                running.push(async move {
+                    let (result, _) = self
+                        .submit(action, target.priority, Some((progress, index)))
+                        .await?;
+                    progress.write(index, &StepRecord::finished(&result)).await;
+                    Ok::<_, crate::error::Error>(result)
+                });
             }
         }
         while let Some(result) = running.next().await {
-            let (result, _) = result?;
+            let result = result?;
             let ok = result.status.is_ok();
             steps.push(result);
             if !ok {
-                return self.finish(false, steps).await;
+                return self.finish(false, steps, &progress).await;
             }
         }
-        self.finish(true, steps).await
+        self.finish(true, steps, &progress).await
     }
 
     /// The build targets `target` affects against its base: every target
@@ -196,15 +229,22 @@ impl PlanRunner {
         Ok(Ok(affected_targets(before.as_ref(), &after)))
     }
 
-    async fn finish(&self, green: bool, steps: Vec<StepResult>) -> Result<VerificationOutcome> {
+    async fn finish(
+        &self,
+        green: bool,
+        steps: Vec<StepResult>,
+        progress: &Progress,
+    ) -> Result<VerificationOutcome> {
         let mut outcome = VerificationOutcome {
             green,
             steps,
             excerpt: None,
+            run: progress.run_id(),
         };
         if let Some(failed) = outcome.first_failure() {
             outcome.excerpt = self.excerpt(failed).await?;
         }
+        progress.finish(green, outcome.summary()).await;
         Ok(outcome)
     }
 }
