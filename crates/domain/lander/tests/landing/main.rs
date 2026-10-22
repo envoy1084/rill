@@ -3,6 +3,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 mod doubles;
+mod ladder;
 mod pipeline;
 mod postland;
 mod service;

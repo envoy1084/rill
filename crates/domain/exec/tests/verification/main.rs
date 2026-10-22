@@ -7,6 +7,7 @@ mod fixture;
 mod graph;
 mod hermetic;
 mod history;
+mod regenerate;
 mod running;
 mod runs;
 mod secrets;

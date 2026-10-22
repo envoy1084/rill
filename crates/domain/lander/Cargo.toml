@@ -25,6 +25,10 @@ tracing = { workspace = true }
 globset = { workspace = true }
 toml = { workspace = true }
 parking_lot = { workspace = true }
+gix-merge = { workspace = true }
+gix-imara-diff = { workspace = true }
+gix-attributes = { workspace = true }
+gix-parallel = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

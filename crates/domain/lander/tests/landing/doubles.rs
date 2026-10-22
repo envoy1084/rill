@@ -105,3 +105,57 @@ pub fn bad_file_verifier(fx: &Fixture) -> Arc<dyn Verifier> {
         }
     }))
 }
+
+/// A regenerator that writes, into each output, the names under `deps/`
+/// in the merged tree, one per line; or fails with `fail`.
+pub struct ListingRegenerator {
+    pub trees: rill_core::TreeOps,
+    pub fail: Option<String>,
+    pub seen: Mutex<Vec<rill_lander::RegenerateRequest>>,
+}
+
+#[async_trait]
+impl rill_lander::Regenerator for ListingRegenerator {
+    async fn regenerate(
+        &self,
+        request: rill_lander::RegenerateRequest,
+    ) -> rill_lander::Result<rill_lander::Regenerated> {
+        self.seen.lock().await.push(request.clone());
+        if let Some(why) = &self.fail {
+            return Ok(rill_lander::Regenerated::Failed(why.clone()));
+        }
+        let deps = self
+            .trees
+            .list_dir(request.root, &RepoPathBuf::new("deps").unwrap())
+            .await
+            .unwrap();
+        let listing: String = deps.iter().map(|(name, _)| format!("{name}\n")).collect();
+        Ok(rill_lander::Regenerated::Files(
+            request
+                .outputs
+                .iter()
+                .map(|p| (p.clone(), bytes::Bytes::from(listing.clone())))
+                .collect(),
+        ))
+    }
+}
+
+/// A resolver that takes every conflict it is offered.
+#[derive(Default)]
+pub struct TakingResolver {
+    pub offered: Mutex<Vec<Vec<RepoPathBuf>>>,
+}
+
+#[async_trait]
+impl rill_lander::ConflictResolver for TakingResolver {
+    async fn dispatch(
+        &self,
+        _change: ChangeId,
+        _version: ChangeVersionHash,
+        _onto: ChangeVersionHash,
+        paths: &[RepoPathBuf],
+    ) -> rill_lander::Result<Option<String>> {
+        self.offered.lock().await.push(paths.to_vec());
+        Ok(Some("agent:fixer".into()))
+    }
+}

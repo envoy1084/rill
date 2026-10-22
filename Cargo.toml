@@ -129,6 +129,12 @@ rmcp = { version = "=3.6.0", default-features = false, features = ["server", "tr
 regex-syntax = "0.8.11"
 unicode-normalization = "0.1.26"
 gix = { version = "0.89.0", default-features = false, features = ["parallel", "sha1"] }
+# Merge drivers (union) and `.gitattributes`; pinned with gix.
+gix-merge = { version = "=0.22.0", default-features = false, features = ["sha1"] }
+gix-imara-diff = "=0.3.1"
+gix-attributes = "=0.37.0"
+# Makes gix-attributes' names `Arc`-backed, so they cross threads.
+gix-parallel = { version = "=0.50.0", features = ["parallel"] }
 toml = "1.1.8"
 dirs = "7.0.0"
 tempfile = "3.27.0"

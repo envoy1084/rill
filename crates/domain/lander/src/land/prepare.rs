@@ -2,12 +2,14 @@
 //! approve, or record why it cannot land.
 
 use rill_core::{rebase, RootTree};
-use rill_types::{ChangeVersion, ChangeVersionHash, LandStatus, RepoPathBuf, Timestamp};
+use rill_types::{ChangeVersion, ChangeVersionHash, LandStatus, Timestamp};
 
+use super::head_config::HeadRules;
 use super::lander::Lander;
 use crate::config::VerifyMode;
 use crate::error::{Error, Result};
 use crate::events::LandEvent;
+use crate::ladder::{Climb, Unresolved};
 use crate::queue::QueuedRequest;
 use crate::traits::{Approval, VerifyRequest, VerifyStage};
 
@@ -37,6 +39,7 @@ impl Lander {
         &self,
         queued: &QueuedRequest,
         tip: Option<ChangeVersionHash>,
+        rules: &HeadRules,
     ) -> Result<Prepared> {
         let requested = queued.request.version;
         let cv = self
@@ -55,8 +58,14 @@ impl Lander {
                         .await;
                     return Ok(Prepared::Dropped);
                 }
-                match self.rebase_onto(queued, &requested, &tip).await? {
-                    Some(rebased) => rebased,
+                match self
+                    .rebase_through_ladder(queued, &requested, &tip, rules)
+                    .await?
+                {
+                    Some(rebased) => {
+                        let hash = self.repo.put_change_version(&rebased).await?;
+                        (hash, rebased)
+                    }
                     None => return Ok(Prepared::Conflicted),
                 }
             }
@@ -110,28 +119,39 @@ impl Lander {
         self.publish(LandEvent::Failed { change_id, reason });
     }
 
-    /// Rebase `tip` onto `head`. Returns `None` after recording a
-    /// conflict status.
-    async fn rebase_onto(
+    /// Rebase `version` onto `head`, taking what conflicts up the
+    /// ladder. Returns `None` after recording a conflict status.
+    pub(super) async fn rebase_through_ladder(
         &self,
         queued: &QueuedRequest,
-        tip: &ChangeVersionHash,
+        version: &ChangeVersionHash,
         head: &ChangeVersionHash,
-    ) -> Result<Option<(ChangeVersionHash, ChangeVersion)>> {
-        let rebased = rebase(&self.derive, tip, head, Timestamp::now()).await?;
-        if rebased.has_conflicts() {
-            let paths: Vec<_> = rebased.conflicted_paths().cloned().collect();
-            self.conflicted(queued, paths).await;
-            return Ok(None);
+        rules: &HeadRules,
+    ) -> Result<Option<ChangeVersion>> {
+        let rebased = rebase(&self.derive, version, head, Timestamp::now()).await?;
+        match self
+            .climb(rebased, &rules.merge, queued.request.risk)
+            .await?
+        {
+            Climb::Resolved(cv) => Ok(Some(*cv)),
+            Climb::Unresolved(unresolved) => {
+                self.conflicted(queued, unresolved, *head).await;
+                Ok(None)
+            }
         }
-        let hash = self.repo.put_change_version(&rebased).await?;
-        Ok(Some((hash, rebased)))
     }
 
-    /// Record that `queued` conflicts at `paths` and hand it back.
-    pub(super) async fn conflicted(&self, queued: &QueuedRequest, paths: Vec<RepoPathBuf>) {
+    /// Record that `queued` conflicts and hand it back: to a resolver
+    /// agent when one takes it, and always to its owner.
+    pub(super) async fn conflicted(
+        &self,
+        queued: &QueuedRequest,
+        unresolved: Unresolved,
+        onto: ChangeVersionHash,
+    ) {
         let change_id = queued.request.change_id;
-        tracing::info!(%change_id, ?paths, "rebase conflicted");
+        let paths = unresolved.paths;
+        tracing::info!(%change_id, ?paths, reason = ?unresolved.reason, "rebase conflicted");
         self.set_status(
             queued,
             LandStatus::Conflict {
@@ -139,11 +159,21 @@ impl Lander {
             },
         )
         .await;
-        self.return_to_owner(
-            change_id,
-            format!("rebase onto trunk conflicts at {} path(s)", paths.len()),
-        )
-        .await;
+        let mut reason = format!("rebase onto trunk conflicts at {} path(s)", paths.len());
+        if let Some(why) = &unresolved.reason {
+            reason.push_str(&format!(": {why}"));
+        }
+        if let (false, Some(resolver)) = (unresolved.manual, &self.resolver) {
+            match resolver
+                .dispatch(change_id, queued.request.version, onto, &paths)
+                .await
+            {
+                Ok(Some(who)) => reason.push_str(&format!("; {who} is resolving it")),
+                Ok(None) => {}
+                Err(e) => tracing::warn!(%change_id, error = %e, "conflict resolver failed"),
+            }
+        }
+        self.return_to_owner(change_id, reason).await;
         self.publish(LandEvent::Conflict { change_id, paths });
     }
 

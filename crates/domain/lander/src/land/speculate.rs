@@ -5,9 +5,9 @@
 //! pure tree operation that cannot conflict.
 
 use futures::future::join_all;
-use rill_core::rebase;
-use rill_types::{ChangeVersionHash, Timestamp};
+use rill_types::ChangeVersionHash;
 
+use super::head_config::HeadRules;
 use super::lander::Lander;
 use super::prepare::{Candidate, Prepared};
 use crate::error::Result;
@@ -20,6 +20,7 @@ impl Lander {
         &self,
         head: Option<ChangeVersionHash>,
         batch: &[(QueuedRequest, Footprint)],
+        rules: &HeadRules,
     ) -> Vec<Candidate> {
         let footprints: Vec<Footprint> = batch.iter().map(|(_, f)| f.clone()).collect();
         let plan = Plan::new(&footprints);
@@ -37,7 +38,7 @@ impl Lander {
                     Slot::After(j) => ready[j].as_ref().map(|c| c.version),
                     Slot::Linear => continue,
                 };
-                jobs.push(async move { (i, self.prepare(&batch[i].0, base).await) });
+                jobs.push(async move { (i, self.prepare(&batch[i].0, base, rules).await) });
             }
             for (i, outcome) in join_all(jobs).await {
                 let conflicted = matches!(outcome, Ok(Prepared::Conflicted));
@@ -59,7 +60,7 @@ impl Lander {
                 continue;
             }
             let lined = match (placed[i] == Slot::Linear, ready[i].take()) {
-                (true, _) => match self.prepare(&batch[i].0, tip).await {
+                (true, _) => match self.prepare(&batch[i].0, tip, rules).await {
                     Ok(Prepared::Ready(c)) => Some(*c),
                     Ok(_) => None,
                     Err(e) => {
@@ -67,7 +68,7 @@ impl Lander {
                         None
                     }
                 },
-                (false, Some(c)) => match self.reparent(c, tip).await {
+                (false, Some(c)) => match self.reparent(c, tip, rules).await {
                     Ok(c) => c,
                     Err(e) => {
                         self.fail(&batch[i].0, e.to_string()).await;
@@ -90,6 +91,7 @@ impl Lander {
         &self,
         candidate: Candidate,
         tip: Option<ChangeVersionHash>,
+        rules: &HeadRules,
     ) -> Result<Option<Candidate>> {
         let Some(tip) = tip else {
             return Ok(Some(candidate));
@@ -97,12 +99,12 @@ impl Lander {
         if candidate.base == Some(tip) || candidate.cv.first_parent() == Some(tip) {
             return Ok(Some(candidate));
         }
-        let rebased = rebase(&self.derive, &candidate.version, &tip, Timestamp::now()).await?;
-        if rebased.has_conflicts() {
-            let paths: Vec<_> = rebased.conflicted_paths().cloned().collect();
-            self.conflicted(&candidate.queued, paths).await;
+        let Some(rebased) = self
+            .rebase_through_ladder(&candidate.queued, &candidate.version, &tip, rules)
+            .await?
+        else {
             return Ok(None);
-        }
+        };
         let version = self.repo.put_change_version(&rebased).await?;
         self.derive.ensure_land_critical(&version).await?;
         Ok(Some(Candidate {

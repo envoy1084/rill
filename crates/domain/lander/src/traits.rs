@@ -4,10 +4,14 @@
 //! directly: the server wires concrete implementations in, and tests use
 //! the no-op and always-green ones here.
 
+use std::collections::BTreeMap;
+use std::time::Duration;
+
 use async_trait::async_trait;
+use bytes::Bytes;
 use rill_store::repo::ReviewSnapshot;
 use rill_types::{
-    ChangeId, ChangeVersionHash, LabelVote, Principal, RiskClass, TreeHash, TrunkSeq,
+    ChangeId, ChangeVersionHash, LabelVote, Principal, RepoPathBuf, RiskClass, TreeHash, TrunkSeq,
 };
 use serde::{Deserialize, Serialize};
 
@@ -171,4 +175,68 @@ where
     async fn verify(&self, request: VerifyRequest) -> Result<VerificationOutcome> {
         (self.0)(request).await
     }
+}
+
+/// A `regenerate` merge driver's command to run on a merged tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegenerateRequest {
+    /// The driver's name, for labels and logs.
+    pub driver: String,
+    /// The merged tree, holding the head's version of every output.
+    pub root: TreeHash,
+    pub version: ChangeVersionHash,
+    pub command: Vec<String>,
+    /// Globs of the files the command reads; empty is the whole tree.
+    pub inputs: Vec<String>,
+    /// The files it rebuilds, read back after it runs.
+    pub outputs: Vec<RepoPathBuf>,
+    pub env: BTreeMap<String, String>,
+    pub platform: BTreeMap<String, String>,
+    pub timeout: Duration,
+}
+
+/// What a regenerate command produced.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Regenerated {
+    /// Every output, by path.
+    Files(BTreeMap<RepoPathBuf, Bytes>),
+    /// It failed, or left an output out.
+    Failed(String),
+}
+
+/// Runs `regenerate` merge drivers. The server adapts `rill-exec` to this.
+#[async_trait]
+pub trait Regenerator: Send + Sync {
+    async fn regenerate(&self, request: RegenerateRequest) -> Result<Regenerated>;
+}
+
+/// A regenerator for servers without remote execution: every
+/// regeneration fails, so those conflicts go to the owner.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoRegenerator;
+
+#[async_trait]
+impl Regenerator for NoRegenerator {
+    async fn regenerate(&self, _request: RegenerateRequest) -> Result<Regenerated> {
+        Ok(Regenerated::Failed(
+            "this server runs no actions (verification is off)".into(),
+        ))
+    }
+}
+
+/// The ladder's last rung before the owner: hand a conflict no driver
+/// resolved to a resolver agent. The agent's resolution is a new version
+/// of the change that comes back through the queue.
+#[async_trait]
+pub trait ConflictResolver: Send + Sync {
+    /// Offer `version` of `change`, conflicted at `paths` when rebased
+    /// onto `onto`. Returns who took it, for the note to the owner, or
+    /// `None` when no agent did.
+    async fn dispatch(
+        &self,
+        change: ChangeId,
+        version: ChangeVersionHash,
+        onto: ChangeVersionHash,
+        paths: &[RepoPathBuf],
+    ) -> Result<Option<String>>;
 }

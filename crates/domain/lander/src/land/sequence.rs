@@ -65,7 +65,7 @@ impl Lander {
                 }
             };
             let tip = head.map(|(_, h)| h);
-            let rules = match self.landing_rules(tip).await {
+            let rules = match self.head_rules(tip).await {
                 Ok(rules) => rules,
                 Err(e) => {
                     tracing::warn!(error = %e, "reading the landing rules failed");
@@ -77,14 +77,14 @@ impl Lander {
                 if marked.insert(queued.ticket) && !self.accept(queued).await {
                     continue;
                 }
-                match self.footprint(queued, &rules).await {
+                match self.footprint(queued, &rules.landing).await {
                     Ok(f) => batch.push((queued.clone(), f)),
                     Err(e) => self.fail(queued, e.to_string()).await,
                 }
             }
-            let (batch, later) = self.admit(batch, &rules.throttle);
+            let (batch, later) = self.admit(batch, &rules.landing.throttle);
             held.extend(later);
-            let chain = self.speculate(tip, &batch).await;
+            let chain = self.speculate(tip, &batch, &rules).await;
             live = chain.iter().map(|c| c.queued.clone()).collect();
             if chain.is_empty() {
                 return Window::Done(held);

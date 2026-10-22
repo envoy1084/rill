@@ -35,6 +35,16 @@ impl Fixture {
         verifier: Arc<dyn Verifier>,
         policy: LandPolicy,
     ) -> Arc<Lander> {
+        Arc::new(self.bare_lander(hooks, verifier, policy))
+    }
+
+    /// A lander to add a regenerator or resolver to.
+    pub fn bare_lander(
+        &self,
+        hooks: Arc<dyn ReviewHooks>,
+        verifier: Arc<dyn Verifier>,
+        policy: LandPolicy,
+    ) -> Lander {
         let graph = Arc::new(CommitGraph::new(self.repo.clone(), self.derive.clone()));
         Lander::new(
             self.repo.clone(),

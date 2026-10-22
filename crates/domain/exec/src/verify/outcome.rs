@@ -24,6 +24,18 @@ pub enum StepStatus {
 }
 
 impl StepStatus {
+    /// How the step ended, as a phrase: "failed with exit code 1".
+    pub fn describe(&self) -> String {
+        match self {
+            StepStatus::Passed => "passed".into(),
+            StepStatus::Failed { exit_code } => format!("failed with exit code {exit_code}"),
+            StepStatus::TimedOut => "timed out".into(),
+            StepStatus::Error(message) => format!("could not run: {message}"),
+            StepStatus::Unaffected => "was unaffected".into(),
+            StepStatus::NotGating => "was not gating".into(),
+        }
+    }
+
     /// Whether the step lets the tree pass.
     pub fn is_ok(&self) -> bool {
         matches!(
@@ -119,15 +131,11 @@ impl VerificationOutcome {
         match self.first_failure() {
             None => tally,
             Some(failed) => {
-                let what = match &failed.status {
-                    StepStatus::Failed { exit_code } => {
-                        format!("failed with exit code {exit_code}")
-                    }
-                    StepStatus::TimedOut => "timed out".to_string(),
-                    StepStatus::Error(message) => format!("could not run: {message}"),
-                    other => format!("ended {other:?}"),
-                };
-                format!("step {} {what}; {tally}", failed.label())
+                format!(
+                    "step {} {}; {tally}",
+                    failed.label(),
+                    failed.status.describe()
+                )
             }
         }
     }

@@ -14,8 +14,8 @@ use crate::config::LandPolicy;
 use crate::error::Result;
 use crate::events::LandEvent;
 use crate::queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest, SWEEP_LIMIT};
-use crate::schedule::{serve_order, share_key, Eta, LandingRules, Thrash, Timings};
-use crate::traits::{ReviewHooks, Verifier};
+use crate::schedule::{serve_order, share_key, Eta, Thrash, Timings};
+use crate::traits::{ConflictResolver, NoRegenerator, Regenerator, ReviewHooks, Verifier};
 
 /// Capacity of the event channel; slow subscribers lag rather than block
 /// landing.
@@ -32,14 +32,16 @@ pub struct Lander {
     pub(super) graph: Arc<CommitGraph>,
     pub(super) hooks: Arc<dyn ReviewHooks>,
     pub(super) verifier: Arc<dyn Verifier>,
+    pub(crate) regenerator: Arc<dyn Regenerator>,
+    pub(super) resolver: Option<Arc<dyn ConflictResolver>>,
     pub(super) policy: LandPolicy,
     queue: LandQueue,
     events: broadcast::Sender<LandEvent>,
     /// The lander lease.
     lease: LeaseHolder,
-    /// Landing rules by the trunk head they were read at.
+    /// Rules by the trunk head they were read at.
     pub(super) rules:
-        parking_lot::Mutex<Option<(Option<rill_types::ChangeVersionHash>, Arc<LandingRules>)>>,
+        parking_lot::Mutex<Option<(Option<rill_types::ChangeVersionHash>, Arc<super::HeadRules>)>>,
     /// Recent rebase outcomes per domain.
     pub(super) thrash: Thrash,
     /// Recent queue-to-trunk times.
@@ -50,7 +52,7 @@ pub struct Lander {
 pub const LANDER_LEASE: &str = "lander";
 
 impl Lander {
-    /// A lander over `repo`.
+    /// A lander over `repo`, without regenerate drivers or a resolver.
     pub fn new(
         repo: RepoStore,
         derive: Arc<DeriveManager>,
@@ -58,9 +60,9 @@ impl Lander {
         hooks: Arc<dyn ReviewHooks>,
         verifier: Arc<dyn Verifier>,
         policy: LandPolicy,
-    ) -> Arc<Self> {
+    ) -> Self {
         let (events, _) = broadcast::channel(EVENT_CAPACITY);
-        Arc::new(Lander {
+        Lander {
             lease: LeaseHolder::new(repo.clone(), LANDER_LEASE),
             queue: LandQueue::new(repo.clone()),
             repo,
@@ -68,12 +70,26 @@ impl Lander {
             graph,
             hooks,
             verifier,
+            regenerator: Arc::new(NoRegenerator),
+            resolver: None,
             policy,
             events,
             rules: parking_lot::Mutex::new(None),
             thrash: Thrash::new(),
             timings: Timings::new(),
-        })
+        }
+    }
+
+    /// Run `regenerate` merge drivers with `regenerator`.
+    pub fn with_regenerator(mut self, regenerator: Arc<dyn Regenerator>) -> Self {
+        self.regenerator = regenerator;
+        self
+    }
+
+    /// Offer conflicts the drivers leave to `resolver` before their owner.
+    pub fn with_resolver(mut self, resolver: Arc<dyn ConflictResolver>) -> Self {
+        self.resolver = Some(resolver);
+        self
     }
 
     /// The lander lease, taken or renewed as needed; `None` while another

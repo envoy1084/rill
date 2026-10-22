@@ -170,7 +170,7 @@ fn services(
         ),
         Arc::new(LabelSet::default()),
     )));
-    let lander = Lander::new(
+    let lander = Arc::new(Lander::new(
         repo.clone(),
         derive.clone(),
         graph,
@@ -180,6 +180,6 @@ fn services(
         ),
         Arc::new(AlwaysGreen),
         LandPolicy::default(),
-    );
+    ));
     (derive, review, lander)
 }

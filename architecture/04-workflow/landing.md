@@ -18,7 +18,8 @@ flowchart LR
     Q -->|lease holder: fair order| F[footprints, admit]
     F --> R[speculate in waves: rebase, verify, approve]
     R -->|refused| E[Ejected + reason]
-    R -->|conflict| C[Conflict, return to owner]
+    R -->|conflict| D[ladder: merge drivers]
+    D -->|unresolved| C[Conflict: resolver agent, owner]
     R --> L[line up: re-parent onto the one before]
     L --> G[group commit, up to 64 per transaction]
     G -->|trunk or a review moved| S
@@ -127,8 +128,8 @@ Each window of up to `MAX_BATCH` (64):
    A wave's requests are prepared concurrently: a version already on trunk
    or an ancestor of it fails; one not based on its slot is rebased, with
    [structural merge](../03-core-algorithms/merge.md#structural-merge-mergecontentrs-rill-merge-syntax)
-   resolving what the line merge cannot (`Conflict { paths }` returns it
-   to its owner); it is verified unless its
+   resolving what the line merge cannot and the
+   [conflict ladder](#conflict-ladder) what neither can; it is verified unless its
    mode is `None`; its land-critical values are stored; and it is approved.
    A failure removes only what was speculated on top of it: later requests
    are placed against the survivors.
@@ -170,6 +171,64 @@ recent landings. `rill land` prints both. The lease holder exports
 `land_wait_p50_ms`, `land_wait_p99_ms` (queue to trunk), `land_interval_ms`,
 `land_conflict_permille{key=domain}` and `land_queued_by_share{key}` (the
 busiest 20 of each).
+
+## Conflict ladder
+
+A rebase that still conflicts climbs a ladder before anyone sees it
+(`rill-lander/src/ladder/`):
+
+1. **Merge algebra**: trivial resolution inside `rebase`.
+2. **Structural merge**: weave, inside `rebase`.
+3. **Merge drivers** declared at the head the batch lands on, in
+   `.rill/merge.toml`, falling back to `merge=union` in the root
+   `.gitattributes` (gitoxide's attribute matcher):
+
+   ```toml
+   [[driver]]
+   paths = ["CHANGELOG.md", "registry/*.toml"]
+   merge = "union"        # both sides' added lines, the head's first (gix-merge)
+
+   [[driver]]
+   paths = ["snapshots/**"]
+   merge = "generated"    # the head's version; a later change regenerates it
+
+   [[driver]]
+   name = "cargo"
+   paths = ["Cargo.lock"]
+   merge = "regenerate"   # the head's version, then this command
+   command = ["cargo", "update", "--workspace", "--offline"]
+   inputs = ["Cargo.lock", "**/Cargo.toml"]   # whole tree when omitted
+   timeout_secs = 300
+   risk = ["trivial", "low", "normal"]        # every class when omitted
+
+   [ladder]
+   manual = ["auth/**"]   # conflicts here go to the owner, never an agent
+   ```
+
+   The first driver whose paths match applies, for the risk classes it
+   lists. It is all or nothing: if any conflicted path has no driver, or a
+   driver fails, every conflict stays. `regenerate` stores the version with
+   the head's side in place, and the `Regenerator` runs the command at the
+   root of that tree. In the server that is `ExecRegenerator`: a
+   `merge:<name>` step on the repository's plan runner (same workers,
+   platform defaults and cache as verification; sandboxed, no network,
+   cached by its inputs). The outputs it wrote become the files. Without
+   verification enabled, regeneration fails. `-merge` and
+   `merge=binary` in `.gitattributes` count as manual. A resolved version
+   records `merge_drivers` in its extras (`cargo: Cargo.lock; union:
+   registry.toml`).
+4. **Resolver agent**: a `ConflictResolver`, when the lander has one and
+   no path is manual, is offered the change and the paths. Its resolution
+   is a new version that comes back through the queue. Dispatch to real
+   agents is phase 23; the server has none yet.
+5. **Owner**: the request ends `Conflict { paths }` and the change goes
+   back to its owner, with the driver's error and who is resolving it, if
+   anyone.
+
+A driver's resolution keeps the request's approvals and risk class: the
+approval is for the requested version, as for any rebase, and the drivers
+are on trunk, where `.rill/` is owner-only. Only a rebase that climbs past
+the drivers counts as a conflict for thrash throttling.
 
 ## The land transaction
 
@@ -280,11 +339,17 @@ step.
   client has to request again.
 * After a failed landing the rebased version stays stored but is not the
   review's current version.
+* Only the root `.gitattributes` is read, and only its `merge` attribute.
+* `regenerate` runs without network, so lockfile commands must work
+  offline (vendored or cached dependencies in the image). A conflicted
+  chain of lockfile changes regenerates once per request, in order.
 
 ## Code
 
 * [rill-lander/src/land/lander.rs](../../crates/domain/lander/src/land/lander.rs), [sequence.rs](../../crates/domain/lander/src/land/sequence.rs), [prepare.rs](../../crates/domain/lander/src/land/prepare.rs), [commit.rs](../../crates/domain/lander/src/land/commit.rs), [speculate.rs](../../crates/domain/lander/src/land/speculate.rs), [domains.rs](../../crates/domain/lander/src/land/domains.rs), [record.rs](../../crates/domain/lander/src/land/record.rs)
 * [rill-lander/src/schedule/](../../crates/domain/lander/src/schedule/) (footprints, landing rules, fair order, plan, thrash, ETAs)
+* [rill-lander/src/ladder/](../../crates/domain/lander/src/ladder/) (merge rules, `.gitattributes`, union, the ladder), [land/head_config.rs](../../crates/domain/lander/src/land/head_config.rs) (rules read once per head)
+* [rill-exec/src/verify/regenerate.rs](../../crates/domain/exec/src/verify/regenerate.rs), [rill-runtime/src/workers/regenerator.rs](../../crates/server/runtime/src/workers/regenerator.rs)
 * [rill-lander/src/queue.rs](../../crates/domain/lander/src/queue.rs), [config.rs](../../crates/domain/lander/src/config.rs), [events.rs](../../crates/domain/lander/src/events.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)
 * [rill-lander/src/land/followups.rs](../../crates/domain/lander/src/land/followups.rs) (jobs a landing enqueues)
 * [rill-store/src/repo/landing.rs](../../crates/foundation/store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records), [repo/leases.rs](../../crates/foundation/store/src/repo/leases.rs), [repo/trunk.rs](../../crates/foundation/store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)

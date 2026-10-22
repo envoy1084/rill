@@ -14,6 +14,7 @@
 pub mod config;
 pub mod error;
 pub mod events;
+pub mod ladder;
 pub mod land;
 pub mod postland;
 pub mod queue;
@@ -24,11 +25,13 @@ pub mod traits;
 pub use config::{LandPolicy, VerifyMode, VerifyModes};
 pub use error::{Error, Result};
 pub use events::LandEvent;
-pub use land::{landing_of, list_landings, Lander, Landing, MAX_BATCH};
+pub use ladder::{MergeRules, MERGE_DRIVERS_EXTRA, MERGE_RULES_PATH};
+pub use land::{landing_of, list_landings, HeadRules, Lander, Landing, MAX_BATCH};
 pub use postland::{PostLandVerifier, Sweep, VerificationRecord, VerificationStatus};
 pub use queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest};
 pub use revert::{auto_revert, build_revert, has_forward_fix, revert, RevertOutcome};
 pub use traits::{
-    AlwaysGreen, Approval, FnVerifier, NoopHooks, ReviewHooks, VerificationOutcome, Verifier,
+    AlwaysGreen, Approval, ConflictResolver, FnVerifier, NoRegenerator, NoopHooks,
+    RegenerateRequest, Regenerated, Regenerator, ReviewHooks, VerificationOutcome, Verifier,
     VerifyRequest, VerifyStage,
 };

@@ -75,8 +75,8 @@ impl RepoRegistry {
             .await?,
         ));
 
-        let verifier: Arc<dyn Verifier> = match self.config.verify.enabled {
-            true => Arc::new(workers::ExecVerifier::new(
+        let runner = self.config.verify.enabled.then(|| {
+            Arc::new(
                 PlanRunner::new(
                     self.exec.clone(),
                     &config.org,
@@ -89,9 +89,14 @@ impl RepoRegistry {
                     repo.clone(),
                     std::time::Duration::from_secs(self.config.verify.retention_days * 24 * 3600),
                 )),
+            )
+        });
+        let verifier: Arc<dyn Verifier> = match &runner {
+            Some(runner) => Arc::new(workers::ExecVerifier::new(
+                runner.clone(),
                 TestHistory::new(repo.clone()),
             )),
-            false => Arc::new(AlwaysGreen),
+            None => Arc::new(AlwaysGreen),
         };
         let authorizer = Arc::new(Authorizer::new(repo.clone()));
         let mut hooks = workers::ReviewHooksAdapter::new(review.clone())
@@ -107,7 +112,7 @@ impl RepoRegistry {
             });
         }
         let hooks = Arc::new(hooks);
-        let lander = Lander::new(
+        let mut lander = Lander::new(
             repo.clone(),
             derive.clone(),
             graph.clone(),
@@ -115,6 +120,10 @@ impl RepoRegistry {
             verifier,
             self.config.lander.clone(),
         );
+        if let Some(runner) = runner {
+            lander = lander.with_regenerator(Arc::new(workers::ExecRegenerator::new(runner)));
+        }
+        let lander = Arc::new(lander);
         let postland = self
             .config
             .postland

@@ -1,5 +1,7 @@
 //! Pre-land and post-land verification through remote execution.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use rill_exec::history::TestHistory;
 use rill_exec::{PlanRunner, Target};
@@ -9,14 +11,14 @@ use rill_lander::{VerificationOutcome, Verifier, VerifyRequest, VerifyStage};
 /// Runs a tree's `.rill/verify.toml` through the scheduler and reports
 /// the outcome to the lander.
 pub struct ExecVerifier {
-    runner: PlanRunner,
+    runner: Arc<PlanRunner>,
     history: TestHistory,
 }
 
 impl ExecVerifier {
     /// A verifier running plans with `runner` and recording what ran in
     /// `history`.
-    pub fn new(runner: PlanRunner, history: TestHistory) -> Self {
+    pub fn new(runner: Arc<PlanRunner>, history: TestHistory) -> Self {
         ExecVerifier { runner, history }
     }
 }
