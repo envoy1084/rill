@@ -162,6 +162,32 @@ gVisor (`deploy/exec/run.sh`):
 The actions are trivial; the numbers measure scheduling, the cache and the
 worker round trip, not build work.
 
+### Trunk healing
+
+`trunk_red` (in `rill-load`) is the self-healing gate. It starts an
+embedded server with post-land verification on and pre-land verification
+off (so every break reaches trunk), seeds a plan of two checks and a test
+that flakes on demand, lands an unrelated change every 2 s throughout, and
+runs five scenarios: a breaking change; two breaking changes a second
+apart; a known-flaky test failing on three landings; a revert that
+conflicts with a later edit (then the owner's `Fixes:` landing); and a
+forward fix inside the grace period. Each culprit is timed from landing
+to trunk showing red, to an incident naming it, and from there to its
+revert (or recorded blocked revert, or fix), against detect ≤ 2 min,
+attribute ≤ 5 min, repair ≤ grace + 2 min.
+
+```
+cargo run -p rill-load --bin trunk_red -- --grace 30 --interval 30 [--only "forward fix"]
+```
+
+At the server's default 30 s sweep interval and a 30 s grace, every
+scenario passes: each break is detected and attributed in 27–30 s (one
+sweep), reverted 30 s later (the grace), two breaks in one batch get one
+incident each, flaky failures pass on a re-run with nothing blamed, a
+conflicting revert is recorded as blocked and the owner's fix closes it,
+and a forward fix within the grace period cancels the revert. A run takes
+about 7 minutes.
+
 ## Limitations
 
 - No benchmark covers search indexing, blame or path history yet.
@@ -175,7 +201,7 @@ worker round trip, not build work.
 ## Code
 
 - [rill-bench/src/lib.rs](../../tools/bench/src/lib.rs), [rill-bench/benches/core.rs](../../tools/bench/benches/core.rs), [rill-bench/benches/meta.rs](../../tools/bench/benches/meta.rs)
-- [rill-load/src/bin/exec_load.rs](../../tools/load/src/bin/exec_load.rs),
+- [rill-load/src/bin/exec_load.rs](../../tools/load/src/bin/exec_load.rs), [trunk_red.rs](../../tools/load/src/bin/trunk_red.rs), [healing/](../../tools/load/src/healing/mod.rs)
 - [rill-load/src/run.rs](../../tools/load/src/run.rs), [workload.rs](../../tools/load/src/workload.rs), [profile.rs](../../tools/load/src/profile.rs), [stats.rs](../../tools/load/src/stats.rs)
 
 ---

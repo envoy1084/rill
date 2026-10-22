@@ -218,7 +218,7 @@ pub async fn revert_conflict(trunk: &Trunk, slo: &Slo) -> anyhow::Result<Value> 
     trunk
         .land(
             vec![set("a/conflict.txt", "fine\n")],
-            &format!("fix a\n\nFixes: trunk@{seq}"),
+            &format!("fix a\n\nFixes: {seq}"),
         )
         .await?;
     resolved(trunk, seq, "fixed", slo.revert).await?;
@@ -240,7 +240,7 @@ pub async fn forward_fix(trunk: &Trunk, slo: &Slo) -> anyhow::Result<Value> {
     trunk
         .land(
             vec![set("a/fix.txt", "fine\n")],
-            &format!("fix a\n\nFixes: trunk@{seq}"),
+            &format!("fix a\n\nFixes: {seq}"),
         )
         .await?;
     let (fixed, _) = resolved(trunk, seq, "fixed", slo.grace).await?;

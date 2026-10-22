@@ -231,6 +231,7 @@ and `RevertSet` need repository ownership.
 * [rill-lander/src/revert.rs](../../crates/domain/lander/src/revert.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)
 * [rill-runtime/src/workers/hooks.rs](../../crates/server/runtime/src/workers/hooks.rs), [verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [repo_tasks.rs](../../crates/server/runtime/src/workers/repo_tasks.rs)
 * [rill-api/src/services/lander.rs](../../crates/server/api/src/services/lander.rs)
+* The gate that breaks trunk on purpose and times the healing: `trunk_red`, see [performance](../09-engineering/performance.md#trunk-healing)
 * [rill-runtime/src/config/server.rs](../../crates/server/runtime/src/config/server.rs) (`PostLandConfig`)
 
 ---
