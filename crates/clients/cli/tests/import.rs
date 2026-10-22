@@ -26,7 +26,7 @@ fn git(dir: &Path, args: &[&str]) -> String {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn git_history_round_trips_through_a_running_server() {
+async fn git_history_round_trips_and_a_following_mirror_keeps_up() {
     let server = Server::start().await;
     let work = tempfile::tempdir().unwrap();
     let src = work.path().join("src");
@@ -79,4 +79,31 @@ async fn git_history_round_trips_through_a_running_server() {
         git(&src, &["rev-parse", "HEAD^{tree}"])
     );
     assert!(git(&mirror, &["log", "-1", "--format=%an <%ae>", "trunk"]).contains("Ada Lovelace"));
+
+    let mut follow = export.to_vec();
+    follow.push("--follow");
+    let following = server.rill(work.path(), &follow);
+    let landing = async {
+        std::fs::write(src.join("lib.rs"), "pub fn three() {}\n").unwrap();
+        git(&src, &["commit", "-q", "-am", "fourth"]);
+        server
+            .json(work.path(), &["import", "git", &path, "--repo", "imported"])
+            .await;
+        for _ in 0..200 {
+            if git(&mirror, &["rev-list", "--count", "trunk"]) == "4" {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        panic!("the following mirror never exported trunk@4");
+    };
+    tokio::select! {
+        (code, out) = following => panic!("--follow exited ({code}): {out}"),
+        () = landing => {}
+    }
+    assert_eq!(
+        git(&mirror, &["rev-parse", "trunk^{tree}"]),
+        git(&src, &["rev-parse", "HEAD^{tree}"]),
+        "a following mirror keeps the git tree"
+    );
 }

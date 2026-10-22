@@ -129,7 +129,7 @@ unchanged ref reports every commit as skipped and lands nothing.
 
 ## Export
 
-`rill export git <path> [--branch trunk]` (with `--repo`) writes trunk into
+`rill export git <path> [--branch trunk] [--follow]` (with `--repo`) writes trunk into
 the git repository at `<path>`, creating it if missing, through `git
 fast-import`. Each trunk position becomes one commit on the branch: its
 author is the git author kept by an import, else the Rill principal; the
@@ -141,6 +141,14 @@ the server truncates, is written as a full snapshot. An export resumes
 after the position named in the branch's last commit and refuses a branch
 whose last commit is not an export. Importing a git history and exporting
 it again gives the same git tree (`rill-cli/tests/import.rs`).
+
+`--follow` keeps a standing mirror: after the first export it watches
+trunk (`WatchTrunk` from the mirrored head) and runs the same incremental
+export on each landing event, so the branch trails trunk by one landing.
+A dropped stream reconnects from the branch's last position, with backoff
+up to 30 s while the server is unreachable; Ctrl-C stops it. Each export
+re-reads the branch, so a mirror restarted or run twice never writes a
+position twice.
 
 ## CLI
 

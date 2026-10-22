@@ -41,6 +41,10 @@ pub struct GitExportArgs {
     /// Branch to mirror trunk onto.
     #[arg(long, default_value = "trunk")]
     pub branch: String,
+    /// Keep following trunk, exporting each landing as it lands, until
+    /// interrupted: a standing git mirror.
+    #[arg(long)]
+    pub follow: bool,
 }
 
 /// Run an export subcommand.
@@ -57,7 +61,18 @@ async fn git(ctx: &mut Ctx<'_>, args: GitExportArgs) -> Result<()> {
         std::fs::create_dir_all(&args.path)?;
         git_cmd(&args.path, &["init", "-q"]).await?;
     }
-    let from = mirrored_through(&args.path, &args.branch).await?;
+    let (exported, head) = export_once(&repo, &args.path, &args.branch).await?;
+    report(ctx, &repo_name, &args.branch, exported, head)?;
+    if !args.follow {
+        return Ok(());
+    }
+    follow(ctx, &repo, &repo_name, &args, head).await
+}
+
+/// Export what landed since the branch's last mirrored position; how many
+/// positions, and the head mirrored.
+async fn export_once(repo: &RepoClient, path: &Path, branch: &str) -> Result<(usize, TrunkSeq)> {
+    let from = mirrored_through(path, branch).await?;
     let head = match repo.trunk_head().await {
         Ok(Some((seq, _))) => seq,
         Ok(None) => TrunkSeq::ZERO,
@@ -70,24 +85,81 @@ async fn git(ctx: &mut Ctx<'_>, args: GitExportArgs) -> Result<()> {
         landings.retain(|l| l.seq > from);
         let mut stream = Vec::new();
         for (i, landing) in landings.iter().enumerate() {
-            let continues = (i == 0 && from > TrunkSeq::ZERO).then_some(args.branch.as_str());
-            commit(&repo, landing, &args.branch, continues, &mut stream).await?;
+            let continues = (i == 0 && from > TrunkSeq::ZERO).then_some(branch);
+            commit(repo, landing, branch, continues, &mut stream).await?;
             exported += 1;
         }
         stream.extend_from_slice(b"done\n");
-        fast_import(&args.path, &stream).await?;
+        fast_import(path, &stream).await?;
     }
+    Ok((exported, head.max(from)))
+}
+
+/// Export each landing as trunk's watch reports it, reconnecting when the
+/// stream ends, until interrupted.
+async fn follow(
+    ctx: &mut Ctx<'_>,
+    repo: &RepoClient,
+    repo_name: &str,
+    args: &GitExportArgs,
+    mut head: TrunkSeq,
+) -> Result<()> {
+    use futures::StreamExt;
+    let mut retry = std::time::Duration::from_millis(500);
+    loop {
+        let mut events = match repo.watch_trunk(Some(head)).await {
+            Ok(events) => events,
+            Err(e) => {
+                tracing::warn!(error = %e, "watching trunk failed; retrying");
+                tokio::select! {
+                    _ = tokio::signal::ctrl_c() => return Ok(()),
+                    _ = tokio::time::sleep(retry) => {}
+                }
+                retry = (retry * 2).min(std::time::Duration::from_secs(30));
+                continue;
+            }
+        };
+        retry = std::time::Duration::from_millis(500);
+        loop {
+            let event = tokio::select! {
+                _ = tokio::signal::ctrl_c() => return Ok(()),
+                event = events.next() => event,
+            };
+            match event {
+                Some(Ok(_)) => {
+                    let (exported, now) = export_once(repo, &args.path, &args.branch).await?;
+                    if exported > 0 {
+                        report(ctx, repo_name, &args.branch, exported, now)?;
+                    }
+                    head = now;
+                }
+                Some(Err(e)) => {
+                    tracing::warn!(error = %e, "trunk watch failed; reconnecting");
+                    break;
+                }
+                None => break,
+            }
+        }
+    }
+}
+
+fn report(
+    ctx: &mut Ctx<'_>,
+    repo: &str,
+    branch: &str,
+    exported: usize,
+    head: TrunkSeq,
+) -> Result<()> {
     ctx.emit(
         j!({
-            "repo": repo_name,
-            "branch": args.branch,
+            "repo": repo,
+            "branch": branch,
             "exported": exported,
             "through": head.get(),
         }),
         |out| {
             out.line(format!(
-                "exported {exported} trunk position(s) to {}; it mirrors trunk@{}",
-                args.branch,
+                "exported {exported} trunk position(s) to {branch}; it mirrors trunk@{}",
                 head.get()
             ))
         },

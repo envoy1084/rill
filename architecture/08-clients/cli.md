@@ -49,7 +49,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Services | `dev`, `api [--roles]`, `cache --origin --dir --max-bytes` ([cache tier](../07-runtime/cache.md)) |
 | Access | `access grant/revoke <subject> <relation> [path]`, `access list [--path] [--subject] [--relation]`, `access check <relation> [path] [--as]`, `access who <relation> [path]`, `access where <relation> [--as]` |
 | Admin | `admin whoami`, `admin token issue`, `admin policy get/set`, `admin health`, `admin idp add/list/remove` (OIDC, or SAML with `--saml-metadata`), `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session`, `admin agent register/list/suspend/activate`, `admin trust add/list/remove` (workload issuers), `admin kill --agent/--session/--sponsor/--model`, `admin scim create/list/revoke`, `admin audit list/watch/seal/verify/export`, `admin protect redact/approve/redactions/release/rotate-key`, `admin secret set/list/delete` (the value from standard input or `--from-file`, never an argument) |
-| Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
+| Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch; `--follow` keeps it following), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
 
 Each group lives in `commands/<group>.rs`. `commands/parse.rs` holds the
 shared positional parsers: `root_arg` (defaults to trunk), `seq_arg` (`7` or
@@ -67,7 +67,7 @@ Behaviours worth knowing:
 - `rill import git <path> --repo R` imports through the server the client
   is configured for; `--storage-dir DIR` (or `RILL_STORAGE_DIR`) opens
   `LocalStores` directly instead. `rill export git <dir>` mirrors trunk into
-  a git branch. See [git import and export](../06-services/git-import.md).
+  a git branch, and with `--follow` keeps exporting each landing. See [git import and export](../06-services/git-import.md).
 - Every change the CLI creates has `Provenance {tool: "rill-cli"}`.
 - `rill login` lists the org's providers through `SessionService`, runs the
   device flow against the chosen one's CLI client, prints the code and URL
