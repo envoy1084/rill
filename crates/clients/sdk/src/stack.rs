@@ -10,8 +10,9 @@ use crate::repo::RepoClient;
 use crate::review::ReviewClient;
 use crate::types::{LandProgress, LandStatus, Root};
 
-/// The polling schedule for awaiting landings: exponential, jittered,
-/// without a limit on attempts.
+/// The polling schedule for awaiting landings: exponential, without a
+/// limit on attempts. Not jittered: one client polls its own ticket, and
+/// jitter would only delay noticing the landing.
 pub type Backoff = backon::ExponentialBuilder;
 
 fn default_backoff() -> Backoff {
@@ -19,7 +20,6 @@ fn default_backoff() -> Backoff {
         .with_min_delay(Duration::from_millis(250))
         .with_factor(1.6)
         .with_max_delay(Duration::from_secs(5))
-        .with_jitter()
         .without_max_times()
 }
 
@@ -182,5 +182,26 @@ impl StackClient {
             let wait = waits.next().unwrap_or(Duration::from_secs(5));
             tokio::time::sleep(wait.min(timeout - elapsed)).await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use backon::BackoffBuilder;
+
+    use super::*;
+
+    #[test]
+    fn land_polling_checks_at_its_first_interval_without_jitter() {
+        let delays: Vec<u128> = default_backoff()
+            .build()
+            .take(3)
+            .map(|d| d.as_millis())
+            .collect();
+        assert_eq!(
+            delays,
+            [250, 400, 640],
+            "a landing is noticed at the first poll, not up to twice as late"
+        );
     }
 }

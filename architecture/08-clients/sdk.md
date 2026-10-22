@@ -169,7 +169,9 @@ submits each change, then calls `set_stack`. `sync_stack` rebases bottom-up,
 each change onto the previous result, and reports conflicts instead of
 raising them. `land_stack` requests a land for each change and waits for it
 before the next. `await_land` polls land status with `Backoff`, a `backon`
-exponential builder (250 ms initial, factor 1.6, 5 s max, jittered). It returns `Error::LandFailed` on a failed or
+exponential builder (250 ms initial, factor 1.6, 5 s max). It is not
+jittered: one client polls its own ticket, and jitter only delayed noticing
+the landing (up to 500 ms instead of 250). It returns `Error::LandFailed` on a failed or
 cancelled land and `Error::Timeout` when the deadline passes.
 
 ## Errors
