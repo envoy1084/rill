@@ -89,6 +89,10 @@ spec:
             - name: tls
               mountPath: /etc/rill/tls
             {{- end }}
+            {{- if .Values.exec.workerSecret }}
+            - name: exec-worker-secret
+              mountPath: /etc/rill/exec
+            {{- end }}
       volumes:
         - name: config
           secret:
@@ -103,6 +107,11 @@ spec:
         - name: tls
           secret:
             secretName: {{ .Values.tls.secret }}
+        {{- end }}
+        {{- if .Values.exec.workerSecret }}
+        - name: exec-worker-secret
+          secret:
+            secretName: {{ .Values.exec.workerSecret }}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

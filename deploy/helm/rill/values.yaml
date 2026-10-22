@@ -94,3 +94,23 @@ serviceMonitor:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# Remote execution. Servers serve REAPI; workers are Buildbarn's bb_worker
+# beside bb_runner, in pods under a gVisor RuntimeClass. `workerSecret`
+# names a Secret (key `secret`) the servers and workers share.
+exec:
+  workerSecret: ""
+  workers:
+    replicas: 0
+    concurrency: 8
+    runtimeClassName: gvisor
+    buildbarnTag: 20261020T112007Z-e88a90a
+    # The image actions run in; Bazel's platform property `container-image`
+    # must name it.
+    runnerImage: rill-exec-runner:dev
+    resources:
+      requests:
+        cpu: "2"
+        memory: 4Gi
+      limits:
+        memory: 8Gi

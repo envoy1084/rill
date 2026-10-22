@@ -9,6 +9,7 @@ Everything needed to build and run Rill outside `cargo run`.
 | [compose](compose/README.md) | A staging cluster on one machine: FoundationDB, SeaweedFS (S3), three servers behind nginx, Prometheus and Grafana; soak and chaos scripts |
 | [grafana](grafana/README.md) | Dashboards for the server's Prometheus metrics |
 | [keycloak](keycloak/README.md) | A Keycloak realm for OpenID Connect and SAML sign-in tests |
+| [exec](exec/run.sh) | Remote execution workers locally: Buildbarn's `bb_worker` and `bb_runner` (under gVisor, no network) inside a Docker engine with gVisor, a Bazel sample and the sandbox escape suite |
 | [orbstack](orbstack/workload-check.sh) | A check that a pod's Kubernetes service-account token signs in as an agent, on a local OrbStack cluster |
 
 Configuration keys are documented in

@@ -49,6 +49,12 @@ stringData:
     {{- end }}
     {{- end }}
 
+    {{- if .Values.exec.workerSecret }}
+
+    [exec]
+    worker_secret_file = "/etc/rill/exec/secret"
+    {{- end }}
+
     [shutdown]
     drain_secs = {{ .Values.shutdown.drainSecs }}
     grace_secs = {{ .Values.shutdown.graceSecs }}

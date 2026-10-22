@@ -13,3 +13,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
+
+{{- define "rill.workerSelector" -}}
+app.kubernetes.io/name: {{ .Chart.Name }}-exec-worker
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}

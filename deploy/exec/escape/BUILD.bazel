@@ -1,0 +1,50 @@
+# Each action tries to break out of the remote execution sandbox and
+# records whether it was blocked. Built remotely like any other target;
+# run.sh escape fails if any line says ESCAPED.
+
+CHECKS = {
+    "network_dns": "getent hosts example.com",
+    "network_ip": "curl -s -m 5 http://1.1.1.1",
+    "network_rill": "curl -s -m 5 http://host.orb.internal:7471/livez",
+    "write_worker_files": "touch /bb/escaped || touch /buildbarn/escaped",
+    "poison_toolchain": "touch /usr/bin/escaped || touch /etc/escaped",
+    "mount": "mount -t tmpfs none /mnt",
+    "worker_secret": "grep -a RILL_WORKER_SECRET /proc/*/environ",
+    "host_processes": "grep -al bb_worker /proc/*/cmdline",
+}
+
+[genrule(
+    name = name,
+    outs = [name + ".txt"],
+    cmd = "(" + attempt + ") >/dev/null 2>&1 && echo '%s: ESCAPED' > $@ || echo '%s: blocked' > $@" % (name, name),
+    tags = ["no-cache"],
+) for name, attempt in CHECKS.items()]
+
+# A fork bomb is contained if the sandbox survives it: the action ends at
+# its timeout and the next action still runs on the same runner.
+genrule(
+    name = "fork_bomb",
+    outs = ["fork_bomb.txt"],
+    cmd = "timeout 20 sh -c 'for i in $$(seq 20000); do sleep 30 & done' >/dev/null 2>&1 || true; echo 'fork_bomb: contained' > $@",
+    tags = ["no-cache"],
+)
+
+genrule(
+    name = "after_bomb",
+    srcs = ["fork_bomb.txt"],
+    outs = ["after_bomb.txt"],
+    cmd = "echo 'after_bomb: the runner still runs actions' > $@",
+    tags = ["no-cache"],
+)
+
+genrule(
+    name = "kernel",
+    outs = ["kernel.txt"],
+    cmd = "echo \"kernel: $$(uname -r)\" > $@",
+    tags = ["no-cache"],
+)
+
+filegroup(
+    name = "report",
+    srcs = [name + ".txt" for name in CHECKS] + ["fork_bomb.txt", "after_bomb.txt", "kernel.txt"],
+)
