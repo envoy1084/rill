@@ -55,15 +55,9 @@ mod tests {
     fn maps_errors_to_codes() {
         assert_eq!(code_for(&CliError::usage("x")), USAGE);
         assert_eq!(code_for(&CliError::conflict("x")), CONFLICT);
-        let aborted = CliError::Sdk(rill_sdk::Error::Status {
-            code: Code::Aborted,
-            message: String::new(),
-        });
+        let aborted = CliError::Sdk(rill_sdk::Error::status(Code::Aborted, String::new()));
         assert_eq!(code_for(&aborted), CONFLICT);
-        let missing = CliError::Sdk(rill_sdk::Error::Status {
-            code: Code::NotFound,
-            message: String::new(),
-        });
+        let missing = CliError::Sdk(rill_sdk::Error::status(Code::NotFound, String::new()));
         assert_eq!(code_for(&missing), ERROR);
         assert_eq!(
             code_for(&CliError::Sdk(rill_sdk::Error::Timeout(

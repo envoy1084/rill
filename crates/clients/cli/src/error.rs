@@ -103,7 +103,7 @@ impl From<rill_mcp::ToolError> for CliError {
 fn describe_sdk(e: &rill_sdk::Error) -> String {
     use rill_sdk::Error;
     match e {
-        Error::Status { code, message } => {
+        Error::Status { code, message, .. } => {
             let what = match code {
                 Code::NotFound => "not found",
                 Code::AlreadyExists => "already exists",
@@ -146,10 +146,7 @@ mod tests {
 
     #[test]
     fn sdk_status_is_described_plainly() {
-        let err = CliError::Sdk(rill_sdk::Error::Status {
-            code: Code::NotFound,
-            message: "no such repo".into(),
-        });
+        let err = CliError::Sdk(rill_sdk::Error::status(Code::NotFound, "no such repo"));
         assert_eq!(err.to_string(), "not found: no such repo");
         assert_eq!(err.code(), "not_found");
         assert_eq!(CliError::usage("x").code(), "usage");

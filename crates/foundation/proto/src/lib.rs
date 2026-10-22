@@ -21,6 +21,12 @@ mod generated {
     connectrpc::include_generated!();
 }
 
+/// The `google.rpc` status and error-detail messages errors carry.
+pub use generated::google;
+
+/// The `domain` of every `google.rpc.ErrorInfo` Rill returns.
+pub const ERROR_DOMAIN: &str = "rill.dev";
+
 /// Generated protobuf messages, Connect service traits and clients.
 pub mod rill {
     /// Version 1 of the Rill API (`package rill.v1`), with each message's

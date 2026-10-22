@@ -49,7 +49,7 @@ pub use audit::AuditClient;
 pub use client::Client;
 pub use config::{ClientConfig, SessionConfig, TlsOptions};
 pub use connectrpc::ErrorCode as Code;
-pub use error::{Error, Result};
+pub use error::{Error, ErrorReason, Result};
 pub use intent::IntentClient;
 pub use lander::LanderClient;
 pub use local::{Checkout, LocalChange, LocalChangeKind};

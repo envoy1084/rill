@@ -43,7 +43,15 @@ async fn a_json_call_over_http1_reaches_the_api_and_errors_carry_their_code() {
 
     let (status, _, body) = call("GetRepo", r#"{"repo":"missing"}"#, None).await;
     assert_eq!(status, 404);
-    assert_eq!(json(&body)["code"], "not_found");
+    let error = json(&body);
+    assert_eq!(error["code"], "not_found");
+    let info = error["details"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["type"] == "google.rpc.ErrorInfo")
+        .expect("the reason travels as an ErrorInfo detail");
+    assert_eq!(info["debug"]["reason"], "NOT_FOUND", "{error}");
 
     let (status, _, body) = call("GetRepo", r#"{"repo":"web"}"#, Some("Bearer nonsense")).await;
     assert_eq!(status, 401, "a bad token is refused before any handler");

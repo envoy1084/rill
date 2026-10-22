@@ -6429,7 +6429,10 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "async-trait",
+ "base64 0.23.1",
  "blake3",
+ "buffa",
+ "buffa-types",
  "bytes",
  "connectrpc",
  "dashmap",
@@ -6478,6 +6481,7 @@ dependencies = [
  "async-trait",
  "axum",
  "backon",
+ "base64 0.23.1",
  "buffa",
  "bytes",
  "connectrpc",

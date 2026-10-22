@@ -41,15 +41,17 @@ impl RepoClient {
             Root::Ref(name) => Ok(self.resolve_ref(name).await?.0),
             Root::Seq(seq) => {
                 let mut landings = self.trunk_range(*seq, *seq).await?;
-                landings.pop().map(|l| l.hash).ok_or_else(|| Error::Status {
-                    code: connectrpc::ErrorCode::NotFound,
-                    message: format!("{seq} is not on trunk"),
+                landings.pop().map(|l| l.hash).ok_or_else(|| {
+                    Error::status(
+                        connectrpc::ErrorCode::NotFound,
+                        format!("{seq} is not on trunk"),
+                    )
                 })
             }
-            Root::Tree(h) => Err(Error::Status {
-                code: connectrpc::ErrorCode::InvalidArgument,
-                message: format!("tree {h} is not a change version"),
-            }),
+            Root::Tree(h) => Err(Error::status(
+                connectrpc::ErrorCode::InvalidArgument,
+                format!("tree {h} is not a change version"),
+            )),
         }
     }
 

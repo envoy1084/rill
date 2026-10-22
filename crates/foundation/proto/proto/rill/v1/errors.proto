@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package rill.v1;
+
+// Why a call failed, beyond its status code. Every error the server returns
+// carries a `google.rpc.ErrorInfo` detail whose `reason` is one of these
+// names without the `ERROR_REASON_` prefix (`ETAG_MISMATCH`) and whose
+// `domain` is `rill.dev`; `metadata` holds the values the message names.
+// Clients branch on the reason, never on the message text.
+enum ErrorReason {
+  ERROR_REASON_UNSPECIFIED = 0;
+
+  // INVALID_ARGUMENT: a field is malformed. A `google.rpc.BadRequest`
+  // detail names the field.
+  ERROR_REASON_INVALID_FIELD = 1;
+  // INVALID_ARGUMENT: a resource name does not parse.
+  ERROR_REASON_INVALID_NAME = 2;
+  // INVALID_ARGUMENT: a revision (`trunk@5`, a hash, a ref) does not parse.
+  ERROR_REASON_INVALID_REVISION = 3;
+  // INVALID_ARGUMENT: a list filter does not parse or names an unknown field.
+  ERROR_REASON_INVALID_FILTER = 4;
+  // INVALID_ARGUMENT: a page token is malformed or was issued for other
+  // parameters.
+  ERROR_REASON_INVALID_PAGE_TOKEN = 5;
+  // INVALID_ARGUMENT: a `request_id` was already used for a different request.
+  ERROR_REASON_REQUEST_ID_REUSED = 6;
+  // RESOURCE_EXHAUSTED: a request or value is over a size limit.
+  ERROR_REASON_TOO_LARGE = 7;
+
+  // UNAUTHENTICATED: no token, or one that is malformed, expired or revoked.
+  ERROR_REASON_UNAUTHENTICATED = 10;
+  // PERMISSION_DENIED: the caller lacks the relation the call needs.
+  ERROR_REASON_PERMISSION_DENIED = 11;
+  // PERMISSION_DENIED: the caller's token narrows what it may do, and this
+  // is outside it.
+  ERROR_REASON_CAPABILITY_DENIED = 12;
+  // FAILED_PRECONDITION: the repository's policy does not allow this yet.
+  // A `google.rpc.PreconditionFailure` detail lists what is missing.
+  ERROR_REASON_POLICY_DENIED = 13;
+
+  // NOT_FOUND: the named resource does not exist.
+  ERROR_REASON_NOT_FOUND = 20;
+  // FAILED_PRECONDITION: objects the request refers to were never uploaded;
+  // upload them and retry.
+  ERROR_REASON_MISSING_OBJECTS = 21;
+  // ALREADY_EXISTS: the resource to create exists.
+  ERROR_REASON_ALREADY_EXISTS = 22;
+
+  // ABORTED: the `etag` given is not the resource's current one; read it
+  // again and retry.
+  ERROR_REASON_ETAG_MISMATCH = 30;
+  // ABORTED: a ref is no longer at the target the request expected.
+  ERROR_REASON_REF_MOVED = 31;
+  // ABORTED: another writer won a race; retrying is safe.
+  ERROR_REASON_CONTENDED = 32;
+  // FAILED_PRECONDITION: the change has a newer version than the one named.
+  ERROR_REASON_VERSION_SUPERSEDED = 33;
+  // FAILED_PRECONDITION: the version holds unresolved conflicts.
+  ERROR_REASON_CONFLICTS_UNRESOLVED = 34;
+  // FAILED_PRECONDITION: the resource is not in a state that allows this
+  // (a landed change, a resolved thread).
+  ERROR_REASON_INVALID_STATE = 35;
+  // FAILED_PRECONDITION: the content was redacted.
+  ERROR_REASON_REDACTED = 36;
+
+  // RESOURCE_EXHAUSTED: the caller is over its request rate. A
+  // `google.rpc.RetryInfo` detail says when to retry.
+  ERROR_REASON_RATE_LIMITED = 40;
+  // RESOURCE_EXHAUSTED: the landing queue is full. Retry later.
+  ERROR_REASON_QUEUE_FULL = 41;
+  // RESOURCE_EXHAUSTED: an agent or sponsor budget is spent.
+  ERROR_REASON_BUDGET_EXHAUSTED = 42;
+
+  // UNAVAILABLE: this server cannot answer now (draining, a store outage,
+  // a request still running elsewhere); retry, possibly elsewhere.
+  ERROR_REASON_UNAVAILABLE = 50;
+  // UNIMPLEMENTED: the server does not support this.
+  ERROR_REASON_UNIMPLEMENTED = 51;
+  // DEADLINE_EXCEEDED: the call ran out of time.
+  ERROR_REASON_TIMEOUT = 52;
+  // INTERNAL or DATA_LOSS: a server fault; the message is for operators.
+  ERROR_REASON_INTERNAL = 53;
+}

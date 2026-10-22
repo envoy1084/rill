@@ -53,12 +53,15 @@ arc-swap = { workspace = true }
 
 tonic = { workspace = true }
 connectrpc = { workspace = true }
+buffa = { workspace = true }
+buffa-types = { workspace = true }
 tower = { workspace = true }
 http = { workspace = true }
 parking_lot = { workspace = true }
 reqwest = { workspace = true }
 
 [dev-dependencies]
+base64 = { workspace = true }
 prost-types = { workspace = true }
 rill-identity = { workspace = true, features = ["testing"] }
 rill-store = { workspace = true, features = ["s3", "testing"] }

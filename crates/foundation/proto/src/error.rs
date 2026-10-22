@@ -43,6 +43,18 @@ impl ConvertError {
     pub fn missing(field: &'static str) -> Self {
         ConvertError::Missing { field }
     }
+
+    /// The field that failed.
+    pub fn field(&self) -> &'static str {
+        match self {
+            ConvertError::BadLength { field, .. }
+            | ConvertError::Missing { field }
+            | ConvertError::BadEnum { field, .. }
+            | ConvertError::Invalid { field, .. }
+            | ConvertError::Unknown { field, .. }
+            | ConvertError::OutOfRange { field, .. } => field,
+        }
+    }
 }
 
 impl From<ConvertError> for connectrpc::ConnectError {

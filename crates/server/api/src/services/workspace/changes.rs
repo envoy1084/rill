@@ -26,7 +26,7 @@ impl WorkspaceSvc {
         let mut ws = before.clone();
         let tree = common::hash("tree_hash", &req.tree_hash)?;
         opened.repo.trees.get_tree(&tree).await.map_err(|_| {
-            Error::precondition(format!("snapshot tree {tree} has not been uploaded"))
+            Error::MissingObjects(format!("snapshot tree {tree} has not been uploaded"))
         })?;
         ws.snapshot = Some(tree);
         let op = self

@@ -11,6 +11,9 @@ use std::env;
 use std::path::PathBuf;
 
 const PROTOS: &[&str] = &[
+    "google/rpc/status.proto",
+    "google/rpc/error_details.proto",
+    "rill/v1/errors.proto",
     "rill/v1/types.proto",
     "rill/v1/events.proto",
     "rill/v1/repo.proto",
@@ -82,7 +85,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// a module for nested types.
 fn oneof_modules(fds: &prost_types::FileDescriptorSet) -> String {
     let mut out = String::new();
-    for message in fds.file.iter().flat_map(|f| &f.message_type) {
+    let rill = fds.file.iter().filter(|f| f.package().starts_with("rill."));
+    for message in rill.flat_map(|f| &f.message_type) {
         let real_oneofs = message
             .field
             .iter()

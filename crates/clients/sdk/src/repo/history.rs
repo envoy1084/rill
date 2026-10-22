@@ -78,13 +78,12 @@ impl RepoClient {
 
     /// The current version of a change.
     pub async fn current_version(&self, change_id: ChangeId) -> Result<ChangeInfo> {
-        self.change_versions(change_id)
-            .await?
-            .pop()
-            .ok_or_else(|| crate::Error::Status {
-                code: connectrpc::ErrorCode::NotFound,
-                message: format!("change {change_id} has no versions"),
-            })
+        self.change_versions(change_id).await?.pop().ok_or_else(|| {
+            crate::Error::status(
+                connectrpc::ErrorCode::NotFound,
+                format!("change {change_id} has no versions"),
+            )
+        })
     }
 
     /// Walk history from `start`, newest first, optionally restricted to

@@ -102,10 +102,7 @@ mod tests {
 
     #[test]
     fn status_codes_are_snake_case() {
-        let err = rill_sdk::Error::Status {
-            code: rill_sdk::Code::FailedPrecondition,
-            message: "x".into(),
-        };
+        let err = rill_sdk::Error::status(rill_sdk::Code::FailedPrecondition, "x");
         assert_eq!(sdk_code(&err), "failed_precondition");
         assert_eq!(ToolError::NoRepo.code(), "no_repo");
         assert_eq!(ToolError::from(err).code(), "failed_precondition");

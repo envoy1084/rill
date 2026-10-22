@@ -108,14 +108,14 @@ impl RepoClient {
     pub async fn read_file(&self, root: &Root, path: &RepoPath) -> Result<Bytes> {
         match self.resolve_path(root, path).await? {
             Some(EntryKind::File { content, .. }) => self.get_blob(&content).await,
-            Some(EntryKind::Dir { .. }) => Err(Error::Status {
-                code: connectrpc::ErrorCode::FailedPrecondition,
-                message: format!("{path} is a directory"),
-            }),
-            None => Err(Error::Status {
-                code: connectrpc::ErrorCode::NotFound,
-                message: format!("{path} does not exist at {root}"),
-            }),
+            Some(EntryKind::Dir { .. }) => Err(Error::status(
+                connectrpc::ErrorCode::FailedPrecondition,
+                format!("{path} is a directory"),
+            )),
+            None => Err(Error::status(
+                connectrpc::ErrorCode::NotFound,
+                format!("{path} does not exist at {root}"),
+            )),
         }
     }
 }

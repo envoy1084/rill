@@ -199,10 +199,10 @@ async fn landable_version(opened: &Opened, state: &ReviewState) -> Result<Change
         .evaluate_for(state, opened.principal())
         .await?;
     if !decision.allowed {
-        return Err(Error::precondition(format!(
-            "submit policy does not allow landing {id}: {}",
-            decision.reasons.join("; ")
-        )));
+        return Err(Error::PolicyDenied {
+            message: format!("submit policy does not allow landing {id}"),
+            missing: decision.reasons,
+        });
     }
     state
         .current_version()

@@ -1,6 +1,9 @@
 //! SDK error type.
 
+use buffa::{Enumeration, Message};
 use connectrpc::ErrorCode as Code;
+use rill_proto::google::rpc;
+pub use rill_proto::rill::v1::ErrorReason;
 use rill_types::{ChangeId, ChangeVersionHash, RepoPathBuf};
 use thiserror::Error;
 
@@ -17,6 +20,13 @@ pub enum Error {
         code: Code,
         /// Server-provided message.
         message: String,
+        /// Why, from the error's `ErrorInfo`; `None` from a transport
+        /// failure or an older server.
+        reason: Option<ErrorReason>,
+        /// For a policy denial, what is still missing.
+        missing: Vec<String>,
+        /// How long to wait before retrying, when the server says.
+        retry_after: Option<std::time::Duration>,
     },
 
     /// A wire message could not be decoded into a `rill-types` value.
@@ -76,6 +86,25 @@ impl Error {
         }
     }
 
+    /// The reason the server gave, if any.
+    pub fn reason(&self) -> Option<ErrorReason> {
+        match self {
+            Error::Status { reason, .. } => *reason,
+            _ => None,
+        }
+    }
+
+    /// Build a status error from a code and message, with no details.
+    pub fn status(code: Code, message: impl Into<String>) -> Self {
+        Error::Status {
+            code,
+            message: message.into(),
+            reason: None,
+            missing: Vec::new(),
+            retry_after: None,
+        }
+    }
+
     /// True for a `NotFound` status.
     pub fn is_not_found(&self) -> bool {
         self.code() == Some(Code::NotFound)
@@ -94,11 +123,60 @@ impl Error {
 
 impl From<connectrpc::ConnectError> for Error {
     fn from(err: connectrpc::ConnectError) -> Self {
+        let mut reason = None;
+        let mut missing = Vec::new();
+        let mut retry_after = None;
+        for detail in &err.details {
+            let Some(bytes) = detail.value.as_deref().and_then(decode_detail) else {
+                continue;
+            };
+            match detail.type_url.rsplit('/').next().unwrap_or_default() {
+                "google.rpc.ErrorInfo" => {
+                    if let Ok(info) = rpc::ErrorInfo::decode_from_slice(&bytes) {
+                        if info.domain == rill_proto::ERROR_DOMAIN {
+                            reason = ErrorReason::from_proto_name(&format!(
+                                "ERROR_REASON_{}",
+                                info.reason
+                            ));
+                        }
+                    }
+                }
+                "google.rpc.PreconditionFailure" => {
+                    if let Ok(failure) = rpc::PreconditionFailure::decode_from_slice(&bytes) {
+                        missing = failure
+                            .violations
+                            .into_iter()
+                            .map(|v| v.description)
+                            .collect();
+                    }
+                }
+                "google.rpc.RetryInfo" => {
+                    if let Ok(retry) = rpc::RetryInfo::decode_from_slice(&bytes) {
+                        if let Some(delay) = retry.retry_delay.as_option() {
+                            retry_after =
+                                Some(std::time::Duration::from_secs(delay.seconds.max(0) as u64));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
         Error::Status {
             code: err.code,
             message: err.message.unwrap_or_default(),
+            reason,
+            missing,
+            retry_after,
         }
     }
+}
+
+/// An error detail's value: base64, padded or not.
+fn decode_detail(value: &str) -> Option<Vec<u8>> {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD_NO_PAD
+        .decode(value.trim_end_matches('='))
+        .ok()
 }
 
 /// Result alias used throughout the SDK.
@@ -111,6 +189,7 @@ mod tests {
     #[test]
     fn status_mapping_preserves_code() {
         let err: Error = connectrpc::ConnectError::not_found("no such repo").into();
+        assert_eq!(err.reason(), None, "no ErrorInfo, no reason");
         assert!(err.is_not_found());
         assert_eq!(err.code(), Some(Code::NotFound));
         assert_eq!(err.to_string(), "NotFound: no such repo");

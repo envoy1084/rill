@@ -150,11 +150,7 @@ where
                 "this operation is already running; retry later".into(),
             ))
         }
-        Claim::Mismatch => {
-            return Err(Error::InvalidArgument(
-                "operation_id was already used for a different request".into(),
-            ))
-        }
+        Claim::Mismatch => return Err(Error::RequestIdReused),
     };
     let scope = Scope {
         principal: principal.clone(),
