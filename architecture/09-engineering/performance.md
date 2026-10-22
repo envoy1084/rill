@@ -103,6 +103,32 @@ metadata. At 50% of D1 the one laptop running load, server and database
 saturates: reads are dropped and every latency rises, commits to 384 ms
 p99.
 
+### Execution
+
+`exec_load` (in `rill-load`) puts verification-shaped load on remote
+execution through REAPI: it seeds a pool of executed actions, then
+submits at a fixed rate, repeating a pooled action (`--hit-share`, 0.85:
+a step whose inputs did not change) or uploading and running a new one
+(a step whose inputs did). It reports the rate, the share served from the
+action cache and latency for each kind.
+
+```
+cargo run --release -p rill-load --bin exec_load -- --seconds 90      # in-process server, 16 local workers
+cargo run --release -p rill-load --bin exec_load -- --endpoint http://127.0.0.1:7470 \
+  --platform OSFamily=linux --platform container-image=rill-exec-runner
+```
+
+At 30% of D1's execution rate (50M actions a day, so 175 a second) for 90
+s on one laptop, `rill dev` with two Buildbarn workers of 10 slots under
+gVisor (`deploy/exec/run.sh`):
+
+| Requests/s | From the cache | Executions/s | Hit p50 / p99 | Execution p50 / p99 | Errors |
+| --- | --- | --- | --- | --- | --- |
+| 175 | 85.2% | 25.9 | 0.2 / 0.6 ms | 21.7 / 43.8 ms | 0 |
+
+The actions are trivial; the numbers measure scheduling, the cache and the
+worker round trip, not build work.
+
 ## Limitations
 
 - No benchmark covers search indexing, blame or path history yet.
@@ -116,6 +142,7 @@ p99.
 ## Code
 
 - [rill-bench/src/lib.rs](../../tools/bench/src/lib.rs), [rill-bench/benches/core.rs](../../tools/bench/benches/core.rs), [rill-bench/benches/meta.rs](../../tools/bench/benches/meta.rs)
+- [rill-load/src/bin/exec_load.rs](../../tools/load/src/bin/exec_load.rs),
 - [rill-load/src/run.rs](../../tools/load/src/run.rs), [workload.rs](../../tools/load/src/workload.rs), [profile.rs](../../tools/load/src/profile.rs), [stats.rs](../../tools/load/src/stats.rs)
 
 ---

@@ -5985,20 +5985,25 @@ name = "rill-load"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "bytes",
  "clap",
  "futures",
  "hdrhistogram",
  "parking_lot",
+ "prost 0.14.4",
+ "prost-types 0.14.4",
  "rand 0.10.3",
  "reqwest",
  "rill-api",
  "rill-proto",
+ "rill-reapi-proto",
  "rill-sdk",
  "rill-types",
  "serde_json",
  "tokio",
  "tokio-util",
+ "tonic",
 ]
 
 [[package]]

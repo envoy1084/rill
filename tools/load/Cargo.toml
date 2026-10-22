@@ -24,3 +24,8 @@ parking_lot = { workspace = true }
 hdrhistogram = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
+rill-reapi-proto = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+tonic = { workspace = true }
+blake3 = { workspace = true }
