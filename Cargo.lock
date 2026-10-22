@@ -6135,9 +6135,11 @@ dependencies = [
  "rill-sdk",
  "rill-types",
  "serde_json",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tonic",
+ "tracing-subscriber",
 ]
 
 [[package]]

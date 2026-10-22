@@ -16,9 +16,16 @@ impl EmbeddedServer {
     /// `exec_workers` in-process workers running verification and merge
     /// drivers (none: verification off).
     pub async fn start(exec_workers: usize) -> anyhow::Result<Self> {
-        let any: SocketAddr = "127.0.0.1:0".parse()?;
-        let listeners = Listeners::bind(any, any).await?;
-        let (grpc, _) = listeners.addrs()?;
+        let mut config = Self::config();
+        if exec_workers > 0 {
+            config.verify.enabled = true;
+            config.exec.local.workers = exec_workers;
+        }
+        Self::start_with(config).await
+    }
+
+    /// The dev-mode, memory-backed configuration `start` begins from.
+    pub fn config() -> ServerConfig {
         let mut config = ServerConfig {
             dev_mode: true,
             storage: StorageConfig::Memory,
@@ -26,10 +33,14 @@ impl EmbeddedServer {
         };
         // The harness is one principal doing every agent's work.
         config.rate_limit.per_principal_per_sec = 0;
-        if exec_workers > 0 {
-            config.verify.enabled = true;
-            config.exec.local.workers = exec_workers;
-        }
+        config
+    }
+
+    /// Start a server with `config` on a free port.
+    pub async fn start_with(config: ServerConfig) -> anyhow::Result<Self> {
+        let any: SocketAddr = "127.0.0.1:0".parse()?;
+        let listeners = Listeners::bind(any, any).await?;
+        let (grpc, _) = listeners.addrs()?;
         let shutdown = CancellationToken::new();
         let state = rill_api::build_state(config, shutdown.clone()).await?;
         let token = shutdown.clone();

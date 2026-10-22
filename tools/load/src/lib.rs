@@ -3,6 +3,7 @@
 //! reporting throughput and latency percentiles per operation.
 
 pub mod contended;
+pub mod healing;
 pub mod ledger;
 pub mod profile;
 pub mod run;
