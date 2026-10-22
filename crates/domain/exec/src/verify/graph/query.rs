@@ -24,7 +24,7 @@ impl PlanRunner {
             &self.trees,
             tree,
             &spec.step,
-            &self.platform,
+            &self.defaults,
             None,
         )
         .await?;

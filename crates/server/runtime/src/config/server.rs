@@ -224,16 +224,24 @@ pub struct VerifyConfig {
     /// Platform properties every step asks for, matching the workers that
     /// should run them; a step's own `platform` adds to these.
     pub platform: BTreeMap<String, String>,
+    /// Environment every step gets beneath its own `env`. Workers start a
+    /// command with only its action's environment, so this is where
+    /// `PATH` comes from.
+    pub env: BTreeMap<String, String>,
     /// Days a verification run, and so its logs and artifacts, stays
     /// readable.
     pub retention_days: u64,
 }
+
+/// The `PATH` steps get unless configured otherwise.
+pub const DEFAULT_STEP_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
 impl Default for VerifyConfig {
     fn default() -> Self {
         VerifyConfig {
             enabled: false,
             platform: BTreeMap::new(),
+            env: BTreeMap::from([("PATH".to_string(), DEFAULT_STEP_PATH.to_string())]),
             retention_days: 30,
         }
     }

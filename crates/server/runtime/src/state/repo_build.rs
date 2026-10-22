@@ -84,6 +84,7 @@ impl RepoRegistry {
                     trees.clone(),
                     self.config.verify.platform.clone(),
                 )
+                .with_env(self.config.verify.env.clone())
                 .with_runs(RunStore::new(
                     repo.clone(),
                     std::time::Duration::from_secs(self.config.verify.retention_days * 24 * 3600),

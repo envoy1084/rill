@@ -10,7 +10,7 @@ mod run;
 mod select;
 mod submit;
 
-pub use compile::{compile, CompiledAction, ExtraFile};
+pub use compile::{compile, CompiledAction, ExtraFile, StepDefaults};
 pub use outcome::{StepResult, StepStatus, VerificationOutcome};
 pub use plan::{load_plan, Plan, Step, DEFAULT_STEP_TIMEOUT, MAX_SHARDS, PLAN_PATH};
 pub use run::{PlanRunner, Target, AFFECTED_ENV, AFFECTED_FILE};

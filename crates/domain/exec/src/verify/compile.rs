@@ -27,6 +27,15 @@ pub struct CompiledAction {
     pub junit: Option<String>,
 }
 
+/// What every step of a repository gets beneath its own settings.
+#[derive(Debug, Clone, Default)]
+pub struct StepDefaults {
+    /// Platform properties the step's own add to.
+    pub platform: BTreeMap<String, String>,
+    /// Environment the step's own `env` overrides.
+    pub env: BTreeMap<String, String>,
+}
+
 /// A file Rill adds to a step's input root, relative to its working
 /// directory, named to the command by an environment variable.
 #[derive(Debug, Clone)]
@@ -43,18 +52,19 @@ pub async fn compile(
     trees: &TreeOps,
     root: TreeHash,
     step: &Step,
-    default_platform: &BTreeMap<String, String>,
+    defaults: &StepDefaults,
     extra: Option<ExtraFile>,
 ) -> Result<Vec<CompiledAction>> {
     let input_root = space.input_root(trees, root, &step.inputs).await?;
     let mut input_root = space.with_directory(input_root, &step.working_dir).await?;
-    let mut base_env = step.env.clone();
+    let mut base_env = defaults.env.clone();
+    base_env.extend(step.env.clone());
     if let Some(extra) = extra {
         let path = step.working_dir.join(&extra.name)?;
         input_root = space.with_file(input_root, &path, extra.bytes).await?;
         base_env.insert(extra.env, extra.name);
     }
-    let mut properties = default_platform.clone();
+    let mut properties = defaults.platform.clone();
     properties.extend(step.platform.clone());
     let platform = Platform {
         properties: properties

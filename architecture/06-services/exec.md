@@ -102,7 +102,9 @@ bazel-diff and the build tool come from the worker image; the query
 usually needs a platform whose workers can fetch external dependencies.
 
 **Compiling** (`verify/compile.rs`) writes one `Command` and `Action` per
-shard: arguments, sorted environment, `output_paths`, the working
+shard: arguments, sorted environment (`[verify] env` under the step's
+own, which is where `PATH` comes from: Buildbarn's runner gives a
+command nothing else), `output_paths`, the working
 directory, the step timeout, and the platform (`[verify] platform` plus
 the step's). Shards differ only in `TEST_SHARD_INDEX` and
 `TEST_TOTAL_SHARDS`, the test sharding protocol runners such as Bazel's

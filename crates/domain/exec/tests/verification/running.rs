@@ -147,3 +147,39 @@ async fn a_step_past_its_timeout_times_out() {
     assert!(!outcome.green);
     assert_eq!(outcome.steps[0].status, StepStatus::TimedOut);
 }
+
+#[tokio::test]
+async fn steps_get_the_default_environment_under_their_own() {
+    use rill_exec::{PlanRunner, Target};
+
+    let fx = Fixture::new().await;
+    let runner = PlanRunner::new(
+        fx.scheduler.clone(),
+        rill_store::DEFAULT_ORG,
+        "app",
+        fx.trees.clone(),
+        Default::default(),
+    )
+    .with_env(std::collections::BTreeMap::from([
+        ("GREETING".to_string(), "hello".to_string()),
+        ("MODE".to_string(), "default".to_string()),
+    ]));
+    let plan = r#"
+[[step]]
+command = ["sh", "-c", 'test "$GREETING" = hello && test "$MODE" = mine']
+env = { MODE = "mine" }
+"#;
+    let root = fx.tree(None, &[("PLAN", plan)]).await;
+    let outcome = runner
+        .verify(&Target {
+            root,
+            version: rill_types::ObjectHash::ZERO,
+            base: None,
+            risk: None,
+            priority: rill_jobs::Priority::Normal,
+            trunk: false,
+        })
+        .await
+        .unwrap();
+    assert!(outcome.green, "{:?}", outcome);
+}

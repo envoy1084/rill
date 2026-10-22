@@ -51,9 +51,12 @@ pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
             grace_secs: 5,
         },
         // Plans run on workers in this process, unisolated: a development
-        // server runs its user's own code.
+        // server runs its user's own code, with the tools on its `PATH`.
         verify: rill_runtime::config::VerifyConfig {
             enabled: true,
+            env: std::env::var("PATH")
+                .map(|path| std::collections::BTreeMap::from([("PATH".to_string(), path)]))
+                .unwrap_or_default(),
             ..Default::default()
         },
         exec: rill_runtime::config::ExecConfig {

@@ -11,7 +11,7 @@ use rill_core::TreeOps;
 use rill_jobs::Priority;
 use rill_types::{ObjectHash, RiskClass, TreeHash};
 
-use super::compile::{compile, ExtraFile};
+use super::compile::{compile, ExtraFile, StepDefaults};
 use super::graph::{affected_targets, GraphSpec};
 use super::outcome::{StepResult, StepStatus, VerificationOutcome};
 use super::plan::{load_plan, Step};
@@ -48,7 +48,7 @@ pub struct PlanRunner {
     pub(crate) scheduler: Arc<Scheduler>,
     pub(crate) space: ExecSpace,
     pub(crate) trees: TreeOps,
-    pub(crate) platform: BTreeMap<String, String>,
+    pub(crate) defaults: StepDefaults,
     pub(crate) repo: String,
     pub(crate) requester: String,
     pub(crate) runs: Option<RunStore>,
@@ -68,11 +68,22 @@ impl PlanRunner {
             space: scheduler.space(org),
             scheduler,
             trees,
-            platform,
+            defaults: StepDefaults {
+                platform,
+                env: BTreeMap::new(),
+            },
             repo: repo.to_string(),
             requester: format!("verify:{repo}"),
             runs: None,
         }
+    }
+
+    /// Give every step `env`, under its own environment. Workers start
+    /// commands with only the action's environment, so this is where
+    /// `PATH` comes from.
+    pub fn with_env(mut self, env: BTreeMap<String, String>) -> Self {
+        self.defaults.env = env;
+        self
     }
 
     /// Record each verification as a run in `runs`.
@@ -174,7 +185,7 @@ impl PlanRunner {
                 &self.trees,
                 target.root,
                 step,
-                &self.platform,
+                &self.defaults,
                 extra,
             ));
         }
