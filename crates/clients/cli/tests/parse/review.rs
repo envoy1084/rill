@@ -90,7 +90,7 @@ fn landing_group() {
         })
     ));
     assert!(
-        matches!(parse(&["landings", "-n", "3", "--before", "trunk@9"]).command, Command::Landings(a) if a.limit == 3)
+        matches!(parse(&["landings", "-n", "3", "--page-token", "t"]).command, Command::Landings(a) if a.limit == 3 && a.page_token.as_deref() == Some("t"))
     );
     assert!(matches!(
         parse(&["verify", "7"]).command,

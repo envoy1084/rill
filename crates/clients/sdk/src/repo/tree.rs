@@ -24,9 +24,9 @@ impl RepoClient {
     pub async fn tree(&self, hash: TreeHash) -> Result<Tree> {
         let grant = self.grants().for_hash(&hash);
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
+            let svc = self.content();
             let request = pb::GetTreeRequest {
-                repo: self.repo.clone(),
+                repo: self.resource.clone(),
                 hash: hash_to_proto(&hash),
                 grant: grant.clone(),
             };
@@ -49,46 +49,58 @@ impl RepoClient {
 
     /// [`RepoClient::list_dir`] with the directory's tree hash.
     pub async fn list_dir_full(&self, root: &Root, path: &RepoPath) -> Result<DirListing> {
-        let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::ListDirRequest {
-                repo: self.repo.clone(),
-                root: root.to_proto().into(),
-                path: path.to_string(),
-            };
-            async move { svc.list_dir(request).await }
-        })
-        .await?
-        .into_owned();
-        let entries = resp
-            .entries
-            .into_iter()
-            .map(|e| {
-                let entry: TreeEntry = required("list_dir.entry", e.entry)?.try_into()?;
-                Ok((e.name, entry.kind))
+        let mut entries = Vec::new();
+        let mut page_token = String::new();
+        let mut tree_hash;
+        loop {
+            let resp = crate::client::retry_idempotent(|| {
+                let svc = self.content();
+                let request = pb::ListDirectoryRequest {
+                    repo: self.resource.clone(),
+                    revision: root.to_string(),
+                    path: path.to_string(),
+                    page_size: 1000,
+                    page_token: page_token.clone(),
+                };
+                async move { svc.list_directory(request).await }
             })
-            .collect::<Result<Vec<(String, EntryKind)>>>()?;
-        let tree_hash = hash_from_proto("list_dir.tree_hash", &resp.tree_hash)?;
-        self.grants().record(
-            &resp.read_grant,
-            entries
-                .iter()
-                .filter_map(|(_, kind)| entry_hash(kind))
-                .chain([tree_hash]),
-        );
+            .await?
+            .into_owned();
+            let page = resp
+                .entries
+                .into_iter()
+                .map(|e| {
+                    let entry: TreeEntry = required("list_directory.entry", e.entry)?.try_into()?;
+                    Ok((e.name, entry.kind))
+                })
+                .collect::<Result<Vec<(String, EntryKind)>>>()?;
+            let hash = hash_from_proto("list_directory.tree_hash", &resp.tree_hash)?;
+            self.grants().record(
+                &resp.read_grant,
+                page.iter()
+                    .filter_map(|(_, kind)| entry_hash(kind))
+                    .chain([hash]),
+            );
+            tree_hash = hash;
+            entries.extend(page);
+            if resp.next_page_token.is_empty() {
+                break;
+            }
+            page_token = resp.next_page_token;
+        }
         Ok(DirListing { tree_hash, entries })
     }
 
     /// The entry at `path` under `root`, or `None` if it does not exist.
     pub async fn resolve_path(&self, root: &Root, path: &RepoPath) -> Result<Option<EntryKind>> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::ResolvePathRequest {
-                repo: self.repo.clone(),
-                root: root.to_proto().into(),
+            let svc = self.content();
+            let request = pb::StatRequest {
+                repo: self.resource.clone(),
+                revision: root.to_string(),
                 path: path.to_string(),
             };
-            async move { svc.resolve_path(request).await }
+            async move { svc.stat(request).await }
         })
         .await?
         .into_owned();
@@ -106,15 +118,28 @@ impl RepoClient {
     ///
     /// Fails with `NotFound` if the path is absent or a directory.
     pub async fn read_file(&self, root: &Root, path: &RepoPath) -> Result<Bytes> {
-        match self.resolve_path(root, path).await? {
-            Some(EntryKind::File { content, .. }) => self.get_blob(&content).await,
-            Some(EntryKind::Dir { .. }) => Err(Error::status(
+        let resp = crate::client::retry_idempotent(|| {
+            let svc = self.content();
+            let request = pb::ReadFileRequest {
+                repo: self.resource.clone(),
+                revision: root.to_string(),
+                path: path.to_string(),
+                max_bytes: 0,
+            };
+            async move { svc.read_file(request).await }
+        })
+        .await?
+        .into_owned();
+        let entry: TreeEntry = required("read_file.entry", resp.entry)?.try_into()?;
+        self.grants()
+            .record(&resp.read_grant, entry_hash(&entry.kind));
+        match entry.kind {
+            // Too large to come back inline: stream it.
+            EntryKind::File { content, .. } if resp.truncated => self.get_blob(&content).await,
+            EntryKind::File { .. } => Ok(resp.data),
+            EntryKind::Dir { .. } => Err(Error::status(
                 connectrpc::ErrorCode::FailedPrecondition,
                 format!("{path} is a directory"),
-            )),
-            None => Err(Error::status(
-                connectrpc::ErrorCode::NotFound,
-                format!("{path} does not exist at {root}"),
             )),
         }
     }

@@ -2,6 +2,9 @@
 //! a change that breaks its repository's plan does not land.
 
 use super::*;
+use crate::common::names;
+
+const SECRET: &str = "orgs/default/secrets/DEPLOY_KEY";
 
 const PLAN: &str = r#"
 [[step]]
@@ -12,19 +15,13 @@ inputs = ["src/**"]
 
 /// A change of `edits` on trunk, or on nothing in an empty repository.
 async fn apply(c: &mut Clients, on_trunk: bool, edits: Vec<pb::Edit>) -> Bytes {
-    c.repo
+    c.changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            base: (on_trunk.then(|| pb::EditBase {
-                base: Some(pb::edit_base::Base::Root(trunk())),
-            }))
-            .into(),
+            parent: names::repo("app"),
+            base: on_trunk.then(common::trunk_base).into(),
             edits,
             message: "edit".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -44,10 +41,9 @@ async fn a_change_that_fails_the_plan_does_not_land() {
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -87,22 +83,24 @@ async fn a_plan_step_gets_an_org_secret_set_through_the_api() {
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let put = c
         .secrets
-        .put_secret(pb::PutSecretRequest {
-            operation_id: Bytes::new(),
-            org: String::new(),
-            name: "DEPLOY_KEY".into(),
+        .update_secret(pb::UpdateSecretRequest {
+            secret: pb::Secret {
+                name: SECRET.into(),
+                repos: vec!["app".into()],
+                ..Default::default()
+            }
+            .into(),
             value: Bytes::from_static(b"k3y-of-16-bytes!"),
-            repos: vec!["app".into()],
-            trunk_only: false,
+            allow_missing: true,
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -111,11 +109,14 @@ async fn a_plan_step_gets_an_org_secret_set_through_the_api() {
         .unwrap();
     assert_eq!(
         (put.name.as_str(), put.repos.as_slice()),
-        ("DEPLOY_KEY", ["app".to_string()].as_slice())
+        (SECRET, ["app".to_string()].as_slice())
     );
     let listed = c
         .secrets
-        .list_secrets(pb::ListSecretsRequest { org: String::new() })
+        .list_secrets(pb::ListSecretsRequest {
+            parent: names::org("default"),
+            ..Default::default()
+        })
         .await
         .unwrap()
         .into_owned()
@@ -136,18 +137,13 @@ secrets = ["DEPLOY_KEY"]
     .await;
     assert_eq!(land_with(&mut c, "app", change, &[("Owner", 1)]).await, 1);
 
-    let deleted = c
-        .secrets
+    c.secrets
         .delete_secret(pb::DeleteSecretRequest {
-            operation_id: Bytes::new(),
-            org: String::new(),
-            name: "DEPLOY_KEY".into(),
+            request_id: String::new(),
+            name: SECRET.into(),
         })
         .await
-        .unwrap()
-        .into_owned()
-        .deleted;
-    assert!(deleted);
+        .unwrap();
     let next = apply(&mut c, true, vec![set_edit("README", b"hi")]).await;
     let refused = try_land_with(&mut c, "app", next, &[]).await.unwrap_err();
     assert!(
@@ -169,10 +165,9 @@ async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -200,9 +195,8 @@ async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
     let checks = ChecksServiceClient::authed(channel, Bearer(None));
     let flaky = checks
         .list_flaky_tests(pb::ListFlakyTestsRequest {
-            repo: "app".into(),
-            min_score: None,
-            limit: 0,
+            parent: names::repo("app"),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -212,9 +206,9 @@ async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
     assert_eq!(flaky[0].target, "step:racy");
     let history = checks
         .get_test_history(pb::GetTestHistoryRequest {
-            repo: "app".into(),
+            parent: names::repo("app"),
             target: "step:racy".into(),
-            limit: 0,
+            max_results: 0,
         })
         .await
         .unwrap()
@@ -243,10 +237,9 @@ async fn a_failed_runs_steps_logs_and_artifacts_are_readable() {
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -277,11 +270,16 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
         .to_string();
 
     let checks = ChecksServiceClient::authed(connect(&server.grpc).await, Bearer(None));
-    let get = pb::GetRunRequest {
-        repo: "app".into(),
-        run: run_id.clone(),
-    };
-    let run = checks.get_run(get.clone()).await.unwrap().into_owned();
+    let run_name = format!("{}/runs/{run_id}", names::repo("app"));
+    let run = checks
+        .get_run(pb::GetRunRequest {
+            name: run_name.clone(),
+        })
+        .await
+        .unwrap()
+        .into_owned()
+        .run
+        .unwrap();
     assert_eq!(run.green, Some(false));
     let step = |name: &str| run.steps.iter().find(|s| s.name == name).unwrap().clone();
     let (build, check) = (step("build"), step("check"));
@@ -292,8 +290,7 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
     );
 
     let log = |step: u32, stream: pb::LogStream, offset: i64| pb::ReadLogRequest {
-        repo: "app".into(),
-        run: run_id.clone(),
+        run: run_name.clone(),
         step,
         stream: stream.into(),
         offset,
@@ -316,8 +313,7 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
     );
     let artifact = checks
         .read_artifact(pb::ReadArtifactRequest {
-            repo: "app".into(),
-            run: run_id.clone(),
+            run: run_name.clone(),
             step: build.index,
             path: "out/app".into(),
             offset: 0,
@@ -330,9 +326,8 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
 
     let listed = checks
         .list_runs(pb::ListRunsRequest {
-            repo: "app".into(),
-            version: Bytes::new(),
-            limit: 0,
+            parent: names::repo("app"),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -340,7 +335,7 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
         .runs;
     assert_eq!(listed[0].id, run_id);
     let watched: Vec<_> = checks
-        .watch_run(get)
+        .watch_run(pb::WatchRunRequest { name: run_name })
         .await
         .unwrap()
         .messages()
@@ -363,10 +358,9 @@ async fn a_step_whose_rerun_differs_is_listed_as_nonhermetic() {
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -383,7 +377,10 @@ async fn a_step_whose_rerun_differs_is_listed_as_nonhermetic() {
     let mut steps = Vec::new();
     for _ in 0..100 {
         steps = checks
-            .list_nonhermetic(pb::ListNonhermeticRequest { repo: "app".into() })
+            .list_nonhermetic_steps(pb::ListNonhermeticStepsRequest {
+                parent: names::repo("app"),
+                ..Default::default()
+            })
             .await
             .unwrap()
             .into_owned()
@@ -408,58 +405,58 @@ async fn an_owner_quarantines_a_target_and_lifts_it_again() {
     let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let checks = ChecksServiceClient::authed(connect(&server.grpc).await, Bearer(None));
-    let quarantine = |target: &str| pb::QuarantineRequest {
-        operation_id: Bytes::new(),
-        repo: "app".into(),
-        target: target.into(),
-        reason: "flips on unchanged inputs".into(),
+    let quarantine = |target: &str| pb::CreateQuarantineRequest {
+        request_id: String::new(),
+        parent: names::repo("app"),
+        quarantine: pb::Quarantine {
+            target: target.into(),
+            reason: "flips on unchanged inputs".into(),
+            ..Default::default()
+        }
+        .into(),
     };
-    let bad = checks.quarantine(quarantine("unit")).await.unwrap_err();
+    let bad = checks
+        .create_quarantine(quarantine("unit"))
+        .await
+        .unwrap_err();
     assert_eq!(bad.code, connectrpc::ErrorCode::InvalidArgument);
-    for added in [true, false] {
-        let reply = checks
-            .quarantine(quarantine("test:core::racy"))
-            .await
-            .unwrap();
-        assert_eq!(reply.into_owned().added, added);
-    }
-    let listed = checks
-        .list_quarantined(pb::ListQuarantinedRequest { repo: "app".into() })
+    let added = checks
+        .create_quarantine(quarantine("test:core::racy"))
         .await
         .unwrap()
         .into_owned()
-        .targets;
+        .quarantine
+        .unwrap();
+    let again = checks
+        .create_quarantine(quarantine("test:core::racy"))
+        .await
+        .unwrap_err();
+    assert_eq!(again.code, connectrpc::ErrorCode::AlreadyExists);
+    let listed = checks
+        .list_quarantines(pb::ListQuarantinesRequest {
+            parent: names::repo("app"),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_owned()
+        .quarantines;
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].reason, "flips on unchanged inputs");
-    let release = || pb::ReleaseQuarantineRequest {
-        operation_id: Bytes::new(),
-        repo: "app".into(),
-        target: "test:core::racy".into(),
+    let release = || pb::DeleteQuarantineRequest {
+        request_id: String::new(),
+        name: added.name.clone(),
     };
-    assert!(
-        checks
-            .release_quarantine(release())
-            .await
-            .unwrap()
-            .into_owned()
-            .released
-    );
-    assert!(
-        !checks
-            .release_quarantine(release())
-            .await
-            .unwrap()
-            .into_owned()
-            .released
-    );
+    checks.delete_quarantine(release()).await.unwrap();
+    let missing = checks.delete_quarantine(release()).await.unwrap_err();
+    assert_eq!(missing.code, connectrpc::ErrorCode::NotFound);
 }
 
 #[tokio::test]
@@ -468,22 +465,21 @@ async fn an_owner_freezes_trunk_and_its_health_says_so() {
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
-    let lander = rill_proto::rill::v1::LanderServiceClient::authed(
-        connect(&server.grpc).await,
-        Bearer(None),
-    );
+    let lander =
+        rill_proto::rill::v1::TrunkServiceClient::authed(connect(&server.grpc).await, Bearer(None));
     let health = |_: &mut Clients| {
         let lander = lander.clone();
         async move {
             lander
-                .get_trunk_health(pb::GetTrunkHealthRequest { repo: "app".into() })
+                .get_trunk_health(pb::GetTrunkHealthRequest {
+                    parent: names::repo("app"),
+                })
                 .await
                 .unwrap()
                 .into_owned()
@@ -493,15 +489,13 @@ async fn an_owner_freezes_trunk_and_its_health_says_so() {
     assert_eq!(fresh.health.unwrap().state, "green");
     assert!(fresh.open.is_empty());
 
-    let freeze = |frozen| pb::FreezeTrunkRequest {
-        operation_id: Bytes::new(),
-        repo: "app".into(),
-        frozen,
-        reason: "incident review".into(),
-    };
     let frozen = lander
         .clone()
-        .freeze_trunk(freeze(true))
+        .freeze_trunk(pb::FreezeTrunkRequest {
+            request_id: String::new(),
+            parent: names::repo("app"),
+            reason: "incident review".into(),
+        })
         .await
         .unwrap()
         .into_owned();
@@ -511,13 +505,20 @@ async fn an_owner_freezes_trunk_and_its_health_says_so() {
         (now.frozen, now.frozen_reason.as_deref()),
         (true, Some("incident review"))
     );
-    lander.clone().freeze_trunk(freeze(false)).await.unwrap();
+    lander
+        .clone()
+        .unfreeze_trunk(pb::UnfreezeTrunkRequest {
+            request_id: String::new(),
+            parent: names::repo("app"),
+        })
+        .await
+        .unwrap();
     assert!(!health(&mut c).await.health.unwrap().frozen);
     let incidents = lander
         .clone()
         .list_incidents(pb::ListIncidentsRequest {
-            repo: "app".into(),
-            limit: 0,
+            parent: names::repo("app"),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -532,24 +533,19 @@ async fn an_owner_previews_and_reverts_everything_an_author_landed() {
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let change = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            base: None.into(),
+            parent: names::repo("app"),
             edits: vec![set_edit("agent.txt", b"done by an agent\n")],
             message: "agent work".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -559,56 +555,77 @@ async fn an_owner_previews_and_reverts_everything_an_author_landed() {
         .change_id;
     land(&mut c, "app", change).await;
 
-    let lander = rill_proto::rill::v1::LanderServiceClient::authed(
-        connect(&server.grpc).await,
-        Bearer(None),
-    );
-    let select = |apply| pb::RevertSetRequest {
-        operation_id: Bytes::new(),
-        repo: "app".into(),
-        // Sessions and models come from tokens; a dev caller has none.
+    let lander =
+        rill_proto::rill::v1::TrunkServiceClient::authed(connect(&server.grpc).await, Bearer(None));
+    // Sessions and models come from tokens; a dev caller has none.
+    let by_dev = pb::RevertSelector {
         author: Some("dev".into()),
-        apply,
-        reason: "session went wrong".into(),
         ..Default::default()
     };
+    let preview = |selector: pb::RevertSelector| pb::PreviewBulkRevertRequest {
+        parent: names::repo("app"),
+        selector: selector.into(),
+    };
     let unnamed = lander
-        .revert_set(pb::RevertSetRequest {
+        .preview_bulk_revert(preview(pb::RevertSelector {
             since: Some(0),
-            ..select(false)
-        })
+            ..by_dev.clone()
+        }))
         .await;
     assert!(unnamed.is_ok(), "an author is named");
     let range_only = lander
-        .revert_set(pb::RevertSetRequest {
-            author: None,
+        .preview_bulk_revert(preview(pb::RevertSelector {
             since: Some(0),
-            ..select(false)
-        })
+            ..Default::default()
+        }))
         .await
         .unwrap_err();
     assert_eq!(range_only.code, connectrpc::ErrorCode::InvalidArgument);
 
-    let preview = lander.revert_set(select(false)).await.unwrap().into_owned();
-    assert_eq!(preview.entries.len(), 1);
+    let previewed = lander
+        .preview_bulk_revert(preview(by_dev.clone()))
+        .await
+        .unwrap()
+        .into_owned();
+    assert_eq!(previewed.entries.len(), 1);
     assert_eq!(
-        (preview.entries[0].seq, preview.entries[0].ticket.as_ref()),
-        (1, None)
+        (
+            previewed.entries[0].position,
+            previewed.entries[0].land_request.as_str()
+        ),
+        (1, "")
     );
-    let applied = lander.revert_set(select(true)).await.unwrap().into_owned();
-    let ticket = applied.entries[0].ticket.clone().unwrap();
+    let operation = lander
+        .bulk_revert(pb::BulkRevertRequest {
+            request_id: String::new(),
+            parent: names::repo("app"),
+            selector: by_dev.into(),
+            reason: "session went wrong".into(),
+        })
+        .await
+        .unwrap()
+        .into_owned()
+        .operation
+        .unwrap();
+    assert!(operation.done);
+    let applied = match operation.result {
+        Some(pb::operation::Result::BulkRevert(result)) => result,
+        other => panic!("{other:?}"),
+    };
+    let ticket = applied.entries[0].land_request.clone();
     for _ in 0..100 {
         let status = c
-            .review
-            .get_land_status(pb::GetLandStatusRequest {
-                repo: "app".into(),
-                ticket: ticket.clone(),
+            .landing
+            .get_land_request(pb::GetLandRequestRequest {
+                name: ticket.clone(),
             })
             .await
             .unwrap()
-            .into_owned();
-        if status.seq.is_some() {
-            assert_eq!(status.seq, Some(2));
+            .into_owned()
+            .land_request
+            .unwrap();
+        if status.trunk_position.is_some() {
+            assert_eq!(status.trunk_position, Some(2));
             return;
         }
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;

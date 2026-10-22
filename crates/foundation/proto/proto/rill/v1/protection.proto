@@ -1,24 +1,31 @@
-// Protection service: redacting objects (two administrators) and
-// releasing versions secret scanning quarantined.
+// Protection: redacting objects (two administrators), releasing versions
+// secret scanning quarantined, and rotating data keys.
+//
+// A redaction is `orgs/{org}/redactions/{redaction}`.
 syntax = "proto3";
 
 package rill.v1;
 
 import "rill/v1/types.proto";
 
+// Redactions, quarantined versions and data keys.
 service ProtectionService {
-  rpc RequestRedaction(RequestRedactionRequest) returns (RequestRedactionResponse);
+  // Ask for an object to be redacted; another administrator approves.
+  rpc CreateRedaction(CreateRedactionRequest) returns (CreateRedactionResponse);
   // Apply a request; the approver must be another administrator.
   rpc ApproveRedaction(ApproveRedactionRequest) returns (ApproveRedactionResponse);
+  // An organization's redactions, pending and applied.
   rpc ListRedactions(ListRedactionsRequest) returns (ListRedactionsResponse);
   // Release a version secret scanning quarantined, so it may land.
-  rpc ClearQuarantine(ClearQuarantineRequest) returns (ClearQuarantineResponse);
+  rpc ReleaseVersion(ReleaseVersionRequest) returns (ReleaseVersionResponse);
   // Add a data key to an org (it seals after the activation delay), or
   // wrap every data key again under the key service's current key.
   rpc RotateDataKeys(RotateDataKeysRequest) returns (RotateDataKeysResponse);
 }
 
-message RedactionRecord {
+message Redaction {
+  // `orgs/{org}/redactions/{redaction}`.
+  string name = 10;
   string id = 1;
   string org = 2;
   ObjectKind kind = 3;
@@ -30,44 +37,51 @@ message RedactionRecord {
   optional int64 applied_at = 9;
 }
 
-message RequestRedactionRequest {
-  bytes operation_id = 1;
-  string org = 2;
+message CreateRedactionRequest {
+  string request_id = 1;
+  // `orgs/{org}`. Required.
+  string parent = 2;
   ObjectKind kind = 3;
+  // Required.
   bytes hash = 4;
+  // Required.
   string reason = 5;
 }
-message RequestRedactionResponse {
-  RedactionRecord redaction = 1;
+message CreateRedactionResponse {
+  Redaction redaction = 1;
 }
 
 message ApproveRedactionRequest {
-  bytes operation_id = 1;
-  string org = 2;
-  string id = 3;
+  string request_id = 1;
+  // `orgs/{org}/redactions/{redaction}`. Required.
+  string name = 2;
 }
 message ApproveRedactionResponse {
-  RedactionRecord redaction = 1;
+  Redaction redaction = 1;
 }
 
 message ListRedactionsRequest {
-  string org = 1;
+  // `orgs/{org}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
 }
 message ListRedactionsResponse {
-  repeated RedactionRecord redactions = 1;
+  repeated Redaction redactions = 1;
+  string next_page_token = 2;
 }
 
-message ClearQuarantineRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes version = 3;
+message ReleaseVersionRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}/versions/{hash}`. Required.
+  string version = 2;
 }
-message ClearQuarantineResponse {}
+message ReleaseVersionResponse {}
 
 message RotateDataKeysRequest {
-  bytes operation_id = 1;
-  // The org whose key to rotate; ignored with rewrap.
-  string org = 2;
+  string request_id = 1;
+  // `orgs/{org}`, whose key to rotate; ignored with rewrap.
+  string parent = 2;
   bool rewrap = 3;
 }
 message RotateDataKeysResponse {

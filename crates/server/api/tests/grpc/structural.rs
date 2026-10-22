@@ -8,26 +8,21 @@ use rill_types::{ChangeVersion, ObjectHash};
 use super::*;
 
 async fn apply_on(c: &mut Clients, base: Option<&Bytes>, path: &str, body: &str) -> Bytes {
-    c.repo
+    c.changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+            parent: common::names::repo("app"),
             base: (base.map(|v| pb::EditBase {
-                base: Some(pb::edit_base::Base::Root(pb::RootSpec {
-                    root: Some(pb::root_spec::Root::VersionHash(v.clone())),
-                })),
+                base: Some(pb::edit_base::Base::Revision(hex::encode(v))),
             }))
             .into(),
             edits: vec![set_edit(path, body.as_bytes())],
             message: "edit".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned()
-        .version
+        .info
         .unwrap()
         .change_id
 }
@@ -41,10 +36,9 @@ async fn two_imports(
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: common::names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();

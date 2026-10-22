@@ -2,6 +2,7 @@
 //! administrators, explanations, and versions every server honours.
 
 use connectrpc::client::CallOptions;
+use rill_proto::rill::v1::ContentServiceClient;
 use rill_types::identity::OrgRole;
 use rill_types::Principal;
 
@@ -10,7 +11,6 @@ use super::fixture::*;
 
 fn tuple(path: &str, relation: &str, subject: &str) -> Option<pb::Relation> {
     Some(pb::Relation {
-        repo: "acl".into(),
         path: path.into(),
         relation: relation.into(),
         subject: subject.into(),
@@ -18,11 +18,10 @@ fn tuple(path: &str, relation: &str, subject: &str) -> Option<pb::Relation> {
 }
 
 async fn list_root(c: &mut Clients, repo: &str) -> Result<(), ConnectError> {
-    c.repo
-        .list_dir(pb::ListDirRequest {
-            repo: repo.into(),
-            root: None.into(),
-            path: String::new(),
+    c.content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: common::names::repo(repo),
+            ..Default::default()
         })
         .await
         .map(|_| ())
@@ -42,8 +41,8 @@ async fn a_repository_without_tuples_is_closed_but_to_org_admins() {
     list_root(&mut admin, "orphan").await.unwrap();
     let check = admin
         .access
-        .check(pb::CheckRequest {
-            repo: "orphan".into(),
+        .check_access(pb::CheckAccessRequest {
+            parent: common::names::repo("orphan"),
             path: String::new(),
             relation: "owner".into(),
             subject: None,
@@ -61,17 +60,18 @@ async fn check_expand_and_lookup_explain_access() {
     add_user(&acl.server, "carol", vec![], &["core"]).await;
     acl.owner
         .access
-        .add_relation(pb::AddRelationRequest {
-            operation_id: Bytes::new(),
+        .create_relation(pb::CreateRelationRequest {
+            parent: common::names::repo("acl"),
             relation: (tuple("pub", "writer", "team:core")).into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let check = acl
         .owner
         .access
-        .check(pb::CheckRequest {
-            repo: "acl".into(),
+        .check_access(pb::CheckAccessRequest {
+            parent: common::names::repo("acl"),
             path: "pub/deep".into(),
             relation: "reader".into(),
             subject: Some("user:carol".into()),
@@ -89,8 +89,8 @@ async fn check_expand_and_lookup_explain_access() {
     let expanded = acl
         .owner
         .access
-        .expand(pb::ExpandRequest {
-            repo: "acl".into(),
+        .expand_access(pb::ExpandAccessRequest {
+            parent: common::names::repo("acl"),
             path: "pub".into(),
             relation: "writer".into(),
         })
@@ -115,7 +115,7 @@ async fn check_expand_and_lookup_explain_access() {
         .owner
         .access
         .lookup_paths(pb::LookupPathsRequest {
-            repo: "acl".into(),
+            parent: common::names::repo("acl"),
             relation: "reader".into(),
             subject: Some("user:carol".into()),
         })
@@ -129,8 +129,8 @@ async fn check_expand_and_lookup_explain_access() {
     let carol = acl.as_principal(&Principal::human("carol")).await;
     let mine = carol
         .access
-        .check(pb::CheckRequest {
-            repo: "acl".into(),
+        .check_access(pb::CheckAccessRequest {
+            parent: common::names::repo("acl"),
             path: "secret".into(),
             relation: "reader".into(),
             subject: None,
@@ -141,8 +141,8 @@ async fn check_expand_and_lookup_explain_access() {
     assert!(!mine.allowed);
     let err = carol
         .access
-        .expand(pb::ExpandRequest {
-            repo: "acl".into(),
+        .expand_access(pb::ExpandAccessRequest {
+            parent: common::names::repo("acl"),
             path: String::new(),
             relation: "reader".into(),
         })
@@ -163,9 +163,10 @@ async fn unknown_subjects_and_relations_are_invalid() {
         let err = acl
             .owner
             .access
-            .add_relation(pb::AddRelationRequest {
-                operation_id: Bytes::new(),
+            .create_relation(pb::CreateRelationRequest {
+                parent: common::names::repo("acl"),
                 relation: (tuple("", relation, subject)).into(),
+                ..Default::default()
             })
             .await
             .unwrap_err();
@@ -180,9 +181,10 @@ async fn a_relation_version_from_the_future_is_refused() {
     let granted = acl
         .owner
         .access
-        .add_relation(pb::AddRelationRequest {
-            operation_id: Bytes::new(),
+        .create_relation(pb::CreateRelationRequest {
+            parent: common::names::repo("acl"),
             relation: (tuple("pub", "reader", &format!("principal:{}", bob().id))).into(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -192,16 +194,17 @@ async fn a_relation_version_from_the_future_is_refused() {
     let root = acl.at_version();
     let read = |seen: i64| {
         let root = root.clone();
-        let repo = RepoServiceClient::authed(channel.clone(), Bearer(Some(token.clone())));
-        let header = format!("{}={seen}", granted.repo_id);
+        let repo = ContentServiceClient::authed(channel.clone(), Bearer(Some(token.clone())));
+        let header = format!("{}={seen}", granted.repo_uid);
         async move {
-            let request = pb::ListDirRequest {
-                repo: "acl".into(),
-                root: root.into(),
+            let request = pb::ListDirectoryRequest {
+                repo: common::names::repo("acl"),
+                revision: root,
                 path: "pub".into(),
+                ..Default::default()
             };
             let options = CallOptions::default().with_header("x-rill-relations", header);
-            repo.list_dir_with_options(request, options)
+            repo.list_directory_with_options(request, options)
                 .await
                 .map(|_| ())
         }

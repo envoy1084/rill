@@ -1,119 +1,70 @@
-//! Repository records, refs, trunk and derived-data RPCs.
+//! Refs, releases, trunk positions and derived values.
 
-use rill_policy::{Relation, Subject};
-use rill_proto::convert::{hash_to_proto, ref_name_from_proto};
+use rill_proto::convert::hash_to_proto;
 use rill_proto::rill::v1 as pb;
-use rill_types::{ObjectHash, RefName, RefUpdate, RepoPathBuf, TrunkSeq};
+use rill_types::{ChangeVersionHash, ObjectHash, RefName, RepoPathBuf, TrunkSeq};
 
 use super::RepoSvc;
-use crate::auth::caller;
-use crate::services::common::{self, hash, open};
-use crate::services::Call;
+use crate::listing::{Filter, Kind, Page, Position};
+use crate::services::common::{self, hash, open_repo};
+use crate::services::{names, Call};
 use rill_runtime::error::{Error, Result};
+use rill_runtime::state::RepoContext;
 
-/// Longest a `WaitDerived` call blocks.
+/// Longest a `WaitDerivedValue` call blocks.
 const MAX_WAIT_MS: u64 = 60_000;
 const WAIT_POLL: std::time::Duration = std::time::Duration::from_millis(50);
+/// Trunk positions read at a time while filling a page.
+const TRUNK_SCAN: u64 = 1000;
+
+/// A ref's etag: its target, so an update fenced on it is a true
+/// compare-and-swap.
+fn etag(target: &ChangeVersionHash) -> String {
+    target.to_hex()
+}
+
+/// The wire form of `short` pointing at `target`.
+async fn ref_proto(
+    ctx: &RepoContext,
+    short: &RefName,
+    target: ChangeVersionHash,
+) -> Result<pb::Ref> {
+    let trunk_position = if short.is_trunk() {
+        ctx.repo.trunk_seq_of(&target).await?.map(TrunkSeq::get)
+    } else {
+        None
+    };
+    Ok(pb::Ref {
+        name: names::ref_name(ctx, short.as_str()),
+        target: hash_to_proto(&target),
+        trunk_position,
+        etag: etag(&target),
+    })
+}
+
+/// The short ref name a ref resource name holds.
+fn short_name(name: &str) -> Result<RefName> {
+    let short = names::parse(&rill_proto::names::REF, name)?[2];
+    RefName::new(short).map_err(|e| Error::InvalidName(format!("{short:?}: {e}")))
+}
 
 impl RepoSvc {
-    pub(super) async fn get_repo_impl(
+    pub(super) async fn get_ref_impl(
         &self,
-        request: Call<pb::GetRepoRequest>,
-    ) -> Result<pb::GetRepoResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::GetRefRequest>,
+    ) -> Result<pb::GetRefResponse> {
+        let name = &request.get_ref().name;
+        let short = short_name(name)?;
+        let opened = open_repo(&self.state, &request, name).await?;
         opened.permit().read_any().await?;
-        Ok(pb::GetRepoResponse {
-            repo: common::repo_proto(&opened.repo).await?.into(),
-        })
-    }
-
-    pub(super) async fn list_repos_impl(
-        &self,
-        request: Call<pb::ListReposRequest>,
-    ) -> Result<pb::ListReposResponse> {
-        let ctx = caller(&request)?;
-        let limit = common::limit(request.get_ref().limit, 100, 10_000);
-        let mut repos = Vec::new();
-        for config in self.state.repos.list().await? {
-            let repo = self.state.repos.get(config.id).await?;
-            let opened = common::opened(&self.state, ctx.clone(), repo);
-            if opened.permit().read_any().await.is_ok() {
-                repos.push(common::repo_proto(&opened.repo).await?);
-            }
-            if repos.len() >= limit {
-                break;
-            }
-        }
-        Ok(pb::ListReposResponse {
-            repos,
-            next_page_token: None,
-        })
-    }
-
-    /// Any authenticated principal may create a repository and becomes
-    /// its owner, which also takes the repository out of the open
-    /// bootstrap state (see `auth::permit`).
-    pub(super) async fn create_repo_impl(
-        &self,
-        request: Call<pb::CreateRepoRequest>,
-    ) -> Result<pb::CreateRepoResponse> {
-        let ctx = caller(&request)?;
-        let req = request.get_ref();
-        if req.repo.parse::<rill_types::RepoId>().is_ok() {
-            return Err(Error::invalid("repo must be a name, not an id"));
-        }
-        let repo = self
-            .state
-            .repos
-            .create(
-                &req.repo,
-                req.description.as_deref().unwrap_or(""),
-                rill_store::RepoSettings {
-                    windows_safe: req.windows_safe,
-                },
-                &ctx.principal,
-            )
-            .await?;
-        repo.authorizer
-            .grant(
-                rill_policy::rebac::REPO_OBJECT,
-                Relation::Owner,
-                &Subject::principal(&ctx.principal),
-                &ctx.principal,
-            )
-            .await?;
-        tracing::info!(repo = %req.repo, owner = %ctx.principal, "repository created");
-        Ok(pb::CreateRepoResponse {
-            repo: common::repo_proto(&repo).await?.into(),
-        })
-    }
-
-    pub(super) async fn resolve_ref_impl(
-        &self,
-        request: Call<pb::ResolveRefRequest>,
-    ) -> Result<pb::ResolveRefResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read_any().await?;
-        let name = ref_name_from_proto("name", &request.get_ref().name)?;
-        let hash = opened
+        let target = opened
             .repo
             .repo
-            .get_ref(&name)
+            .get_ref(&short)
             .await?
-            .ok_or_else(|| Error::not_found(format!("ref {name:?}")))?;
-        let trunk_seq = if name.is_trunk() {
-            opened
-                .repo
-                .repo
-                .trunk_seq_of(&hash)
-                .await?
-                .map(TrunkSeq::get)
-        } else {
-            None
-        };
-        Ok(pb::ResolveRefResponse {
-            hash: hash_to_proto(&hash),
-            trunk_seq,
+            .ok_or_else(|| Error::not_found(format!("ref {short}")))?;
+        Ok(pb::GetRefResponse {
+            r#ref: ref_proto(&opened.repo, &short, target).await?.into(),
         })
     }
 
@@ -121,180 +72,224 @@ impl RepoSvc {
         &self,
         request: Call<pb::ListRefsRequest>,
     ) -> Result<pb::ListRefsResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        let req = request.get_ref();
+        let opened = open_repo(&self.state, &request, &req.parent).await?;
         opened.permit().read_any().await?;
-        let prefix = request.get_ref().prefix.clone().unwrap_or_default();
-        let mut refs = Vec::new();
-        for (name, target) in opened.repo.repo.list_refs().await? {
-            if !name.as_str().starts_with(&prefix) {
-                continue;
-            }
-            let trunk_seq = if name.is_trunk() {
-                opened
-                    .repo
-                    .repo
-                    .trunk_seq_of(&target)
-                    .await?
-                    .map(TrunkSeq::get)
-            } else {
-                None
-            };
-            refs.push(pb::Ref {
-                name: name.to_string(),
-                target: hash_to_proto(&target),
-                trunk_seq,
-            });
+        let filter = Filter::parse(&req.filter, &[("name", Kind::Str)])?;
+        let page = Page::new(req.page_size, &req.page_token, &[&req.parent, &req.filter])?;
+        let mut refs: Vec<_> = opened
+            .repo
+            .repo
+            .list_refs()
+            .await?
+            .into_iter()
+            .filter(|(name, _)| filter.matches(&NamedRef(name.as_str())))
+            .collect();
+        refs.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+        let (refs, next_page_token) = page.of(refs)?;
+        let mut out = Vec::with_capacity(refs.len());
+        for (name, target) in refs {
+            out.push(ref_proto(&opened.repo, &name, target).await?);
         }
-        Ok(pb::ListRefsResponse { refs })
+        Ok(pb::ListRefsResponse {
+            refs: out,
+            next_page_token,
+        })
     }
 
-    /// Cut `release/<name>` at a trunk position: repository owners only.
-    pub(super) async fn cut_release_impl(
+    /// Compare-and-swap a ref on its etag. Trunk and releases are owned by
+    /// their landers: they only move through landings.
+    pub(super) async fn update_ref_impl(
         &self,
-        request: Call<pb::CutReleaseRequest>,
-    ) -> Result<pb::CutReleaseResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::UpdateRefRequest>,
+    ) -> Result<pb::UpdateRefResponse> {
+        let req = request.get_ref();
+        let wire = req
+            .r#ref
+            .as_option()
+            .ok_or(rill_proto::ConvertError::missing("ref"))?;
+        let short = short_name(&wire.name)?;
+        let opened = open_repo(&self.state, &request, &wire.name).await?;
+        opened.permit().write(&RepoPathBuf::root()).await?;
+        refuse_lander_refs(&short)?;
+        let target = hash("ref.target", &wire.target)?;
+        if !opened.repo.repo.has_change_version(&target).await? {
+            return Err(Error::MissingObjects(format!(
+                "version {target} does not exist"
+            )));
+        }
+        let expected = match (req.etag.as_str(), req.allow_missing) {
+            ("", true) => None,
+            ("", false) => {
+                return Err(Error::invalid(
+                    "etag is required to update a ref; set allow_missing to create one",
+                ))
+            }
+            (etag, _) => Some(parse_etag(etag)?),
+        };
+        opened
+            .repo
+            .repo
+            .update_ref(&short, expected, Some(target), opened.principal())
+            .await
+            .map_err(|e| moved(e, &short))?;
+        Ok(pb::UpdateRefResponse {
+            r#ref: ref_proto(&opened.repo, &short, target).await?.into(),
+        })
+    }
+
+    pub(super) async fn delete_ref_impl(
+        &self,
+        request: Call<pb::DeleteRefRequest>,
+    ) -> Result<pb::DeleteRefResponse> {
+        let req = request.get_ref();
+        let short = short_name(&req.name)?;
+        let opened = open_repo(&self.state, &request, &req.name).await?;
+        opened.permit().write(&RepoPathBuf::root()).await?;
+        refuse_lander_refs(&short)?;
+        if req.etag.is_empty() {
+            return Err(Error::invalid("etag is required to delete a ref"));
+        }
+        opened
+            .repo
+            .repo
+            .update_ref(
+                &short,
+                Some(parse_etag(&req.etag)?),
+                None,
+                opened.principal(),
+            )
+            .await
+            .map_err(|e| moved(e, &short))?;
+        Ok(pb::DeleteRefResponse {})
+    }
+
+    /// Cut `release/{release_id}` at a trunk position: owners only.
+    pub(super) async fn create_release_impl(
+        &self,
+        request: Call<pb::CreateReleaseRequest>,
+    ) -> Result<pb::CreateReleaseResponse> {
+        let req = request.get_ref();
+        let opened = open_repo(&self.state, &request, &req.parent).await?;
         opened.permit().admin().await?;
-        let name = request.get_ref().name.clone();
-        let ref_name = RefName::release(&name)
-            .map_err(|e| Error::invalid(format!("release name {name:?}: {e}")))?;
+        let release = &req.release_id;
+        let ref_name = RefName::release(release)
+            .map_err(|e| Error::invalid(format!("release name {release:?}: {e}")))?;
         let repo = &opened.repo.repo;
-        let (seq, hash) = match request.get_ref().at {
+        let (_, hash) = match req.trunk_position {
             Some(at) => {
-                let seq = TrunkSeq(at);
                 let hash = repo
-                    .trunk_at(seq)
+                    .trunk_at(TrunkSeq(at))
                     .await?
                     .ok_or_else(|| Error::not_found(format!("trunk@{at}")))?;
-                (seq, hash)
+                (TrunkSeq(at), hash)
             }
             None => repo
                 .trunk_head()
                 .await?
                 .ok_or_else(|| Error::precondition("trunk is empty; nothing to cut"))?,
         };
-        repo.cut_release(&name, hash, opened.principal())
+        repo.cut_release(release, hash, opened.principal())
             .await
             .map_err(|e| match e.is_conflict() {
-                true => Error::FailedPrecondition(format!("{ref_name} already exists")),
+                true => Error::AlreadyExists(format!("{ref_name} already exists")),
                 false => e.into(),
             })?;
-        Ok(pb::CutReleaseResponse {
-            r#ref: ref_name.to_string(),
-            hash: hash_to_proto(&hash),
-            trunk_seq: seq.get(),
+        Ok(pb::CreateReleaseResponse {
+            r#ref: ref_proto(&opened.repo, &ref_name, hash).await?.into(),
         })
     }
 
-    /// Compare-and-swap a ref. Trunk and releases are owned by their
-    /// landers: they only move through landings, so requests to move them
-    /// are refused.
-    pub(super) async fn move_ref_impl(
+    pub(super) async fn get_trunk_position_impl(
         &self,
-        request: Call<pb::MoveRefRequest>,
-    ) -> Result<pb::MoveRefResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().write(&RepoPathBuf::root()).await?;
-        let update = RefUpdate::try_from(
-            request
-                .get_ref()
-                .update
-                .clone()
-                .ok_or_else(|| Error::invalid("update is required"))?,
-        )?;
-        if update.name.is_trunk() {
-            return Err(Error::denied(
-                "trunk only moves through landings; use RequestLand",
-            ));
-        }
-        if update.name.is_release() {
-            return Err(Error::denied(
-                "a release only moves through its lander; cut it with CutRelease \
-                 and land on it with RequestLand onto it",
-            ));
-        }
-        if let Some(target) = &update.target {
-            if !opened.repo.repo.has_change_version(target).await? {
-                return Err(Error::precondition(format!(
-                    "target {target} does not exist"
-                )));
+        request: Call<pb::GetTrunkPositionRequest>,
+    ) -> Result<pb::GetTrunkPositionResponse> {
+        let name = &request.get_ref().name;
+        let position = names::parse(&rill_proto::names::TRUNK_POSITION, name)?[2].to_string();
+        let opened = open_repo(&self.state, &request, name).await?;
+        opened.permit().read_any().await?;
+        let repo = &opened.repo.repo;
+        let (seq, hash) = match position.as_str() {
+            "head" => repo
+                .trunk_head()
+                .await?
+                .ok_or_else(|| Error::not_found("trunk has no head yet"))?,
+            n => {
+                let seq = TrunkSeq(n.parse().map_err(|_| {
+                    Error::InvalidName(format!("{n:?} is not a trunk position or head"))
+                })?);
+                let hash = repo
+                    .trunk_at(seq)
+                    .await?
+                    .ok_or_else(|| Error::not_found(format!("trunk@{}", seq.get())))?;
+                (seq, hash)
+            }
+        };
+        Ok(pb::GetTrunkPositionResponse {
+            landing: common::landing(&opened.repo, seq, hash).await?.into(),
+        })
+    }
+
+    /// Trunk positions oldest first, read by key so a page costs its size.
+    pub(super) async fn list_trunk_positions_impl(
+        &self,
+        request: Call<pb::ListTrunkPositionsRequest>,
+    ) -> Result<pb::ListTrunkPositionsResponse> {
+        let req = request.get_ref();
+        let opened = open_repo(&self.state, &request, &req.parent).await?;
+        opened.permit().read_any().await?;
+        let filter = Filter::parse(&req.filter, &[("position", Kind::Int)])?;
+        let page = Page::new(req.page_size, &req.page_token, &[&req.parent, &req.filter])?;
+        let mut after = match &page.start {
+            Position::Start => 0,
+            Position::After(key) => u64::from_be_bytes(
+                key.as_slice()
+                    .try_into()
+                    .map_err(|_| Error::InvalidPageToken("not a token for this list".into()))?,
+            ),
+            Position::Offset(_) => {
+                return Err(Error::InvalidPageToken("not a token for this list".into()))
+            }
+        };
+        let repo = &opened.repo.repo;
+        let head = repo.trunk_head().await?.map(|(s, _)| s.get()).unwrap_or(0);
+        let mut landings = Vec::new();
+        while landings.len() < page.size && after < head {
+            let to = (after + TRUNK_SCAN).min(head);
+            for (seq, hash) in repo.trunk_range(TrunkSeq(after), TrunkSeq(to)).await? {
+                after = seq.get();
+                if filter.matches(&TrunkRecord(seq.get())) {
+                    landings.push(common::landing(&opened.repo, seq, hash).await?);
+                    if landings.len() == page.size {
+                        break;
+                    }
+                }
+            }
+            if after < to && landings.len() < page.size {
+                after = to;
             }
         }
-        opened
-            .repo
-            .repo
-            .update_ref(
-                &update.name,
-                update.expected,
-                update.target,
-                opened.principal(),
-            )
-            .await
-            .map_err(|e| {
-                if e.is_conflict() {
-                    Error::FailedPrecondition(format!(
-                        "ref {:?} is not at the expected target",
-                        update.name
-                    ))
-                } else {
-                    e.into()
-                }
-            })?;
-        Ok(pb::MoveRefResponse {
-            hash: update.target.map(|h| hash_to_proto(&h)),
+        let next_page_token = if after < head && landings.len() == page.size {
+            page.token(Position::After(after.to_be_bytes().to_vec()))
+        } else {
+            String::new()
+        };
+        Ok(pb::ListTrunkPositionsResponse {
+            landings,
+            next_page_token,
         })
     }
 
-    pub(super) async fn trunk_head_impl(
+    pub(super) async fn get_derived_value_impl(
         &self,
-        request: Call<pb::TrunkHeadRequest>,
-    ) -> Result<pb::TrunkHeadResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read_any().await?;
-        let head = opened
-            .repo
-            .repo
-            .trunk_head()
-            .await?
-            .ok_or_else(|| Error::not_found("trunk has no head yet"))?;
-        Ok(pb::TrunkHeadResponse {
-            seq: head.0.get(),
-            hash: hash_to_proto(&head.1),
-        })
-    }
-
-    pub(super) async fn trunk_range_impl(
-        &self,
-        request: Call<pb::TrunkRangeRequest>,
-    ) -> Result<pb::TrunkRangeResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().read_any().await?;
-        let req = request.get_ref();
-        if req.to < req.from {
-            return Err(Error::invalid("to must not be less than from"));
-        }
-        let mut landings = Vec::new();
-        for (seq, hash) in opened
-            .repo
-            .repo
-            .trunk_range(TrunkSeq(req.from.saturating_sub(1)), TrunkSeq(req.to))
-            .await?
-        {
-            landings.push(common::land_event(&opened.repo, seq, hash).await?);
-        }
-        Ok(pb::TrunkRangeResponse { landings })
-    }
-
-    pub(super) async fn get_derived_impl(
-        &self,
-        request: Call<pb::GetDerivedRequest>,
-    ) -> Result<pb::GetDerivedResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::GetDerivedValueRequest>,
+    ) -> Result<pb::GetDerivedValueResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
         let req = request.get_ref();
         let hash = hash("hash", &req.hash)?;
-        match derived(&opened.repo, &req.kind, &hash, true).await? {
-            Some(data) => Ok(pb::GetDerivedResponse { data }),
+        match derived(&opened.repo, &req.kind, &hash).await? {
+            Some(data) => Ok(pb::GetDerivedValueResponse { data }),
             None => Err(Error::not_found(format!(
                 "derived {:?} for {hash}",
                 req.kind
@@ -302,25 +297,25 @@ impl RepoSvc {
         }
     }
 
-    pub(super) async fn wait_derived_impl(
+    pub(super) async fn wait_derived_value_impl(
         &self,
-        request: Call<pb::WaitDerivedRequest>,
-    ) -> Result<pb::WaitDerivedResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::WaitDerivedValueRequest>,
+    ) -> Result<pb::WaitDerivedValueResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
         let req = request.get_ref();
         let hash = hash("hash", &req.hash)?;
         let deadline = tokio::time::Instant::now()
             + std::time::Duration::from_millis(req.timeout_ms.min(MAX_WAIT_MS));
         loop {
-            if let Some(data) = derived(&opened.repo, &req.kind, &hash, true).await? {
-                return Ok(pb::WaitDerivedResponse {
+            if let Some(data) = derived(&opened.repo, &req.kind, &hash).await? {
+                return Ok(pb::WaitDerivedValueResponse {
                     ready: true,
                     data: Some(data),
                 });
             }
             if tokio::time::Instant::now() >= deadline {
-                return Ok(pb::WaitDerivedResponse {
+                return Ok(pb::WaitDerivedValueResponse {
                     ready: false,
                     data: None,
                 });
@@ -330,15 +325,56 @@ impl RepoSvc {
     }
 }
 
-/// Fetch a derived record's raw bytes. Known framework kinds are computed
-/// on demand when `compute` is set; other kinds are read as stored.
-async fn derived(
-    ctx: &rill_runtime::state::RepoContext,
-    kind: &str,
-    hash: &ObjectHash,
-    compute: bool,
-) -> Result<Option<bytes::Bytes>> {
-    if compute && ctx.repo.has_change_version(hash).await? {
+/// Trunk and releases move only through their landers.
+fn refuse_lander_refs(name: &RefName) -> Result<()> {
+    if name.is_trunk() {
+        return Err(Error::denied(
+            "trunk only moves through landings; use LandingService.RequestLand",
+        ));
+    }
+    if name.is_release() {
+        return Err(Error::denied(
+            "a release only moves through its lander: cut it with CreateRelease \
+             and land on it with RequestLand onto it",
+        ));
+    }
+    Ok(())
+}
+
+fn parse_etag(etag: &str) -> Result<ChangeVersionHash> {
+    etag.parse()
+        .map_err(|_| Error::EtagMismatch(format!("{etag:?} is not this ref's etag")))
+}
+
+/// A lost compare-and-swap is a stale etag.
+fn moved(e: rill_store::Error, name: &RefName) -> Error {
+    if e.is_conflict() {
+        Error::EtagMismatch(format!("ref {name} has moved; read it again"))
+    } else {
+        e.into()
+    }
+}
+
+struct NamedRef<'a>(&'a str);
+
+impl crate::listing::Record for NamedRef<'_> {
+    fn field(&self, _: &str) -> crate::listing::FieldValue {
+        crate::listing::FieldValue::Str(self.0.to_string())
+    }
+}
+
+struct TrunkRecord(u64);
+
+impl crate::listing::Record for TrunkRecord {
+    fn field(&self, _: &str) -> crate::listing::FieldValue {
+        crate::listing::FieldValue::Int(self.0 as i64)
+    }
+}
+
+/// A derived record's raw bytes, computed on demand for the kinds the
+/// framework knows.
+async fn derived(ctx: &RepoContext, kind: &str, hash: &ObjectHash) -> Result<Option<bytes::Bytes>> {
+    if ctx.repo.has_change_version(hash).await? {
         ctx.derive.compute_kind(kind, hash).await?;
     }
     Ok(ctx.repo.get_derived(kind, hash).await?)

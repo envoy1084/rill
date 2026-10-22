@@ -10,27 +10,20 @@ fn path(p: &str) -> RepoPathBuf {
     RepoPathBuf::new(p).unwrap()
 }
 
-async fn edit(
-    c: &mut Clients,
-    base: Option<pb::RootSpec>,
-    edits: Vec<pb::Edit>,
-) -> Result<Bytes, Code> {
-    c.repo
+async fn edit(c: &mut Clients, base: Option<String>, edits: Vec<pb::Edit>) -> Result<Bytes, Code> {
+    c.changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
-            base: (base.map(|root| pb::EditBase {
-                base: Some(pb::edit_base::Base::Root(root)),
+            parent: common::names::repo("acl"),
+            base: (base.map(|revision| pb::EditBase {
+                base: Some(pb::edit_base::Base::Revision(revision)),
             }))
             .into(),
             edits,
             message: "edit".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
-        .map(|r| r.into_owned().hash)
+        .map(|r| r.into_owned().info.unwrap().hash)
         .map_err(|s| s.code)
 }
 
@@ -84,15 +77,13 @@ async fn a_merge_is_charged_only_for_what_it_writes() {
     .await
     .unwrap();
     // Merging brings alice's change in without bob writing it.
-    c.repo
-        .merge(pb::MergeRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
-            left: mine.clone(),
-            right: theirs.clone(),
+    c.changes
+        .merge_versions(pb::MergeVersionsRequest {
+            parent: common::names::repo("acl"),
+            left: ObjectHash::from_slice(&mine).unwrap().to_hex(),
+            right: ObjectHash::from_slice(&theirs).unwrap().to_hex(),
             message: "merge".into(),
-            provenance: None.into(),
-            intent: None,
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -123,12 +114,11 @@ async fn a_merge_is_charged_only_for_what_it_writes() {
         ),
     );
     let err = c
-        .repo
-        .create_change_version(pb::CreateChangeVersionRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
+        .changes
+        .create_version(pb::CreateVersionRequest {
+            parent: common::names::repo("acl"),
             version: pb::ChangeVersion::from(forged).into(),
-            signatures: Vec::new(),
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -137,15 +127,17 @@ async fn a_merge_is_charged_only_for_what_it_writes() {
 }
 
 async fn change_of(c: &mut Clients, version: &Bytes) -> Bytes {
-    c.repo
-        .get_change_version(pb::GetChangeVersionRequest {
-            repo: "acl".into(),
-            hash: version.clone(),
+    c.changes
+        .get_version(pb::GetVersionRequest {
+            name: common::names::version("acl", version),
+            view: pb::VersionView::Basic.into(),
         })
         .await
         .unwrap()
         .into_owned()
         .version
+        .unwrap()
+        .info
         .unwrap()
         .change_id
 }
@@ -153,13 +145,10 @@ async fn change_of(c: &mut Clients, version: &Bytes) -> Bytes {
 async fn vote(c: &mut Clients, change: &Bytes, label: &str, value: i32) -> Result<(), Code> {
     c.review
         .vote(pb::VoteRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
-            change_id: change.clone(),
+            review: common::names::review("acl", change),
             label: label.into(),
             value,
-            reason: None,
-            version: None,
+            ..Default::default()
         })
         .await
         .map(|_| ())
@@ -181,10 +170,9 @@ async fn a_revoke_between_commit_and_land_keeps_the_change_off_trunk() {
     let change = change_of(&mut c, &version).await;
     acl.owner
         .review
-        .submit_for_review(pb::SubmitForReviewRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
-            change_id: change.clone(),
+        .submit_change(pb::SubmitChangeRequest {
+            request_id: String::new(),
+            change: common::names::change("acl", &change),
         })
         .await
         .unwrap();
@@ -194,49 +182,45 @@ async fn a_revoke_between_commit_and_land_keeps_the_change_off_trunk() {
     // Bob loses write on pub/ after committing.
     acl.owner
         .access
-        .remove_relation(pb::RemoveRelationRequest {
-            operation_id: Bytes::new(),
+        .delete_relation(pb::DeleteRelationRequest {
+            parent: common::names::repo("acl"),
             relation: (pb::Relation {
-                repo: "acl".into(),
                 path: "pub".into(),
                 relation: "writer".into(),
                 subject: format!("principal:{}", bob().id),
             })
             .into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let ticket = acl
         .owner
-        .review
+        .landing
         .request_land(pb::RequestLandRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
-            change_id: change.clone(),
-            onto: None,
+            request_id: String::new(),
+            change: common::names::change("acl", &change),
+            onto: String::new(),
         })
         .await
         .unwrap()
         .into_owned()
-        .ticket
+        .land_request
         .unwrap();
     let mut error = None;
     for _ in 0..100 {
         let status = acl
             .owner
-            .review
-            .get_land_status(pb::GetLandStatusRequest {
-                repo: "acl".into(),
-                ticket: ticket.id.clone(),
+            .landing
+            .get_land_request(pb::GetLandRequestRequest {
+                name: ticket.name.clone(),
             })
             .await
             .unwrap()
-            .into_owned();
-        match rill_proto::convert::known::<pb::LandStatus>(
-            status.ticket.as_option().unwrap().status,
-        )
-        .unwrap()
-        {
+            .into_owned()
+            .land_request
+            .unwrap();
+        match rill_proto::convert::known::<pb::LandStatus>(status.status).unwrap() {
             pb::LandStatus::Landed => panic!("a revoked author's change landed"),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 error = status.error;
@@ -280,10 +264,9 @@ async fn owner_approvals_come_from_the_owners_file_or_the_owner_relation() {
         .unwrap();
     let change = change_of(&mut c, &version).await;
     c.review
-        .submit_for_review(pb::SubmitForReviewRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
-            change_id: change.clone(),
+        .submit_change(pb::SubmitChangeRequest {
+            request_id: String::new(),
+            change: common::names::change("acl", &change),
         })
         .await
         .unwrap();

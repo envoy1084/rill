@@ -80,7 +80,7 @@ fn hash(text: &str) -> Result<ObjectHash> {
     ObjectHash::from_hex(text).map_err(|_| CliError::usage(format!("invalid hash {text:?}")))
 }
 
-fn record_json(r: &pb::RedactionRecord) -> serde_json::Value {
+fn record_json(r: &pb::Redaction) -> serde_json::Value {
     j!({
         "id": r.id,
         "org": r.org,
@@ -92,7 +92,7 @@ fn record_json(r: &pb::RedactionRecord) -> serde_json::Value {
     })
 }
 
-fn show(ctx: &mut Ctx<'_>, record: Option<pb::RedactionRecord>) -> Result<()> {
+fn show(ctx: &mut Ctx<'_>, record: Option<pb::Redaction>) -> Result<()> {
     let record = record.ok_or_else(|| CliError::conflict("the server returned no record"))?;
     ctx.emit(record_json(&record), |out| {
         let state = if record.applied_at.is_some() {
@@ -118,9 +118,9 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
                 .parse()
                 .map_err(|_| CliError::usage(format!("unknown object kind {:?}", a.kind)))?;
             let response = svc
-                .request_redaction(pb::RequestRedactionRequest {
-                    operation_id: Default::default(),
-                    org: a.org.org,
+                .create_redaction(pb::CreateRedactionRequest {
+                    request_id: String::new(),
+                    parent: rill_sdk::names::org(&a.org.org),
                     kind: (kind as i32).into(),
                     hash: hash(&a.hash)?.as_bytes().to_vec().into(),
                     reason: a.reason,
@@ -132,9 +132,8 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
         ProtectCmd::Approve(a) => {
             let response = svc
                 .approve_redaction(pb::ApproveRedactionRequest {
-                    operation_id: Default::default(),
-                    org: a.org.org,
-                    id: a.id,
+                    request_id: String::new(),
+                    name: format!("{}/redactions/{}", rill_sdk::names::org(&a.org.org), a.id),
                 })
                 .await?
                 .into_owned();
@@ -142,7 +141,11 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
         }
         ProtectCmd::Redactions(o) => {
             let list = svc
-                .list_redactions(pb::ListRedactionsRequest { org: o.org })
+                .list_redactions(pb::ListRedactionsRequest {
+                    parent: rill_sdk::names::org(&o.org),
+                    page_size: 1000,
+                    page_token: String::new(),
+                })
                 .await?
                 .into_owned()
                 .redactions;
@@ -171,10 +174,9 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
         }
         ProtectCmd::Release(a) => {
             let version = hash(&a.held)?;
-            svc.clear_quarantine(pb::ClearQuarantineRequest {
-                operation_id: Default::default(),
-                repo: a.repo,
-                version: version.as_bytes().to_vec().into(),
+            svc.release_version(pb::ReleaseVersionRequest {
+                request_id: String::new(),
+                version: rill_sdk::names::version(&rill_sdk::names::repo(&a.repo), &version),
             })
             .await?;
             ctx.emit(j!({ "released": version.to_hex() }), |out| {
@@ -184,8 +186,8 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
         ProtectCmd::RotateKey(a) => {
             let response = svc
                 .rotate_data_keys(pb::RotateDataKeysRequest {
-                    operation_id: Default::default(),
-                    org: a.org.org,
+                    request_id: String::new(),
+                    parent: rill_sdk::names::org(&a.org.org),
                     rewrap: a.rewrap,
                 })
                 .await?

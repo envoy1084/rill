@@ -1,8 +1,7 @@
-//! `rill.v1.ReviewService`: a thin mapping onto `rill_review::ReviewService`
-//! plus the hand-off to the lander.
+//! `rill.v1.ReviewService`: a thin mapping onto `rill_review::ReviewService`,
+//! with resource names and pages.
 
 mod feedback;
-mod land;
 mod owners;
 mod reviews;
 mod service;

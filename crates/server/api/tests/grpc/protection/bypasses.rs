@@ -38,12 +38,11 @@ fn copies(source: &Bytes, from_path: &str, to: &[String]) -> pb::ChangeVersion {
 }
 
 async fn create(c: &mut Clients, version: pb::ChangeVersion) -> Result<(), ConnectError> {
-    c.repo
-        .create_change_version(pb::CreateChangeVersionRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+    c.changes
+        .create_version(pb::CreateVersionRequest {
+            parent: common::names::repo("app"),
             version: version.into(),
-            signatures: Vec::new(),
+            ..Default::default()
         })
         .await
         .map(|_| ())
@@ -78,7 +77,12 @@ async fn a_subtree_copy_is_scanned_at_its_destination() {
     repo(&mut c, "app").await;
     land_rules(&mut c, "app", RULES).await;
     let (fixture, _) = blob(&server, "tests/fixtures/k.txt", &secret_file()).await;
-    let source = apply(&mut c, "app", vec![fixture]).await.unwrap().hash;
+    let source = apply(&mut c, "app", vec![fixture])
+        .await
+        .unwrap()
+        .info
+        .unwrap()
+        .hash;
 
     let mut cv = ChangeVersion {
         change_id: rill_types::ChangeId::new(),
@@ -101,12 +105,11 @@ async fn a_subtree_copy_is_scanned_at_its_destination() {
         },
     );
     let refused = c
-        .repo
-        .create_change_version(pb::CreateChangeVersionRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+        .changes
+        .create_version(pb::CreateVersionRequest {
+            parent: common::names::repo("app"),
             version: pb::ChangeVersion::from(cv).into(),
-            signatures: Vec::new(),
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -145,6 +148,8 @@ async fn a_child_of_a_quarantined_version_cannot_reach_trunk() {
     )
     .await
     .unwrap()
+    .info
+    .unwrap()
     .hash;
     let child = apply_on(
         &mut c,
@@ -154,6 +159,8 @@ async fn a_child_of_a_quarantined_version_cannot_reach_trunk() {
         "clean",
     )
     .await
+    .unwrap()
+    .info
     .unwrap()
     .hash;
     let ctx = server.state.repos.resolve("app").await.unwrap();
@@ -165,11 +172,11 @@ async fn a_child_of_a_quarantined_version_cannot_reach_trunk() {
         .map(|(_, h)| Bytes::copy_from_slice(h.as_bytes()));
     let appended = c
         .admin
-        .append_trunk(pb::AppendTrunkRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+        .import_trunk_position(pb::ImportTrunkPositionRequest {
+            parent: common::names::repo("app"),
             expected: head,
             version: child,
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -184,18 +191,23 @@ async fn a_copy_from_an_unreadable_path_is_refused_before_it_is_scanned() {
     repo(&mut root, "app").await;
     land_rules(&mut root, "app", "allow_paths = [\"infra/**\"]\n").await;
     let (infra, _) = blob(&server, "infra/deploy.env", &secret_file()).await;
-    let source = apply(&mut root, "app", vec![infra]).await.unwrap().hash;
+    let source = apply(&mut root, "app", vec![infra])
+        .await
+        .unwrap()
+        .info
+        .unwrap()
+        .hash;
     let bob = Principal::human("bob");
     root.access
-        .add_relation(pb::AddRelationRequest {
-            operation_id: Bytes::new(),
+        .create_relation(pb::CreateRelationRequest {
+            parent: common::names::repo("app"),
             relation: (pb::Relation {
-                repo: "app".into(),
                 path: "scratch".into(),
                 relation: "writer".into(),
                 subject: format!("principal:{}", bob.id),
             })
             .into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -223,7 +235,12 @@ async fn copied_files_count_toward_the_file_limit() {
     let files: Vec<pb::Edit> = (0..1000)
         .map(|i| set_edit(&format!("lib/f{i}.txt"), format!("{i}\n").as_bytes()))
         .collect();
-    let source = apply(&mut c, "app", files).await.unwrap().hash;
+    let source = apply(&mut c, "app", files)
+        .await
+        .unwrap()
+        .info
+        .unwrap()
+        .hash;
     let to: Vec<String> = (0..=rill_types::limits::MAX_FILES_PER_CHANGE / 1000)
         .map(|i| format!("copy{i}"))
         .collect();
@@ -246,6 +263,8 @@ async fn a_credential_in_extension_fields_is_refused() {
     repo(&mut c, "app").await;
     let source = apply(&mut c, "app", vec![set_edit("README", b"hi\n")])
         .await
+        .unwrap()
+        .info
         .unwrap()
         .hash;
     let mut cv = copies(&source, "", &[]);

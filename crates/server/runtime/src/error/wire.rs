@@ -95,6 +95,35 @@ impl From<Error> for ConnectError {
     }
 }
 
+/// An error as a `google.rpc.Status` with the details it would be returned
+/// with, for failures stored rather than returned (a long-running
+/// operation's).
+pub fn status_proto(err: Error) -> rpc::Status {
+    use base64::Engine;
+    let err = ConnectError::from(err);
+    let lenient = base64::engine::GeneralPurpose::new(
+        &base64::alphabet::STANDARD,
+        base64::engine::GeneralPurposeConfig::new()
+            .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
+    );
+    rpc::Status {
+        code: err.code.grpc_code() as i32,
+        message: err.message.clone().unwrap_or_default(),
+        details: err
+            .details
+            .iter()
+            .filter_map(|d| {
+                let value = lenient.decode(d.value.as_deref()?).ok()?;
+                Some(buffa_types::google::protobuf::Any {
+                    type_url: format!("type.googleapis.com/{}", d.type_url),
+                    value: value.into(),
+                    ..Default::default()
+                })
+            })
+            .collect(),
+    }
+}
+
 /// A detail carrying `message`, with its JSON form as `debug` for people
 /// reading the error with `curl`.
 fn detail<M: buffa::Message + serde::Serialize>(type_name: &str, message: &M) -> ErrorDetail {

@@ -1,11 +1,24 @@
-// Identity service: token signing keys, revocation and sessions.
+// Identity: who the caller is, tokens and their keys, and each
+// organization's identity providers, users, agents, workload issuers and
+// SCIM credentials.
+//
+// Organization resources: `orgs/{org}/identityProviders/{provider}`,
+// `orgs/{org}/users/{user}`, `orgs/{org}/agents/{agent}`,
+// `orgs/{org}/workloadIssuers/{issuer}`,
+// `orgs/{org}/scimCredentials/{credential}`.
 syntax = "proto3";
 
 package rill.v1;
 
+import "google/protobuf/field_mask.proto";
 import "rill/v1/types.proto";
 
+// Identities, tokens and the organization's sign-in setup.
 service IdentityService {
+  // The caller: principal, teams, capabilities and token.
+  rpc GetCaller(GetCallerRequest) returns (GetCallerResponse);
+  // Mint a capability token attenuated from the caller's.
+  rpc IssueToken(IssueTokenRequest) returns (IssueTokenResponse);
   // Revoke a token (and every token attenuated from it). Callers may
   // revoke a token they present; administrators any token id.
   rpc RevokeToken(RevokeTokenRequest) returns (RevokeTokenResponse);
@@ -13,11 +26,17 @@ service IdentityService {
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
   // Store a new signing key now; it activates after the activation delay.
   rpc RotateTokenKeys(RotateTokenKeysRequest) returns (RotateTokenKeysResponse);
+  // The token signing keys, active and retired.
   rpc ListTokenKeys(ListTokenKeysRequest) returns (ListTokenKeysResponse);
 
-  // An organization's OpenID Connect providers; org administrators.
-  rpc PutIdentityProvider(PutIdentityProviderRequest) returns (PutIdentityProviderResponse);
+  // One OpenID Connect or SAML provider; org administrators.
+  rpc GetIdentityProvider(GetIdentityProviderRequest) returns (GetIdentityProviderResponse);
+  // An organization's identity providers; org administrators.
   rpc ListIdentityProviders(ListIdentityProvidersRequest) returns (ListIdentityProvidersResponse);
+  // Replace a provider, or with `allow_missing` create it; org
+  // administrators.
+  rpc UpdateIdentityProvider(UpdateIdentityProviderRequest) returns (UpdateIdentityProviderResponse);
+  // Remove a provider; org administrators.
   rpc DeleteIdentityProvider(DeleteIdentityProviderRequest) returns (DeleteIdentityProviderResponse);
 
   // An organization's users; org administrators.
@@ -26,15 +45,22 @@ service IdentityService {
   // every token the user holds at once.
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
 
-  // Agents: org administrators, or a user for agents they sponsor.
-  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
-  rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse);
+  // Register an agent: org administrators, or a user for agents they
+  // sponsor.
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse);
+  // One agent.
+  rpc GetAgent(GetAgentRequest) returns (GetAgentResponse);
+  // An organization's agents.
   rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  // Suspend or reactivate an agent, or replace its registration.
+  rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse);
 
   // Issuers whose workload JWTs may be exchanged for agent tokens; org
   // administrators.
-  rpc PutWorkloadIssuer(PutWorkloadIssuerRequest) returns (PutWorkloadIssuerResponse);
   rpc ListWorkloadIssuers(ListWorkloadIssuersRequest) returns (ListWorkloadIssuersResponse);
+  // Replace an issuer, or with `allow_missing` create it.
+  rpc UpdateWorkloadIssuer(UpdateWorkloadIssuerRequest) returns (UpdateWorkloadIssuerResponse);
+  // Remove an issuer.
   rpc DeleteWorkloadIssuer(DeleteWorkloadIssuerRequest) returns (DeleteWorkloadIssuerResponse);
 
   // Stop an agent, a session, everything a sponsor's agents do, or every
@@ -46,11 +72,54 @@ service IdentityService {
   // (`/scim/v2/<org>`) with; org administrators. The secret is returned
   // once.
   rpc CreateScimCredential(CreateScimCredentialRequest) returns (CreateScimCredentialResponse);
+  // An organization's SCIM credentials, revoked ones included.
   rpc ListScimCredentials(ListScimCredentialsRequest) returns (ListScimCredentialsResponse);
-  rpc RevokeScimCredential(RevokeScimCredentialRequest) returns (RevokeScimCredentialResponse);
+  // Revoke a SCIM credential; it stays listed as revoked.
+  rpc DeleteScimCredential(DeleteScimCredentialRequest) returns (DeleteScimCredentialResponse);
 }
 
-message ScimCredentialInfo {
+message GetCallerRequest {}
+
+// A capability the caller's token grants, as a human-readable summary.
+message Capability {
+  // Action name, e.g. `repo.write`, `review.vote`, `lander.land`.
+  string action = 1;
+  // Object pattern the action applies to, e.g. `repo:main/*`.
+  string scope = 2;
+  optional int64 expires_at = 3;
+}
+
+message GetCallerResponse {
+  Principal principal = 1;
+  repeated string teams = 2;
+  repeated Capability capabilities = 3;
+  optional int64 token_expires_at = 4;
+  // The caller's token id (`tk_…`), session (`ss_…`) and organization,
+  // when the caller presented an issued token.
+  optional string token_id = 5;
+  optional string session = 6;
+  optional string org = 7;
+  optional string sponsor = 8;
+  optional string model = 9;
+}
+
+message IssueTokenRequest {
+  string request_id = 1;
+  // Capabilities to attenuate the caller's token to; must be a subset.
+  repeated Capability capabilities = 2;
+  optional int64 expires_at = 3;
+  // Principal the token acts as; defaults to the caller. Used to mint
+  // agent identities sponsored by the caller.
+  optional Principal for_principal = 4;
+}
+message IssueTokenResponse {
+  string token = 1;
+  int64 expires_at = 2;
+}
+
+message ScimCredential {
+  // `orgs/{org}/scimCredentials/{credential}`.
+  string name = 6;
   string org = 1;
   string id = 2;
   Principal created_by = 3;
@@ -58,30 +127,36 @@ message ScimCredentialInfo {
   optional int64 revoked_at = 5;
 }
 message CreateScimCredentialRequest {
-  bytes operation_id = 1;
-  string org = 2;
+  string request_id = 1;
+  // `orgs/{org}`. Required.
+  string parent = 2;
 }
 message CreateScimCredentialResponse {
-  ScimCredentialInfo credential = 1;
+  ScimCredential credential = 1;
   // The bearer token to give the provisioning system; not stored.
   string token = 2;
 }
 message ListScimCredentialsRequest {
-  string org = 1;
+  // `orgs/{org}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
 }
 message ListScimCredentialsResponse {
-  repeated ScimCredentialInfo credentials = 1;
+  repeated ScimCredential credentials = 1;
+  string next_page_token = 2;
 }
-message RevokeScimCredentialRequest {
-  bytes operation_id = 1;
-  string org = 2;
-  string id = 3;
+message DeleteScimCredentialRequest {
+  string request_id = 1;
+  // `orgs/{org}/scimCredentials/{credential}`. Required.
+  string name = 2;
 }
-message RevokeScimCredentialResponse {}
+message DeleteScimCredentialResponse {}
 
 message KillSwitchRequest {
-  bytes operation_id = 1;
-  string org = 2;
+  string request_id = 1;
+  // `orgs/{org}`. Required.
+  string parent = 2;
   oneof target {
     string agent = 3;
     // `ss_…`
@@ -131,6 +206,10 @@ message AgentSpec {
 }
 
 message Agent {
+  // `orgs/{org}/agents/{agent}`. Output only.
+  string name = 7;
+  // Output only.
+  string etag = 8;
   AgentSpec spec = 1;
   Principal principal = 2;
   // `active` or `suspended`.
@@ -140,33 +219,53 @@ message Agent {
   int64 updated_at = 6;
 }
 
-message RegisterAgentRequest {
-  bytes operation_id = 1;
-  AgentSpec agent = 2;
+message CreateAgentRequest {
+  string request_id = 1;
+  // `orgs/{org}`. Required.
+  string parent = 2;
+  // The registration; its org and name are the new agent's. Required.
+  AgentSpec agent = 3;
 }
-message RegisterAgentResponse {
+message CreateAgentResponse {
   Agent agent = 1;
 }
+message GetAgentRequest {
+  // `orgs/{org}/agents/{agent}`. Required.
+  string name = 1;
+}
+message GetAgentResponse {
+  Agent agent = 1;
+}
+message ListAgentsRequest {
+  // `orgs/{org}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `status` (`active`, `suspended`) and `sponsor`.
+  string filter = 4;
+}
+message ListAgentsResponse {
+  repeated Agent agents = 1;
+  string next_page_token = 2;
+}
 message UpdateAgentRequest {
-  bytes operation_id = 1;
-  string org = 2;
-  string name = 3;
-  optional bool suspended = 4;
-  // Replaces the registration's sponsor, scope, models, budgets, bindings
-  // and expiry when set; the org and name must match.
-  AgentSpec spec = 5;
+  string request_id = 1;
+  // The agent, by `name`, with the fields to change. Required.
+  Agent agent = 2;
+  // `status` (`active` or `suspended`) and/or `spec`, which replaces the
+  // registration's sponsor, scope, models, budgets, bindings and expiry;
+  // its org and name must match. Required.
+  google.protobuf.FieldMask update_mask = 3;
+  // The etag read; empty means no condition.
+  string etag = 4;
 }
 message UpdateAgentResponse {
   Agent agent = 1;
 }
-message ListAgentsRequest {
-  string org = 1;
-}
-message ListAgentsResponse {
-  repeated Agent agents = 1;
-}
 
 message WorkloadIssuerSpec {
+  // `orgs/{org}/workloadIssuers/{issuer}`. Output only.
+  string resource_name = 8;
   string org = 1;
   string name = 2;
   string issuer = 3;
@@ -179,27 +278,32 @@ message WorkloadIssuerSpec {
   }
   repeated string audiences = 7;
 }
-message PutWorkloadIssuerRequest {
-  bytes operation_id = 1;
+message UpdateWorkloadIssuerRequest {
+  string request_id = 1;
+  // The issuer; its org and name say which. Required.
   WorkloadIssuerSpec issuer = 2;
+  // Create it when absent.
+  bool allow_missing = 3;
 }
-message PutWorkloadIssuerResponse {
+message UpdateWorkloadIssuerResponse {
   WorkloadIssuerSpec issuer = 1;
 }
 message ListWorkloadIssuersRequest {
-  string org = 1;
+  // `orgs/{org}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
 }
 message ListWorkloadIssuersResponse {
   repeated WorkloadIssuerSpec issuers = 1;
+  string next_page_token = 2;
 }
 message DeleteWorkloadIssuerRequest {
-  bytes operation_id = 1;
-  string org = 2;
-  string name = 3;
+  string request_id = 1;
+  // `orgs/{org}/workloadIssuers/{issuer}`. Required.
+  string name = 2;
 }
-message DeleteWorkloadIssuerResponse {
-  bool deleted = 1;
-}
+message DeleteWorkloadIssuerResponse {}
 
 message IdentityProviderSpec {
   string org = 1;
@@ -225,6 +329,8 @@ message IdentityProviderSpec {
   optional string saml_sp_entity_id = 12;
 }
 message IdentityProviderInfo {
+  // `orgs/{org}/identityProviders/{provider}`.
+  string resource_name = 14;
   string org = 1;
   string name = 2;
   string issuer = 3;
@@ -240,29 +346,45 @@ message IdentityProviderInfo {
   optional string saml_sp_entity_id = 13;
 }
 
-message PutIdentityProviderRequest {
-  bytes operation_id = 1;
-  IdentityProviderSpec provider = 2;
+message GetIdentityProviderRequest {
+  // `orgs/{org}/identityProviders/{provider}`. Required.
+  string name = 1;
 }
-message PutIdentityProviderResponse {
+message GetIdentityProviderResponse {
+  IdentityProviderInfo provider = 1;
+}
+message UpdateIdentityProviderRequest {
+  string request_id = 1;
+  // The provider; its org and name say which. Required.
+  IdentityProviderSpec provider = 2;
+  // Create it when absent.
+  bool allow_missing = 3;
+}
+message UpdateIdentityProviderResponse {
   IdentityProviderInfo provider = 1;
 }
 message ListIdentityProvidersRequest {
-  string org = 1;
+  // `orgs/{org}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
 }
 message ListIdentityProvidersResponse {
   repeated IdentityProviderInfo providers = 1;
+  string next_page_token = 2;
 }
 message DeleteIdentityProviderRequest {
-  bytes operation_id = 1;
-  string org = 2;
-  string name = 3;
+  string request_id = 1;
+  // `orgs/{org}/identityProviders/{provider}`. Required.
+  string name = 2;
 }
-message DeleteIdentityProviderResponse {
-  bool deleted = 1;
-}
+message DeleteIdentityProviderResponse {}
 
 message User {
+  // `orgs/{org}/users/{user}`, by user name. Output only.
+  string name = 11;
+  // Output only.
+  string etag = 12;
   string org = 1;
   Principal principal = 2;
   optional string email = 3;
@@ -278,26 +400,32 @@ message User {
   int64 updated_at = 10;
 }
 message ListUsersRequest {
-  string org = 1;
+  // `orgs/{org}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `status` (`active`, `suspended`), `roles` and `teams`.
+  string filter = 4;
 }
 message ListUsersResponse {
   repeated User users = 1;
+  string next_page_token = 2;
 }
 message UpdateUserRequest {
-  bytes operation_id = 1;
-  string org = 2;
-  string name = 3;
-  optional bool suspended = 4;
-  // Replace the user's roles with `roles` when set.
-  bool set_roles = 5;
-  repeated string roles = 6;
+  string request_id = 1;
+  // The user, by `name`, with the fields to change. Required.
+  User user = 2;
+  // `status` (`active` or `suspended`) and/or `roles`. Required.
+  google.protobuf.FieldMask update_mask = 3;
+  // The etag read; empty means no condition.
+  string etag = 4;
 }
 message UpdateUserResponse {
   User user = 1;
 }
 
 message RevokeTokenRequest {
-  bytes operation_id = 1;
+  string request_id = 1;
   oneof target {
     // The token itself: revokes its token id.
     string token = 2;
@@ -311,14 +439,14 @@ message RevokeTokenResponse {
 }
 
 message RevokeSessionRequest {
-  bytes operation_id = 1;
+  string request_id = 1;
   // `ss_…`
   string session = 2;
 }
 message RevokeSessionResponse {}
 
 message RotateTokenKeysRequest {
-  bytes operation_id = 1;
+  string request_id = 1;
 }
 message RotateTokenKeysResponse {
   // Absent when another server rotated at the same moment.
@@ -340,58 +468,4 @@ message TokenKey {
 }
 message ListTokenKeysResponse {
   repeated TokenKey keys = 1;
-}
-
-// Signing in. Open: callers have no token yet, and each RPC checks what it
-// is given.
-service SessionService {
-  // The organization's providers a client can sign in through, with the
-  // endpoints of their device flow.
-  rpc ListSignInProviders(ListSignInProvidersRequest) returns (ListSignInProvidersResponse);
-  // RFC 8693: a provider's ID token for a session.
-  rpc ExchangeToken(ExchangeTokenRequest) returns (SessionGrant);
-  // A refresh token for a new access token and a new refresh token.
-  rpc RefreshSession(RefreshSessionRequest) returns (SessionGrant);
-}
-
-message ListSignInProvidersRequest {
-  string org = 1;
-}
-message SignInProvider {
-  string org = 1;
-  string name = 2;
-  string issuer = 3;
-  optional string cli_client_id = 4;
-  repeated string scopes = 5;
-  optional string device_authorization_endpoint = 6;
-  optional string token_endpoint = 7;
-}
-message ListSignInProvidersResponse {
-  repeated SignInProvider providers = 1;
-}
-
-message ExchangeTokenRequest {
-  string subject_token = 1;
-  // `urn:ietf:params:oauth:token-type:id_token` (a person), or
-  // `urn:ietf:params:oauth:token-type:jwt` (a workload, for an agent).
-  string subject_token_type = 2;
-  // For workloads: the org whose trusted issuer signed the JWT.
-  string org = 3;
-  // For workloads: the agent, when several bindings match.
-  optional string agent = 4;
-  // For workloads: the model the agent runs as.
-  optional string model = 5;
-}
-
-message RefreshSessionRequest {
-  string refresh_token = 1;
-}
-
-message SessionGrant {
-  string access_token = 1;
-  int64 expires_at = 2;
-  optional string refresh_token = 3;
-  string session = 4;
-  Principal principal = 5;
-  string org = 6;
 }

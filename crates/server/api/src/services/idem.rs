@@ -23,79 +23,86 @@ const RENEW_EVERY: std::time::Duration =
 
 /// A request message carrying an idempotency key.
 pub trait Idempotent: Message {
-    fn operation_id(&self) -> &[u8];
+    /// The key as 16 bytes; empty when the request has none.
+    fn key(&self) -> Result<Vec<u8>>;
 }
 
+/// Requests keyed by a `request_id` UUID.
 macro_rules! idempotent {
     ($($t:ident),* $(,)?) => {
         $(impl Idempotent for pb::$t {
-            fn operation_id(&self) -> &[u8] {
-                &self.operation_id
+            fn key(&self) -> Result<Vec<u8>> {
+                if self.request_id.is_empty() {
+                    return Ok(Vec::new());
+                }
+                Ok(super::names::request_id(&self.request_id)?.as_bytes().to_vec())
             }
         })*
     };
 }
 
 idempotent!(
+    ApplyEditsRequest,
+    CreateRepoRequest,
+    UpdateRefRequest,
+    DeleteRefRequest,
+    CreateReleaseRequest,
+    CreateVersionRequest,
+    RebaseVersionRequest,
+    MergeVersionsRequest,
+    ResolveConflictsRequest,
+    CreateWorkspaceRequest,
+    UpdateWorkspaceRequest,
+    DeleteWorkspaceRequest,
+    SnapshotWorkspaceRequest,
+    StartChangeRequest,
+    SyncWorkspaceRequest,
+    HandoffWorkspaceRequest,
+    UndoOperationRequest,
+    SubmitChangeRequest,
+    VoteRequest,
+    CreateThreadRequest,
+    ReplyThreadRequest,
+    ResolveThreadRequest,
+    UpdateStackRequest,
+    AbandonChangeRequest,
+    RequestLandRequest,
+    RequestLandStackRequest,
     ReportVerificationRequest,
-    RevertSeqRequest,
+    RevertLandingRequest,
+    BulkRevertRequest,
     BisectRequest,
+    FreezeTrunkRequest,
+    UnfreezeTrunkRequest,
     CreateIntentRequest,
     UpdateIntentRequest,
     LinkChangeRequest,
-    CreateOrgRequest,
+    CreateQuarantineRequest,
+    DeleteQuarantineRequest,
     IssueTokenRequest,
-    AddRelationRequest,
-    RequestRedactionRequest,
-    ApproveRedactionRequest,
-    ClearQuarantineRequest,
-    RemoveRelationRequest,
-    SetPolicyRequest,
-    CreateRepoRequest,
-    CreateChangeVersionRequest,
-    ApplyEditsRequest,
-    RebaseRequest,
-    MergeRequest,
-    ResolveRequest,
-    MoveRefRequest,
-    CutReleaseRequest,
-    CreateWorkspaceRequest,
-    SetSparseProfileRequest,
-    SnapshotRequest,
-    NewChangeRequest,
-    UpdateBaseRequest,
-    HandoffRequest,
-    UndoRequest,
-    DeleteWorkspaceRequest,
-    SubmitForReviewRequest,
-    VoteRequest,
-    CommentRequest,
-    ReplyThreadRequest,
-    ResolveThreadRequest,
-    SetStackRequest,
-    AbandonRequest,
-    RequestLandRequest,
-    RequestLandStackRequest,
-    AppendTrunkRequest,
     RevokeTokenRequest,
     RevokeSessionRequest,
     RotateTokenKeysRequest,
-    RotateDataKeysRequest,
-    DeleteSecretRequest,
-    QuarantineRequest,
-    FreezeTrunkRequest,
-    RevertSetRequest,
-    ReleaseQuarantineRequest,
-    PutIdentityProviderRequest,
+    UpdateIdentityProviderRequest,
     DeleteIdentityProviderRequest,
     UpdateUserRequest,
-    RegisterAgentRequest,
+    CreateAgentRequest,
     UpdateAgentRequest,
-    PutWorkloadIssuerRequest,
+    UpdateWorkloadIssuerRequest,
     DeleteWorkloadIssuerRequest,
     KillSwitchRequest,
     CreateScimCredentialRequest,
-    RevokeScimCredentialRequest,
+    DeleteScimCredentialRequest,
+    CreateOrgRequest,
+    CreateRelationRequest,
+    DeleteRelationRequest,
+    UpdatePolicyRequest,
+    ImportTrunkPositionRequest,
+    CreateRedactionRequest,
+    ApproveRedactionRequest,
+    ReleaseVersionRequest,
+    RotateDataKeysRequest,
+    DeleteSecretRequest,
 );
 
 /// The idempotency key of the request being handled, for work that
@@ -131,7 +138,7 @@ where
     F: FnOnce(Call<Req>) -> Fut,
     Fut: Future<Output = Result<Response<Resp>>>,
 {
-    let operation = request.get_ref().operation_id().to_vec();
+    let operation = request.get_ref().key()?;
     if operation.is_empty() {
         return handler(request).await;
     }

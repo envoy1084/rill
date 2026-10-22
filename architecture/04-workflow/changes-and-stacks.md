@@ -34,14 +34,14 @@ on the `ci` row being absent, it writes the `ChangeInfo` row and appends
 the hash to the repository's stamped version log (`log`) and to the
 change's dense version list (`chv`, creation order).
 `change_versions(id).last()` is the *current* version everywhere the
-server needs one: `edit_base`, `NewChange`'s predecessor, review submit,
+server needs one: `edit_base`, `StartChange`'s predecessor, review submit,
 and the SDK's `current_version`. `ChangeInfo.trunk_seq` is filled in at
 read time from the `trunkh/` index.
 
 ## The single write path
 
 Every RPC that creates a version goes through `commit_version_with`
-([commit.rs](../../crates/server/api/src/services/repo/commit.rs)). It
+([commit.rs](../../crates/server/api/src/services/changes/commit.rs)). It
 checks the change limits and path rules, that parents and predecessor
 exist, that no change targets the root path, and that every `Set` content
 and copy source exists. It writes the version object and its
@@ -55,9 +55,9 @@ commit then fails. Then **one transaction** stores:
   dropped, threads re-anchored, risk and status recomputed), with a
   `StatusChanged` event when the status moves;
 * a `VersionStored` event and a versions charge for the author;
-* the caller's extras: `NewChange` and `UpdateBase` add their workspace
+* the caller's extras: `StartChange` and `SyncWorkspace` add their workspace
   operation, so the workspace and the version commit together;
-* for a request with an `operation_id`, the version hash in its claim.
+* for a request with a `request_id`, the version hash in its claim.
 
 A missing review, or one that no longer takes versions, is skipped. If
 the review or workspace changed meanwhile the transaction conflicts and
@@ -74,11 +74,11 @@ names a stored version gets that version back instead of storing another
 | New change | `ApplyEdits(EditBase::Root, change_id=None)` | `[resolved root]` (none on an empty repo) | `None` | fresh |
 | Amend onto a root | `ApplyEdits(EditBase::Root, change_id=id)` | `[resolved root]` | current version of `id` | `id` |
 | Amend in place | `ApplyEdits(EditBase::ChangeId(id))` | current version's parents | current version | `id` (or the explicit `change_id`) |
-| Workspace | `NewChange` | `[ws.base]` | current version of `ws.working_change` | `ws.working_change` |
-| Rebase | `RepoSvc.Rebase`, `UpdateBase`, the lander, `rill stack sync` | `[new_parent]` + old parents after the first | the rebased version | kept |
+| Workspace | `StartChange` | `[ws.base]` | current version of `ws.working_change` | `ws.working_change` |
+| Rebase | `RepoSvc.Rebase`, `SyncWorkspace`, the lander, `rill stack sync` | `[new_parent]` + old parents after the first | the rebased version | kept |
 | Resolve | `RepoSvc.Resolve` | unchanged | the conflicted version | kept |
 | Merge | `RepoSvc.Merge` (`merge_changes`) | `[left, right]` | `None` | fresh |
-| Raw | `CreateChangeVersion` | as given | as given | as given |
+| Raw | `CreateVersion` | as given | as given | as given |
 
 `ApplyEdits` edits are `SetContent` (a `ContentRef` that must already
 exist, else `FailedPrecondition`), `Delete`, or `Patch`. A `Patch` is a
@@ -89,7 +89,7 @@ match exactly at its stated line or within 50 lines of it; otherwise the
 request is `InvalidArgument`. `write(path)` is checked per edit. A version
 with no file changes requires `write(root)`.
 
-`Resolve` only accepts paths that are `FileChange::Conflict` in the
+`ResolveConflicts` only accepts paths that are `FileChange::Conflict` in the
 version. It merges provenance with the previous version and sets
 `resolved_by`. `rebase` never fails on conflicts: it writes
 `FileChange::Conflict` terms (see
@@ -121,7 +121,7 @@ checkout's `working_change` or `--top`). `stack::collect` walks first
 parents from it until it reaches a landed version, with a bound of 10 000
 hops. Nothing is stored.
 
-**Declared.** `ReviewService::set_stack` (RPC `SetStack`,
+**Declared.** `ReviewService::set_stack` (RPC `UpdateStack`,
 [stacks.rs](../../crates/domain/review/src/stacks.rs)) requires a non-empty
 list in which every member is under review and no id repeats. Each
 member's current version must have the previous member's current version
@@ -178,7 +178,7 @@ with the conflict as data, and the owner gets a comment saying where.
 
 * [rill-types/src/objects/change.rs](../../crates/foundation/types/src/objects/change.rs), [ids.rs](../../crates/foundation/types/src/ids.rs)
 * [rill-store/src/repo/versions.rs](../../crates/foundation/store/src/repo/versions.rs) (`put_change_version`, `change_versions`)
-* [rill-api/src/services/repo/commit.rs](../../crates/server/api/src/services/repo/commit.rs), [write.rs](../../crates/server/api/src/services/repo/write.rs)
+* [rill-api/src/services/changes/commit.rs](../../crates/server/api/src/services/changes/commit.rs), [write.rs](../../crates/server/api/src/services/changes/write.rs)
 * [rill-core/src/rebase.rs](../../crates/engine/core/src/rebase.rs), [builder.rs](../../crates/engine/core/src/builder.rs)
 * [rill-review/src/stacks.rs](../../crates/domain/review/src/stacks.rs)
 * [rill-runtime/src/workers/hooks.rs](../../crates/server/runtime/src/workers/hooks.rs) (`dependents_of`)

@@ -9,13 +9,14 @@ use rill_types::audit::{AuditEntry, AuditRoot};
 use rill_types::Principal;
 
 use super::*;
+use common::names;
 
 async fn chain(c: &mut Clients, org: &str) -> Vec<AuditEntry> {
     c.audit
         .list_audit_entries(pb::ListAuditEntriesRequest {
-            org: org.into(),
-            after_seq: 0,
-            limit: 0,
+            parent: names::org(org),
+            page_size: 10_000,
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -33,7 +34,11 @@ async fn verify(
     let entries = chain(c, org).await;
     let roots: Vec<AuditRoot> = c
         .audit
-        .list_audit_roots(pb::ListAuditRootsRequest { org: org.into() })
+        .list_audit_roots(pb::ListAuditRootsRequest {
+            parent: names::org(org),
+            page_size: 10_000,
+            ..Default::default()
+        })
         .await
         .unwrap()
         .into_owned()
@@ -62,18 +67,18 @@ async fn actions_are_chained_sealed_and_tamper_evident() {
     let mut root = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
     root.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "audited".into(),
-            description: None,
-            windows_safe: false,
+            request_id: String::new(),
+            parent: names::org("default"),
+            repo_id: "audited".into(),
+            repo: None.into(),
         })
         .await
         .unwrap();
     root.access
-        .add_relation(pb::AddRelationRequest {
-            operation_id: Bytes::new(),
+        .create_relation(pb::CreateRelationRequest {
+            request_id: String::new(),
+            parent: names::repo("audited"),
             relation: (pb::Relation {
-                repo: "audited".into(),
                 path: "src".into(),
                 relation: "reader".into(),
                 subject: format!("principal:{}", Principal::human("ann").id),
@@ -82,10 +87,10 @@ async fn actions_are_chained_sealed_and_tamper_evident() {
         })
         .await
         .unwrap();
-    root.admin
+    root.orgs
         .create_org(pb::CreateOrgRequest {
-            operation_id: Bytes::new(),
-            name: "acme".into(),
+            request_id: String::new(),
+            org_id: "acme".into(),
             description: None,
         })
         .await
@@ -95,7 +100,7 @@ async fn actions_are_chained_sealed_and_tamper_evident() {
     let sealed = root
         .audit
         .seal_audit(pb::SealAuditRequest {
-            org: "default".into(),
+            parent: names::org("default"),
         })
         .await
         .unwrap()
@@ -161,9 +166,8 @@ async fn actions_are_chained_sealed_and_tamper_evident() {
     let refused = ann
         .audit
         .list_audit_entries(pb::ListAuditEntriesRequest {
-            org: "default".into(),
-            after_seq: 0,
-            limit: 0,
+            parent: names::org("default"),
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -179,21 +183,21 @@ async fn refusals_are_audited_but_sampled() {
     let mut root = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
     root.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "closed".into(),
-            description: None,
-            windows_safe: false,
+            request_id: String::new(),
+            parent: names::org("default"),
+            repo_id: "closed".into(),
+            repo: None.into(),
         })
         .await
         .unwrap();
     let eve = clients(&server, Some(&server.token_for(&Principal::human("eve")))).await;
     for _ in 0..5 {
         let refused = eve
-            .repo
-            .list_dir(pb::ListDirRequest {
-                repo: "closed".into(),
-                root: None.into(),
+            .content
+            .list_directory(pb::ListDirectoryRequest {
+                repo: names::repo("closed"),
                 path: "src".into(),
+                ..Default::default()
             })
             .await
             .unwrap_err();

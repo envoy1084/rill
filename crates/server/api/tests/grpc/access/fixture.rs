@@ -101,31 +101,28 @@ impl Acl {
         owner
             .repo
             .create_repo(pb::CreateRepoRequest {
-                operation_id: Bytes::new(),
-                repo: "acl".into(),
-                description: None,
-                windows_safe: false,
+                parent: common::names::org("default"),
+                repo_id: "acl".into(),
+                ..Default::default()
             })
             .await
             .unwrap();
         let version = owner
-            .repo
+            .changes
             .apply_edits(pb::ApplyEditsRequest {
-                operation_id: Bytes::new(),
-                repo: "acl".into(),
-                base: None.into(),
+                parent: common::names::repo("acl"),
                 edits: vec![
                     blob_edit(&server, "pub/a.txt", public_bytes()).await,
                     blob_edit(&server, "secret/s.txt", secret_bytes()).await,
                 ],
                 message: "seed".into(),
-                intent: None,
-                provenance: None.into(),
-                change_id: None,
+                ..Default::default()
             })
             .await
             .unwrap()
             .into_owned()
+            .info
+            .unwrap()
             .hash;
         let repo_id = server
             .state
@@ -148,15 +145,15 @@ impl Acl {
     pub async fn grant(&mut self, path: &str, relation: &str, who: &Principal) {
         self.owner
             .access
-            .add_relation(pb::AddRelationRequest {
-                operation_id: Bytes::new(),
+            .create_relation(pb::CreateRelationRequest {
+                parent: common::names::repo("acl"),
                 relation: (pb::Relation {
-                    repo: "acl".into(),
                     path: path.into(),
                     relation: relation.into(),
                     subject: format!("principal:{}", who.id),
                 })
                 .into(),
+                ..Default::default()
             })
             .await
             .unwrap();
@@ -166,9 +163,8 @@ impl Acl {
         clients(&self.server, Some(&self.server.token_for(who))).await
     }
 
-    pub fn at_version(&self) -> pb::RootSpec {
-        pb::RootSpec {
-            root: Some(pb::root_spec::Root::VersionHash(self.version.clone())),
-        }
+    /// The revision naming [`Acl::version`].
+    pub fn at_version(&self) -> String {
+        ObjectHash::from_slice(&self.version).unwrap().to_hex()
     }
 }

@@ -7,7 +7,9 @@ use rill_types::identity::{AccountStatus, AgentBudgets, AgentRecord, Sponsor, Wo
 use rill_types::{Principal, RepoPathBuf, Timestamp};
 
 use crate::auth::{caller, require_org_admin};
-use crate::services::Call;
+use crate::listing::{FieldValue, Filter, Kind, Page, Record};
+use crate::services::{etag, names, Call};
+use rill_proto::names::AGENT;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -21,8 +23,17 @@ fn parse_sponsor(text: &str) -> Result<Sponsor> {
     }
 }
 
+/// The wire form of an agent, with its name and etag.
 pub fn agent_proto(a: &AgentRecord) -> pb::Agent {
+    let mut out = agent_fields(a);
+    out.etag = etag::of(&out);
+    out
+}
+
+fn agent_fields(a: &AgentRecord) -> pb::Agent {
     pb::Agent {
+        name: names::org_resource(&AGENT, &a.org, &a.principal.name),
+        etag: String::new(),
         spec: (pb::AgentSpec {
             org: a.org.clone(),
             name: a.principal.name.clone(),
@@ -135,15 +146,23 @@ async fn may_manage(
     )))
 }
 
-pub async fn register(
+pub async fn create(
     state: &AppState,
-    request: Call<pb::RegisterAgentRequest>,
-) -> Result<pb::RegisterAgentResponse> {
+    request: Call<pb::CreateAgentRequest>,
+) -> Result<pb::CreateAgentResponse> {
     let ctx = caller(&request)?;
-    let spec = request
-        .into_inner()
+    let req = request.into_inner();
+    let org = names::org(&req.parent)?;
+    let spec = req
         .agent
-        .ok_or_else(|| Error::invalid("agent is required"))?;
+        .into_option()
+        .ok_or(rill_proto::ConvertError::missing("agent"))?;
+    if spec.org != org {
+        return Err(Error::invalid(format!(
+            "the agent's org {:?} is not the parent's",
+            spec.org
+        )));
+    }
     let agent = from_spec(spec, &ctx.principal, Timestamp::now())?;
     may_manage(state, &ctx, &agent.org, &agent.sponsor).await?;
     if state.stores.get_org(&agent.org).await?.is_none() {
@@ -159,7 +178,25 @@ pub async fn register(
             other => other.into(),
         })?;
     tracing::info!(by = %ctx.principal, agent = %agent.principal, org = %agent.org, sponsor = %agent.sponsor.label(), "agent registered");
-    Ok(pb::RegisterAgentResponse {
+    Ok(pb::CreateAgentResponse {
+        agent: agent_proto(&agent).into(),
+    })
+}
+
+pub async fn get(
+    state: &AppState,
+    request: Call<pb::GetAgentRequest>,
+) -> Result<pb::GetAgentResponse> {
+    let ctx = caller(&request)?;
+    let (org, name) = names::org_child(&AGENT, &request.get_ref().name)?;
+    let agent = state
+        .identity
+        .store()
+        .agent(&org, &name)
+        .await?
+        .ok_or_else(|| Error::NotFound(format!("agent {org}/{name}")))?;
+    may_manage(state, &ctx, &agent.org, &agent.sponsor).await?;
+    Ok(pb::GetAgentResponse {
         agent: agent_proto(&agent).into(),
     })
 }
@@ -170,15 +207,37 @@ pub async fn update(
 ) -> Result<pb::UpdateAgentResponse> {
     let ctx = caller(&request)?;
     let req = request.into_inner();
+    let given = req
+        .agent
+        .into_option()
+        .ok_or(rill_proto::ConvertError::missing("agent"))?;
+    let (org, name) = names::org_child(&AGENT, &given.name)?;
+    let mask = req.update_mask.into_option().unwrap_or_default().paths;
+    if mask.is_empty() {
+        return Err(rill_proto::ConvertError::missing("update_mask").into());
+    }
+    if let Some(bad) = mask
+        .iter()
+        .find(|p| !matches!(p.as_str(), "status" | "spec"))
+    {
+        return Err(Error::invalid(format!(
+            "update_mask names {bad:?}; it may name status and spec"
+        )));
+    }
     let store = state.identity.store();
     let before = store
-        .agent(&req.org, &req.name)
+        .agent(&org, &name)
         .await?
-        .ok_or_else(|| Error::NotFound(format!("agent {}/{}", req.org, req.name)))?;
+        .ok_or_else(|| Error::NotFound(format!("agent {org}/{name}")))?;
     may_manage(state, &ctx, &before.org, &before.sponsor).await?;
+    etag::check(&agent_proto(&before).etag, &req.etag, "the agent")?;
     let now = Timestamp::now();
-    let mut after = match req.spec.into_option() {
-        Some(spec) => {
+    let mut after = match mask.iter().any(|p| p == "spec") {
+        true => {
+            let spec = given
+                .spec
+                .into_option()
+                .ok_or(rill_proto::ConvertError::missing("agent.spec"))?;
             if spec.org != before.org || spec.name != before.principal.name {
                 return Err(Error::invalid("the spec must name the same org and agent"));
             }
@@ -191,13 +250,17 @@ pub async fn update(
                 ..replaced
             }
         }
-        None => before.clone(),
+        false => before.clone(),
     };
-    if let Some(suspended) = req.suspended {
-        after.status = if suspended {
-            AccountStatus::Suspended
-        } else {
-            AccountStatus::Active
+    if mask.iter().any(|p| p == "status") {
+        after.status = match given.status.as_str() {
+            "active" => AccountStatus::Active,
+            "suspended" => AccountStatus::Suspended,
+            other => {
+                return Err(Error::invalid(format!(
+                    "status is active or suspended, not {other:?}"
+                )))
+            }
         };
     }
     after.updated_at = now;
@@ -213,13 +276,43 @@ pub async fn list(
     request: Call<pb::ListAgentsRequest>,
 ) -> Result<pb::ListAgentsResponse> {
     let ctx = caller(&request)?;
-    let org = request.into_inner().org;
+    let req = request.get_ref();
+    let org = names::org(&req.parent)?;
+    let filter = Filter::parse(
+        &req.filter,
+        &[("status", Kind::Str), ("sponsor", Kind::Str)],
+    )?;
+    let page = Page::new(req.page_size, &req.page_token, &[&req.parent, &req.filter])?;
     let agents = state.identity.store().agents(&org).await?;
     let admin = require_org_admin(state, &ctx, &org).await.is_ok();
-    let visible = agents
+    let visible: Vec<pb::Agent> = agents
         .iter()
         .filter(|a| admin || a.sponsor == Sponsor::User(ctx.principal.name.clone()))
         .map(agent_proto)
+        .filter(|a| filter.matches(&Listed(a)))
         .collect();
-    Ok(pb::ListAgentsResponse { agents: visible })
+    let (agents, next_page_token) = page.of(visible)?;
+    Ok(pb::ListAgentsResponse {
+        agents,
+        next_page_token,
+    })
+}
+
+/// An agent as a list filter sees it.
+struct Listed<'a>(&'a pb::Agent);
+
+impl Record for Listed<'_> {
+    fn field(&self, field: &str) -> FieldValue {
+        match field {
+            "status" => FieldValue::Str(self.0.status.clone()),
+            "sponsor" => FieldValue::Str(
+                self.0
+                    .spec
+                    .as_option()
+                    .map(|s| s.sponsor.clone())
+                    .unwrap_or_default(),
+            ),
+            _ => FieldValue::Missing,
+        }
+    }
 }

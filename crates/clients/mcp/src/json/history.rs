@@ -168,7 +168,7 @@ pub fn version_result(r: &VersionResult) -> Value {
 pub fn log_page(p: &LogPage) -> Value {
     json!({
         "entries": p.entries.iter().map(change_info).collect::<Vec<_>>(),
-        "next_start": opt(p.next_start.as_ref(), hash),
+        "next_page_token": p.next_page_token,
     })
 }
 
@@ -185,7 +185,7 @@ pub fn path_history_entry(e: &PathHistoryEntry) -> Value {
 pub fn path_history_page(p: &PathHistoryPage) -> Value {
     json!({
         "entries": p.entries.iter().map(path_history_entry).collect::<Vec<_>>(),
-        "next_start": opt(p.next_start.as_ref(), hash),
+        "next_page_token": p.next_page_token,
     })
 }
 

@@ -155,7 +155,7 @@ the first run made instead of reverting twice.
 
 ## Blast-radius reverts
 
-`RevertSet` (repository owners; `rill revert --session S --model M
+`BulkRevert` (repository owners; `rill revert --session S --model M
 --sponsor P --author A --intent I [--since N] [--until M] -m why`) undoes
 every landing one origin made: those whose vouched provenance matches every
 field given (session and model come from the token that wrote a version,
@@ -205,10 +205,10 @@ The lander logs hook errors and carries on. Status transitions are in
 record (target `postland`) with external reports, worst wins: `Failed` or
 `Inherited`, then `Running`, `Pending`, `Skipped`, `Passed`; no reports is
 `Pending`. An inferred red record blaming another position is `Inherited`.
-`RevertSeq` and `Bisect` need the `land()` permit; `Bisect` fails with
+`RevertLanding` and `Bisect` need the `land()` permit; `Bisect` fails with
 `FailedPrecondition` when the worker is disabled. `GetTrunkHealth` (health
 and open incidents) and `ListIncidents` need read access; `FreezeTrunk`
-and `RevertSet` need repository ownership.
+and `BulkRevert` need repository ownership.
 
 ## Limitations
 
@@ -227,10 +227,10 @@ and `RevertSet` need repository ownership.
 
 * [rill-lander/src/postland/](../../crates/domain/lander/src/postland/mod.rs): [worker.rs](../../crates/domain/lander/src/postland/worker.rs), [bisect.rs](../../crates/domain/lander/src/postland/bisect.rs), [positions.rs](../../crates/domain/lander/src/postland/positions.rs), [batch.rs](../../crates/domain/lander/src/postland/batch.rs), [record.rs](../../crates/domain/lander/src/postland/record.rs)
 * [rill-lander/src/healing/](../../crates/domain/lander/src/healing/mod.rs) (incidents, health, fixes, mass reverts), [land/guard.rs](../../crates/domain/lander/src/land/guard.rs); store [repo/health.rs](../../crates/foundation/store/src/repo/health.rs)
-* [rill-exec/src/verify/affects.rs](../../crates/domain/exec/src/verify/affects.rs), [rill-api/src/services/trunk_health.rs](../../crates/server/api/src/services/trunk_health.rs)
+* [rill-exec/src/verify/affects.rs](../../crates/domain/exec/src/verify/affects.rs), [rill-api/src/services/trunk/health.rs](../../crates/server/api/src/services/trunk/health.rs)
 * [rill-lander/src/revert.rs](../../crates/domain/lander/src/revert.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)
 * [rill-runtime/src/workers/hooks.rs](../../crates/server/runtime/src/workers/hooks.rs), [verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [repo_tasks.rs](../../crates/server/runtime/src/workers/repo_tasks.rs)
-* [rill-api/src/services/lander.rs](../../crates/server/api/src/services/lander.rs)
+* [rill-api/src/services/trunk/verification.rs](../../crates/server/api/src/services/trunk/verification.rs)
 * The gate that breaks trunk on purpose and times the healing: `trunk_red`, see [performance](../09-engineering/performance.md#trunk-healing)
 * [rill-runtime/src/config/server.rs](../../crates/server/runtime/src/config/server.rs) (`PostLandConfig`)
 

@@ -23,8 +23,9 @@ async fn every_caller_gets_exactly_what_its_class_allows() {
             };
             let probe = targeted(&method.name, &callers);
             let precise = probe.is_some();
-            let body =
-                probe.unwrap_or_else(|| raw::request_body(&method, "acl", &callers.workspace));
+            let body = probe.unwrap_or_else(|| {
+                raw::request_body(&method, |field| callers.targets.value(&method.name, field))
+            });
             let outcome = raw::call(channel.clone(), &method, body, token.as_deref()).await;
             let passed = !refused(outcome.code);
             // An empty request may fail validation before the permission

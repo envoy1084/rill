@@ -1,69 +1,84 @@
-// Checks service: what verification ran, test by test.
+// Checks: what verification ran, test by test, and which targets are
+// quarantined.
+//
+// A run is `orgs/{org}/repos/{repo}/runs/{run}`; a quarantine is
+// `orgs/{org}/repos/{repo}/quarantines/{target}`.
 syntax = "proto3";
 
 package rill.v1;
 
 import "rill/v1/types.proto";
 
+// Verification runs, test history, flakes and quarantines.
 service ChecksService {
-  // Recent runs of a step or test, newest first.
+  // Recent runs of a step or test, newest first, with its flake stats.
   rpc GetTestHistory(GetTestHistoryRequest) returns (GetTestHistoryResponse);
   // Targets whose outcome changes on unchanged inputs, flakiest first.
   rpc ListFlakyTests(ListFlakyTestsRequest) returns (ListFlakyTestsResponse);
-  // Verification runs, newest first, all or of one version.
+  // Verification runs, newest first.
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
-  rpc GetRun(GetRunRequest) returns (VerifyRun);
+  // One run with its steps.
+  rpc GetRun(GetRunRequest) returns (GetRunResponse);
   // The run now and after every change, until it ends.
-  rpc WatchRun(GetRunRequest) returns (stream VerifyRun);
+  rpc WatchRun(WatchRunRequest) returns (stream WatchRunResponse);
   // A byte range of a step's standard output or error.
-  rpc ReadLog(ReadLogRequest) returns (ReadBytesResponse);
+  rpc ReadLog(ReadLogRequest) returns (ReadLogResponse);
   // A byte range of a file a step produced.
-  rpc ReadArtifact(ReadArtifactRequest) returns (ReadBytesResponse);
+  rpc ReadArtifact(ReadArtifactRequest) returns (ReadArtifactResponse);
   // Steps a hermeticity probe caught giving different outputs on a re-run;
   // they run uncached until the flag expires.
-  rpc ListNonhermetic(ListNonhermeticRequest) returns (ListNonhermeticResponse);
+  rpc ListNonhermeticSteps(ListNonhermeticStepsRequest) returns (ListNonhermeticStepsResponse);
   // Targets whose failures neither block landings nor make trunk red.
-  rpc ListQuarantined(ListQuarantinedRequest) returns (ListQuarantinedResponse);
+  rpc ListQuarantines(ListQuarantinesRequest) returns (ListQuarantinesResponse);
   // Quarantine a step or test (repository owners).
-  rpc Quarantine(QuarantineRequest) returns (QuarantineResponse);
+  rpc CreateQuarantine(CreateQuarantineRequest) returns (CreateQuarantineResponse);
   // Lift a quarantine (repository owners).
-  rpc ReleaseQuarantine(ReleaseQuarantineRequest) returns (ReleaseQuarantineResponse);
+  rpc DeleteQuarantine(DeleteQuarantineRequest) returns (DeleteQuarantineResponse);
 }
 
-message QuarantinedTarget {
-  // `step:<name>[#shard]` or `test:<id>`.
+// A target whose failures are not held against changes.
+message Quarantine {
+  // `…/quarantines/{target}`. Output only.
+  string name = 6;
+  // `step:<name>[#shard]` or `test:<id>`. Required on create.
   string target = 1;
+  // Output only.
   int64 since = 2;
+  // Output only.
   Principal by = 3;
   string reason = 4;
-  // The intent tracking the fix, when one was opened.
+  // The intent tracking the fix, when one was opened. Output only.
   optional bytes intent = 5;
 }
-message ListQuarantinedRequest {
-  string repo = 1;
+
+message ListQuarantinesRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
 }
-message ListQuarantinedResponse {
-  repeated QuarantinedTarget targets = 1;
+message ListQuarantinesResponse {
+  repeated Quarantine quarantines = 1;
+  string next_page_token = 2;
 }
-message QuarantineRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  string target = 3;
-  string reason = 4;
+
+message CreateQuarantineRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // Required.
+  Quarantine quarantine = 3;
 }
-message QuarantineResponse {
-  // False when it was already quarantined.
-  bool added = 1;
+message CreateQuarantineResponse {
+  Quarantine quarantine = 1;
 }
-message ReleaseQuarantineRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  string target = 3;
+
+message DeleteQuarantineRequest {
+  string request_id = 1;
+  // `…/quarantines/{target}`. Required.
+  string name = 2;
 }
-message ReleaseQuarantineResponse {
-  // False when it was not quarantined.
-  bool released = 1;
-}
+message DeleteQuarantineResponse {}
 
 message NonhermeticStep {
   string step = 1;
@@ -74,11 +89,15 @@ message NonhermeticStep {
   int64 until = 5;
 }
 
-message ListNonhermeticRequest {
-  string repo = 1;
+message ListNonhermeticStepsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
 }
-message ListNonhermeticResponse {
+message ListNonhermeticStepsResponse {
   repeated NonhermeticStep steps = 1;
+  string next_page_token = 2;
 }
 
 enum StepState {
@@ -123,6 +142,8 @@ message RunStep {
 }
 
 message VerifyRun {
+  // `…/runs/{run}`.
+  string name = 9;
   string id = 1;
   bytes version = 2;
   // Verification of trunk, after landing.
@@ -137,19 +158,32 @@ message VerifyRun {
 }
 
 message ListRunsRequest {
-  string repo = 1;
-  // Only runs of this version.
-  bytes version = 2;
-  // Default 20.
-  uint32 limit = 3;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // Only runs of this version, `…/versions/{hash}`.
+  string version = 4;
 }
 message ListRunsResponse {
   repeated VerifyRun runs = 1;
+  string next_page_token = 2;
 }
 
 message GetRunRequest {
-  string repo = 1;
-  string run = 2;
+  // `…/runs/{run}`. Required.
+  string name = 1;
+}
+message GetRunResponse {
+  VerifyRun run = 1;
+}
+
+message WatchRunRequest {
+  // `…/runs/{run}`. Required.
+  string name = 1;
+}
+message WatchRunResponse {
+  VerifyRun run = 1;
 }
 
 enum LogStream {
@@ -159,28 +193,32 @@ enum LogStream {
 }
 
 message ReadLogRequest {
-  string repo = 1;
-  string run = 2;
-  uint32 step = 3;
-  LogStream stream = 4;
+  // `…/runs/{run}`. Required.
+  string run = 1;
+  uint32 step = 2;
+  LogStream stream = 3;
   // A negative offset counts from the end: -4096 is the last 4 KiB.
-  int64 offset = 5;
+  int64 offset = 4;
   // Default and most 1 MiB.
-  uint32 limit = 6;
+  uint32 limit = 5;
+}
+message ReadLogResponse {
+  bytes data = 1;
+  // Where `data` starts, and the whole size.
+  uint64 offset = 2;
+  uint64 size = 3;
 }
 
 message ReadArtifactRequest {
-  string repo = 1;
-  string run = 2;
-  uint32 step = 3;
-  string path = 4;
-  int64 offset = 5;
-  uint32 limit = 6;
+  // `…/runs/{run}`. Required.
+  string run = 1;
+  uint32 step = 2;
+  string path = 3;
+  int64 offset = 4;
+  uint32 limit = 5;
 }
-
-message ReadBytesResponse {
+message ReadArtifactResponse {
   bytes data = 1;
-  // Where `data` starts, and the whole size.
   uint64 offset = 2;
   uint64 size = 3;
 }
@@ -211,10 +249,12 @@ message TestRun {
 }
 
 message GetTestHistoryRequest {
-  string repo = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // Required.
   string target = 2;
   // Default 50, at most 100.
-  uint32 limit = 3;
+  int32 max_results = 3;
 }
 message GetTestHistoryResponse {
   repeated TestRun runs = 1;
@@ -232,12 +272,14 @@ message FlakyTest {
 }
 
 message ListFlakyTestsRequest {
-  string repo = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
   // Default 0.1.
-  optional double min_score = 2;
-  // Default 50.
-  uint32 limit = 3;
+  optional double min_score = 4;
 }
 message ListFlakyTestsResponse {
   repeated FlakyTest tests = 1;
+  string next_page_token = 2;
 }

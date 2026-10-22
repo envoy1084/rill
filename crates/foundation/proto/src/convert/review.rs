@@ -209,6 +209,7 @@ impl TryFrom<pb::Comment> for Comment {
 impl From<&Thread> for pb::Thread {
     fn from(t: &Thread) -> Self {
         pb::Thread {
+            name: String::new(),
             id: t.id.clone(),
             anchor: pb::ThreadAnchor::from(&t.anchor).into(),
             comments: t.comments.iter().map(pb::Comment::from).collect(),
@@ -268,6 +269,7 @@ pub fn review_status_from_proto(
 impl From<&ReviewState> for pb::ReviewState {
     fn from(r: &ReviewState) -> Self {
         pb::ReviewState {
+            name: String::new(),
             change_id: id_to_proto(&r.change_id),
             versions: r.versions.iter().map(hash_to_proto).collect(),
             status: pb::ReviewStatus::from(r.status).into(),

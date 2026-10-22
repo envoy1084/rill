@@ -9,10 +9,11 @@ use connectrpc::ConnectError;
 use futures::future::BoxFuture;
 use http::{HeaderValue, Uri};
 use rill_proto::rill::v1::{
-    AccessServiceClient, AdminServiceClient, AuditServiceClient, ChecksServiceClient,
-    IdentityServiceClient, IntentServiceClient, LanderServiceClient, ProtectionServiceClient,
-    RepoServiceClient, ReviewServiceClient, SecretServiceClient, SessionServiceClient,
-    WorkspaceServiceClient,
+    AccessServiceClient, AdminServiceClient, AuditServiceClient, ChangeServiceClient,
+    ChecksServiceClient, ContentServiceClient, EventServiceClient, IdentityServiceClient,
+    IntentServiceClient, LandingServiceClient, OperationServiceClient, OrgServiceClient,
+    PolicyServiceClient, ProtectionServiceClient, RepoServiceClient, ReviewServiceClient,
+    SecretServiceClient, SessionServiceClient, TrunkServiceClient, WorkspaceServiceClient,
 };
 
 use crate::access::AccessClient;
@@ -167,14 +168,28 @@ where
 
 /// Generated repo client over the SDK transport.
 pub type RepoSvc = RepoServiceClient<Transport>;
+/// Generated content client over the SDK transport.
+pub type ContentSvc = ContentServiceClient<Transport>;
+/// Generated change client over the SDK transport.
+pub type ChangeSvc = ChangeServiceClient<Transport>;
+/// Generated event client over the SDK transport.
+pub type EventSvc = EventServiceClient<Transport>;
 /// Generated workspace client over the SDK transport.
 pub type WorkspaceSvc = WorkspaceServiceClient<Transport>;
 /// Generated review client over the SDK transport.
 pub type ReviewSvc = ReviewServiceClient<Transport>;
 /// Generated intent client over the SDK transport.
 pub type IntentSvc = IntentServiceClient<Transport>;
-/// Generated lander client over the SDK transport.
-pub type LanderSvc = LanderServiceClient<Transport>;
+/// Generated landing client over the SDK transport.
+pub type LandingSvc = LandingServiceClient<Transport>;
+/// Generated trunk client over the SDK transport.
+pub type TrunkSvc = TrunkServiceClient<Transport>;
+/// Generated operation client over the SDK transport.
+pub type OperationSvc = OperationServiceClient<Transport>;
+/// Generated policy client over the SDK transport.
+pub type PolicySvc = PolicyServiceClient<Transport>;
+/// Generated org client over the SDK transport.
+pub type OrgSvc = OrgServiceClient<Transport>;
 /// Generated admin client over the SDK transport.
 pub type AdminSvc = AdminServiceClient<Transport>;
 /// Generated audit client over the SDK transport.
@@ -370,6 +385,21 @@ impl Client {
         RepoServiceClient::new(self.transport(), self.call_config())
     }
 
+    /// A fresh generated content client.
+    pub fn content_svc(&self) -> ContentSvc {
+        ContentServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated change client.
+    pub fn change_svc(&self) -> ChangeSvc {
+        ChangeServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated event client.
+    pub fn event_svc(&self) -> EventSvc {
+        EventServiceClient::new(self.transport(), self.call_config())
+    }
+
     /// A fresh generated workspace client.
     pub fn workspace_svc(&self) -> WorkspaceSvc {
         WorkspaceServiceClient::new(self.transport(), self.call_config())
@@ -385,9 +415,29 @@ impl Client {
         IntentServiceClient::new(self.transport(), self.call_config())
     }
 
-    /// A fresh generated lander client.
-    pub fn lander_svc(&self) -> LanderSvc {
-        LanderServiceClient::new(self.transport(), self.call_config())
+    /// A fresh generated landing client.
+    pub fn landing_svc(&self) -> LandingSvc {
+        LandingServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated trunk client.
+    pub fn trunk_svc(&self) -> TrunkSvc {
+        TrunkServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated operation client.
+    pub fn operation_svc(&self) -> OperationSvc {
+        OperationServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated policy client.
+    pub fn policy_svc(&self) -> PolicySvc {
+        PolicyServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated org client.
+    pub fn org_svc(&self) -> OrgSvc {
+        OrgServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated admin client.

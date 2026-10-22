@@ -1,6 +1,7 @@
 //! Repositories live in orgs and are addressed as `org/repo`.
 
 use super::*;
+use common::names;
 
 #[tokio::test]
 async fn repositories_are_addressed_within_their_org() {
@@ -13,39 +14,35 @@ async fn repositories_are_addressed_within_their_org() {
     let bot = clients(&server, Some(&bot_token)).await;
 
     let create_org = |name: &str| pb::CreateOrgRequest {
-        operation_id: Bytes::new(),
-        name: name.into(),
+        request_id: String::new(),
+        org_id: name.into(),
         description: None,
     };
     let err = bot
-        .admin
+        .orgs
         .create_org(create_org("botcorp"))
         .await
         .unwrap_err();
     assert_eq!(err.code, Code::PermissionDenied);
-    alice.admin.create_org(create_org("acme")).await.unwrap();
-    let dup = alice
-        .admin
-        .create_org(create_org("acme"))
-        .await
-        .unwrap_err();
+    alice.orgs.create_org(create_org("acme")).await.unwrap();
+    let dup = alice.orgs.create_org(create_org("acme")).await.unwrap_err();
     assert_eq!(dup.code, Code::AlreadyExists);
 
-    let create_repo = |repo: &str| pb::CreateRepoRequest {
-        operation_id: Bytes::new(),
-        repo: repo.into(),
-        description: None,
-        windows_safe: false,
+    let create_repo = |org: &str, repo: &str| pb::CreateRepoRequest {
+        request_id: String::new(),
+        parent: names::org(org),
+        repo_id: repo.into(),
+        repo: None.into(),
     };
     let missing = alice
         .repo
-        .create_repo(create_repo("ghost/app"))
+        .create_repo(create_repo("ghost", "app"))
         .await
         .unwrap_err();
     assert_eq!(missing.code, Code::NotFound);
     let scoped = alice
         .repo
-        .create_repo(create_repo("acme/app"))
+        .create_repo(create_repo("acme", "app"))
         .await
         .unwrap()
         .into_owned()
@@ -53,7 +50,7 @@ async fn repositories_are_addressed_within_their_org() {
         .unwrap();
     let plain = alice
         .repo
-        .create_repo(create_repo("app"))
+        .create_repo(create_repo("default", "app"))
         .await
         .unwrap()
         .into_owned()
@@ -63,28 +60,27 @@ async fn repositories_are_addressed_within_their_org() {
         (scoped.org.as_str(), plain.org.as_str()),
         ("acme", "default")
     );
-    assert_ne!(scoped.id, plain.id);
+    assert_ne!(scoped.uid, plain.uid);
 
     alice
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "acme/app".into(),
+            request_id: String::new(),
+            parent: names::repo("acme/app"),
             base: None.into(),
             edits: vec![set_edit("README.md", b"acme\n")],
             message: "first".into(),
-            intent: None,
+            intent: String::new(),
             provenance: None.into(),
-            change_id: None,
+            change: String::new(),
         })
         .await
         .unwrap();
     let listed = alice
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: "app".into(),
-            root: None.into(),
-            path: String::new(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: names::repo("app"),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -95,12 +91,12 @@ async fn repositories_are_addressed_within_their_org() {
     );
 
     let orgs = alice
-        .admin
-        .list_orgs(pb::ListOrgsRequest {})
+        .orgs
+        .list_orgs(pb::ListOrgsRequest::default())
         .await
         .unwrap()
         .into_owned();
-    let names: Vec<_> = orgs.orgs.iter().map(|o| o.name.as_str()).collect();
-    assert_eq!(names, vec!["acme", "default"]);
+    let ids: Vec<_> = orgs.orgs.iter().map(|o| o.org_id.as_str()).collect();
+    assert_eq!(ids, vec!["acme", "default"]);
     server.stop().await;
 }

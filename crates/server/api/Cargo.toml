@@ -47,6 +47,7 @@ futures = { workspace = true }
 
 tonic = { workspace = true }
 connectrpc = { workspace = true }
+uuid = { workspace = true }
 connectrpc-health = { workspace = true }
 connectrpc-reflection = { workspace = true }
 buffa = { workspace = true }

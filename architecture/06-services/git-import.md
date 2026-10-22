@@ -60,8 +60,8 @@ append to trunk, and load and save the map.
   is the misc record `git_import_map`. Run it while no server uses the
   directory.
 * The CLI's `RemoteTarget` (the default) goes through a server: content
-  through `PutBlob` or inline, versions through `CreateChangeVersion`,
-  trunk through the admin-only `AppendTrunk` RPC (`land_on_trunk` with the
+  through `WriteBlob` or inline, versions through `CreateVersion`,
+  trunk through the admin-only `ImportTrunkPosition` RPC (`land_on_trunk` with the
   expected head, idempotent like every mutation), and the map is a JSON
   file in the git directory (`rill-import-<repo>.json`, `--map-file`),
   saved after every commit. The server stamps the importing principal and
@@ -87,7 +87,7 @@ A merge becomes a version with several parents and file changes relative
 to `parents[0]`, which is the data model's rule (see
 [objects and ids](../02-data/objects-and-ids.md)). The version is written
 through the target (`put_change_version` in the store, which is a no-op
-for a hash it already has; `CreateChangeVersion` through a server). A parent missing
+for a hash it already has; `CreateVersion` through a server). A parent missing
 from the map is `Error::MissingParent`; a path `RepoPathBuf` rejects is
 `Error::InvalidPath`.
 

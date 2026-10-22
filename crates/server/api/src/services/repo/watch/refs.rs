@@ -8,7 +8,7 @@ use rill_proto::rill::v1 as pb;
 use rill_types::{EventKind, RefName, TrunkSeq};
 
 use super::stream::{forward, EventStream};
-use crate::services::common::open;
+use crate::services::common::open_repo;
 use crate::services::repo::RepoSvc;
 use crate::services::Call;
 use rill_runtime::error::Result;
@@ -18,10 +18,10 @@ impl RepoSvc {
     pub(in crate::services::repo) async fn watch_refs_impl(
         &self,
         request: Call<pb::WatchRefsRequest>,
-    ) -> Result<EventStream<pb::RefEvent>> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+    ) -> Result<EventStream<pb::WatchRefsResponse>> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().parent).await?;
         opened.permit().read_any().await?;
-        let prefix = request.get_ref().prefix.clone().unwrap_or_default();
+        let prefix = request.get_ref().prefix.clone();
         let trunk = RefName::trunk().to_string();
         let filter = EventFilter::kinds(["ref_moved", "landed"]);
         let ctx = opened.repo.clone();
@@ -40,8 +40,8 @@ impl RepoSvc {
                 if !name.starts_with(&prefix) {
                     return Ok(None);
                 }
-                Ok(Some(pb::RefEvent {
-                    name,
+                Ok(Some(pb::WatchRefsResponse {
+                    r#ref: name,
                     old: old.map(|h| hash_to_proto(&h)),
                     new: new.map(|h| hash_to_proto(&h)),
                     at: timestamp_to_proto(event.at),

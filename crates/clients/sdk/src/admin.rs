@@ -1,11 +1,13 @@
-//! Admin: identity, capability tokens, policies and health.
+//! Admin: the caller, capability tokens, policies, orgs, importing
+//! history and health.
 
-use rill_proto::convert::{id_to_proto, timestamp_from_proto};
+use rill_proto::convert::{required, timestamp_from_proto};
 use rill_proto::rill::v1 as pb;
-use rill_types::{OperationId, Timestamp};
+use rill_types::OperationId;
 
 use crate::client::Client;
 use crate::error::Result;
+use crate::names;
 use crate::types::{Health, IssuedToken, OrgInfo, Policy, TokenRequest, WhoAmI};
 
 /// Instance-wide administrative operations; not scoped to a repository.
@@ -19,16 +21,11 @@ impl AdminClient {
         AdminClient { client }
     }
 
-    fn svc(&self) -> crate::client::AdminSvc {
-        self.client.admin_svc()
-    }
-
     /// The caller's identity and capabilities.
     pub async fn whoami(&self) -> Result<WhoAmI> {
         crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::WhoAmIRequest {};
-            async move { svc.who_am_i(request).await }
+            let svc = self.client.identity_svc();
+            async move { svc.get_caller(pb::GetCallerRequest {}).await }
         })
         .await?
         .into_owned()
@@ -47,13 +44,13 @@ impl AdminClient {
         request: TokenRequest,
     ) -> Result<IssuedToken> {
         let request = pb::IssueTokenRequest {
-            operation_id: id_to_proto(&op),
+            request_id: names::request_id(&op),
             capabilities: request.capabilities.iter().map(|c| c.to_proto()).collect(),
             expires_at: request.expires_at.map(|t| t.millis()),
             for_principal: request.for_principal.map(pb::Principal::from).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.client.identity_svc(), request.clone());
             async move { svc.issue_token(request).await }
         })
         .await?
@@ -64,45 +61,45 @@ impl AdminClient {
         })
     }
 
-    /// A named policy.
-    pub async fn policy(&self, name: &str) -> Result<Policy> {
-        crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::GetPolicyRequest {
-                name: name.to_string(),
-            };
+    /// `repo`'s `policy` (`submit` or `risk`).
+    pub async fn policy(&self, repo: &str, policy: &str) -> Result<Policy> {
+        let name = names::policy(repo, policy);
+        let resp = crate::client::retry_idempotent(|| {
+            let svc = self.client.policy_svc();
+            let request = pb::GetPolicyRequest { name: name.clone() };
             async move { svc.get_policy(request).await }
         })
         .await?
-        .into_owned()
-        .try_into()
+        .into_owned();
+        required("get_policy.policy", resp.policy)?.try_into()
     }
 
-    /// Replace a named policy's text. Returns the update time.
-    pub async fn set_policy(&self, name: &str, text: &str) -> Result<Timestamp> {
-        self.set_policy_with_op(OperationId::new(), name, text)
-            .await
-    }
-
-    /// [`AdminClient::set_policy`] with a caller-chosen idempotency key.
-    pub async fn set_policy_with_op(
+    /// Replace `repo`'s `policy` text; with `etag`, only if it is unchanged
+    /// since it was read.
+    pub async fn set_policy(
         &self,
-        op: OperationId,
-        name: &str,
+        repo: &str,
+        policy: &str,
         text: &str,
-    ) -> Result<Timestamp> {
-        let request = pb::SetPolicyRequest {
-            operation_id: id_to_proto(&op),
-            name: name.to_string(),
-            text: text.to_string(),
+        etag: Option<&str>,
+    ) -> Result<Policy> {
+        let request = pb::UpdatePolicyRequest {
+            request_id: names::request_id(&OperationId::new()),
+            policy: pb::Policy {
+                name: names::policy(repo, policy),
+                text: text.to_string(),
+                ..Default::default()
+            }
+            .into(),
+            etag: etag.unwrap_or_default().to_string(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
-            async move { svc.set_policy(request).await }
+            let (svc, request) = (self.client.policy_svc(), request.clone());
+            async move { svc.update_policy(request).await }
         })
         .await?
         .into_owned();
-        Ok(timestamp_from_proto(resp.updated_at))
+        required("update_policy.policy", resp.policy)?.try_into()
     }
 
     /// Append an imported `version` to `repo`'s trunk if trunk still ends
@@ -113,55 +110,65 @@ impl AdminClient {
         expected: Option<rill_types::ChangeVersionHash>,
         version: rill_types::ChangeVersionHash,
     ) -> Result<rill_types::TrunkSeq> {
-        let request = pb::AppendTrunkRequest {
-            operation_id: id_to_proto(&OperationId::new()),
-            repo: repo.to_string(),
+        let request = pb::ImportTrunkPositionRequest {
+            request_id: names::request_id(&OperationId::new()),
+            parent: names::repo(repo),
             expected: expected.map(|h| rill_proto::convert::hash_to_proto(&h)),
             version: rill_proto::convert::hash_to_proto(&version),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
-            async move { svc.append_trunk(request).await }
+            let (svc, request) = (self.client.admin_svc(), request.clone());
+            async move { svc.import_trunk_position(request).await }
         })
         .await?
         .into_owned();
-        Ok(rill_types::TrunkSeq(resp.seq))
+        Ok(rill_types::TrunkSeq(resp.position))
     }
 
     /// Create an org.
     pub async fn create_org(&self, name: &str, description: Option<&str>) -> Result<OrgInfo> {
         let request = pb::CreateOrgRequest {
-            operation_id: id_to_proto(&OperationId::new()),
-            name: name.to_string(),
+            request_id: names::request_id(&OperationId::new()),
+            org_id: name.to_string(),
             description: description.map(str::to_string),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.client.org_svc(), request.clone());
             async move { svc.create_org(request).await }
         })
         .await?
         .into_owned();
-        Ok(rill_proto::convert::required("create_org.org", resp.org)?.into())
+        Ok(required("create_org.org", resp.org)?.into())
     }
 
     /// Every org.
     pub async fn list_orgs(&self) -> Result<Vec<OrgInfo>> {
-        let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::ListOrgsRequest {};
-            async move { svc.list_orgs(request).await }
-        })
-        .await?
-        .into_owned();
-        Ok(resp.orgs.into_iter().map(OrgInfo::from).collect())
+        let mut orgs = Vec::new();
+        let mut page_token = String::new();
+        loop {
+            let resp = crate::client::retry_idempotent(|| {
+                let svc = self.client.org_svc();
+                let request = pb::ListOrgsRequest {
+                    page_size: 1000,
+                    page_token: page_token.clone(),
+                };
+                async move { svc.list_orgs(request).await }
+            })
+            .await?
+            .into_owned();
+            orgs.extend(resp.orgs.into_iter().map(OrgInfo::from));
+            if resp.next_page_token.is_empty() {
+                return Ok(orgs);
+            }
+            page_token = resp.next_page_token;
+        }
     }
 
     /// Server health.
     pub async fn health(&self) -> Result<Health> {
         Ok(crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::HealthRequest {};
-            async move { svc.health(request).await }
+            let svc = self.client.admin_svc();
+            async move { svc.get_health(pb::GetHealthRequest {}).await }
         })
         .await?
         .into_owned()

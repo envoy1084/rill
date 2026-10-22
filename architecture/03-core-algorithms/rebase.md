@@ -68,7 +68,7 @@ The algebra settles most paths before any content is read:
 
 | Caller | What happens to a conflicted result |
 | --- | --- |
-| `Rebase` RPC ([repo/write.rs](../../crates/server/api/src/services/repo/write.rs)) | Stored through `commit_version`; `has_conflicts` is true |
+| `RebaseVersion` RPC ([changes/write.rs](../../crates/server/api/src/services/changes/write.rs)) | Stored through `commit_version`; `has_conflicts` is true |
 | Workspace rebase ([services/workspace/mod.rs](../../crates/server/api/src/services/workspace/mod.rs)) | Stored through `commit_version`; the workspace snapshot moves to its root |
 | Lander ([land/prepare.rs](../../crates/domain/lander/src/land/prepare.rs)) | Not stored. The request gets `LandStatus::Conflict` and the change goes back to its owner |
 

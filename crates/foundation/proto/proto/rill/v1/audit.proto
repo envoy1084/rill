@@ -1,20 +1,23 @@
-// Audit service: each org's hash-chained audit log and its signed seals,
-// for org administrators (instance administrators for `_instance`).
+// Audit: each org's hash-chained audit log and its signed seals, for org
+// administrators (instance administrators for `orgs/_instance`).
 syntax = "proto3";
 
 package rill.v1;
 
 import "rill/v1/types.proto";
 
+// The audit log.
 service AuditService {
+  // Entries in chain order.
   rpc ListAuditEntries(ListAuditEntriesRequest) returns (ListAuditEntriesResponse);
+  // The signed seals over the chain, oldest first.
   rpc ListAuditRoots(ListAuditRootsRequest) returns (ListAuditRootsResponse);
   // Seal what the chain gained since its last seal, now.
   rpc SealAudit(SealAuditRequest) returns (SealAuditResponse);
   // The public keys seals verify with, by token key id.
   rpc ListAuditKeys(ListAuditKeysRequest) returns (ListAuditKeysResponse);
   // Entries as they are chained, for SIEM export.
-  rpc WatchAudit(WatchAuditRequest) returns (stream AuditEntryRecord);
+  rpc WatchAudit(WatchAuditRequest) returns (stream WatchAuditResponse);
 }
 
 message AuditEntryRecord {
@@ -49,25 +52,33 @@ message AuditRootRecord {
 }
 
 message ListAuditEntriesRequest {
-  // Defaults to the default org; `_instance` for instance-wide actions.
-  string org = 1;
-  uint64 after_seq = 2;
-  uint32 limit = 3;
+  // `orgs/{org}`; `orgs/_instance` for instance-wide actions. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // Entries after this sequence on the first page.
+  uint64 after_seq = 4;
 }
 message ListAuditEntriesResponse {
   repeated AuditEntryRecord entries = 1;
   uint64 head_seq = 2;
+  string next_page_token = 3;
 }
 
 message ListAuditRootsRequest {
-  string org = 1;
+  // `orgs/{org}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
 }
 message ListAuditRootsResponse {
   repeated AuditRootRecord roots = 1;
+  string next_page_token = 2;
 }
 
 message SealAuditRequest {
-  string org = 1;
+  // `orgs/{org}`. Required.
+  string parent = 1;
 }
 message SealAuditResponse {
   // Absent when nothing was added since the last seal.
@@ -75,9 +86,13 @@ message SealAuditResponse {
 }
 
 message WatchAuditRequest {
-  string org = 1;
+  // `orgs/{org}`. Required.
+  string parent = 1;
   // Entries after this one; 0 for the whole chain.
   uint64 after_seq = 2;
+}
+message WatchAuditResponse {
+  AuditEntryRecord entry = 1;
 }
 
 message ListAuditKeysRequest {}

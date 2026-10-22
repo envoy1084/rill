@@ -28,8 +28,8 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ScimCmd) -> Result<()> {
         ScimCmd::Create(o) => {
             let created = svc
                 .create_scim_credential(pb::CreateScimCredentialRequest {
-                    operation_id: Default::default(),
-                    org: o.org.clone(),
+                    request_id: String::new(),
+                    parent: rill_sdk::names::org(&o.org),
                 })
                 .await?
                 .into_owned();
@@ -44,7 +44,11 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ScimCmd) -> Result<()> {
         }
         ScimCmd::List(o) => {
             let credentials = svc
-                .list_scim_credentials(pb::ListScimCredentialsRequest { org: o.org })
+                .list_scim_credentials(pb::ListScimCredentialsRequest {
+                    parent: rill_sdk::names::org(&o.org),
+                    page_size: 1000,
+                    page_token: String::new(),
+                })
                 .await?
                 .into_owned()
                 .credentials;
@@ -66,10 +70,13 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ScimCmd) -> Result<()> {
             })
         }
         ScimCmd::Revoke(a) => {
-            svc.revoke_scim_credential(pb::RevokeScimCredentialRequest {
-                operation_id: Default::default(),
-                org: a.org.org,
-                id: a.name.clone(),
+            svc.delete_scim_credential(pb::DeleteScimCredentialRequest {
+                request_id: String::new(),
+                name: format!(
+                    "{}/scimCredentials/{}",
+                    rill_sdk::names::org(&a.org.org),
+                    a.name
+                ),
             })
             .await?;
             ctx.emit(json!({ "revoked": a.name }), |out| {

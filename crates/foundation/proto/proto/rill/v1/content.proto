@@ -1,0 +1,301 @@
+// Reading a repository's content at a revision: files, directories,
+// blobs, diffs, blame, history and search.
+//
+// Requests name the repository (`orgs/{org}/repos/{repo}`) and a revision
+// (see repos.proto; `trunk` when empty). Content is served by hash only
+// with a read grant from the response that revealed the hash.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+// Files, trees, blobs, diffs, blame, history and search.
+service ContentService {
+  // One file's entry and, up to `max_bytes`, its content.
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  // Up to 1,000 files at one revision.
+  rpc BatchReadFiles(BatchReadFilesRequest) returns (BatchReadFilesResponse);
+  // What is at a path: a file, a directory, a symlink, or nothing.
+  rpc Stat(StatRequest) returns (StatResponse);
+  // A directory's entries, by name.
+  rpc ListDirectory(ListDirectoryRequest) returns (ListDirectoryResponse);
+  // A tree object by hash.
+  rpc GetTree(GetTreeRequest) returns (GetTreeResponse);
+  // Content by reference, streamed.
+  rpc ReadBlob(ReadBlobRequest) returns (stream ReadBlobResponse);
+  // Upload content: one header message, then the data.
+  rpc WriteBlob(stream WriteBlobRequest) returns (WriteBlobResponse);
+  // Which objects exist, before an upload.
+  rpc BatchCheckObjects(BatchCheckObjectsRequest) returns (BatchCheckObjectsResponse);
+
+  // The difference between two revisions.
+  rpc Diff(DiffRequest) returns (DiffResponse);
+  // Who last changed each line of a file.
+  rpc Blame(BlameRequest) returns (BlameResponse);
+  // The versions behind a revision, newest first.
+  rpc ListHistory(ListHistoryRequest) returns (ListHistoryResponse);
+  // The versions that changed one path, following renames.
+  rpc ListPathHistory(ListPathHistoryRequest) returns (ListPathHistoryResponse);
+  // Regular-expression search over a revision's files.
+  rpc Grep(GrepRequest) returns (GrepResponse);
+  // The merge bases of two revisions.
+  rpc FindMergeBase(FindMergeBaseRequest) returns (FindMergeBaseResponse);
+  // Whether one revision is an ancestor of another.
+  rpc IsAncestor(IsAncestorRequest) returns (IsAncestorResponse);
+}
+
+message ReadFileRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string revision = 2;
+  // Required.
+  string path = 3;
+  // Content larger than this is not returned (`data` empty, `truncated`);
+  // read it with ReadBlob. 0 means 4 MiB, the most allowed.
+  uint64 max_bytes = 4;
+}
+message ReadFileResponse {
+  TreeEntry entry = 1;
+  bytes data = 2;
+  // The file is larger than `max_bytes`.
+  bool truncated = 3;
+  // A read grant for the file's content.
+  string read_grant = 4;
+}
+
+message BatchReadFilesRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string revision = 2;
+  // At most 1,000.
+  repeated string paths = 3;
+  // Per file, as in ReadFile; the whole response holds at most 16 MiB of
+  // content, the rest truncated.
+  uint64 max_bytes = 4;
+}
+message BatchReadFilesResponse {
+  // Parallel to `paths`; a missing path has no entry.
+  repeated ReadFileResponse files = 1;
+}
+
+message StatRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string revision = 2;
+  string path = 3;
+}
+message StatResponse {
+  // Absent if the path does not exist.
+  optional TreeEntry entry = 1;
+  string read_grant = 2;
+}
+
+message ListDirectoryRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string revision = 2;
+  // Empty for the root.
+  string path = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+message ListDirectoryResponse {
+  bytes tree_hash = 1;
+  // Entries the caller may read, and directories on the way to them.
+  repeated NamedTreeEntry entries = 2;
+  string next_page_token = 3;
+  // A read grant for the readable entries.
+  string read_grant = 4;
+}
+
+message GetTreeRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  bytes hash = 2;
+  // A read grant naming the tree, from the listing that revealed it.
+  string grant = 3;
+}
+message GetTreeResponse {
+  Tree tree = 1;
+  string read_grant = 2;
+}
+
+message ReadBlobRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  ContentRef content = 2;
+  // Byte range; the whole blob by default.
+  optional uint64 offset = 3;
+  optional uint64 length = 4;
+  // A read grant naming the content. Outside dev mode content is never
+  // served by hash alone.
+  string grant = 5;
+}
+message ReadBlobResponse {
+  bytes data = 1;
+}
+
+message WriteBlobRequest {
+  oneof msg {
+    WriteBlobHeader header = 1;
+    bytes data = 2;
+  }
+}
+message WriteBlobHeader {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 2;
+  // Total size, if known; lets the server pick chunking up front.
+  optional uint64 size = 3;
+  // Expected content hash; the upload fails if it does not match.
+  optional bytes expected_hash = 4;
+}
+message WriteBlobResponse {
+  ContentRef content = 1;
+}
+
+message BatchCheckObjectsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  repeated ObjectRef objects = 2;
+}
+message ObjectRef {
+  ObjectKind kind = 1;
+  bytes hash = 2;
+}
+message BatchCheckObjectsResponse {
+  // Parallel to `objects`.
+  repeated bool present = 1;
+}
+
+message DiffRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  // Required.
+  string base = 2;
+  // Required.
+  string target = 3;
+  // Restrict to these paths or prefixes; empty means everything.
+  repeated string paths = 4;
+  DiffFormat format = 5;
+  uint32 context_lines = 6;
+  // Most files to return; 0 means 1,000.
+  uint32 max_files = 7;
+}
+message DiffResponse {
+  repeated FileDiff files = 1;
+  // `max_files` or the 4 MiB budget cut the diff.
+  bool truncated = 2;
+  // A read grant for the content on both sides.
+  string read_grant = 3;
+}
+
+message BlameRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string revision = 2;
+  // Required.
+  string path = 3;
+}
+message BlameResponse {
+  repeated BlameLine lines = 1;
+}
+message BlameLine {
+  uint32 line_no = 1;
+  // `orgs/{org}/repos/{repo}/versions/{hash}`.
+  string version = 2;
+  Principal author = 3;
+  optional uint64 trunk_position = 4;
+  bytes text = 5;
+}
+
+message ListHistoryRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  // Where to start walking.
+  string revision = 2;
+  // Only versions touching this path or prefix.
+  string path = 3;
+  // Walk first parents only.
+  bool first_parent = 4;
+  int32 page_size = 5;
+  string page_token = 6;
+}
+message ListHistoryResponse {
+  repeated ChangeInfo versions = 1;
+  string next_page_token = 2;
+}
+
+message ListPathHistoryRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string revision = 2;
+  // Required.
+  string path = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+message ListPathHistoryResponse {
+  repeated PathHistoryEntry entries = 1;
+  string next_page_token = 2;
+}
+message PathHistoryEntry {
+  ChangeInfo version = 1;
+  // The path as of this version (differs across renames).
+  string path = 2;
+  FileChange change = 3;
+}
+
+message GrepRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string revision = 2;
+  // Regular expression (Rust `regex` syntax). Required.
+  string pattern = 3;
+  bool case_insensitive = 4;
+  // Glob filters on paths, e.g. `src/**/*.rs`; empty means all paths.
+  repeated string path_globs = 5;
+  // Most hits; 0 means 5,000.
+  uint32 max_results = 6;
+  uint32 context_lines = 7;
+}
+message GrepResponse {
+  repeated GrepHit hits = 1;
+  // `max_results` cut the hits.
+  bool truncated = 2;
+}
+message GrepHit {
+  string path = 1;
+  uint32 line_no = 2;
+  string line = 3;
+  repeated string before = 4;
+  repeated string after = 5;
+  uint64 byte_start = 6;
+  uint64 byte_end = 7;
+}
+
+message FindMergeBaseRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  // Required.
+  string a = 2;
+  // Required.
+  string b = 3;
+}
+message FindMergeBaseResponse {
+  // Version names; empty when the two share no history.
+  repeated string bases = 1;
+}
+
+message IsAncestorRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  // Required.
+  string ancestor = 2;
+  // Required.
+  string descendant = 3;
+}
+message IsAncestorResponse {
+  bool is_ancestor = 1;
+}

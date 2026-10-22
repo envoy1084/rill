@@ -1,6 +1,5 @@
 //! Loading workspaces and appending to their operation log.
 
-use rill_proto::convert::id_from_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{
     ChangeVersion, ChangeVersionHash, Operation, OperationId, OperationKind, RepoPathBuf,
@@ -8,21 +7,23 @@ use rill_types::{
 };
 
 use super::WorkspaceSvc;
+use crate::services::changes::{commit_version_with, CommitExtras};
 use crate::services::common::{self, Opened};
-use crate::services::repo::{commit_version_with, CommitExtras};
+use crate::services::names;
 use rill_runtime::error::{Error, Result};
+use rill_runtime::state::RepoContext;
 
 impl WorkspaceSvc {
     /// Load a workspace the caller may modify.
-    pub(super) async fn load_mut(&self, opened: &Opened, id: &[u8]) -> Result<Workspace> {
-        let ws = self.load(opened, id).await?;
+    pub(super) async fn load_mut(&self, opened: &Opened, name: &str) -> Result<Workspace> {
+        let ws = self.load(opened, name).await?;
         opened.permit().write(&RepoPathBuf::root()).await?;
         opened.permit().owns_or_admin(&ws.owner).await?;
         Ok(ws)
     }
 
-    pub(super) async fn load(&self, opened: &Opened, id: &[u8]) -> Result<Workspace> {
-        let id: WorkspaceId = id_from_proto("workspace", id)?;
+    pub(super) async fn load(&self, opened: &Opened, name: &str) -> Result<Workspace> {
+        let id = workspace_id(name)?;
         opened.permit().read(&RepoPathBuf::root()).await?;
         opened
             .repo
@@ -122,9 +123,63 @@ pub(super) async fn base_root(opened: &Opened, ws: &Workspace) -> Result<Option<
     }
 }
 
+/// The workspace id a workspace (or workspace operation) name holds.
+pub(super) fn workspace_id(name: &str) -> Result<WorkspaceId> {
+    let ws = name
+        .split('/')
+        .nth(5)
+        .filter(|_| name.split('/').nth(4) == Some("workspaces"))
+        .ok_or_else(|| Error::InvalidName(format!("{name:?} is not a workspace name")))?;
+    ws.parse()
+        .map_err(|_| Error::InvalidName(format!("{ws:?} is not a workspace id")))
+}
+
+/// A workspace's etag: its head operation, which every change moves.
+pub(super) fn etag(ws: &Workspace) -> String {
+    ws.head_op.map(|op| op.to_string()).unwrap_or_default()
+}
+
+/// Refuse to change `ws` unless `etag` is its current one; an empty etag
+/// is no condition.
+pub(super) fn check_etag(ws: &Workspace, given: &str) -> Result<()> {
+    if !given.is_empty() && given != etag(ws) {
+        return Err(Error::EtagMismatch(format!(
+            "workspace {} has changed; read it again",
+            ws.id
+        )));
+    }
+    Ok(())
+}
+
+/// The wire form of a workspace, with its name and etag.
+pub(super) fn workspace_proto(ctx: &RepoContext, ws: &Workspace) -> pb::Workspace {
+    pb::Workspace {
+        name: names::workspace(ctx, &ws.id),
+        etag: etag(ws),
+        ..pb::Workspace::from(ws)
+    }
+}
+
+/// The wire form of an operation, with its name.
+pub(super) fn operation_proto(ctx: &RepoContext, op: &Operation) -> pb::WorkspaceOperation {
+    pb::WorkspaceOperation {
+        name: format!(
+            "{}/operations/{}",
+            names::workspace(ctx, &op.workspace),
+            op.id
+        ),
+        resulting: workspace_proto(ctx, &op.resulting).into(),
+        ..pb::WorkspaceOperation::from(op)
+    }
+}
+
 pub(super) fn response_pair(
+    ctx: &RepoContext,
     ws: &Workspace,
     op: &Operation,
-) -> (Option<pb::Workspace>, Option<pb::Operation>) {
-    (Some(pb::Workspace::from(ws)), Some(pb::Operation::from(op)))
+) -> (Option<pb::Workspace>, Option<pb::WorkspaceOperation>) {
+    (
+        Some(workspace_proto(ctx, ws)),
+        Some(operation_proto(ctx, op)),
+    )
 }

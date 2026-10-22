@@ -30,4 +30,4 @@ prost-types = { workspace = true }
 
 [package.metadata.cargo-machete]
 # Used by the generated code.
-ignored = ["buffa-types", "serde", "serde_json"]
+ignored = ["serde", "serde_json"]

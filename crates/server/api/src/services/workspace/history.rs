@@ -1,38 +1,43 @@
 //! The operation log: listing it and undoing an operation.
 
-use rill_proto::convert::opt_id_from_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{OperationId, OperationKind, Workspace};
 
-use super::oplog::response_pair;
+use super::oplog::{operation_proto, response_pair, workspace_id};
 use super::WorkspaceSvc;
-use crate::services::common::{self, open, operation_id};
-use crate::services::Call;
+use crate::listing::{Page, Position};
+use crate::services::common::open_repo;
+use crate::services::{names, Call};
 use rill_runtime::error::{Error, Result};
 
-/// Default page size for operation listings.
-const DEFAULT_OPS_LIMIT: usize = 50;
+/// The most of a workspace's log that is read at once.
 const MAX_OPS_LIMIT: usize = 1000;
 
 impl WorkspaceSvc {
-    pub(super) async fn undo_impl(
+    pub(super) async fn undo_operation_impl(
         &self,
-        request: Call<pb::UndoRequest>,
-    ) -> Result<pb::UndoResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::UndoOperationRequest>,
+    ) -> Result<pb::UndoOperationResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().name).await?;
         let req = request.into_inner();
-        let before = self.load_mut(&opened, &req.workspace).await?;
+        let (workspace, operation) = req.name.rsplit_once("/operations/").ok_or_else(|| {
+            Error::InvalidName(format!("{:?} is not an operation name", req.name))
+        })?;
+        workspace_id(workspace)?;
+        let before = self.load_mut(&opened, workspace).await?;
         let mut ws = before.clone();
         let ops = opened
             .repo
             .repo
             .list_operations(&ws.id, MAX_OPS_LIMIT)
             .await?;
-        let target: OperationId = match opt_id_from_proto("target", req.target.as_ref())? {
-            Some(id) => id,
-            None => ws
+        let target: OperationId = match operation {
+            "head" => ws
                 .head_op
                 .ok_or_else(|| Error::precondition("workspace has no operations"))?,
+            id => id
+                .parse()
+                .map_err(|_| Error::InvalidName(format!("{id:?} is not an operation id")))?,
         };
         let undone = ops
             .iter()
@@ -59,38 +64,60 @@ impl WorkspaceSvc {
                 &opened,
                 Some(&before),
                 &mut ws,
-                operation_id(&req.operation_id)?,
+                names::request_id(&req.request_id)?,
                 OperationKind::Undo { undone: target },
             )
             .await?;
-        let (workspace, operation) = response_pair(&ws, &op);
-        Ok(pb::UndoResponse {
+        let (workspace, operation) = response_pair(&opened.repo, &ws, &op);
+        Ok(pb::UndoOperationResponse {
             workspace: workspace.into(),
             operation: operation.into(),
         })
     }
 
-    pub(super) async fn list_operations_impl(
+    pub(super) async fn list_workspace_operations_impl(
         &self,
-        request: Call<pb::ListOperationsRequest>,
-    ) -> Result<pb::ListOperationsResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::ListWorkspaceOperationsRequest>,
+    ) -> Result<pb::ListWorkspaceOperationsResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().parent).await?;
         let req = request.get_ref();
-        let ws = self.load(&opened, &req.workspace).await?;
-        let limit = common::limit(req.limit, DEFAULT_OPS_LIMIT, MAX_OPS_LIMIT);
-        let before: Option<OperationId> = opt_id_from_proto("before", req.before.as_ref())?;
+        let ws = self.load(&opened, &req.parent).await?;
+        let page = Page::new(req.page_size, &req.page_token, &[&req.parent])?;
+        // The log, newest first; a page continues after the operation the
+        // previous one ended with.
         let mut ops = opened
             .repo
             .repo
             .list_operations(&ws.id, MAX_OPS_LIMIT)
             .await?;
-        if let Some(before) = before {
-            if let Some(pos) = ops.iter().position(|o| o.id == before) {
-                ops.truncate(pos);
+        ops.reverse();
+        let skip = match &page.start {
+            Position::Start => 0,
+            Position::After(key) => {
+                let after =
+                    OperationId::from_bytes(key.as_slice().try_into().map_err(|_| {
+                        Error::InvalidPageToken("not a token for this list".into())
+                    })?);
+                ops.iter()
+                    .position(|o| o.id == after)
+                    .map_or(ops.len(), |i| i + 1)
             }
-        }
-        let start = ops.len().saturating_sub(limit);
-        let operations = ops.drain(start..).map(pb::Operation::from).collect();
-        Ok(pb::ListOperationsResponse { operations })
+            Position::Offset(_) => {
+                return Err(Error::InvalidPageToken("not a token for this list".into()))
+            }
+        };
+        let rest = &ops[skip.min(ops.len())..];
+        let taken = &rest[..page.size.min(rest.len())];
+        let next_page_token = match (taken.last(), rest.len() > taken.len()) {
+            (Some(last), true) => page.token(Position::After(last.id.as_bytes().to_vec())),
+            _ => String::new(),
+        };
+        Ok(pb::ListWorkspaceOperationsResponse {
+            operations: taken
+                .iter()
+                .map(|op| operation_proto(&opened.repo, op))
+                .collect(),
+            next_page_token,
+        })
     }
 }

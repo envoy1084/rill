@@ -1,0 +1,269 @@
+// Trunk: its head and queue, post-land verification, incidents, reverts
+// and bisection.
+//
+// A landing is `orgs/{org}/repos/{repo}/trunk/positions/{n}`; an incident
+// is `orgs/{org}/repos/{repo}/incidents/{culprit position}`.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/landing.proto";
+import "rill/v1/operations.proto";
+import "rill/v1/types.proto";
+
+// Trunk status, verification and healing.
+service TrunkService {
+  // Trunk's head, what is landing and the last verified position.
+  rpc GetTrunkStatus(GetTrunkStatusRequest) returns (GetTrunkStatusResponse);
+  // Landings newest first, each with its verification.
+  rpc ListLandings(ListLandingsRequest) returns (ListLandingsResponse);
+  // A landing's verification: the post-land verifier's and runners' reports.
+  rpc GetVerification(GetVerificationRequest) returns (GetVerificationResponse);
+  // File a runner's verification report for a landing.
+  rpc ReportVerification(ReportVerificationRequest) returns (ReportVerificationResponse);
+  // Land the revert of one landing.
+  rpc RevertLanding(RevertLandingRequest) returns (RevertLandingResponse);
+  // What reverting every landing a session, model, sponsor, author or
+  // intent made would revert, and which reverts conflict (owners).
+  rpc PreviewBulkRevert(PreviewBulkRevertRequest) returns (PreviewBulkRevertResponse);
+  // Queue those reverts in the emergency lane (owners).
+  rpc BulkRevert(BulkRevertRequest) returns (BulkRevertResponse);
+  // Find the landing in (from, to] that broke trunk.
+  rpc Bisect(BisectRequest) returns (BisectResponse);
+  // Trunk's state and the incidents keeping it red.
+  rpc GetTrunkHealth(GetTrunkHealthRequest) returns (GetTrunkHealthResponse);
+  // Incidents, open and closed, newest culprit first.
+  rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse);
+  // Freeze trunk so only emergency landings land (owners).
+  rpc FreezeTrunk(FreezeTrunkRequest) returns (FreezeTrunkResponse);
+  // Thaw a frozen trunk (owners).
+  rpc UnfreezeTrunk(UnfreezeTrunkRequest) returns (UnfreezeTrunkResponse);
+}
+
+enum VerificationStatus {
+  VERIFICATION_STATUS_UNSPECIFIED = 0;
+  VERIFICATION_STATUS_PENDING = 1;
+  VERIFICATION_STATUS_RUNNING = 2;
+  VERIFICATION_STATUS_PASSED = 3;
+  VERIFICATION_STATUS_FAILED = 4;
+  // Failed, and a later bisect found an earlier culprit.
+  VERIFICATION_STATUS_INHERITED = 5;
+  VERIFICATION_STATUS_SKIPPED = 6;
+}
+
+// One runner's report on one landing.
+message VerificationReport {
+  // The verification target or runner (`unit`, `lint`, …).
+  string target = 1;
+  VerificationStatus status = 2;
+  Principal reporter = 3;
+  int64 reported_at = 4;
+  optional string details = 5;
+  // A content-addressed log or artifact, if the runner stored one.
+  optional bytes artifact = 6;
+}
+
+// A landing's verification.
+message Verification {
+  // `…/trunk/positions/{n}`.
+  string landing = 1;
+  uint64 position = 2;
+  // The worst of the reports; pending when there are none.
+  VerificationStatus status = 3;
+  // The position that introduced the failure, when known.
+  optional uint64 culprit = 4;
+  repeated VerificationReport reports = 5;
+}
+
+message GetTrunkStatusRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+}
+message GetTrunkStatusResponse {
+  uint64 head_position = 1;
+  bytes head_hash = 2;
+  // Queued and rebasing requests, in serve order.
+  repeated LandRequest in_flight = 3;
+  // The latest position whose verification passed.
+  optional uint64 last_verified_position = 4;
+}
+
+message ListLandingsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListLandingsResponse {
+  // Newest first.
+  repeated Landing landings = 1;
+  // Parallel to `landings`.
+  repeated Verification verifications = 2;
+  string next_page_token = 3;
+}
+
+message GetVerificationRequest {
+  // `…/trunk/positions/{n}`. Required.
+  string landing = 1;
+}
+message GetVerificationResponse {
+  Verification verification = 1;
+}
+
+message ReportVerificationRequest {
+  string request_id = 1;
+  // `…/trunk/positions/{n}`. Required.
+  string landing = 2;
+  // Required.
+  string target = 3;
+  // Required.
+  VerificationStatus status = 4;
+  optional string details = 5;
+  optional bytes artifact = 6;
+}
+message ReportVerificationResponse {
+  Verification verification = 1;
+}
+
+message RevertLandingRequest {
+  string request_id = 1;
+  // `…/trunk/positions/{n}`. Required.
+  string landing = 2;
+  string reason = 3;
+}
+message RevertLandingResponse {
+  // The revert's own landing.
+  Landing landing = 1;
+  ChangeVersion version = 2;
+}
+
+// Which landings a bulk revert covers; name at least one origin.
+message RevertSelector {
+  optional string session = 1;
+  optional string model = 2;
+  // By name (`ann`) or as shown (`agent:bot`).
+  optional string sponsor = 3;
+  optional string author = 4;
+  // `orgs/{org}/repos/{repo}/intents/{intent}`.
+  optional string intent = 5;
+  // Positions in (since, until]; all of trunk when absent.
+  optional uint64 since = 6;
+  optional uint64 until = 7;
+}
+
+message PreviewBulkRevertRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  RevertSelector selector = 2;
+}
+message PreviewBulkRevertResponse {
+  // Newest first.
+  repeated BulkRevertEntry entries = 1;
+}
+
+message BulkRevertRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  RevertSelector selector = 3;
+  string reason = 4;
+}
+message BulkRevertResponse {
+  // Done once every revert is queued; its result lists them.
+  Operation operation = 1;
+}
+
+message BisectRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // The last known-good position.
+  uint64 from = 3;
+  // The first known-bad position.
+  uint64 to = 4;
+  string target = 5;
+}
+message BisectResponse {
+  optional uint64 culprit = 1;
+  // The positions the bisect tested, with their outcomes.
+  repeated Verification tested = 2;
+}
+
+message TrunkHealth {
+  // green, red, fixing or guarded.
+  string state = 1;
+  int64 since = 2;
+  // Culprits of the open incidents.
+  repeated uint64 open = 3;
+  repeated string failing_steps = 4;
+  bool frozen = 5;
+  optional string frozen_reason = 6;
+}
+
+// A landing that broke trunk, and what happened since.
+message Incident {
+  // `…/incidents/{culprit position}`.
+  string name = 19;
+  uint64 culprit = 1;
+  bytes version = 2;
+  bytes change_id = 3;
+  repeated string failures = 4;
+  repeated string steps = 5;
+  string details = 6;
+  Principal author = 7;
+  optional string session = 8;
+  optional string model = 9;
+  optional Principal sponsor = 10;
+  // open, fixing or closed.
+  string state = 11;
+  int64 opened_at = 12;
+  int64 updated_at = 13;
+  // The landing that reverted or fixed it.
+  optional uint64 fix = 14;
+  // reverted, fixed or recovered, and at which position.
+  optional string resolution = 15;
+  optional uint64 resolved_at = 16;
+  optional string revert_blocked = 17;
+  optional string assigned = 18;
+}
+
+message GetTrunkHealthRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+}
+message GetTrunkHealthResponse {
+  TrunkHealth health = 1;
+  repeated Incident open = 2;
+}
+
+message ListIncidentsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `state` (`open`, `fixing`, `closed`).
+  string filter = 4;
+}
+message ListIncidentsResponse {
+  repeated Incident incidents = 1;
+  string next_page_token = 2;
+}
+
+message FreezeTrunkRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  string reason = 3;
+}
+message FreezeTrunkResponse {
+  TrunkHealth health = 1;
+}
+
+message UnfreezeTrunkRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+}
+message UnfreezeTrunkResponse {
+  TrunkHealth health = 1;
+}

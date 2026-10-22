@@ -44,7 +44,6 @@ use connectrpc::{ConnectError, ErrorCode as Code};
 use futures::StreamExt;
 use rill_api::{AppState, Listeners, ServerConfig};
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::RepoServiceClient;
 use rill_types::{ObjectHash, ObjectKind};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;

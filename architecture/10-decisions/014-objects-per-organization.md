@@ -29,7 +29,7 @@ backend over another namespace; a repository's store is always its org's.
 
 * **One namespace with read grants alone:** grants stop fetches, but the
   existence of a hash still leaks across tenants through uploads and
-  `HasObjects`, and a single grant-check bug exposes every tenant.
+  `BatchCheckObjects`, and a single grant-check bug exposes every tenant.
 * **Per-repository namespaces:** forks and moves inside an organization
   would copy all content, and organizations are the tenancy boundary.
 

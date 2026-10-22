@@ -142,6 +142,8 @@ message ChangeVersion {
 
 // Metadata-only projection of a change version.
 message ChangeInfo {
+  // `orgs/{org}/repos/{repo}/versions/{hash}`. Output only.
+  string name = 13;
   bytes hash = 1;
   bytes change_id = 2;
   repeated bytes parents = 3;
@@ -231,6 +233,10 @@ enum IntentStatus {
 
 // A task, spec, bug or plan that changes link to.
 message Intent {
+  // `orgs/{org}/repos/{repo}/intents/{intent}`. Output only.
+  string name = 12;
+  // Output only.
+  string etag = 13;
   bytes id = 1;
   string title = 2;
   string body = 3;
@@ -306,6 +312,8 @@ message Comment {
 }
 
 message Thread {
+  // `…/changes/{change}/review/threads/{thread}`. Output only.
+  string name = 6;
   string id = 1;
   ThreadAnchor anchor = 2;
   repeated Comment comments = 3;
@@ -326,6 +334,8 @@ enum ReviewStatus {
 
 // The review state of a change, keyed by its stable change id.
 message ReviewState {
+  // `…/changes/{change}/review`. Output only.
+  string name = 15;
   bytes change_id = 1;
   repeated bytes versions = 2;
   ReviewStatus status = 3;
@@ -350,17 +360,30 @@ message SparseProfile {
 
 // A principal's in-progress state on a repository.
 message Workspace {
-  bytes id = 1;
-  bytes repo = 2;
+  // `orgs/{org}/repos/{repo}/workspaces/{workspace}`. Output only.
+  string name = 1;
+  // The `ws_` id. Output only.
+  bytes uid = 2;
+  // Output only.
   Principal owner = 3;
-  string name = 4;
+  string display_name = 4;
+  // The version the workspace is based on. Output only.
   bytes base = 5;
+  // The change its snapshot becomes versions of. Output only.
   bytes working_change = 6;
+  // Output only.
   optional bytes snapshot = 7;
   SparseProfile sparse = 8;
+  // Output only.
   optional bytes head_op = 9;
+  // Output only.
   int64 created_at = 10;
+  // Output only.
   int64 updated_at = 11;
+  // Changes with every operation; Update and Delete take it. Output only.
+  string etag = 12;
+  // The repository's `rp_` id. Output only.
+  bytes repo_uid = 13;
 }
 
 message OperationKind {
@@ -410,7 +433,9 @@ message OperationKind {
 }
 
 // One entry in a workspace's operation log.
-message Operation {
+message WorkspaceOperation {
+  // `…/workspaces/{workspace}/operations/{operation}`. Output only.
+  string name = 10;
   bytes id = 1;
   bytes workspace = 2;
   optional bytes parent = 3;
@@ -422,30 +447,31 @@ message Operation {
   Workspace resulting = 9;
 }
 
-// A compare-and-swap request on a ref; absent `expected` means the ref
-// must not exist, absent `target` deletes it.
-message RefUpdate {
-  string name = 1;
-  optional bytes expected = 2;
-  optional bytes target = 3;
-}
-
 // A named pointer and its current target.
 message Ref {
+  // `orgs/{org}/repos/{repo}/refs/{ref}`.
   string name = 1;
   bytes target = 2;
-  // Set for `trunk`: the sequence number of the head.
-  optional uint64 trunk_seq = 3;
+  // Set for `trunk`: the position of the head.
+  optional uint64 trunk_position = 3;
+  // Changes whenever the target does; UpdateRef and DeleteRef take it.
+  // Output only.
+  string etag = 4;
 }
 
-// A point in history named by ref, version hash or trunk sequence.
-message RootSpec {
-  oneof root {
-    string ref = 1;
-    bytes version_hash = 2;
-    bytes tree_hash = 3;
-    uint64 trunk_seq = 4;
-  }
+// One landing: the version at a trunk position.
+message Landing {
+  // `orgs/{org}/repos/{repo}/trunk/positions/{N}`.
+  string name = 1;
+  uint64 position = 2;
+  // `orgs/{org}/repos/{repo}/versions/{hash}`.
+  string version = 3;
+  bytes version_hash = 4;
+  bytes change_id = 5;
+  Principal landed_by = 6;
+  int64 landed_at = 7;
+  // Set when this landing reverts an earlier position.
+  optional uint64 reverts_position = 8;
 }
 
 // One line of a structured diff.
@@ -490,21 +516,31 @@ message FileDiff {
   optional MergeTerms conflict = 7;
 }
 
-// A repository record.
+// A repository.
 message Repo {
-  bytes id = 1;
-  string name = 2;
-  optional string description = 3;
-  int64 created_at = 4;
-  uint64 trunk_head_seq = 5;
-  // Paths Windows cannot create are rejected.
-  bool windows_safe = 6;
-  // The org the repository belongs to.
-  string org = 7;
+  // `orgs/{org}/repos/{repo}`. Output only.
+  string name = 1;
+  // The `rp_` id, which stays the same if the repository is renamed.
+  // Output only.
+  bytes uid = 2;
+  // The repository's name within its org. Output only.
+  string repo_id = 3;
+  optional string description = 4;
+  // Output only.
+  int64 created_at = 5;
+  // Output only.
+  uint64 trunk_head_position = 6;
+  // Paths Windows cannot create are rejected. Immutable.
+  bool windows_safe = 7;
+  // The org the repository belongs to. Output only.
+  string org = 8;
 }
 
 message Org {
+  // `orgs/{org}`.
   string name = 1;
+  // The org's id, `{org}`.
+  string org_id = 4;
   optional string description = 2;
   int64 created_at = 3;
 }

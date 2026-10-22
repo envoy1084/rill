@@ -64,12 +64,28 @@ async fn update(
         .client()?
         .identity_svc()
         .update_user(pb::UpdateUserRequest {
-            operation_id: Default::default(),
-            org,
-            name,
-            suspended,
-            set_roles: roles.is_some(),
-            roles: roles.unwrap_or_default(),
+            request_id: String::new(),
+            user: pb::User {
+                name: format!("{}/users/{name}", rill_sdk::names::org(&org)),
+                status: match suspended {
+                    Some(true) => "suspended",
+                    _ => "active",
+                }
+                .into(),
+                roles: roles.clone().unwrap_or_default(),
+                ..Default::default()
+            }
+            .into(),
+            update_mask: rill_proto::FieldMask {
+                paths: match (suspended.is_some(), roles.is_some()) {
+                    (true, true) => vec!["status".into(), "roles".into()],
+                    (true, false) => vec!["status".into()],
+                    _ => vec!["roles".into()],
+                },
+                ..Default::default()
+            }
+            .into(),
+            etag: String::new(),
         })
         .await?
         .into_owned()
@@ -100,7 +116,11 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: UserCmd) -> Result<()> {
             let users = ctx
                 .client()?
                 .identity_svc()
-                .list_users(pb::ListUsersRequest { org: o.org })
+                .list_users(pb::ListUsersRequest {
+                    parent: rill_sdk::names::org(&o.org),
+                    page_size: 1000,
+                    ..Default::default()
+                })
                 .await?
                 .into_owned()
                 .users;

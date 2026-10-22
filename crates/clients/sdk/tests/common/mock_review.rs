@@ -1,4 +1,5 @@
-//! Review service whose land tickets follow a scripted status sequence.
+//! Review and landing services whose land requests follow a scripted
+//! status sequence.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Mutex;
@@ -10,7 +11,7 @@ use connectrpc::{
 use futures::stream::BoxStream;
 use rill_proto::convert::{hash_to_proto, id_to_proto};
 use rill_proto::rill::v1 as pb;
-use rill_proto::rill::v1::ReviewService;
+use rill_proto::rill::v1::{LandingService, ReviewService};
 use rill_types::{ChangeId, Principal};
 
 use super::fixtures::fake_hash;
@@ -35,17 +36,20 @@ impl MockReview {
         }
     }
 
-    fn ticket(&self, id: &str, change_id: Bytes, status: pb::LandStatus) -> pb::LandTicket {
-        pb::LandTicket {
-            id: id.to_string(),
+    fn ticket(&self, id: &str, change_id: Bytes, status: pb::LandStatus) -> pb::LandRequest {
+        pb::LandRequest {
+            name: format!("orgs/default/repos/main/landRequests/{id}"),
+            ticket: id.to_string(),
             change_id,
             status: status.into(),
             requested_at: 1,
+            ..Default::default()
         }
     }
 
     fn review_state(change_id: Bytes, stack: Vec<Bytes>) -> pb::ReviewState {
         pb::ReviewState {
+            name: String::new(),
             change_id,
             versions: vec![hash_to_proto(&fake_hash("v1"))],
             status: pb::ReviewStatus::Open.into(),
@@ -64,55 +68,80 @@ impl MockReview {
     }
 }
 
+/// The id of the change a `…/changes/{change}` name names.
+fn change_of(name: &str) -> Result<ChangeId, ConnectError> {
+    name.rsplit('/')
+        .next()
+        .and_then(|id| id.parse().ok())
+        .ok_or_else(|| ConnectError::invalid_argument(format!("bad change name {name:?}")))
+}
+
 // The mocks return concrete types.
 #[allow(refining_impl_trait)]
 impl ReviewService for MockReview {
-    async fn submit_for_review(
+    async fn submit_change(
         &self,
         ctx: RequestContext,
-        req: ServiceRequest<'_, pb::SubmitForReviewRequest>,
-    ) -> RpcResult<pb::SubmitForReviewResponse> {
-        let req = Request::new(ctx, req);
-        let req = req.into_inner();
-        let id: ChangeId = rill_proto::convert::id_from_proto("change_id", &req.change_id)?;
+        req: ServiceRequest<'_, pb::SubmitChangeRequest>,
+    ) -> RpcResult<pb::SubmitChangeResponse> {
+        let req = Request::new(ctx, req).into_inner();
+        let id = change_of(&req.change)?;
         self.submitted.lock().unwrap().push(id);
-        Ok(Response::new(pb::SubmitForReviewResponse {
-            review: Self::review_state(req.change_id, vec![]).into(),
+        Ok(Response::new(pb::SubmitChangeResponse {
+            review: Self::review_state(id_to_proto(&id), vec![]).into(),
         }))
     }
 
-    async fn set_stack(
+    async fn update_stack(
         &self,
         ctx: RequestContext,
-        req: ServiceRequest<'_, pb::SetStackRequest>,
-    ) -> RpcResult<pb::SetStackResponse> {
-        let req = Request::new(ctx, req);
-        let req = req.into_inner();
-        let ids: Vec<ChangeId> =
-            rill_proto::convert::ids_from_proto("change_ids", &req.change_ids)?;
-        self.stacks.lock().unwrap().push(ids);
-        Ok(Response::new(pb::SetStackResponse {
-            reviews: req
-                .change_ids
+        req: ServiceRequest<'_, pb::UpdateStackRequest>,
+    ) -> RpcResult<pb::UpdateStackResponse> {
+        let req = Request::new(ctx, req).into_inner();
+        let ids = req
+            .changes
+            .iter()
+            .map(|c| change_of(c))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.stacks.lock().unwrap().push(ids.clone());
+        let stack: Vec<Bytes> = ids.iter().map(id_to_proto).collect();
+        Ok(Response::new(pb::UpdateStackResponse {
+            reviews: stack
                 .iter()
-                .map(|id| Self::review_state(id.clone(), req.change_ids.clone()))
+                .map(|id| Self::review_state(id.clone(), stack.clone()))
                 .collect(),
         }))
     }
 
+    unimplemented_rpcs! {
+        get_review(pb::GetReviewRequest) -> pb::GetReviewResponse;
+        batch_get_reviews(pb::BatchGetReviewsRequest) -> pb::BatchGetReviewsResponse;
+        list_reviews(pb::ListReviewsRequest) -> pb::ListReviewsResponse;
+        vote(pb::VoteRequest) -> pb::VoteResponse;
+        create_thread(pb::CreateThreadRequest) -> pb::CreateThreadResponse;
+        reply_thread(pb::ReplyThreadRequest) -> pb::ReplyThreadResponse;
+        resolve_thread(pb::ResolveThreadRequest) -> pb::ResolveThreadResponse;
+        evaluate_landing(pb::EvaluateLandingRequest) -> pb::EvaluateLandingResponse;
+        abandon_change(pb::AbandonChangeRequest) -> pb::AbandonChangeResponse;
+        watch_review(pb::WatchReviewRequest) -> ServiceStream<pb::WatchReviewResponse>;
+    }
+}
+
+// The mocks return concrete types.
+#[allow(refining_impl_trait)]
+impl LandingService for MockReview {
     async fn request_land(
         &self,
         ctx: RequestContext,
         req: ServiceRequest<'_, pb::RequestLandRequest>,
     ) -> RpcResult<pb::RequestLandResponse> {
-        let req = Request::new(ctx, req);
-        let req = req.into_inner();
-        let id: ChangeId = rill_proto::convert::id_from_proto("change_id", &req.change_id)?;
+        let req = Request::new(ctx, req).into_inner();
+        let id = change_of(&req.change)?;
         self.land_requests.lock().unwrap().push(id);
         Ok(Response::new(pb::RequestLandResponse {
-            ticket: (self.ticket(
+            land_request: (self.ticket(
                 &format!("ticket-{id}"),
-                req.change_id,
+                id_to_proto(&id),
                 pb::LandStatus::Queued,
             ))
             .into(),
@@ -124,9 +153,8 @@ impl ReviewService for MockReview {
         ctx: RequestContext,
         req: ServiceRequest<'_, pb::RequestLandStackRequest>,
     ) -> RpcResult<pb::RequestLandStackResponse> {
-        let req = Request::new(ctx, req);
-        let req = req.into_inner();
-        let id: ChangeId = rill_proto::convert::id_from_proto("change_id", &req.change_id)?;
+        let req = Request::new(ctx, req).into_inner();
+        let id = change_of(&req.change)?;
         let stack = self
             .stacks
             .lock()
@@ -141,7 +169,7 @@ impl ReviewService for MockReview {
             .unwrap()
             .extend(stack.iter().copied());
         Ok(Response::new(pb::RequestLandStackResponse {
-            tickets: stack
+            land_requests: stack
                 .iter()
                 .map(|c| {
                     self.ticket(
@@ -154,13 +182,13 @@ impl ReviewService for MockReview {
         }))
     }
 
-    async fn get_land_status(
+    async fn get_land_request(
         &self,
         ctx: RequestContext,
-        req: ServiceRequest<'_, pb::GetLandStatusRequest>,
-    ) -> RpcResult<pb::GetLandStatusResponse> {
-        let req = Request::new(ctx, req);
-        let ticket = req.into_inner().ticket;
+        req: ServiceRequest<'_, pb::GetLandRequestRequest>,
+    ) -> RpcResult<pb::GetLandRequestResponse> {
+        let name = Request::new(ctx, req).into_inner().name;
+        let ticket = name.rsplit('/').next().unwrap_or_default().to_string();
         *self.polls.lock().unwrap() += 1;
         let status = {
             let mut script = self.script.lock().unwrap();
@@ -172,25 +200,18 @@ impl ReviewService for MockReview {
         };
         let landed = status == pb::LandStatus::Landed;
         let change_id = id_to_proto(&ChangeId::derived("ticket", &ticket));
-        Ok(Response::new(pb::GetLandStatusResponse {
-            position: None,
-            eta_ms: None,
-            ticket: self.ticket(&ticket, change_id, status).into(),
-            seq: landed.then_some(7),
-            landed_hash: landed.then(|| hash_to_proto(&fake_hash("landed"))),
-            error: (status == pb::LandStatus::Failed).then(|| "boom".to_string()),
+        Ok(Response::new(pb::GetLandRequestResponse {
+            land_request: pb::LandRequest {
+                trunk_position: landed.then_some(7),
+                landed_hash: landed.then(|| hash_to_proto(&fake_hash("landed"))),
+                error: (status == pb::LandStatus::Failed).then(|| "boom".to_string()),
+                ..self.ticket(&ticket, change_id, status)
+            }
+            .into(),
         }))
     }
 
     unimplemented_rpcs! {
-        get_review(pb::GetReviewRequest) -> pb::GetReviewResponse;
-        list_reviews(pb::ListReviewsRequest) -> pb::ListReviewsResponse;
-        vote(pb::VoteRequest) -> pb::VoteResponse;
-        comment(pb::CommentRequest) -> pb::CommentResponse;
-        reply_thread(pb::ReplyThreadRequest) -> pb::ReplyThreadResponse;
-        resolve_thread(pb::ResolveThreadRequest) -> pb::ResolveThreadResponse;
-        evaluate_submit(pb::EvaluateSubmitRequest) -> pb::EvaluateSubmitResponse;
-        abandon(pb::AbandonRequest) -> pb::AbandonResponse;
-        watch_review(pb::WatchReviewRequest) -> ServiceStream<pb::ReviewEvent>;
+        list_land_requests(pb::ListLandRequestsRequest) -> pb::ListLandRequestsResponse;
     }
 }

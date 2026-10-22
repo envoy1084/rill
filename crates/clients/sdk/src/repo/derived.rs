@@ -17,12 +17,12 @@ impl RepoClient {
     pub async fn derived(&self, kind: &str, hash: ObjectHash) -> Result<Bytes> {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
-            let request = pb::GetDerivedRequest {
-                repo: self.repo.clone(),
+            let request = pb::GetDerivedValueRequest {
+                repo: self.resource.clone(),
                 kind: kind.to_string(),
                 hash: hash_to_proto(&hash),
             };
-            async move { svc.get_derived(request).await }
+            async move { svc.get_derived_value(request).await }
         })
         .await?
         .into_owned();
@@ -38,13 +38,13 @@ impl RepoClient {
     ) -> Result<Derived> {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
-            let request = pb::WaitDerivedRequest {
-                repo: self.repo.clone(),
+            let request = pb::WaitDerivedValueRequest {
+                repo: self.resource.clone(),
                 kind: kind.to_string(),
                 hash: hash_to_proto(&hash),
                 timeout_ms: timeout.as_millis() as u64,
             };
-            async move { svc.wait_derived(request).await }
+            async move { svc.wait_derived_value(request).await }
         })
         .await?
         .into_owned();

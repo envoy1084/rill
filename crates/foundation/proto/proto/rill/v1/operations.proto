@@ -1,0 +1,88 @@
+// Long-running operations: work that outlives the request that started
+// it, polled or waited on by name.
+//
+// An operation is `orgs/{org}/repos/{repo}/operations/{operation}`.
+syntax = "proto3";
+
+package rill.v1;
+
+import "google/rpc/status.proto";
+import "rill/v1/types.proto";
+
+// Long-running operations.
+service OperationService {
+  // An operation's state, and its result once done.
+  rpc GetOperation(GetOperationRequest) returns (GetOperationResponse);
+  // A repository's operations, newest first.
+  rpc ListOperations(ListOperationsRequest) returns (ListOperationsResponse);
+  // Wait until an operation is done or the timeout passes.
+  rpc WaitOperation(WaitOperationRequest) returns (WaitOperationResponse);
+}
+
+// Work that outlives its request.
+message Operation {
+  // `orgs/{org}/repos/{repo}/operations/{operation}`. Output only.
+  string name = 1;
+  // What the operation does (`bulk_revert`).
+  string kind = 2;
+  bool done = 3;
+  Principal creator = 4;
+  int64 created_at = 5;
+  int64 updated_at = 6;
+  // Set once done: the failure or the result.
+  oneof result {
+    google.rpc.Status error = 7;
+    BulkRevertResult bulk_revert = 8;
+  }
+}
+
+// One landing a bulk revert covers.
+message BulkRevertEntry {
+  // `…/trunk/positions/{n}`.
+  string landing = 1;
+  uint64 position = 2;
+  bytes change_id = 3;
+  string summary = 4;
+  // In a preview: paths its revert conflicts at after the newer reverts.
+  repeated string conflicts = 5;
+  // Once applied: the revert's land request, `…/landRequests/{ticket}`.
+  string land_request = 6;
+}
+
+// What a bulk revert queued.
+message BulkRevertResult {
+  // Newest first.
+  repeated BulkRevertEntry entries = 1;
+}
+
+message GetOperationRequest {
+  // `…/operations/{operation}`. Required.
+  string name = 1;
+}
+message GetOperationResponse {
+  Operation operation = 1;
+}
+
+message ListOperationsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `kind` and `done`.
+  string filter = 4;
+}
+message ListOperationsResponse {
+  repeated Operation operations = 1;
+  string next_page_token = 2;
+}
+
+message WaitOperationRequest {
+  // `…/operations/{operation}`. Required.
+  string name = 1;
+  // At most this long; default and maximum 60 s.
+  uint32 timeout_ms = 2;
+}
+message WaitOperationResponse {
+  // Done, or as it stood when the timeout passed.
+  Operation operation = 1;
+}

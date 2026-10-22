@@ -1,81 +1,93 @@
-// Access service: the relationship tuples that say who may do what in a
+// Access: the relationship tuples that say who may do what in a
 // repository, and questions about them.
+//
+// Responses carry the repository's relation version after the call.
+// Clients send versions they have seen in the `x-rill-relations` header
+// (`rp_<hex>=<version>`, comma separated); checks on that repository then
+// reflect at least that version on every server.
 syntax = "proto3";
 
 package rill.v1;
 
 import "rill/v1/types.proto";
 
+// Relation tuples and access checks.
 service AccessService {
-  rpc AddRelation(AddRelationRequest) returns (AddRelationResponse);
-  rpc RemoveRelation(RemoveRelationRequest) returns (RemoveRelationResponse);
+  // Grant a relation (repository owners).
+  rpc CreateRelation(CreateRelationRequest) returns (CreateRelationResponse);
+  // Take a relation back (repository owners).
+  rpc DeleteRelation(DeleteRelationRequest) returns (DeleteRelationResponse);
+  // A repository's tuples.
   rpc ListRelations(ListRelationsRequest) returns (ListRelationsResponse);
   // Whether a subject holds a relation on a path, and which tuples say so.
-  rpc Check(CheckRequest) returns (CheckResponse);
+  rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
   // Every tuple that grants a relation on a path, with team members.
-  rpc Expand(ExpandRequest) returns (ExpandResponse);
+  rpc ExpandAccess(ExpandAccessRequest) returns (ExpandAccessResponse);
   // The directories a subject holds a relation on.
   rpc LookupPaths(LookupPathsRequest) returns (LookupPathsResponse);
 }
 
 // A ReBAC tuple: `subject` holds `relation` on `path` (the whole
-// repository when empty) of `repo`.
+// repository when empty).
 message Relation {
-  // `org/name`, or a name in the default org.
-  string repo = 1;
-  string path = 2;
+  string path = 1;
   // `owner`, `writer`, `reviewer` or `reader`; each implies the next.
-  string relation = 3;
+  string relation = 2;
   // `user:<name>`, `agent:<name>`, `team:<name>`, `kind:<human|agent|service>`,
   // `principal:pr_<hex>` or `*`. Users and agents are stored by principal id.
-  string subject = 4;
+  string subject = 3;
 }
 
-// Responses carry the repository's relation version after the call.
-// Clients send versions they have seen in the `x-rill-relations` header
-// (`rp_<hex>=<version>`, comma separated); checks on that repository then
-// reflect at least that version on every server.
-
-message AddRelationRequest {
-  bytes operation_id = 1;
-  Relation relation = 2;
+message CreateRelationRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // Required.
+  Relation relation = 3;
 }
-message AddRelationResponse {
-  string repo_id = 1;
+message CreateRelationResponse {
+  // The repository's uid (`rp_…`), for `x-rill-relations`.
+  string repo_uid = 1;
   int64 relation_version = 2;
 }
 
-message RemoveRelationRequest {
-  bytes operation_id = 1;
-  Relation relation = 2;
+message DeleteRelationRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // Required.
+  Relation relation = 3;
 }
-message RemoveRelationResponse {
-  string repo_id = 1;
+message DeleteRelationResponse {
+  string repo_uid = 1;
   int64 relation_version = 2;
 }
 
 message ListRelationsRequest {
-  string repo = 1;
-  // Only tuples on this directory.
-  optional string path = 2;
-  // Only tuples granted to this subject.
-  optional string subject = 3;
-  optional string relation = 4;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `path`, `subject` and `relation`.
+  string filter = 4;
 }
 message ListRelationsResponse {
   repeated Relation relations = 1;
   int64 relation_version = 2;
+  string next_page_token = 3;
 }
 
-message CheckRequest {
-  string repo = 1;
+message CheckAccessRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
   string path = 2;
+  // Required.
   string relation = 3;
   // `user:<name>` or `agent:<name>`; the caller when absent. Asking about
   // anyone else needs owner.
   optional string subject = 4;
 }
-message CheckResponse {
+message CheckAccessResponse {
   bool allowed = 1;
   // The tuples that grant it, nearest directory first.
   repeated Relation because = 2;
@@ -84,9 +96,11 @@ message CheckResponse {
   int64 relation_version = 4;
 }
 
-message ExpandRequest {
-  string repo = 1;
+message ExpandAccessRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
   string path = 2;
+  // Required.
   string relation = 3;
 }
 message ExpandedTuple {
@@ -94,15 +108,17 @@ message ExpandedTuple {
   // For a team subject, the org's active users in the team.
   repeated Principal members = 2;
 }
-message ExpandResponse {
+message ExpandAccessResponse {
   repeated ExpandedTuple tuples = 1;
   int64 relation_version = 2;
 }
 
 message LookupPathsRequest {
-  string repo = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // Required.
   string relation = 2;
-  // As in CheckRequest.
+  // As in CheckAccessRequest.
   optional string subject = 3;
 }
 message LookupPathsResponse {

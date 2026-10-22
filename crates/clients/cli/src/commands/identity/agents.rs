@@ -159,8 +159,9 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;
-            svc.register_agent(pb::RegisterAgentRequest {
-                operation_id: Default::default(),
+            svc.create_agent(pb::CreateAgentRequest {
+                request_id: String::new(),
+                parent: rill_sdk::names::org(&a.org.org),
                 agent: (pb::AgentSpec {
                     org: a.org.org,
                     name: a.name,
@@ -187,7 +188,11 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
         }
         AgentCmd::List(o) => {
             let agents = svc
-                .list_agents(pb::ListAgentsRequest { org: o.org })
+                .list_agents(pb::ListAgentsRequest {
+                    parent: rill_sdk::names::org(&o.org),
+                    page_size: 1000,
+                    ..Default::default()
+                })
                 .await?
                 .into_owned()
                 .agents;
@@ -230,11 +235,19 @@ async fn update(
 ) -> Result<Option<pb::Agent>> {
     Ok((svc
         .update_agent(pb::UpdateAgentRequest {
-            operation_id: Default::default(),
-            org: a.org.org,
-            name: a.name,
-            suspended: Some(suspended),
-            spec: None.into(),
+            request_id: String::new(),
+            agent: pb::Agent {
+                name: format!("{}/agents/{}", rill_sdk::names::org(&a.org.org), a.name),
+                status: if suspended { "suspended" } else { "active" }.into(),
+                ..Default::default()
+            }
+            .into(),
+            update_mask: rill_proto::FieldMask {
+                paths: vec!["status".into()],
+                ..Default::default()
+            }
+            .into(),
+            etag: String::new(),
         })
         .await?
         .into_owned()
@@ -255,14 +268,16 @@ pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
                 (None, None) => pb::workload_issuer_spec::Keys::Discovery(true),
             };
             let saved = svc
-                .put_workload_issuer(pb::PutWorkloadIssuerRequest {
-                    operation_id: Default::default(),
+                .update_workload_issuer(pb::UpdateWorkloadIssuerRequest {
+                    request_id: String::new(),
+                    allow_missing: true,
                     issuer: (pb::WorkloadIssuerSpec {
                         org: a.org.org,
                         name: a.name,
                         issuer: a.issuer,
                         keys: Some(keys),
                         audiences: a.audiences,
+                        ..Default::default()
                     })
                     .into(),
                 })
@@ -278,7 +293,11 @@ pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
         }
         TrustCmd::List(o) => {
             let issuers = svc
-                .list_workload_issuers(pb::ListWorkloadIssuersRequest { org: o.org })
+                .list_workload_issuers(pb::ListWorkloadIssuersRequest {
+                    parent: rill_sdk::names::org(&o.org),
+                    page_size: 1000,
+                    page_token: String::new(),
+                })
                 .await?
                 .into_owned()
                 .issuers;
@@ -299,18 +318,16 @@ pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
             })
         }
         TrustCmd::Remove(a) => {
-            let deleted = svc
-                .delete_workload_issuer(pb::DeleteWorkloadIssuerRequest {
-                    operation_id: Default::default(),
-                    org: a.org.org,
-                    name: a.name,
-                })
-                .await?
-                .into_owned()
-                .deleted;
-            ctx.emit(json!({ "deleted": deleted }), |out| {
-                out.line(if deleted { "removed" } else { "no such issuer" })
+            svc.delete_workload_issuer(pb::DeleteWorkloadIssuerRequest {
+                request_id: String::new(),
+                name: format!(
+                    "{}/workloadIssuers/{}",
+                    rill_sdk::names::org(&a.org.org),
+                    a.name
+                ),
             })
+            .await?;
+            ctx.emit(json!({ "deleted": true }), |out| out.line("removed"))
         }
     }
 }
@@ -333,8 +350,8 @@ pub async fn kill(ctx: &mut Ctx<'_>, a: KillArgs) -> Result<()> {
         .client()?
         .identity_svc()
         .kill_switch(pb::KillSwitchRequest {
-            operation_id: Default::default(),
-            org: a.org.org,
+            request_id: String::new(),
+            parent: rill_sdk::names::org(&a.org.org),
             target: Some(target),
             reason: a.reason,
         })

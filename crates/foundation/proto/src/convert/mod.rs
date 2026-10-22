@@ -13,7 +13,6 @@ mod intent;
 mod land;
 mod primitives;
 mod principal;
-mod refs;
 mod review;
 mod tree;
 mod workspace;

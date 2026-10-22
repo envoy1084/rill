@@ -8,6 +8,7 @@ mod idem;
 mod land_queue;
 mod landing;
 mod leases;
+mod long_operations;
 mod orgs;
 mod quarantine;
 mod quota;

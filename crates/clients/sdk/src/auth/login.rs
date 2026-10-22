@@ -23,7 +23,9 @@ pub async fn sign_in_providers(
 ) -> Result<Vec<pb::SignInProvider>> {
     Ok(connection
         .sessions()
-        .list_sign_in_providers(pb::ListSignInProvidersRequest { org: org.into() })
+        .list_sign_in_providers(pb::ListSignInProvidersRequest {
+            parent: crate::names::org(org),
+        })
         .await?
         .into_owned()
         .providers)
@@ -99,6 +101,9 @@ pub async fn login(
             model: None,
         })
         .await?
-        .into_owned();
+        .into_owned()
+        .grant
+        .into_option()
+        .ok_or_else(|| Error::from(rill_proto::ConvertError::missing("exchange_token.grant")))?;
     Ok(Credentials::from_grant(endpoint, grant))
 }

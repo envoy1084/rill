@@ -12,6 +12,7 @@ use rill_proto::rill::v1::AuditService;
 use rill_types::audit::{AuditEntry, AuditOutcome, AuditRoot, INSTANCE_AUDIT};
 
 use crate::auth::{caller, require_instance_admin, require_org_admin};
+use crate::listing::{Page, Position};
 use crate::services::Call;
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::error::{Error, Result};
@@ -20,7 +21,6 @@ use rill_runtime::state::AppState;
 type GrpcResult<T> = std::result::Result<Response<T>, ConnectError>;
 
 const DEFAULT_LIMIT: usize = 500;
-const MAX_LIMIT: usize = 5000;
 /// How often a watch looks for newly chained entries.
 const WATCH_POLL: Duration = Duration::from_millis(500);
 
@@ -36,14 +36,11 @@ impl AuditSvc {
     }
 }
 
-/// The org a request names, once the caller may read its audit log.
-async fn authorized<T>(state: &AppState, request: &Call<T>, org: &str) -> Result<String> {
+/// The org a request's parent names, once the caller may read its audit
+/// log.
+async fn authorized<T>(state: &AppState, request: &Call<T>, parent: &str) -> Result<String> {
     let ctx = caller(request)?;
-    let org = if org.is_empty() {
-        rill_store::DEFAULT_ORG.to_string()
-    } else {
-        org.to_string()
-    };
+    let org = super::names::org(parent)?;
     if org == INSTANCE_AUDIT {
         require_instance_admin(state, &ctx)?;
     } else {
@@ -93,7 +90,7 @@ fn root_proto(root: &AuditRoot) -> Result<pb::AuditRootRecord> {
 }
 
 type EntryStream =
-    Pin<Box<dyn Stream<Item = std::result::Result<pb::AuditEntryRecord, ConnectError>> + Send>>;
+    Pin<Box<dyn Stream<Item = std::result::Result<pb::WatchAuditResponse, ConnectError>> + Send>>;
 
 // Handlers return their concrete response types.
 #[allow(refining_impl_trait)]
@@ -106,21 +103,31 @@ impl AuditService for AuditSvc {
         let request = Call::new(ctx, request);
         let result: Result<_> = async {
             let req = request.get_ref();
-            let org = authorized(&self.state, &request, &req.org).await?;
-            let limit = match req.limit as usize {
-                0 => DEFAULT_LIMIT,
-                n => n.min(MAX_LIMIT),
+            let org = authorized(&self.state, &request, &req.parent).await?;
+            let after = req.after_seq.to_string();
+            let page = Page::new(req.page_size, &req.page_token, &[&req.parent, &after])?;
+            let after = match &page.start {
+                Position::Start => req.after_seq,
+                Position::After(key) => u64::from_be_bytes(
+                    key.as_slice()
+                        .try_into()
+                        .map_err(|_| Error::InvalidPageToken("not a token for this list".into()))?,
+                ),
+                Position::Offset(_) => {
+                    return Err(Error::InvalidPageToken("not a token for this list".into()))
+                }
             };
             let audit = self.state.stores.audit();
-            let entries = audit
-                .entries(&org, req.after_seq, limit)
-                .await?
-                .iter()
-                .map(entry_proto)
-                .collect::<Result<_>>()?;
+            let found = audit.entries(&org, after, page.size).await?;
+            let next_page_token = match (found.len() == page.size, found.last()) {
+                (true, Some(last)) => page.token(Position::After(last.seq.to_be_bytes().to_vec())),
+                _ => String::new(),
+            };
+            let entries = found.iter().map(entry_proto).collect::<Result<_>>()?;
             Ok(pb::ListAuditEntriesResponse {
                 entries,
                 head_seq: audit.head(&org).await?.seq,
+                next_page_token,
             })
         }
         .await;
@@ -134,17 +141,15 @@ impl AuditService for AuditSvc {
     ) -> GrpcResult<pb::ListAuditRootsResponse> {
         let request = Call::new(ctx, request);
         let result: Result<_> = async {
-            let org = authorized(&self.state, &request, &request.get_ref().org).await?;
-            let roots = self
-                .state
-                .stores
-                .audit()
-                .roots(&org)
-                .await?
-                .iter()
-                .map(root_proto)
-                .collect::<Result<_>>()?;
-            Ok(pb::ListAuditRootsResponse { roots })
+            let req = request.get_ref();
+            let org = authorized(&self.state, &request, &req.parent).await?;
+            let page = Page::new(req.page_size, &req.page_token, &[&req.parent])?;
+            let (roots, next_page_token) =
+                page.of(self.state.stores.audit().roots(&org).await?)?;
+            Ok(pb::ListAuditRootsResponse {
+                roots: roots.iter().map(root_proto).collect::<Result<_>>()?,
+                next_page_token,
+            })
         }
         .await;
         result.map(Response::new).map_err(ConnectError::from)
@@ -157,7 +162,7 @@ impl AuditService for AuditSvc {
     ) -> GrpcResult<pb::SealAuditResponse> {
         let request = Call::new(ctx, request);
         let result: Result<_> = async {
-            let org = authorized(&self.state, &request, &request.get_ref().org).await?;
+            let org = authorized(&self.state, &request, &request.get_ref().parent).await?;
             rill_runtime::audit::worker::catch_up(&self.state).await?;
             let root = rill_runtime::audit::seal::seal(&self.state, &org).await?;
             Ok(pb::SealAuditResponse {
@@ -194,7 +199,7 @@ impl AuditService for AuditSvc {
         request: ServiceRequest<'_, pb::WatchAuditRequest>,
     ) -> GrpcResult<EntryStream> {
         let request = Call::new(ctx, request);
-        let org = authorized(&self.state, &request, &request.get_ref().org)
+        let org = authorized(&self.state, &request, &request.get_ref().parent)
             .await
             .map_err(ConnectError::from)?;
         let mut after = request.get_ref().after_seq;
@@ -212,7 +217,11 @@ impl AuditService for AuditSvc {
                 };
                 for entry in &page {
                     after = entry.seq;
-                    let item = entry_proto(entry).map_err(ConnectError::from);
+                    let item = entry_proto(entry)
+                        .map(|entry| pb::WatchAuditResponse {
+                            entry: entry.into(),
+                        })
+                        .map_err(ConnectError::from);
                     if tx.send(item).await.is_err() {
                         return;
                     }

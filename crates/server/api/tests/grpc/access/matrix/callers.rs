@@ -5,12 +5,13 @@ use rill_types::{Principal, RepoPathBuf, Timestamp};
 
 use super::super::fixture::*;
 use super::roles::Role;
+use super::targets::Targets;
 use crate::*;
 
 pub(super) struct Callers {
     pub(super) acl: Acl,
     pub(super) tokens: Vec<(Role, Option<String>)>,
-    pub(super) workspace: Bytes,
+    pub(super) targets: Targets,
 }
 
 pub(super) async fn callers() -> Callers {
@@ -19,15 +20,17 @@ pub(super) async fn callers() -> Callers {
     // real content.
     let change = acl
         .owner
-        .repo
-        .get_change_version(pb::GetChangeVersionRequest {
-            repo: "acl".into(),
-            hash: acl.version.clone(),
+        .changes
+        .get_version(pb::GetVersionRequest {
+            name: common::names::version("acl", &acl.version),
+            view: pb::VersionView::Basic.into(),
         })
         .await
         .unwrap()
         .into_owned()
         .version
+        .unwrap()
+        .info
         .unwrap()
         .change_id;
     land(&mut acl.owner, "acl", change).await;
@@ -53,21 +56,24 @@ pub(super) async fn callers() -> Callers {
         .owner
         .workspace
         .create_workspace(pb::CreateWorkspaceRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
-            name: "probe".into(),
-            base: None.into(),
-            sparse: None.into(),
+            parent: common::names::repo("acl"),
+            workspace: (pb::Workspace {
+                display_name: "probe".into(),
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned()
         .workspace
         .unwrap()
-        .id;
+        .name;
+    let targets = Targets::new(&acl, workspace);
     Callers {
         acl,
         tokens,
-        workspace,
+        targets,
     }
 }

@@ -55,9 +55,9 @@ each `Set` (inline, single blob or chunked; see
 
 | Producer | Uses the builder |
 | --- | --- |
-| `ApplyEdits` RPC ([repo/write.rs](../../crates/server/api/src/services/repo/write.rs)) | Yes. Sets identity from the edit base, then one `change(path, FileChange)` per edit; `Patch` edits are applied with `apply_unified` first |
-| Workspace `NewChange` ([services/workspace/mod.rs](../../crates/server/api/src/services/workspace/mod.rs)) | No. `version_from_diff` maps each `TreeDiffEntry` from `diff_trees(base_root, snapshot)` to `Set` or `Delete` |
-| `merge_changes`, `rebase`, `Resolve` RPC | No; they build or edit the struct directly |
+| `ApplyEdits` RPC ([repo/write.rs](../../crates/server/api/src/services/changes/write.rs)) | Yes. Sets identity from the edit base, then one `change(path, FileChange)` per edit; `Patch` edits are applied with `apply_unified` first |
+| Workspace `StartChange` ([services/workspace/mod.rs](../../crates/server/api/src/services/workspace/mod.rs)) | No. `version_from_diff` maps each `TreeDiffEntry` from `diff_trees(base_root, snapshot)` to `Set` or `Delete` |
+| `merge_changes`, `rebase`, `ResolveConflicts` RPC | No; they build or edit the struct directly |
 | git importer ([commit_version.rs](../../crates/domain/git-import/src/import/commit_version.rs)) | Yes, with `build`; it then adds the git SHA to `extra` and stores the version itself |
 
 ## Validation
@@ -114,7 +114,7 @@ or `Error::Join` (the chunking task).
 - [builder.rs](../../crates/engine/core/src/builder.rs)
 - [blobs/](../../crates/engine/core/src/blobs/mod.rs), [validate.rs](../../crates/engine/core/src/validate.rs)
 - [rill-types objects/change.rs](../../crates/foundation/types/src/objects/change.rs)
-- [rill-api services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs)
+- [rill-api services/changes/write.rs](../../crates/server/api/src/services/changes/write.rs)
 
 ---
 ← Previous: [History graph](history-graph.md) · [Index](../index.md) · Next: [Workspaces](../04-workflow/workspaces.md) →

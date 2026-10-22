@@ -1,0 +1,45 @@
+// Organizations: the tenants that own repositories, users and keys.
+//
+// An organization is `orgs/{org}`.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+// Organizations.
+service OrgService {
+  // Create an organization (instance administrators).
+  rpc CreateOrg(CreateOrgRequest) returns (CreateOrgResponse);
+  // One organization.
+  rpc GetOrg(GetOrgRequest) returns (GetOrgResponse);
+  // Every organization.
+  rpc ListOrgs(ListOrgsRequest) returns (ListOrgsResponse);
+}
+
+message CreateOrgRequest {
+  string request_id = 1;
+  // 1-63 lowercase letters, digits and dashes. Required.
+  string org_id = 2;
+  optional string description = 3;
+}
+message CreateOrgResponse {
+  Org org = 1;
+}
+
+message GetOrgRequest {
+  // `orgs/{org}`. Required.
+  string name = 1;
+}
+message GetOrgResponse {
+  Org org = 1;
+}
+
+message ListOrgsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+message ListOrgsResponse {
+  repeated Org orgs = 1;
+  string next_page_token = 2;
+}

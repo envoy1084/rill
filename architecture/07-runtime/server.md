@@ -51,7 +51,7 @@ shutdown token and the process `Lifecycle`.
 The review service sits behind an `ArcSwap`. It is built from the stored
 `policy:submit` and `policy:risk` records (`state/policy.rs`), falling back to
 the default rules and `[risk]` from config. `reload_policy` rebuilds it after
-`SetPolicy` and swaps it in. Handlers call `RepoContext::review()` per
+`UpdatePolicy` and swaps it in. Handlers call `RepoContext::review()` per
 request and must not hold the `Arc` across requests. The lander's
 `ReviewHooksAdapter` holds the swap handle, so in-flight landings see the new
 policy. The review broadcast sender is shared across rebuilds, so event
@@ -106,7 +106,7 @@ hide unreadable paths ([permissions](../05-policy/permissions.md)).
 
 `resolve_root` (`services/common.rs`) turns a `RootSpec` into a root tree.
 An absent spec means the trunk head. `commit_version`
-(`services/repo/write.rs`) is the single write path for change versions. It
+(`services/changes/write.rs`) is the single write path for change versions. It
 checks that parents and content exist, materialises the `RootTree` so a bad
 change fails the request, updates review and publishes `VersionCreated`.
 
@@ -162,18 +162,18 @@ Linux. Shutdown follows `[shutdown]`
 
 * The `RepoContext` cache never evicts. There is no path to unload a
   repository.
-* `PutBlob` buffers the whole upload before it resolves the repository and
+* `WriteBlob` buffers the whole upload before it resolves the repository and
   checks write permission.
-* `GetBlob` reads the whole blob into memory before it slices and streams it.
+* `ReadBlob` reads the whole blob into memory before it slices and streams it.
 * `health_components` probes only the metadata store, the object store and
   uptime.
 
 ## Code
 
-* [lib.rs](../../crates/server/api/src/lib.rs), [serve.rs](../../crates/server/api/src/serve.rs), [error.rs](../../crates/server/runtime/src/error.rs)
+* [lib.rs](../../crates/server/api/src/lib.rs), [serve.rs](../../crates/server/api/src/serve.rs), [error.rs](../../crates/server/runtime/src/error/mod.rs)
 * [state/app.rs](../../crates/server/runtime/src/state/app.rs), [state/registry.rs](../../crates/server/runtime/src/state/registry.rs), [state/repo_context.rs](../../crates/server/runtime/src/state/repo_context.rs), [state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs), [state/policy.rs](../../crates/server/runtime/src/state/policy.rs)
 * [auth/layer.rs](../../crates/server/api/src/auth/layer.rs), [auth/authenticator.rs](../../crates/server/api/src/auth/authenticator.rs), [auth/permit.rs](../../crates/server/api/src/auth/permit.rs), [auth/context.rs](../../crates/server/api/src/auth/context.rs)
-* [services/common.rs](../../crates/server/api/src/services/common.rs), [services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs)
+* [services/common.rs](../../crates/server/api/src/services/common.rs), [services/changes/write.rs](../../crates/server/api/src/services/changes/write.rs)
 
 ---
 ← Previous: [Git import](../06-services/git-import.md) · [Index](../index.md) · Next: [API surface](api-surface.md) →

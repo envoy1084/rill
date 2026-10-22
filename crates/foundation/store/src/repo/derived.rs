@@ -113,7 +113,7 @@ impl RepoStore {
         Ok(())
     }
 
-    async fn seal_row(&self, value: Bytes) -> Result<Bytes> {
+    pub(super) async fn seal_row(&self, value: Bytes) -> Result<Bytes> {
         if value.len() <= OFFLOAD_BYTES {
             let mut row = Vec::with_capacity(value.len() + 1);
             row.push(INLINE);
@@ -129,7 +129,7 @@ impl RepoStore {
         Ok(Bytes::from(row))
     }
 
-    async fn open_row(&self, row: Option<Bytes>) -> Result<Option<Bytes>> {
+    pub(super) async fn open_row(&self, row: Option<Bytes>) -> Result<Option<Bytes>> {
         let Some(row) = row else {
             return Ok(None);
         };

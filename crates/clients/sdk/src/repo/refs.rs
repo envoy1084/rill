@@ -1,99 +1,118 @@
 //! Refs and trunk: resolution, listing, compare-and-swap moves, head and
 //! ranges.
 
-use rill_proto::convert::{
-    hash_from_proto, id_to_proto, opt_hash_from_proto, trunk_seq_from_proto,
-};
+use rill_proto::convert::{hash_from_proto, hash_to_proto, required, trunk_seq_from_proto};
 use rill_proto::rill::v1 as pb;
-use rill_types::{ChangeVersionHash, OperationId, RefName, RefUpdate, TrunkSeq};
+use rill_types::{ChangeVersionHash, OperationId, RefName, TrunkSeq};
 
 use super::RepoClient;
 use crate::error::{Error, Result};
 use crate::types::{LandEvent, RefInfo, Root};
 
 impl RepoClient {
-    /// The target of a ref, with its trunk sequence when it is trunk.
+    /// The target of a ref, with its trunk position when it is trunk.
     pub async fn resolve_ref(
         &self,
         name: &RefName,
     ) -> Result<(ChangeVersionHash, Option<TrunkSeq>)> {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
-            let request = pb::ResolveRefRequest {
-                repo: self.repo.clone(),
-                name: name.to_string(),
+            let request = pb::GetRefRequest {
+                name: crate::names::ref_name(&self.resource, name),
             };
-            async move { svc.resolve_ref(request).await }
+            async move { svc.get_ref(request).await }
         })
         .await?
         .into_owned();
+        let found = required("get_ref.ref", resp.r#ref)?;
         Ok((
-            hash_from_proto("resolve_ref.hash", &resp.hash)?,
-            resp.trunk_seq.map(trunk_seq_from_proto),
+            hash_from_proto("ref.target", &found.target)?,
+            found.trunk_position.map(trunk_seq_from_proto),
         ))
     }
 
     /// Resolve a root to a change version hash. A tree root has no
     /// version and fails with `InvalidArgument`.
     pub async fn resolve_root(&self, root: &Root) -> Result<ChangeVersionHash> {
-        match root {
-            Root::Version(h) => Ok(*h),
-            Root::Ref(name) => Ok(self.resolve_ref(name).await?.0),
-            Root::Seq(seq) => {
-                let mut landings = self.trunk_range(*seq, *seq).await?;
-                landings.pop().map(|l| l.hash).ok_or_else(|| {
-                    Error::status(
-                        connectrpc::ErrorCode::NotFound,
-                        format!("{seq} is not on trunk"),
-                    )
-                })
-            }
-            Root::Tree(h) => Err(Error::status(
-                connectrpc::ErrorCode::InvalidArgument,
-                format!("tree {h} is not a change version"),
-            )),
+        if let Root::Version(h) = root {
+            return Ok(*h);
         }
+        let resp = crate::client::retry_idempotent(|| {
+            let svc = self.svc();
+            let request = pb::ResolveRevisionRequest {
+                repo: self.resource.clone(),
+                revision: root.to_string(),
+            };
+            async move { svc.resolve_revision(request).await }
+        })
+        .await?
+        .into_owned();
+        if resp.version_hash.is_empty() {
+            return Err(Error::status(
+                connectrpc::ErrorCode::InvalidArgument,
+                format!("{root} is not a change version"),
+            ));
+        }
+        Ok(hash_from_proto("version_hash", &resp.version_hash)?)
     }
 
     /// Refs whose names start with `prefix` (all refs when `None`).
     pub async fn list_refs(&self, prefix: Option<&str>) -> Result<Vec<RefInfo>> {
-        let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::ListRefsRequest {
-                repo: self.repo.clone(),
-                prefix: prefix.map(str::to_string),
-            };
-            async move { svc.list_refs(request).await }
-        })
-        .await?
-        .into_owned();
-        resp.refs.into_iter().map(RefInfo::try_from).collect()
+        let filter = match prefix {
+            Some(p) if !p.is_empty() => format!("name = {:?}", format!("{p}*")),
+            _ => String::new(),
+        };
+        let mut refs = Vec::new();
+        let mut page_token = String::new();
+        loop {
+            let resp = crate::client::retry_idempotent(|| {
+                let svc = self.svc();
+                let request = pb::ListRefsRequest {
+                    parent: self.resource.clone(),
+                    page_size: 1000,
+                    page_token: page_token.clone(),
+                    filter: filter.clone(),
+                };
+                async move { svc.list_refs(request).await }
+            })
+            .await?
+            .into_owned();
+            for r in resp.refs {
+                refs.push(RefInfo::try_from(r)?);
+            }
+            if resp.next_page_token.is_empty() {
+                return Ok(refs);
+            }
+            page_token = resp.next_page_token;
+        }
     }
 
-    /// Cut `release/<name>` at trunk position `at` (the head when `None`).
+    /// Cut `releases/<name>` at trunk position `at` (the head when `None`).
     /// Returns the ref, the version it points at and that trunk position.
     pub async fn cut_release(
         &self,
         name: &str,
         at: Option<TrunkSeq>,
     ) -> Result<(RefName, ChangeVersionHash, TrunkSeq)> {
-        let request = pb::CutReleaseRequest {
-            operation_id: id_to_proto(&OperationId::new()),
-            repo: self.repo.clone(),
-            name: name.to_string(),
-            at: at.map(|s| s.get()),
+        let request = pb::CreateReleaseRequest {
+            request_id: crate::names::request_id(&OperationId::new()),
+            parent: self.resource.clone(),
+            release_id: name.to_string(),
+            trunk_position: at.map(|s| s.get()),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.cut_release(request).await }
+            async move { svc.create_release(request).await }
         })
         .await?
         .into_owned();
-        Ok((
-            RefName::new(resp.r#ref)?,
-            hash_from_proto("cut_release.hash", &resp.hash)?,
-            TrunkSeq(resp.trunk_seq),
-        ))
+        let cut = required("create_release.ref", resp.r#ref)?;
+        let target = hash_from_proto("ref.target", &cut.target)?;
+        let seq = match at {
+            Some(seq) => seq,
+            None => self.trunk_head().await?.map(|(s, _)| s).unwrap_or_default(),
+        };
+        Ok((crate::names::ref_short(&cut.name)?, target, seq))
     }
 
     /// Compare-and-swap a ref: `expected` is the required current target
@@ -117,58 +136,89 @@ impl RepoClient {
         expected: Option<ChangeVersionHash>,
         target: Option<ChangeVersionHash>,
     ) -> Result<Option<ChangeVersionHash>> {
-        let update = RefUpdate {
-            name,
-            expected,
-            target,
-        };
-        let request = pb::MoveRefRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            update: pb::RefUpdate::from(update).into(),
-        };
-        let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
-            async move { svc.move_ref(request).await }
-        })
-        .await?
-        .into_owned();
-        Ok(opt_hash_from_proto("move_ref.hash", resp.hash.as_ref())?)
+        let request_id = crate::names::request_id(&op);
+        let ref_name = crate::names::ref_name(&self.resource, &name);
+        // A ref's etag is its target.
+        let etag = expected.map(|h| h.to_hex()).unwrap_or_default();
+        match target {
+            Some(target) => {
+                let request = pb::UpdateRefRequest {
+                    request_id,
+                    r#ref: pb::Ref {
+                        name: ref_name,
+                        target: hash_to_proto(&target),
+                        ..Default::default()
+                    }
+                    .into(),
+                    allow_missing: expected.is_none(),
+                    etag,
+                };
+                crate::client::retry_idempotent(|| {
+                    let (svc, request) = (self.svc(), request.clone());
+                    async move { svc.update_ref(request).await }
+                })
+                .await?;
+            }
+            None => {
+                let request = pb::DeleteRefRequest {
+                    request_id,
+                    name: ref_name,
+                    etag,
+                };
+                crate::client::retry_idempotent(|| {
+                    let (svc, request) = (self.svc(), request.clone());
+                    async move { svc.delete_ref(request).await }
+                })
+                .await?;
+            }
+        }
+        Ok(target)
     }
 
     /// The head of trunk, or `None` for an empty repository.
     pub async fn trunk_head(&self) -> Result<Option<(TrunkSeq, ChangeVersionHash)>> {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
-            let request = pb::TrunkHeadRequest {
-                repo: self.repo.clone(),
+            let request = pb::GetTrunkPositionRequest {
+                name: format!("{}/trunk/positions/head", self.resource),
             };
-            async move { svc.trunk_head(request).await }
+            async move { svc.get_trunk_position(request).await }
         })
-        .await?
-        .into_owned();
-        if resp.hash.is_empty() {
-            return Ok(None);
-        }
-        Ok(Some((
-            trunk_seq_from_proto(resp.seq),
-            hash_from_proto("trunk_head.hash", &resp.hash)?,
-        )))
+        .await;
+        let resp = match resp {
+            Ok(r) => r.into_owned(),
+            Err(e) if e.code == connectrpc::ErrorCode::NotFound => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
+        let landing = LandEvent::try_from(required("landing", resp.landing)?)?;
+        Ok(Some((landing.seq, landing.hash)))
     }
 
-    /// Landings between two sequence numbers, inclusive.
+    /// Landings between two trunk positions, inclusive.
     pub async fn trunk_range(&self, from: TrunkSeq, to: TrunkSeq) -> Result<Vec<LandEvent>> {
-        let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::TrunkRangeRequest {
-                repo: self.repo.clone(),
-                from: from.get(),
-                to: to.get(),
-            };
-            async move { svc.trunk_range(request).await }
-        })
-        .await?
-        .into_owned();
-        resp.landings.into_iter().map(LandEvent::try_from).collect()
+        let filter = format!("position >= {} AND position <= {}", from.get(), to.get());
+        let mut landings = Vec::new();
+        let mut page_token = String::new();
+        loop {
+            let resp = crate::client::retry_idempotent(|| {
+                let svc = self.svc();
+                let request = pb::ListTrunkPositionsRequest {
+                    parent: self.resource.clone(),
+                    page_size: 1000,
+                    page_token: page_token.clone(),
+                    filter: filter.clone(),
+                };
+                async move { svc.list_trunk_positions(request).await }
+            })
+            .await?
+            .into_owned();
+            for landing in resp.landings {
+                landings.push(LandEvent::try_from(landing)?);
+            }
+            if resp.next_page_token.is_empty() {
+                return Ok(landings);
+            }
+            page_token = resp.next_page_token;
+        }
     }
 }

@@ -101,7 +101,7 @@ version-keyed kind with its schedule:
 | `Background` | `phist@1`, `summary@1` | by a derive job (`ensure_background`) for every version that lands |
 | `OnDemand` | blame (keyed by path) | by the first reader |
 
-Any kind is also computed by its first reader if missing. `GetDerived`
+Any kind is also computed by its first reader if missing. `GetDerivedValue`
 with `compute` set computes any registered kind (`compute_kind`); other
 kinds are returned as stored.
 
@@ -133,20 +133,20 @@ history and blame RPCs, the MCP blame tool and review agent context use
 * `ChangeSummary` skips parent summaries but still derives the first
   parent's `RootTree`, which walks the first-parent line if nothing is
   stored.
-* `ChangeSummary` has no consumer in the server other than `GetDerived`
+* `ChangeSummary` has no consumer in the server other than `GetDerivedValue`
   and the derive jobs.
 * History and blame follow first parents only. Blame derives the root tree
   of every first-parent version back to the file's creation, not only the
   versions that touched the path.
-* Blame is not reachable through `GetDerived`.
+* Blame is not reachable through `GetDerivedValue`.
 
 ## Code
 
 * [derive/mod.rs](../../crates/engine/core/src/derive/mod.rs), [derive/traits.rs](../../crates/engine/core/src/derive/traits.rs), [derive/ctx.rs](../../crates/engine/core/src/derive/ctx.rs), [derive/manager.rs](../../crates/engine/core/src/derive/manager.rs)
 * [derive/root_tree.rs](../../crates/engine/core/src/derive/root_tree.rs), [derive/ancestry.rs](../../crates/engine/core/src/derive/ancestry.rs), [derive/changed_paths.rs](../../crates/engine/core/src/derive/changed_paths.rs), [derive/registry.rs](../../crates/engine/core/src/derive/registry.rs), [derive/summary.rs](../../crates/engine/core/src/derive/summary.rs), [derive/history.rs](../../crates/engine/core/src/derive/history.rs), [derive/blame.rs](../../crates/engine/core/src/derive/blame.rs)
 * [tree/materialize.rs](../../crates/engine/core/src/tree/materialize.rs)
-* [rill-api services/repo/refs.rs](../../crates/server/api/src/services/repo/refs.rs): `GetDerived` compute dispatch
-* [rill-api services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/server/runtime/src/workers/deriver.rs): derive jobs
+* [rill-api services/repo/refs.rs](../../crates/server/api/src/services/repo/refs.rs): `GetDerivedValue` compute dispatch
+* [rill-api services/changes/write.rs](../../crates/server/api/src/services/changes/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/server/runtime/src/workers/deriver.rs): derive jobs
 * [rill-runtime state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs): manager construction
 
 ---

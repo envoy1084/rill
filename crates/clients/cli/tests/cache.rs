@@ -25,20 +25,17 @@ async fn the_cache_serves_what_grants_name_and_fetches_each_object_once() {
     let owner = server.client(&ann).await;
     owner.create_repo("acl", None).await.unwrap();
     let first = owner
-        .repo_svc()
+        .change_svc()
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Default::default(),
-            repo: "acl".into(),
-            base: None.into(),
-            edits: Vec::new(),
+            parent: rill_sdk::names::repo("acl"),
             message: "start".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned()
+        .info
+        .unwrap()
         .hash;
     let files = [
         ("pub/a.txt", "a\n".repeat(400)),
@@ -88,11 +85,12 @@ async fn the_cache_serves_what_grants_name_and_fetches_each_object_once() {
     // Bob lists pub/ at the origin and gets a grant for what is there.
     let reader = server.client(&bob).await;
     let listing = reader
-        .repo_svc()
-        .list_dir(pb::ListDirRequest {
-            repo: "acl".into(),
-            root: Root::Version(version).to_proto().into(),
+        .content_svc()
+        .list_directory(pb::ListDirectoryRequest {
+            repo: rill_sdk::names::repo("acl"),
+            revision: version.to_hex(),
             path: "pub".into(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -163,20 +161,17 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
     owner.create_repo("app", None).await.unwrap();
     let leaked = "customer: alice\n".repeat(100);
     let first = owner
-        .repo_svc()
+        .change_svc()
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Default::default(),
-            repo: "app".into(),
-            base: None.into(),
-            edits: Vec::new(),
+            parent: rill_sdk::names::repo("app"),
             message: "start".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned()
+        .info
+        .unwrap()
         .hash;
     let version = owner
         .repo("app")
@@ -192,11 +187,12 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
         .unwrap()
         .hash;
     let grant = owner
-        .repo_svc()
-        .list_dir(pb::ListDirRequest {
-            repo: "app".into(),
-            root: Root::Version(version).to_proto().into(),
+        .content_svc()
+        .list_directory(pb::ListDirectoryRequest {
+            repo: rill_sdk::names::repo("app"),
+            revision: version.to_hex(),
             path: "data".into(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -237,9 +233,9 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
 
     let request = owner
         .protection_svc()
-        .request_redaction(pb::RequestRedactionRequest {
-            operation_id: Default::default(),
-            org: "default".into(),
+        .create_redaction(pb::CreateRedactionRequest {
+            request_id: String::new(),
+            parent: "orgs/default".into(),
             kind: (ObjectKind::Blob as i32).into(),
             hash: hash.as_bytes().to_vec().into(),
             reason: "customer data".into(),
@@ -254,9 +250,8 @@ async fn a_redacted_object_is_dropped_from_the_cache_and_never_served() {
         .await
         .protection_svc()
         .approve_redaction(pb::ApproveRedactionRequest {
-            operation_id: Default::default(),
-            org: "default".into(),
-            id: request.id,
+            request_id: String::new(),
+            name: request.name,
         })
         .await
         .unwrap();
@@ -284,11 +279,9 @@ async fn a_cache_that_cannot_reread_redactions_stops_serving() {
     owner.create_repo("app", None).await.unwrap();
     let content = "kept on the cache's disk\n".repeat(40);
     let version = owner
-        .repo_svc()
+        .change_svc()
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Default::default(),
-            repo: "app".into(),
-            base: None.into(),
+            parent: rill_sdk::names::repo("app"),
             edits: vec![pb::Edit {
                 path: "a.txt".into(),
                 op: Some(pb::edit::Op::SetContent(pb::SetContent {
@@ -301,22 +294,20 @@ async fn a_cache_that_cannot_reread_redactions_stops_serving() {
                 })),
             }],
             message: "a".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned()
+        .info
+        .unwrap()
         .hash;
     let grant = owner
-        .repo_svc()
-        .list_dir(pb::ListDirRequest {
-            repo: "app".into(),
-            root: Root::Version(ObjectHash::from_slice(&version).unwrap())
-                .to_proto()
-                .into(),
-            path: String::new(),
+        .content_svc()
+        .list_directory(pb::ListDirectoryRequest {
+            repo: rill_sdk::names::repo("app"),
+            revision: ObjectHash::from_slice(&version).unwrap().to_hex(),
+            ..Default::default()
         })
         .await
         .unwrap()

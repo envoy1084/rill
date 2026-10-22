@@ -1,4 +1,4 @@
-//! Edit requests and root specs the tests write with.
+//! Edit requests and revisions the tests write with.
 
 use bytes::Bytes;
 use rill_proto::rill::v1 as pb;
@@ -20,8 +20,14 @@ pub(crate) fn set_edit(path: &str, bytes: &[u8]) -> pb::Edit {
     }
 }
 
-pub(crate) fn trunk() -> pb::RootSpec {
-    pb::RootSpec {
-        root: Some(pb::root_spec::Root::Ref("trunk".into())),
+/// The revision naming trunk's head.
+pub(crate) fn trunk() -> String {
+    "trunk".into()
+}
+
+/// An edit base at trunk's head.
+pub(crate) fn trunk_base() -> pb::EditBase {
+    pb::EditBase {
+        base: Some(pb::edit_base::Base::Revision(trunk())),
     }
 }

@@ -22,135 +22,162 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
         .find(|(r, _)| *r == Role::PubReader)
         .and_then(|(_, t)| t.clone())
         .unwrap();
-    let version = callers.acl.version.clone();
+    let repo = || common::names::repo("acl");
+    let version = common::names::version("acl", &callers.acl.version);
     let at = callers.acl.at_version();
     let secret_hash = ObjectHash::digest(ObjectKind::Blob, &secret_bytes());
-    let empty_tree = pb::RootSpec {
-        root: Some(pb::root_spec::Root::TreeHash(Bytes::copy_from_slice(
-            rill_types::Tree::empty_hash().as_bytes(),
-        ))),
-    };
+    let empty_tree = format!("tree:{}", rill_types::Tree::empty_hash().to_hex());
     let probes: Vec<(&str, Vec<u8>)> = vec![
         (
-            "RepoService/ListDir",
-            pb::ListDirRequest {
-                repo: "acl".into(),
-                root: at.clone().into(),
-                path: String::new(),
+            "ContentService/ListDirectory",
+            pb::ListDirectoryRequest {
+                repo: repo(),
+                revision: at.clone(),
+                ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/ListDir",
-            pb::ListDirRequest {
-                repo: "acl".into(),
-                root: at.clone().into(),
+            "ContentService/ListDirectory",
+            pb::ListDirectoryRequest {
+                repo: repo(),
+                revision: at.clone(),
                 path: "secret".into(),
-            }
-            .encode_to_vec(),
-        ),
-        (
-            "RepoService/Log",
-            pb::LogRequest {
-                repo: "acl".into(),
-                limit: 100,
                 ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/Log",
-            pb::LogRequest {
-                repo: "acl".into(),
-                path: Some("secret".into()),
+            "ContentService/ListHistory",
+            pb::ListHistoryRequest {
+                repo: repo(),
+                page_size: 100,
                 ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/GetChangeVersion",
-            pb::GetChangeVersionRequest {
-                repo: "acl".into(),
-                hash: version.clone(),
+            "ContentService/ListHistory",
+            pb::ListHistoryRequest {
+                repo: repo(),
+                path: "secret".into(),
+                ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/GetChangeInfo",
-            pb::GetChangeInfoRequest {
-                repo: "acl".into(),
-                hash: version.clone(),
+            "ChangeService/GetVersion",
+            pb::GetVersionRequest {
+                name: version.clone(),
+                view: pb::VersionView::Full.into(),
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/Diff",
+            "ChangeService/GetVersion",
+            pb::GetVersionRequest {
+                name: version.clone(),
+                view: pb::VersionView::Basic.into(),
+            }
+            .encode_to_vec(),
+        ),
+        (
+            "ChangeService/BatchGetVersions",
+            pb::BatchGetVersionsRequest {
+                parent: repo(),
+                names: vec![version.clone()],
+                view: pb::VersionView::Full.into(),
+            }
+            .encode_to_vec(),
+        ),
+        (
+            "ContentService/Diff",
             pb::DiffRequest {
-                repo: "acl".into(),
-                base: empty_tree.into(),
-                target: at.clone().into(),
+                repo: repo(),
+                base: empty_tree,
+                target: at.clone(),
                 ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/Grep",
+            "ContentService/Grep",
             pb::GrepRequest {
-                repo: "acl".into(),
-                root: at.clone().into(),
+                repo: repo(),
+                revision: at.clone(),
                 pattern: CANARY.into(),
                 ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/ResolvePath",
-            pb::ResolvePathRequest {
-                repo: "acl".into(),
-                root: at.clone().into(),
+            "ContentService/Stat",
+            pb::StatRequest {
+                repo: repo(),
+                revision: at.clone(),
                 path: "secret/s.txt".into(),
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/PathHistory",
-            pb::PathHistoryRequest {
-                repo: "acl".into(),
+            "ContentService/ReadFile",
+            pb::ReadFileRequest {
+                repo: repo(),
+                revision: at.clone(),
                 path: "secret/s.txt".into(),
                 ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/Blame",
+            "ContentService/BatchReadFiles",
+            pb::BatchReadFilesRequest {
+                repo: repo(),
+                revision: at.clone(),
+                paths: vec!["pub/a.txt".into(), "secret/s.txt".into()],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        ),
+        (
+            "ContentService/ListPathHistory",
+            pb::ListPathHistoryRequest {
+                repo: repo(),
+                path: "secret/s.txt".into(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        ),
+        (
+            "ContentService/Blame",
             pb::BlameRequest {
-                repo: "acl".into(),
+                repo: repo(),
                 path: "secret/s.txt".into(),
                 ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/WatchLog",
-            pb::WatchLogRequest {
-                repo: "acl".into(),
+            "RepoService/WatchVersions",
+            pb::WatchVersionsRequest {
+                parent: repo(),
                 after: Some(Bytes::new()),
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/TrunkRange",
-            pb::TrunkRangeRequest {
-                repo: "acl".into(),
-                from: 1,
-                to: 10,
+            "RepoService/ListTrunkPositions",
+            pb::ListTrunkPositionsRequest {
+                parent: repo(),
+                filter: "position >= 1 AND position <= 10".into(),
+                ..Default::default()
             }
             .encode_to_vec(),
         ),
         (
-            "RepoService/GetBlob",
-            pb::GetBlobRequest {
-                repo: "acl".into(),
+            "ContentService/ReadBlob",
+            pb::ReadBlobRequest {
+                repo: repo(),
                 content: (pb::ContentRef {
                     r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
                         hash: Bytes::copy_from_slice(secret_hash.as_bytes()),
@@ -163,9 +190,9 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             .encode_to_vec(),
         ),
         (
-            "RepoService/HasObjects",
-            pb::HasObjectsRequest {
-                repo: "acl".into(),
+            "ContentService/BatchCheckObjects",
+            pb::BatchCheckObjectsRequest {
+                repo: repo(),
                 objects: vec![pb::ObjectRef {
                     kind: pb::ObjectKind::Blob.into(),
                     hash: Bytes::copy_from_slice(secret_hash.as_bytes()),
@@ -176,7 +203,7 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
         (
             "AccessService/LookupPaths",
             pb::LookupPathsRequest {
-                repo: "acl".into(),
+                parent: repo(),
                 relation: "reader".into(),
                 subject: None,
             }

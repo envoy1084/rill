@@ -69,7 +69,10 @@ impl WorkloadConfig {
                 model: self.model.clone(),
             })
             .await?
-            .into_owned())
+            .into_owned()
+            .grant
+            .into_option()
+            .ok_or(rill_proto::ConvertError::missing("exchange_token.grant"))?)
     }
 }
 

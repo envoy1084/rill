@@ -163,8 +163,8 @@ async fn apply_edits_round_trips_types() {
 
     let sent = h.repo.applied.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    assert_eq!(sent[0].operation_id.len(), 16);
-    assert_eq!(sent[0].repo, "main");
+    assert!(uuid::Uuid::parse_str(&sent[0].request_id).is_ok());
+    assert_eq!(sent[0].parent, "orgs/default/repos/main");
 }
 
 #[tokio::test]
@@ -207,7 +207,7 @@ async fn watch_trunk_yields_converted_events() {
 }
 
 #[tokio::test]
-async fn writes_retry_through_unavailable_servers_with_one_operation_id() {
+async fn writes_retry_through_unavailable_servers_with_one_request_id() {
     let mock = MockRepo::new();
     mock.set_trunk(1, fake_hash("head"));
     mock.unavailable
@@ -226,7 +226,7 @@ async fn writes_retry_through_unavailable_servers_with_one_operation_id() {
     assert!(
         applied
             .iter()
-            .all(|r| r.operation_id == applied[0].operation_id && !r.operation_id.is_empty()),
+            .all(|r| r.request_id == applied[0].request_id && !r.request_id.is_empty()),
         "every attempt is the same operation"
     );
 }

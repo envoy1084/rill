@@ -1,7 +1,6 @@
 //! `rill checks quarantine`: targets whose failures neither block
 //! landings nor make trunk red.
 
-use bytes::Bytes;
 use clap::{Args, Subcommand};
 use rill_proto::rill::v1 as pb;
 use rill_types::Timestamp;
@@ -41,15 +40,19 @@ pub struct TargetArg {
 
 /// Run a quarantine subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
-    let repo = ctx.repo_name()?;
+    let repo = rill_sdk::names::repo(&ctx.repo_name()?);
     let svc = ctx.client()?.checks_svc();
     match cmd {
         QuarantineCmd::List => {
             let targets = svc
-                .list_quarantined(pb::ListQuarantinedRequest { repo })
+                .list_quarantines(pb::ListQuarantinesRequest {
+                    parent: repo,
+                    page_size: 1000,
+                    page_token: String::new(),
+                })
                 .await?
                 .into_owned()
-                .targets;
+                .quarantines;
             ctx.emit(
                 j!({ "targets": targets.iter().map(|t| j!({
                     "target": t.target,
@@ -73,38 +76,29 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
             )
         }
         QuarantineCmd::Add(args) => {
-            let added = svc
-                .quarantine(pb::QuarantineRequest {
-                    operation_id: Bytes::new(),
-                    repo,
+            svc.create_quarantine(pb::CreateQuarantineRequest {
+                request_id: String::new(),
+                parent: repo,
+                quarantine: pb::Quarantine {
                     target: args.target.clone(),
                     reason: args.reason,
-                })
-                .await?
-                .into_owned()
-                .added;
-            ctx.emit(j!({ "target": args.target, "added": added }), |out| {
-                out.line(match added {
-                    true => format!("quarantined {}", args.target),
-                    false => format!("{} was already quarantined", args.target),
-                })
+                    ..Default::default()
+                }
+                .into(),
+            })
+            .await?;
+            ctx.emit(j!({ "target": args.target, "added": true }), |out| {
+                out.line(format!("quarantined {}", args.target))
             })
         }
         QuarantineCmd::Release(args) => {
-            let released = svc
-                .release_quarantine(pb::ReleaseQuarantineRequest {
-                    operation_id: Bytes::new(),
-                    repo,
-                    target: args.target.clone(),
-                })
-                .await?
-                .into_owned()
-                .released;
-            ctx.emit(j!({ "target": args.target, "released": released }), |out| {
-                out.line(match released {
-                    true => format!("lifted the quarantine of {}", args.target),
-                    false => format!("{} was not quarantined", args.target),
-                })
+            svc.delete_quarantine(pb::DeleteQuarantineRequest {
+                request_id: String::new(),
+                name: format!("{repo}/quarantines/{}", args.target),
+            })
+            .await?;
+            ctx.emit(j!({ "target": args.target, "released": true }), |out| {
+                out.line(format!("lifted the quarantine of {}", args.target))
             })
         }
     }

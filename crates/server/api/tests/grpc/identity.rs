@@ -26,12 +26,12 @@ async fn identity(server: &TestServer, token: &str) -> IdentityServiceClient<Svc
     IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(token.to_string())))
 }
 
-/// `who_am_i` with `token` on `server`: the gRPC code it fails with, if any.
+/// `get_caller` with `token` on `server`: the gRPC code it fails with, if any.
 async fn who(server: &TestServer, token: &str) -> Option<Code> {
     clients(server, Some(token))
         .await
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .err()
         .map(|s| s.code)
@@ -64,7 +64,7 @@ async fn a_revoked_token_is_refused_by_every_server() {
     identity(&a, &alice)
         .await
         .revoke_token(pb::RevokeTokenRequest {
-            operation_id: Bytes::new(),
+            request_id: String::new(),
             target: Some(pb::revoke_token_request::Target::Token(alice.clone())),
             reason: "logout".into(),
         })
@@ -78,15 +78,15 @@ async fn a_revoked_token_is_refused_by_every_server() {
     let bob = a.token_for(&Principal::human("bob"));
     let bob_id = clients(&a, Some(&bob))
         .await
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .unwrap()
         .into_owned()
         .token_id
         .unwrap();
     let by_id = |id: String| pb::RevokeTokenRequest {
-        operation_id: Bytes::new(),
+        request_id: String::new(),
         target: Some(pb::revoke_token_request::Target::TokenId(id)),
         reason: "compromised".into(),
     };
@@ -140,7 +140,7 @@ async fn revoking_a_session_refuses_every_token_issued_under_it() {
     identity(&a, &first)
         .await
         .revoke_session(pb::RevokeSessionRequest {
-            operation_id: Bytes::new(),
+            request_id: String::new(),
             session: session.id.to_string(),
         })
         .await
@@ -170,7 +170,7 @@ async fn tokens_from_a_rotated_key_verify_on_every_server() {
     let rotated = identity(&a, &root)
         .await
         .rotate_token_keys(pb::RotateTokenKeysRequest {
-            operation_id: Bytes::new(),
+            request_id: String::new(),
         })
         .await
         .unwrap()

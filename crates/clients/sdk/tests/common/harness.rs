@@ -22,10 +22,12 @@ impl Harness {
         let review = Arc::new(review);
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let (repo_s, review_s) = (repo.clone(), review.clone());
-        let router = connectrpc::Router::new()
-            .add_service(repo_s)
-            .add_service(review_s);
+        let router = connectrpc::Router::new();
+        let router = rill_proto::rill::v1::RepoServiceExt::register(repo.clone(), router);
+        let router = rill_proto::rill::v1::ContentServiceExt::register(repo.clone(), router);
+        let router = rill_proto::rill::v1::ChangeServiceExt::register(repo.clone(), router);
+        let router = rill_proto::rill::v1::ReviewServiceExt::register(review.clone(), router);
+        let router = rill_proto::rill::v1::LandingServiceExt::register(review.clone(), router);
         tokio::spawn(async move {
             axum::serve(
                 listener,

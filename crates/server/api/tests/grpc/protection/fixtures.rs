@@ -15,10 +15,9 @@ pub fn admins_config() -> ServerConfig {
 pub async fn repo(c: &mut Clients, name: &str) {
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: name.into(),
-            description: None,
-            windows_safe: false,
+            parent: common::names::org("default"),
+            repo_id: name.into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -29,16 +28,12 @@ pub async fn apply(
     repo: &str,
     edits: Vec<pb::Edit>,
 ) -> Result<pb::ApplyEditsResponse, ConnectError> {
-    c.repo
+    c.changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            base: None.into(),
+            parent: common::names::repo(repo),
             edits,
             message: "edit".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .map(|r| r.into_owned())
@@ -91,24 +86,29 @@ pub async fn apply_on(
     edits: Vec<pb::Edit>,
     message: &str,
 ) -> Result<pb::ApplyEditsResponse, ConnectError> {
-    c.repo
+    c.changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
+            parent: common::names::repo(repo),
             base: (base.map(|v| pb::EditBase {
-                base: Some(pb::edit_base::Base::Root(pb::RootSpec {
-                    root: Some(pb::root_spec::Root::VersionHash(v.clone())),
-                })),
+                base: Some(pb::edit_base::Base::Revision(hex(v))),
             }))
             .into(),
             edits,
             message: message.into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .map(|r| r.into_owned())
+}
+
+/// The version hash of an [`apply`] response.
+pub fn hash_of(applied: &pb::ApplyEditsResponse) -> Bytes {
+    applied.info.as_option().unwrap().hash.clone()
+}
+
+/// A version hash as a revision.
+pub fn hex(hash: &[u8]) -> String {
+    ObjectHash::from_slice(hash).unwrap().to_hex()
 }
 
 /// `n` distinct, well-formed fake AWS access key ids (base32 after the

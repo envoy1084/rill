@@ -5,9 +5,9 @@ use rill_proto::rill::v1 as pb;
 use crate::client::Client;
 use crate::error::Result;
 use crate::intent::IntentClient;
-use crate::lander::LanderClient;
 use crate::review::ReviewClient;
 use crate::stack::StackClient;
+use crate::trunk::TrunkClient;
 use crate::types::RepoInfo;
 use crate::workspace::WorkspaceClient;
 
@@ -17,11 +17,23 @@ use crate::workspace::WorkspaceClient;
 pub struct RepoClient {
     pub(super) client: Client,
     pub(super) repo: String,
+    /// The full resource name, `orgs/{org}/repos/{repo}`.
+    pub(super) resource: String,
 }
 
 impl RepoClient {
     pub(crate) fn new(client: Client, repo: String) -> Self {
-        RepoClient { client, repo }
+        let resource = crate::names::repo(&repo);
+        RepoClient {
+            client,
+            repo,
+            resource,
+        }
+    }
+
+    /// The repository's full resource name, `orgs/{org}/repos/{repo}`.
+    pub fn resource(&self) -> &str {
+        &self.resource
     }
 
     /// The repository name or id requests are addressed to.
@@ -36,22 +48,22 @@ impl RepoClient {
 
     /// Workspaces in this repository.
     pub fn workspaces(&self) -> WorkspaceClient {
-        WorkspaceClient::new(self.client.clone(), self.repo.clone())
+        WorkspaceClient::new(self.client.clone(), self.resource.clone())
     }
 
     /// Reviews in this repository.
     pub fn reviews(&self) -> ReviewClient {
-        ReviewClient::new(self.client.clone(), self.repo.clone())
+        ReviewClient::new(self.client.clone(), self.resource.clone())
     }
 
     /// Intents in this repository.
     pub fn intents(&self) -> IntentClient {
-        IntentClient::new(self.client.clone(), self.repo.clone())
+        IntentClient::new(self.client.clone(), self.resource.clone())
     }
 
-    /// Trunk status, verification and reverts.
-    pub fn lander(&self) -> LanderClient {
-        LanderClient::new(self.client.clone(), self.repo.clone())
+    /// Trunk status, verification, healing and reverts.
+    pub fn trunk(&self) -> TrunkClient {
+        TrunkClient::new(self.client.clone(), self.resource.clone())
     }
 
     /// Stack helpers composed from review and repo calls.
@@ -63,6 +75,18 @@ impl RepoClient {
         self.client.repo_svc()
     }
 
+    pub(crate) fn content(&self) -> crate::client::ContentSvc {
+        self.client.content_svc()
+    }
+
+    pub(crate) fn changes(&self) -> crate::client::ChangeSvc {
+        self.client.change_svc()
+    }
+
+    pub(crate) fn events(&self) -> crate::client::EventSvc {
+        self.client.event_svc()
+    }
+
     pub(crate) fn grants(&self) -> &crate::grants::ReadGrants {
         self.client.read_grants()
     }
@@ -72,7 +96,7 @@ impl RepoClient {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
             let request = pb::GetRepoRequest {
-                repo: self.repo.clone(),
+                name: self.resource.clone(),
             };
             async move { svc.get_repo(request).await }
         })

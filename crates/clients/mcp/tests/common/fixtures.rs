@@ -10,6 +10,7 @@ pub fn fake_hash(seed: &str) -> ObjectHash {
 
 pub fn sample_info(seed: &str, seq: Option<u64>) -> pb::ChangeInfo {
     pb::ChangeInfo {
+        name: String::new(),
         hash: hash_to_proto(&fake_hash(seed)),
         change_id: id_to_proto(&ChangeId::derived("test", seed)),
         parents: vec![],

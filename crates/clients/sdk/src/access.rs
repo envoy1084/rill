@@ -1,11 +1,11 @@
 //! Access: relationship tuples and questions about them.
 
-use rill_proto::convert::id_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{OperationId, Principal};
 
 use crate::client::{retry_idempotent, Client};
 use crate::error::Result;
+use crate::names;
 use crate::types::{AccessCheck, ExpandedRelation, Relation, RelationFilter};
 
 /// Who may do what in repositories. Grants and revokes made through a
@@ -26,55 +26,69 @@ impl AccessClient {
 
     /// Add a tuple.
     pub async fn grant(&self, relation: &Relation) -> Result<()> {
-        let request = pb::AddRelationRequest {
-            operation_id: id_to_proto(&OperationId::new()),
+        let request = pb::CreateRelationRequest {
+            request_id: names::request_id(&OperationId::new()),
+            parent: names::repo(&relation.repo),
             relation: relation.to_proto().into(),
         };
         let resp = retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.add_relation(request).await }
+            async move { svc.create_relation(request).await }
         })
         .await?
         .into_owned();
         self.client
             .relations_seen()
-            .observe(&resp.repo_id, resp.relation_version);
+            .observe(&resp.repo_uid, resp.relation_version);
         Ok(())
     }
 
     /// Remove a tuple.
     pub async fn revoke(&self, relation: &Relation) -> Result<()> {
-        let request = pb::RemoveRelationRequest {
-            operation_id: id_to_proto(&OperationId::new()),
+        let request = pb::DeleteRelationRequest {
+            request_id: names::request_id(&OperationId::new()),
+            parent: names::repo(&relation.repo),
             relation: relation.to_proto().into(),
         };
         let resp = retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.remove_relation(request).await }
+            async move { svc.delete_relation(request).await }
         })
         .await?
         .into_owned();
         self.client
             .relations_seen()
-            .observe(&resp.repo_id, resp.relation_version);
+            .observe(&resp.repo_uid, resp.relation_version);
         Ok(())
     }
 
     /// A repository's tuples (owners only).
     pub async fn list(&self, repo: &str, filter: RelationFilter) -> Result<Vec<Relation>> {
-        let request = pb::ListRelationsRequest {
-            repo: repo.to_string(),
-            path: filter.path,
-            subject: filter.subject,
-            relation: filter.relation,
-        };
-        let resp = retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
-            async move { svc.list_relations(request).await }
-        })
-        .await?
-        .into_owned();
-        Ok(resp.relations.into_iter().map(Relation::from).collect())
+        let mut out = Vec::new();
+        let mut page_token = String::new();
+        loop {
+            let request = pb::ListRelationsRequest {
+                parent: names::repo(repo),
+                page_size: 1000,
+                page_token: page_token.clone(),
+                filter: filter.to_filter(),
+            };
+            let resp = retry_idempotent(|| {
+                let (svc, request) = (self.svc(), request.clone());
+                async move { svc.list_relations(request).await }
+            })
+            .await?
+            .into_owned();
+            out.extend(
+                resp.relations
+                    .into_iter()
+                    .map(|r| Relation::from_proto(repo, r)),
+            );
+            if resp.next_page_token.is_empty() {
+                return Ok(out);
+            }
+            page_token = resp.next_page_token;
+        }
     }
 
     /// Whether `subject` (the caller when `None`) holds `relation` on
@@ -86,21 +100,25 @@ impl AccessClient {
         relation: &str,
         subject: Option<&str>,
     ) -> Result<AccessCheck> {
-        let request = pb::CheckRequest {
-            repo: repo.to_string(),
+        let request = pb::CheckAccessRequest {
+            parent: names::repo(repo),
             path: path.to_string(),
             relation: relation.to_string(),
             subject: subject.map(String::from),
         };
         let resp = retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.check(request).await }
+            async move { svc.check_access(request).await }
         })
         .await?
         .into_owned();
         Ok(AccessCheck {
             allowed: resp.allowed,
-            because: resp.because.into_iter().map(Relation::from).collect(),
+            because: resp
+                .because
+                .into_iter()
+                .map(|r| Relation::from_proto(repo, r))
+                .collect(),
             org_admin: resp.org_admin,
         })
     }
@@ -112,14 +130,14 @@ impl AccessClient {
         path: &str,
         relation: &str,
     ) -> Result<Vec<ExpandedRelation>> {
-        let request = pb::ExpandRequest {
-            repo: repo.to_string(),
+        let request = pb::ExpandAccessRequest {
+            parent: names::repo(repo),
             path: path.to_string(),
             relation: relation.to_string(),
         };
         let resp = retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.expand(request).await }
+            async move { svc.expand_access(request).await }
         })
         .await?
         .into_owned();
@@ -127,10 +145,7 @@ impl AccessClient {
             .tuples
             .into_iter()
             .map(|t| ExpandedRelation {
-                relation: t
-                    .tuple
-                    .map(Relation::from)
-                    .unwrap_or_else(|| Relation::new("", "", "", "")),
+                relation: Relation::from_proto(repo, t.tuple.into_option().unwrap_or_default()),
                 members: t
                     .members
                     .into_iter()
@@ -149,7 +164,7 @@ impl AccessClient {
         subject: Option<&str>,
     ) -> Result<Vec<String>> {
         let request = pb::LookupPathsRequest {
-            repo: repo.to_string(),
+            parent: names::repo(repo),
             relation: relation.to_string(),
             subject: subject.map(String::from),
         };

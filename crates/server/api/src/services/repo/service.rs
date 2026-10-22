@@ -1,19 +1,17 @@
-//! The `RepoService` gRPC impl: dispatches each RPC to its handler.
+//! The `RepoService` impl: dispatches each RPC to its handler.
 
 use std::sync::Arc;
 
+use connectrpc::{RequestContext, Response, ServiceRequest};
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::RepoService;
 
-use super::trees::BlobStream;
-use super::watch::EventStream;
 use crate::services::common::GrpcResult;
-
+use crate::services::repo::EventStream;
 use crate::services::Call;
-use connectrpc::{InboundStream, RequestContext, Response, ServiceRequest};
 use rill_runtime::state::AppState;
 
-/// The repository service.
+/// The `RepoService`.
 #[derive(Clone)]
 pub struct RepoSvc {
     pub(super) state: Arc<AppState>,
@@ -37,6 +35,7 @@ impl RepoService for RepoSvc {
         let request = Call::new(ctx, request);
         Ok(Response::new(self.get_repo_impl(request).await?))
     }
+
     async fn list_repos(
         &self,
         ctx: RequestContext,
@@ -45,6 +44,7 @@ impl RepoService for RepoSvc {
         let request = Call::new(ctx, request);
         Ok(Response::new(self.list_repos_impl(request).await?))
     }
+
     async fn create_repo(
         &self,
         ctx: RequestContext,
@@ -58,210 +58,25 @@ impl RepoService for RepoSvc {
             .await?,
         )
     }
-    async fn get_change_version(
+
+    async fn resolve_revision(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::GetChangeVersionRequest>,
-    ) -> GrpcResult<pb::GetChangeVersionResponse> {
+        request: ServiceRequest<'_, pb::ResolveRevisionRequest>,
+    ) -> GrpcResult<pb::ResolveRevisionResponse> {
         let request = Call::new(ctx, request);
-        Ok(Response::new(self.get_change_version_impl(request).await?))
-    }
-    async fn get_change_info(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::GetChangeInfoRequest>,
-    ) -> GrpcResult<pb::GetChangeInfoResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.get_change_info_impl(request).await?))
-    }
-    async fn get_change_versions(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::GetChangeVersionsRequest>,
-    ) -> GrpcResult<pb::GetChangeVersionsResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.get_change_versions_impl(request).await?))
-    }
-    async fn log(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::LogRequest>,
-    ) -> GrpcResult<pb::LogResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.log_impl(request).await?))
-    }
-    async fn path_history(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::PathHistoryRequest>,
-    ) -> GrpcResult<pb::PathHistoryResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.path_history_impl(request).await?))
-    }
-    async fn blame(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::BlameRequest>,
-    ) -> GrpcResult<pb::BlameResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.blame_impl(request).await?))
-    }
-    async fn grep(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::GrepRequest>,
-    ) -> GrpcResult<pb::GrepResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.grep_impl(request).await?))
-    }
-    async fn get_tree(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::GetTreeRequest>,
-    ) -> GrpcResult<pb::GetTreeResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.get_tree_impl(request).await?))
-    }
-    async fn list_dir(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::ListDirRequest>,
-    ) -> GrpcResult<pb::ListDirResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.list_dir_impl(request).await?))
-    }
-    async fn resolve_path(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::ResolvePathRequest>,
-    ) -> GrpcResult<pb::ResolvePathResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.resolve_path_impl(request).await?))
+        Ok(Response::new(self.resolve_revision_impl(request).await?))
     }
 
-    async fn get_blob(
+    async fn get_ref(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::GetBlobRequest>,
-    ) -> GrpcResult<BlobStream> {
+        request: ServiceRequest<'_, pb::GetRefRequest>,
+    ) -> GrpcResult<pb::GetRefResponse> {
         let request = Call::new(ctx, request);
-        Ok(Response::new(self.get_blob_impl(request).await?))
+        Ok(Response::new(self.get_ref_impl(request).await?))
     }
 
-    async fn put_blob(
-        &self,
-        ctx: RequestContext,
-        requests: InboundStream<pb::PutBlobRequest>,
-    ) -> GrpcResult<pb::PutBlobResponse> {
-        let request = Call::with_message(ctx, requests);
-        Ok(Response::new(self.put_blob_impl(request).await?))
-    }
-
-    async fn has_objects(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::HasObjectsRequest>,
-    ) -> GrpcResult<pb::HasObjectsResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.has_objects_impl(request).await?))
-    }
-    async fn diff(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::DiffRequest>,
-    ) -> GrpcResult<pb::DiffResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.diff_impl(request).await?))
-    }
-    async fn merge_base(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::MergeBaseRequest>,
-    ) -> GrpcResult<pb::MergeBaseResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.merge_base_impl(request).await?))
-    }
-    async fn is_ancestor(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::IsAncestorRequest>,
-    ) -> GrpcResult<pb::IsAncestorResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.is_ancestor_impl(request).await?))
-    }
-    async fn create_change_version(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::CreateChangeVersionRequest>,
-    ) -> GrpcResult<pb::CreateChangeVersionResponse> {
-        let request = Call::new(ctx, request);
-        Ok(
-            crate::services::idem::once(&self.state, request, |r| async move {
-                Ok(Response::new(self.create_change_version_impl(r).await?))
-            })
-            .await?,
-        )
-    }
-    async fn apply_edits(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::ApplyEditsRequest>,
-    ) -> GrpcResult<pb::ApplyEditsResponse> {
-        let request = Call::new(ctx, request);
-        Ok(
-            crate::services::idem::once(&self.state, request, |r| async move {
-                Ok(Response::new(self.apply_edits_impl(r).await?))
-            })
-            .await?,
-        )
-    }
-    async fn rebase(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::RebaseRequest>,
-    ) -> GrpcResult<pb::RebaseResponse> {
-        let request = Call::new(ctx, request);
-        Ok(
-            crate::services::idem::once(&self.state, request, |r| async move {
-                Ok(Response::new(self.rebase_impl(r).await?))
-            })
-            .await?,
-        )
-    }
-    async fn merge(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::MergeRequest>,
-    ) -> GrpcResult<pb::MergeResponse> {
-        let request = Call::new(ctx, request);
-        Ok(
-            crate::services::idem::once(&self.state, request, |r| async move {
-                Ok(Response::new(self.merge_impl(r).await?))
-            })
-            .await?,
-        )
-    }
-    async fn resolve(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::ResolveRequest>,
-    ) -> GrpcResult<pb::ResolveResponse> {
-        let request = Call::new(ctx, request);
-        Ok(
-            crate::services::idem::once(&self.state, request, |r| async move {
-                Ok(Response::new(self.resolve_impl(r).await?))
-            })
-            .await?,
-        )
-    }
-    async fn resolve_ref(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::ResolveRefRequest>,
-    ) -> GrpcResult<pb::ResolveRefResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.resolve_ref_impl(request).await?))
-    }
     async fn list_refs(
         &self,
         ctx: RequestContext,
@@ -270,99 +85,106 @@ impl RepoService for RepoSvc {
         let request = Call::new(ctx, request);
         Ok(Response::new(self.list_refs_impl(request).await?))
     }
-    async fn move_ref(
+
+    async fn update_ref(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::MoveRefRequest>,
-    ) -> GrpcResult<pb::MoveRefResponse> {
+        request: ServiceRequest<'_, pb::UpdateRefRequest>,
+    ) -> GrpcResult<pb::UpdateRefResponse> {
         let request = Call::new(ctx, request);
         Ok(
             crate::services::idem::once(&self.state, request, |r| async move {
-                Ok(Response::new(self.move_ref_impl(r).await?))
+                Ok(Response::new(self.update_ref_impl(r).await?))
             })
             .await?,
         )
-    }
-    async fn cut_release(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::CutReleaseRequest>,
-    ) -> GrpcResult<pb::CutReleaseResponse> {
-        let request = Call::new(ctx, request);
-        Ok(
-            crate::services::idem::once(&self.state, request, |r| async move {
-                Ok(Response::new(self.cut_release_impl(r).await?))
-            })
-            .await?,
-        )
-    }
-    async fn trunk_head(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::TrunkHeadRequest>,
-    ) -> GrpcResult<pb::TrunkHeadResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.trunk_head_impl(request).await?))
-    }
-    async fn trunk_range(
-        &self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, pb::TrunkRangeRequest>,
-    ) -> GrpcResult<pb::TrunkRangeResponse> {
-        let request = Call::new(ctx, request);
-        Ok(Response::new(self.trunk_range_impl(request).await?))
     }
 
-    async fn watch_refs(
+    async fn delete_ref(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::WatchRefsRequest>,
-    ) -> GrpcResult<EventStream<pb::RefEvent>> {
+        request: ServiceRequest<'_, pb::DeleteRefRequest>,
+    ) -> GrpcResult<pb::DeleteRefResponse> {
         let request = Call::new(ctx, request);
-        Ok(Response::new(self.watch_refs_impl(request).await?))
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(self.delete_ref_impl(r).await?))
+            })
+            .await?,
+        )
+    }
+
+    async fn create_release(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::CreateReleaseRequest>,
+    ) -> GrpcResult<pb::CreateReleaseResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.create_release_impl(request).await?))
+    }
+
+    async fn get_trunk_position(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetTrunkPositionRequest>,
+    ) -> GrpcResult<pb::GetTrunkPositionResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.get_trunk_position_impl(request).await?))
+    }
+
+    async fn list_trunk_positions(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListTrunkPositionsRequest>,
+    ) -> GrpcResult<pb::ListTrunkPositionsResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(
+            self.list_trunk_positions_impl(request).await?,
+        ))
     }
 
     async fn watch_trunk(
         &self,
         ctx: RequestContext,
         request: ServiceRequest<'_, pb::WatchTrunkRequest>,
-    ) -> GrpcResult<EventStream<pb::LandEvent>> {
+    ) -> GrpcResult<EventStream<pb::WatchTrunkResponse>> {
         let request = Call::new(ctx, request);
         Ok(Response::new(self.watch_trunk_impl(request).await?))
     }
 
-    async fn watch_log(
+    async fn watch_refs(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::WatchLogRequest>,
-    ) -> GrpcResult<EventStream<pb::LogEntry>> {
+        request: ServiceRequest<'_, pb::WatchRefsRequest>,
+    ) -> GrpcResult<EventStream<pb::WatchRefsResponse>> {
         let request = Call::new(ctx, request);
-        Ok(Response::new(self.watch_log_impl(request).await?))
+        Ok(Response::new(self.watch_refs_impl(request).await?))
     }
 
-    async fn watch_events(
+    async fn watch_versions(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::WatchEventsRequest>,
-    ) -> GrpcResult<EventStream<pb::EventEnvelope>> {
+        request: ServiceRequest<'_, pb::WatchVersionsRequest>,
+    ) -> GrpcResult<EventStream<pb::WatchVersionsResponse>> {
         let request = Call::new(ctx, request);
-        Ok(Response::new(self.watch_events_impl(request).await?))
+        Ok(Response::new(self.watch_versions_impl(request).await?))
     }
 
-    async fn get_derived(
+    async fn get_derived_value(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::GetDerivedRequest>,
-    ) -> GrpcResult<pb::GetDerivedResponse> {
+        request: ServiceRequest<'_, pb::GetDerivedValueRequest>,
+    ) -> GrpcResult<pb::GetDerivedValueResponse> {
         let request = Call::new(ctx, request);
-        Ok(Response::new(self.get_derived_impl(request).await?))
+        Ok(Response::new(self.get_derived_value_impl(request).await?))
     }
-    async fn wait_derived(
+
+    async fn wait_derived_value(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::WaitDerivedRequest>,
-    ) -> GrpcResult<pb::WaitDerivedResponse> {
+        request: ServiceRequest<'_, pb::WaitDerivedValueRequest>,
+    ) -> GrpcResult<pb::WaitDerivedValueResponse> {
         let request = Call::new(ctx, request);
-        Ok(Response::new(self.wait_derived_impl(request).await?))
+        Ok(Response::new(self.wait_derived_value_impl(request).await?))
     }
 }

@@ -76,20 +76,17 @@ async fn a_directory_reader_reads_its_directory_and_nothing_else() {
     // The SDK edits on top of a root; the first version starts from
     // nothing over the raw RPC.
     let first = owner
-        .repo_svc()
+        .change_svc()
         .apply_edits(rill_proto::rill::v1::ApplyEditsRequest {
-            operation_id: Default::default(),
-            repo: "acl".into(),
-            base: None.into(),
-            edits: Vec::new(),
+            parent: rill_sdk::names::repo("acl"),
             message: "start".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned()
+        .info
+        .unwrap()
         .hash;
     let first = rill_types::ObjectHash::from_slice(&first).unwrap();
     let public = "public\n".repeat(100);

@@ -28,25 +28,18 @@ impl MockRepo {
         self.trees.lock().unwrap().insert(label.to_string(), map);
     }
 
-    pub(super) fn root_label(root: Option<&pb::RootSpec>) -> Result<String, Status> {
-        match root.and_then(|r| r.root.as_ref()) {
-            Some(pb::root_spec::Root::Ref(name)) => Ok(name.clone()),
-            Some(pb::root_spec::Root::VersionHash(h)) => Ok(hex::encode(h)),
-            Some(pb::root_spec::Root::TreeHash(h)) => Ok(format!("tree:{}", hex::encode(h))),
-            Some(pb::root_spec::Root::TrunkSeq(n)) => Ok(format!("trunk@{n}")),
-            None => Err(Status::invalid_argument("missing root")),
-        }
-    }
-
-    pub(super) fn tree(
-        &self,
-        root: Option<&pb::RootSpec>,
-    ) -> Result<BTreeMap<String, Bytes>, Status> {
-        let label = Self::root_label(root)?;
+    /// The tree a revision names; revisions are the labels trees are
+    /// installed under.
+    pub(super) fn tree(&self, revision: &str) -> Result<BTreeMap<String, Bytes>, Status> {
+        let label = if revision.is_empty() {
+            "trunk"
+        } else {
+            revision
+        };
         self.trees
             .lock()
             .unwrap()
-            .get(&label)
+            .get(label)
             .cloned()
             .ok_or_else(|| Status::not_found(format!("root {label}")))
     }

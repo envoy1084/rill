@@ -110,6 +110,8 @@ pub fn intent_status_from_proto(
 impl From<&Intent> for pb::Intent {
     fn from(i: &Intent) -> Self {
         pb::Intent {
+            name: String::new(),
+            etag: String::new(),
             id: id_to_proto(&i.id),
             title: i.title.clone(),
             body: i.body.clone(),

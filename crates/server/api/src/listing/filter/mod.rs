@@ -63,6 +63,32 @@ impl Filter {
     pub fn matches(&self, item: &impl Record) -> bool {
         self.expr.as_ref().is_none_or(|e| eval::eval(e, item))
     }
+
+    /// The string values `field` is compared with, for lists that must
+    /// look them up (a name the items store as an id).
+    pub fn values_of(&self, field: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        if let Some(expr) = &self.expr {
+            collect(expr, field, &mut out);
+        }
+        out
+    }
+}
+
+fn collect(expr: &parse::Expr, field: &str, out: &mut Vec<String>) {
+    match expr {
+        parse::Expr::And(a, b) | parse::Expr::Or(a, b) => {
+            collect(a, field, out);
+            collect(b, field, out);
+        }
+        parse::Expr::Not(e) => collect(e, field, out),
+        parse::Expr::Compare {
+            field: f,
+            value: parse::Value::Str(v),
+            ..
+        } if f == field => out.push(v.clone()),
+        parse::Expr::Compare { .. } => {}
+    }
 }
 
 #[cfg(test)]
@@ -127,6 +153,14 @@ mod tests {
         assert!(!holds("labels:docs"));
         assert!(holds(r#"owner = "a*""#), "a wildcard");
         assert!(holds("status:pe"), "a substring");
+    }
+
+    #[test]
+    fn values_compared_with_a_field_are_listed() {
+        let filter =
+            Filter::parse(r#"owner = ann OR (NOT owner = "bob" AND size > 3)"#, SCHEMA).unwrap();
+        assert_eq!(filter.values_of("owner"), ["ann", "bob"]);
+        assert!(filter.values_of("status").is_empty());
     }
 
     #[test]

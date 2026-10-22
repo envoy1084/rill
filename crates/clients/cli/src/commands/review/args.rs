@@ -43,7 +43,7 @@ pub struct ListArgs {
     /// Only this status (open, landable, landing, landed, abandoned).
     #[arg(long)]
     pub status: Option<String>,
-    /// Only reviews owned by this principal id.
+    /// Only reviews owned by this principal, as shown (`ann`, `agent:bot`).
     #[arg(long)]
     pub owner: Option<String>,
     /// Page size.

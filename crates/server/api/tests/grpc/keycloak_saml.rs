@@ -98,9 +98,9 @@ async fn people_sign_in_through_keycloak_saml() {
     let server = TestServer::start(config).await;
     let root = server.token_for(&Principal::human("root"));
     let saved = IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(root)))
-        .put_identity_provider(pb::PutIdentityProviderRequest {
-            operation_id: Bytes::new(),
-            provider: Some(pb::IdentityProviderSpec {
+        .update_identity_provider(pb::UpdateIdentityProviderRequest {
+            request_id: String::new(),
+            provider: (pb::IdentityProviderSpec {
                 org: "default".into(),
                 name: "keycloak-saml".into(),
                 groups_claim: Some("groups".into()),
@@ -108,11 +108,13 @@ async fn people_sign_in_through_keycloak_saml() {
                 saml_metadata: Some(metadata),
                 saml_sp_entity_id: Some("rill-saml".into()),
                 ..Default::default()
-            }),
+            })
+            .into(),
+            allow_missing: true,
         })
         .await
         .unwrap()
-        .into_inner()
+        .into_owned()
         .provider
         .unwrap();
     assert!(saved.saml);
@@ -165,11 +167,11 @@ async fn people_sign_in_through_keycloak_saml() {
     assert_eq!(granted["principal"], "alice");
     let me = clients(&server, Some(granted["access_token"].as_str().unwrap()))
         .await
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .unwrap()
-        .into_inner();
+        .into_owned();
     assert_eq!(me.principal.unwrap().name, "alice");
     assert_eq!(me.teams, ["devs"], "groups become teams");
 

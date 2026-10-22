@@ -1,0 +1,16 @@
+version: v2
+modules:
+  - path: .
+lint:
+  use:
+    - STANDARD
+    - COMMENT_SERVICE
+    - COMMENT_RPC
+  ignore:
+    - google
+  rpc_allow_google_protobuf_empty_requests: false
+breaking:
+  use:
+    - FILE
+  ignore:
+    - google

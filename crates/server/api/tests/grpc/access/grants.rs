@@ -26,9 +26,9 @@ async fn read_blob(
     grant: &str,
 ) -> Result<Vec<u8>, Code> {
     let mut stream = c
-        .repo
-        .get_blob(pb::GetBlobRequest {
-            repo: "acl".into(),
+        .content
+        .read_blob(pb::ReadBlobRequest {
+            repo: common::names::repo("acl"),
             content: blob_ref(hash, size).into(),
             offset: None,
             length: None,
@@ -68,11 +68,12 @@ async fn a_path_reader_fetches_only_what_its_listings_granted() {
 
     // The root lists only the way to `pub`.
     let root = c
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: "acl".into(),
-            root: acl.at_version().into(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: common::names::repo("acl"),
+            revision: acl.at_version(),
             path: String::new(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -80,22 +81,24 @@ async fn a_path_reader_fetches_only_what_its_listings_granted() {
     let names: Vec<_> = root.entries.iter().map(|e| e.name.as_str()).collect();
     assert_eq!(names, ["pub"]);
     let secret_listing = c
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: "acl".into(),
-            root: acl.at_version().into(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: common::names::repo("acl"),
+            revision: acl.at_version(),
             path: "secret".into(),
+            ..Default::default()
         })
         .await
         .unwrap_err();
     assert_eq!(secret_listing.code, Code::PermissionDenied);
 
     let listing = c
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: "acl".into(),
-            root: acl.at_version().into(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: common::names::repo("acl"),
+            revision: acl.at_version(),
             path: "pub".into(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -135,11 +138,12 @@ async fn a_path_reader_fetches_only_what_its_listings_granted() {
     // Someone else's grant is no use either.
     let owner_grant = acl
         .owner
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: "acl".into(),
-            root: acl.at_version().into(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: common::names::repo("acl"),
+            revision: acl.at_version(),
             path: "secret".into(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -156,15 +160,17 @@ async fn a_path_reader_fetches_only_what_its_listings_granted() {
 
     // The version shows only what bob may read, and grants that.
     let version = c
-        .repo
-        .get_change_version(pb::GetChangeVersionRequest {
-            repo: "acl".into(),
-            hash: acl.version.clone(),
+        .changes
+        .get_version(pb::GetVersionRequest {
+            name: common::names::version("acl", &acl.version),
+            view: pb::VersionView::Full.into(),
         })
         .await
         .unwrap()
         .into_owned();
     let paths: Vec<_> = version
+        .version
+        .unwrap()
         .version
         .unwrap()
         .file_changes
@@ -181,24 +187,26 @@ async fn a_tree_is_granted_only_when_all_of_it_is_readable() {
     acl.grant("pub", "reader", &bob()).await;
     let c = acl.as_principal(&bob()).await;
     let root = c
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: "acl".into(),
-            root: acl.at_version().into(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: common::names::repo("acl"),
+            revision: acl.at_version(),
             path: String::new(),
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned();
     let tree = |hash: Bytes, grant: String| {
-        let repo = c.repo.clone();
+        let content = c.content.clone();
         async move {
-            repo.get_tree(pb::GetTreeRequest {
-                repo: "acl".into(),
-                hash,
-                grant,
-            })
-            .await
+            content
+                .get_tree(pb::GetTreeRequest {
+                    repo: common::names::repo("acl"),
+                    hash,
+                    grant,
+                })
+                .await
         }
     };
     // The root tree names `secret`, so its bytes are not granted.

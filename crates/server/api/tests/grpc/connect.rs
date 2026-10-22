@@ -33,15 +33,20 @@ async fn a_json_call_over_http1_reaches_the_api_and_errors_carry_their_code() {
         }
     };
 
-    let (status, _, body) = call("CreateRepo", r#"{"repo":"web"}"#, None).await;
+    let (status, _, body) = call(
+        "CreateRepo",
+        r#"{"parent":"orgs/default","repoId":"web"}"#,
+        None,
+    )
+    .await;
     assert_eq!(status, 200, "{}", String::from_utf8_lossy(&body));
-    assert_eq!(json(&body)["repo"]["name"], "web");
+    assert_eq!(json(&body)["repo"]["name"], "orgs/default/repos/web");
 
-    let (status, _, body) = call("GetRepo", r#"{"repo":"web"}"#, None).await;
+    let (status, _, body) = call("GetRepo", r#"{"name":"orgs/default/repos/web"}"#, None).await;
     assert_eq!(status, 200);
-    assert_eq!(json(&body)["repo"]["name"], "web");
+    assert_eq!(json(&body)["repo"]["repoId"], "web");
 
-    let (status, _, body) = call("GetRepo", r#"{"repo":"missing"}"#, None).await;
+    let (status, _, body) = call("GetRepo", r#"{"name":"orgs/default/repos/missing"}"#, None).await;
     assert_eq!(status, 404);
     let error = json(&body);
     assert_eq!(error["code"], "not_found");
@@ -53,7 +58,12 @@ async fn a_json_call_over_http1_reaches_the_api_and_errors_carry_their_code() {
         .expect("the reason travels as an ErrorInfo detail");
     assert_eq!(info["debug"]["reason"], "NOT_FOUND", "{error}");
 
-    let (status, _, body) = call("GetRepo", r#"{"repo":"web"}"#, Some("Bearer nonsense")).await;
+    let (status, _, body) = call(
+        "GetRepo",
+        r#"{"name":"orgs/default/repos/web"}"#,
+        Some("Bearer nonsense"),
+    )
+    .await;
     assert_eq!(status, 401, "a bad token is refused before any handler");
     assert_eq!(json(&body)["code"], "unauthenticated");
     server.stop().await;

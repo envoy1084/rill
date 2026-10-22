@@ -1,0 +1,184 @@
+// Changes and their versions: reading them and writing new ones.
+//
+// A change is `orgs/{org}/repos/{repo}/changes/{change}` (`ch_` id); a
+// version is `orgs/{org}/repos/{repo}/versions/{hash}`, its content hash.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+// Change versions: read, create, edit, rebase, merge and resolve.
+service ChangeService {
+  // One version: its metadata and, with `view = FULL`, its changes.
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
+  // Up to 1,000 versions.
+  rpc BatchGetVersions(BatchGetVersionsRequest) returns (BatchGetVersionsResponse);
+  // A change's versions, oldest first; the last is current.
+  rpc ListVersions(ListVersionsRequest) returns (ListVersionsResponse);
+  // Store a version built by the client.
+  rpc CreateVersion(CreateVersionRequest) returns (CreateVersionResponse);
+  // Build and store a version from edits to a base.
+  rpc ApplyEdits(ApplyEditsRequest) returns (ApplyEditsResponse);
+  // A new version of a change on a new parent.
+  rpc RebaseVersion(RebaseVersionRequest) returns (RebaseVersionResponse);
+  // A merge of two revisions.
+  rpc MergeVersions(MergeVersionsRequest) returns (MergeVersionsResponse);
+  // A new version with some of a version's conflicts resolved.
+  rpc ResolveConflicts(ResolveConflictsRequest) returns (ResolveConflictsResponse);
+}
+
+// How much of a version to return.
+enum VersionView {
+  // Metadata only.
+  VERSION_VIEW_UNSPECIFIED = 0;
+  VERSION_VIEW_BASIC = 1;
+  // Metadata, the file and subtree changes (those the caller may read),
+  // signatures and a read grant.
+  VERSION_VIEW_FULL = 2;
+}
+
+// A version as returned.
+message Version {
+  ChangeInfo info = 1;
+  // Set for VERSION_VIEW_FULL.
+  ChangeVersion version = 2;
+  repeated Signature signatures = 3;
+  // A read grant for the content the version names.
+  string read_grant = 4;
+}
+
+message GetVersionRequest {
+  // `orgs/{org}/repos/{repo}/versions/{hash}`. Required.
+  string name = 1;
+  VersionView view = 2;
+}
+message GetVersionResponse {
+  Version version = 1;
+}
+
+message BatchGetVersionsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // At most 1,000 version names.
+  repeated string names = 2;
+  VersionView view = 3;
+}
+message BatchGetVersionsResponse {
+  // Parallel to `names`.
+  repeated Version versions = 1;
+}
+
+message ListVersionsRequest {
+  // `orgs/{org}/repos/{repo}/changes/{change}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListVersionsResponse {
+  repeated ChangeInfo versions = 1;
+  string next_page_token = 2;
+}
+
+message CreateVersionRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // Required.
+  ChangeVersion version = 3;
+  repeated Signature signatures = 4;
+}
+message CreateVersionResponse {
+  ChangeInfo version = 1;
+}
+
+// What an edit starts from: a revision, or a change's current version.
+message EditBase {
+  oneof base {
+    string revision = 1;
+    // `orgs/{org}/repos/{repo}/changes/{change}`.
+    string change = 2;
+  }
+}
+
+// One edit to apply to a path.
+message Edit {
+  string path = 1;
+  oneof op {
+    SetContent set_content = 2;
+    bool delete = 3;
+    // A unified diff against the base content.
+    string patch = 4;
+  }
+}
+message SetContent {
+  ContentRef content = 1;
+  FileKind kind = 2;
+  optional CopySource copy_from = 3;
+}
+
+message ApplyEditsRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  EditBase base = 3;
+  repeated Edit edits = 4;
+  string message = 5;
+  // `orgs/{org}/repos/{repo}/intents/{intent}`.
+  string intent = 6;
+  Provenance provenance = 7;
+  // Amend this change (`…/changes/{change}`) rather than starting one.
+  string change = 8;
+}
+message ApplyEditsResponse {
+  ChangeInfo info = 1;
+  ChangeVersion version = 2;
+}
+
+message RebaseVersionRequest {
+  string request_id = 1;
+  // The version to rebase: `…/versions/{hash}`. Required.
+  string name = 2;
+  // The revision to rebase onto. Required.
+  string onto = 3;
+}
+message RebaseVersionResponse {
+  ChangeInfo info = 1;
+  ChangeVersion version = 2;
+}
+
+message MergeVersionsRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // Required.
+  string left = 3;
+  // Required.
+  string right = 4;
+  string message = 5;
+  string intent = 6;
+  Provenance provenance = 7;
+}
+message MergeVersionsResponse {
+  ChangeInfo info = 1;
+  ChangeVersion version = 2;
+}
+
+message Resolution {
+  string path = 1;
+  oneof resolution {
+    SetContent set = 2;
+    bool delete = 3;
+  }
+}
+message ResolveConflictsRequest {
+  string request_id = 1;
+  // The conflicted version: `…/versions/{hash}`. Required.
+  string name = 2;
+  repeated Resolution resolutions = 3;
+  Provenance provenance = 4;
+}
+message ResolveConflictsResponse {
+  ChangeInfo info = 1;
+  ChangeVersion version = 2;
+}

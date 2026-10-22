@@ -3,15 +3,19 @@
 use rill_proto::rill::v1 as pb;
 
 use super::AdminSvc;
+use crate::services::common::open_repo;
 use crate::services::Call;
 use rill_runtime::error::{Error, Result};
 
 impl AdminSvc {
-    pub(super) async fn append_trunk_impl(
+    /// Append an imported version to trunk: the one way, besides landing,
+    /// for history to reach trunk, so importers can bring existing history
+    /// over.
+    pub(super) async fn import_trunk_position_impl(
         &self,
-        request: Call<pb::AppendTrunkRequest>,
-    ) -> Result<pb::AppendTrunkResponse> {
-        let opened = self.open_named(&request, &request.get_ref().repo).await?;
+        request: Call<pb::ImportTrunkPositionRequest>,
+    ) -> Result<pb::ImportTrunkPositionResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().parent).await?;
         opened.permit().admin().await?;
         let req = request.get_ref();
         let expected = rill_proto::convert::opt_hash_from_proto("expected", req.expected.as_ref())?;
@@ -36,6 +40,8 @@ impl AdminSvc {
                     e.into()
                 }
             })?;
-        Ok(pb::AppendTrunkResponse { seq: seq.get() })
+        Ok(pb::ImportTrunkPositionResponse {
+            position: seq.get(),
+        })
     }
 }

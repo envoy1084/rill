@@ -80,7 +80,7 @@ pub async fn logout(ctx: &mut Ctx<'_>) -> Result<()> {
     let ended = client
         .identity_svc()
         .revoke_session(pb::RevokeSessionRequest {
-            operation_id: Default::default(),
+            request_id: String::new(),
             session: credentials.session.clone(),
         })
         .await;

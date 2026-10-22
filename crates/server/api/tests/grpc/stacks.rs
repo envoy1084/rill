@@ -9,47 +9,42 @@ use crate::common::request_land;
 /// A new change on `base` setting `path`; its id and version.
 async fn change_on(c: &mut Clients, base: &Bytes, path: &str) -> (Bytes, Bytes) {
     let resp = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+            parent: common::names::repo("app"),
             base: (pb::EditBase {
-                base: Some(pb::edit_base::Base::Root(pb::RootSpec {
-                    root: Some(pb::root_spec::Root::VersionHash(base.clone())),
-                })),
+                base: Some(pb::edit_base::Base::Revision(hex::encode(base))),
             })
             .into(),
             edits: vec![set_edit(path, path.as_bytes())],
             message: format!("add {path}"),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
-        .into_owned();
-    (resp.version.unwrap().change_id, resp.hash)
+        .into_owned()
+        .info
+        .unwrap();
+    (resp.change_id, resp.hash)
 }
 
 async fn approve(c: &mut Clients, change_id: &Bytes) {
     c.review
-        .submit_for_review(pb::SubmitForReviewRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            change_id: change_id.clone(),
+        .submit_change(pb::SubmitChangeRequest {
+            request_id: String::new(),
+            change: common::names::change("app", change_id),
         })
         .await
         .unwrap();
     for (label, value) in [("Verified", 1), ("Review", 2)] {
         c.review
             .vote(pb::VoteRequest {
-                operation_id: Bytes::new(),
-                repo: "app".into(),
-                change_id: change_id.clone(),
+                request_id: String::new(),
+                review: common::names::review("app", change_id),
                 label: label.into(),
                 value,
                 reason: None,
-                version: None,
+                version: String::new(),
             })
             .await
             .unwrap();
@@ -61,10 +56,9 @@ async fn approve(c: &mut Clients, change_id: &Bytes) {
 async fn reviewed_stack(server: &TestServer, c: &mut Clients, n: usize) -> Vec<Bytes> {
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: common::names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -79,10 +73,13 @@ async fn reviewed_stack(server: &TestServer, c: &mut Clients, n: usize) -> Vec<B
         base = version;
     }
     c.review
-        .set_stack(pb::SetStackRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            change_ids: ids.clone(),
+        .update_stack(pb::UpdateStackRequest {
+            request_id: String::new(),
+            parent: common::names::repo("app"),
+            changes: ids
+                .iter()
+                .map(|id| common::names::change("app", id))
+                .collect(),
         })
         .await
         .unwrap();
@@ -91,21 +88,19 @@ async fn reviewed_stack(server: &TestServer, c: &mut Clients, n: usize) -> Vec<B
 
 async fn change_on_empty(c: &mut Clients) -> (Bytes, Bytes) {
     let resp = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            base: None.into(),
+            parent: common::names::repo("app"),
             edits: vec![set_edit("README", b"r")],
             message: "base".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
-        .into_owned();
-    (resp.version.unwrap().change_id, resp.hash)
+        .into_owned()
+        .info
+        .unwrap();
+    (resp.change_id, resp.hash)
 }
 
 async fn trunk_head(server: &TestServer) -> Bytes {
@@ -117,20 +112,17 @@ async fn trunk_head(server: &TestServer) -> Bytes {
 async fn wait_landed(c: &mut Clients, ticket: &str) -> u64 {
     for _ in 0..200 {
         let status = c
-            .review
-            .get_land_status(pb::GetLandStatusRequest {
-                repo: "app".into(),
-                ticket: ticket.into(),
+            .landing
+            .get_land_request(pb::GetLandRequestRequest {
+                name: ticket.into(),
             })
             .await
             .unwrap()
-            .into_owned();
-        match rill_proto::convert::known::<pb::LandStatus>(
-            status.ticket.as_option().unwrap().status,
-        )
-        .unwrap()
-        {
-            pb::LandStatus::Landed => return status.seq.unwrap(),
+            .into_owned()
+            .land_request
+            .unwrap();
+        match rill_proto::convert::known::<pb::LandStatus>(status.status).unwrap() {
+            pb::LandStatus::Landed => return status.trunk_position.unwrap(),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 panic!("{ticket} did not land: {:?}", status.error)
             }
@@ -146,18 +138,17 @@ async fn a_declared_stack_lands_as_one_group() {
     let mut c = clients(&server, None).await;
     let ids = reviewed_stack(&server, &mut c, 3).await;
     let tickets = c
-        .review
+        .landing
         .request_land_stack(pb::RequestLandStackRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            change_id: ids[2].clone(),
+            request_id: String::new(),
+            change: common::names::change("app", &ids[2]),
             prefix: false,
-            onto: None,
+            onto: String::new(),
         })
         .await
         .unwrap()
         .into_owned()
-        .tickets;
+        .land_requests;
     assert_eq!(
         tickets
             .iter()
@@ -167,7 +158,7 @@ async fn a_declared_stack_lands_as_one_group() {
     );
     let mut seqs = Vec::new();
     for t in &tickets {
-        seqs.push(wait_landed(&mut c, &t.id).await);
+        seqs.push(wait_landed(&mut c, &t.name).await);
     }
     assert_eq!(seqs, vec![2, 3, 4], "in order, on top of each other");
 }
@@ -190,8 +181,7 @@ async fn landing_the_bottom_alone_restacks_the_rest_onto_it() {
         let state = c
             .review
             .get_review(pb::GetReviewRequest {
-                repo: "app".into(),
-                change_id: ids[1].clone(),
+                name: common::names::review("app", &ids[1]),
             })
             .await
             .unwrap()

@@ -1,157 +1,183 @@
-// Workspace service: server-side working copies with an operation log.
+// Server-side workspaces: a principal's working copy of a repository, with
+// an operation log that can be undone.
+//
+// A workspace is `orgs/{org}/repos/{repo}/workspaces/{workspace}`; an
+// entry of its log is `…/workspaces/{workspace}/operations/{operation}`.
 syntax = "proto3";
 
 package rill.v1;
 
 import "rill/v1/types.proto";
 
+// Workspaces and their operation logs.
 service WorkspaceService {
+  // Create a workspace on a base revision.
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (CreateWorkspaceResponse);
+  // A workspace by name.
   rpc GetWorkspace(GetWorkspaceRequest) returns (GetWorkspaceResponse);
+  // A repository's workspaces.
   rpc ListWorkspaces(ListWorkspacesRequest) returns (ListWorkspacesResponse);
-  rpc SetSparseProfile(SetSparseProfileRequest) returns (SetSparseProfileResponse);
-  rpc Snapshot(SnapshotRequest) returns (SnapshotResponse);
-  rpc NewChange(NewChangeRequest) returns (NewChangeResponse);
-  rpc UpdateBase(UpdateBaseRequest) returns (UpdateBaseResponse);
-  rpc Handoff(HandoffRequest) returns (HandoffResponse);
-  rpc Undo(UndoRequest) returns (UndoResponse);
-  rpc ListOperations(ListOperationsRequest) returns (ListOperationsResponse);
+  // Change a workspace's sparse profile, if it still has the `etag` given.
+  rpc UpdateWorkspace(UpdateWorkspaceRequest) returns (UpdateWorkspaceResponse);
+  // Delete a workspace, if it still has the `etag` given.
   rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (DeleteWorkspaceResponse);
-  rpc WorkspaceDiff(WorkspaceDiffRequest) returns (WorkspaceDiffResponse);
+  // Record the working copy's tree.
+  rpc SnapshotWorkspace(SnapshotWorkspaceRequest) returns (SnapshotWorkspaceResponse);
+  // Turn the snapshot into a version of the working change.
+  rpc StartChange(StartChangeRequest) returns (StartChangeResponse);
+  // Move the workspace to a new base, rebasing its working change.
+  rpc SyncWorkspace(SyncWorkspaceRequest) returns (SyncWorkspaceResponse);
+  // Give the workspace to another principal.
+  rpc HandoffWorkspace(HandoffWorkspaceRequest) returns (HandoffWorkspaceResponse);
+  // Restore the workspace to before an operation.
+  rpc UndoOperation(UndoOperationRequest) returns (UndoOperationResponse);
+  // A workspace's operation log, newest first.
+  rpc ListWorkspaceOperations(ListWorkspaceOperationsRequest) returns (ListWorkspaceOperationsResponse);
+  // The difference between the snapshot and the base.
+  rpc DiffWorkspace(DiffWorkspaceRequest) returns (DiffWorkspaceResponse);
 }
 
 message CreateWorkspaceRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  string name = 3;
-  // Defaults to trunk head.
-  RootSpec base = 4;
-  SparseProfile sparse = 5;
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // `display_name` and `sparse` are read; the rest is output only.
+  Workspace workspace = 3;
+  // A revision; trunk when empty.
+  string base = 4;
 }
 message CreateWorkspaceResponse {
   Workspace workspace = 1;
-  Operation operation = 2;
+  WorkspaceOperation operation = 2;
 }
 
 message GetWorkspaceRequest {
-  string repo = 1;
-  bytes workspace = 2;
+  // `…/workspaces/{workspace}`. Required.
+  string name = 1;
 }
 message GetWorkspaceResponse {
   Workspace workspace = 1;
 }
 
 message ListWorkspacesRequest {
-  string repo = 1;
-  optional bytes owner = 2;
-  uint32 limit = 3;
-  optional string page_token = 4;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `owner` (a principal, `ann` or `agent:bot`) and `display_name`.
+  string filter = 4;
 }
 message ListWorkspacesResponse {
   repeated Workspace workspaces = 1;
-  optional string next_page_token = 2;
+  string next_page_token = 2;
 }
 
-message SetSparseProfileRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes workspace = 3;
-  SparseProfile sparse = 4;
+message UpdateWorkspaceRequest {
+  string request_id = 1;
+  // `name` and `sparse` are read. Required.
+  Workspace workspace = 2;
+  // The workspace's current etag. Required.
+  string etag = 3;
 }
-message SetSparseProfileResponse {
+message UpdateWorkspaceResponse {
   Workspace workspace = 1;
-  Operation operation = 2;
-}
-
-message SnapshotRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes workspace = 3;
-  // Root tree of the working copy; its objects must already be uploaded.
-  bytes tree_hash = 4;
-}
-message SnapshotResponse {
-  Operation operation = 1;
-}
-
-message NewChangeRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes workspace = 3;
-  string message = 4;
-  optional bytes intent = 5;
-  Provenance provenance = 6;
-}
-message NewChangeResponse {
-  bytes change_id = 1;
-  bytes version_hash = 2;
-  ChangeVersion version = 3;
-  Operation operation = 4;
-}
-
-message UpdateBaseRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes workspace = 3;
-  // Defaults to trunk head.
-  RootSpec new_base = 4;
-}
-message UpdateBaseResponse {
-  Workspace workspace = 1;
-  Operation operation = 2;
-  // The rebased working change, if one existed.
-  optional ChangeVersion version = 3;
-  optional bytes version_hash = 4;
-}
-
-message HandoffRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes workspace = 3;
-  Principal to = 4;
-}
-message HandoffResponse {
-  Workspace workspace = 1;
-  Operation operation = 2;
-}
-
-message UndoRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes workspace = 3;
-  // Operation to undo; defaults to the head operation.
-  optional bytes target = 4;
-}
-message UndoResponse {
-  Workspace workspace = 1;
-  Operation operation = 2;
-}
-
-message ListOperationsRequest {
-  string repo = 1;
-  bytes workspace = 2;
-  uint32 limit = 3;
-  // Continue from this operation (exclusive), walking toward the root.
-  optional bytes before = 4;
-}
-message ListOperationsResponse {
-  repeated Operation operations = 1;
+  WorkspaceOperation operation = 2;
 }
 
 message DeleteWorkspaceRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes workspace = 3;
+  string request_id = 1;
+  // `…/workspaces/{workspace}`. Required.
+  string name = 2;
+  // The workspace's current etag; any when empty.
+  string etag = 3;
 }
 message DeleteWorkspaceResponse {}
 
-message WorkspaceDiffRequest {
-  string repo = 1;
-  bytes workspace = 2;
-  repeated string paths = 3;
-  DiffFormat format = 4;
-  uint32 context_lines = 5;
+message SnapshotWorkspaceRequest {
+  string request_id = 1;
+  // `…/workspaces/{workspace}`. Required.
+  string name = 2;
+  // Root tree of the working copy; its objects must already be uploaded.
+  bytes tree_hash = 3;
 }
-message WorkspaceDiffResponse {
+message SnapshotWorkspaceResponse {
+  WorkspaceOperation operation = 1;
+}
+
+message StartChangeRequest {
+  string request_id = 1;
+  // `…/workspaces/{workspace}`. Required.
+  string name = 2;
+  string message = 3;
+  // `orgs/{org}/repos/{repo}/intents/{intent}`.
+  string intent = 4;
+  Provenance provenance = 5;
+}
+message StartChangeResponse {
+  // `…/changes/{change}`.
+  string change = 1;
+  ChangeInfo info = 2;
+  ChangeVersion version = 3;
+  WorkspaceOperation operation = 4;
+}
+
+message SyncWorkspaceRequest {
+  string request_id = 1;
+  // `…/workspaces/{workspace}`. Required.
+  string name = 2;
+  // A revision; trunk when empty.
+  string base = 3;
+}
+message SyncWorkspaceResponse {
+  Workspace workspace = 1;
+  WorkspaceOperation operation = 2;
+  // The rebased working change, if one existed.
+  ChangeInfo info = 3;
+  ChangeVersion version = 4;
+}
+
+message HandoffWorkspaceRequest {
+  string request_id = 1;
+  // `…/workspaces/{workspace}`. Required.
+  string name = 2;
+  // Required.
+  Principal to = 3;
+}
+message HandoffWorkspaceResponse {
+  Workspace workspace = 1;
+  WorkspaceOperation operation = 2;
+}
+
+message UndoOperationRequest {
+  string request_id = 1;
+  // The operation to undo: `…/workspaces/{workspace}/operations/{operation}`,
+  // or `…/workspaces/{workspace}/operations/head`. Required.
+  string name = 2;
+}
+message UndoOperationResponse {
+  Workspace workspace = 1;
+  WorkspaceOperation operation = 2;
+}
+
+message ListWorkspaceOperationsRequest {
+  // `…/workspaces/{workspace}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListWorkspaceOperationsResponse {
+  // Newest first.
+  repeated WorkspaceOperation operations = 1;
+  string next_page_token = 2;
+}
+
+message DiffWorkspaceRequest {
+  // `…/workspaces/{workspace}`. Required.
+  string name = 1;
+  repeated string paths = 2;
+  DiffFormat format = 3;
+  uint32 context_lines = 4;
+}
+message DiffWorkspaceResponse {
   repeated FileDiff files = 1;
 }

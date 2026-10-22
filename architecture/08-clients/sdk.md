@@ -16,7 +16,7 @@ flowchart LR
     Repo --> WS[WorkspaceClient]
     Repo --> Rv[ReviewClient]
     Repo --> In[IntentClient]
-    Repo --> La[LanderClient]
+    Repo --> La[TrunkClient]
     Repo --> St[StackClient]
     Repo --> Co[local::Checkout]
 ```
@@ -86,7 +86,7 @@ certificate is checked against the system's roots plus `ca_file`, and
 
 Repositories are named `org/name`, or by a bare name in the default org;
 `RepoInfo.org` names the org. `AdminClient::create_org` and `list_orgs`
-manage orgs (`OrgInfo`). Write methods send an `operation_id`, so a
+manage orgs (`OrgInfo`). Write methods send a `request_id`, so a
 retried call returns the first call's result (see
 [API surface](../07-runtime/api-surface.md#retries)).
 
@@ -121,7 +121,7 @@ sequenceDiagram
         alt len <= INLINE_THRESHOLD (256 B)
             R->>R: ContentRef::Inline
         else
-            R->>S: PutBlob (256 KiB frames)
+            R->>S: WriteBlob (256 KiB frames)
             S-->>R: ContentRef
         end
     end
@@ -153,7 +153,7 @@ next_page_token}`.
   credential store, are written through `files::write_atomic` (a
   `tempfile` in the same directory, fsynced, then persisted over the
   target), so concurrent writers never interleave.
-- `Checkout::create` lists the tree one `ListDir` at a time, never entering
+- `Checkout::create` lists the tree one `ListDirectory` at a time, never entering
   a directory outside the `SparseProfile`, and writes the files.
 - `status` treats a file as unchanged when size and mtime match the
   manifest, and hashes it otherwise. `.rillignore` (gitignore syntax) hides
@@ -211,7 +211,7 @@ cancelled land and `Error::Timeout` when the deadline passes.
 - [repo/mod.rs](../../crates/clients/sdk/src/repo/mod.rs), [repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs), [repo/write.rs](../../crates/clients/sdk/src/repo/write.rs), [repo/history.rs](../../crates/clients/sdk/src/repo/history.rs), [repo/watch.rs](../../crates/clients/sdk/src/repo/watch.rs)
 - [types/root.rs](../../crates/clients/sdk/src/types/root.rs), [types/edit.rs](../../crates/clients/sdk/src/types/edit.rs), [types/page.rs](../../crates/clients/sdk/src/types/page.rs)
 - [local/checkout.rs](../../crates/clients/sdk/src/local/checkout.rs), [local/meta.rs](../../crates/clients/sdk/src/local/meta.rs), [local/status.rs](../../crates/clients/sdk/src/local/status.rs), [local/update.rs](../../crates/clients/sdk/src/local/update.rs), [local/walk.rs](../../crates/clients/sdk/src/local/walk.rs)
-- [stack.rs](../../crates/clients/sdk/src/stack.rs), [review.rs](../../crates/clients/sdk/src/review.rs), [workspace.rs](../../crates/clients/sdk/src/workspace.rs), [lander.rs](../../crates/clients/sdk/src/lander.rs), [admin.rs](../../crates/clients/sdk/src/admin.rs)
+- [stack.rs](../../crates/clients/sdk/src/stack.rs), [review.rs](../../crates/clients/sdk/src/review.rs), [workspace.rs](../../crates/clients/sdk/src/workspace.rs), [trunk.rs](../../crates/clients/sdk/src/trunk.rs), [admin.rs](../../crates/clients/sdk/src/admin.rs)
 
 ---
 ← Previous: [Cache tier](../07-runtime/cache.md) · [Index](../index.md) · Next: [CLI](cli.md) →

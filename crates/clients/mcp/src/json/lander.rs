@@ -36,10 +36,7 @@ pub fn trunk_status(t: &TrunkStatus) -> Value {
     json!({
         "head_seq": t.head_seq.get(),
         "head_hash": hash(&t.head_hash),
-        "in_flight": t.in_flight.iter().map(|l| json!({
-            "ticket": land_ticket(&l.ticket),
-            "version": hash(&l.version),
-        })).collect::<Vec<_>>(),
+        "in_flight": t.in_flight.iter().map(land_ticket).collect::<Vec<_>>(),
         "recent": t.recent.iter().map(land_event).collect::<Vec<_>>(),
         "last_verified_seq": t.last_verified_seq.map(|s| s.get()),
     })

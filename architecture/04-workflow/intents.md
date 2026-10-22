@@ -42,7 +42,7 @@ The only automatic status move is `Open` to `InProgress` on the first
 
 ## RPCs
 
-`IntentSvc` ([intent.rs](../../crates/server/api/src/services/intent.rs)):
+`IntentSvc` ([intent.rs](../../crates/server/api/src/services/intent/records.rs)):
 
 | RPC | Permit | Effect | Errors |
 | --- | --- | --- | --- |
@@ -71,7 +71,7 @@ index, stemming or embedding.
 
 | Carrier | Written by | Read by |
 | --- | --- | --- |
-| `ChangeVersion.intent` | the `intent` field of `ApplyEdits`, `NewChange` and `Merge`. `rebase` and `build_revert` copy it. | `version_facts`, review agent context, `has_forward_fix`, and review `submit` / `add_version` (copied into `ReviewState.intent`) |
+| `ChangeVersion.intent` | the `intent` field of `ApplyEdits`, `StartChange` and `MergeVersions`. `rebase` and `build_revert` copy it. | `version_facts`, review agent context, `has_forward_fix`, and review `submit` / `add_version` (copied into `ReviewState.intent`) |
 | `ReviewState.intent` | `submit`, `add_version`, `LinkChange` | the `intent` filter of `ListReviews` |
 | `Intent.changes` | `LinkChange` only | `GetIntent`, CLI display |
 
@@ -101,13 +101,12 @@ contains `trunk@N`, or when its intent's title or body does. See
 
 ## Limitations
 
-* No optimistic concurrency on intent records.
-* Intent RPCs accept an `operation_id` but ignore it; retries are not
-  idempotent.
+* `UpdateIntent` checks the etag before it writes, not in the write's
+  transaction: two updates racing past the check both land.
 * `UpdateIntent` does not check that a new `parent` exists or that it
   forms no cycle.
 * `ListIntents` and `FindSimilarIntents` scan every intent in the
-  repository. `ListIntents` has no continuation token.
+  repository; `ListIntents` pages that scan.
 * The three link carriers are not reconciled with each other.
 * An amend through `ApplyEdits` does not inherit the previous version's
   `intent`; `rill amend` and `rill describe` produce versions without one.
@@ -117,7 +116,7 @@ contains `trunk@N`, or when its intent's title or body does. See
 ## Code
 
 * [rill-types/src/objects/intent.rs](../../crates/foundation/types/src/objects/intent.rs)
-* [rill-api/src/services/intent.rs](../../crates/server/api/src/services/intent.rs)
+* [rill-api/src/services/intent/records.rs](../../crates/server/api/src/services/intent/records.rs)
 * [rill-review/src/facts.rs](../../crates/domain/review/src/facts.rs) (`version_facts`)
 * [rill-policy/src/submit/entities.rs](../../crates/domain/policy/src/submit/entities.rs) (`intent_kind` attribute)
 * [rill-lander/src/revert.rs](../../crates/domain/lander/src/revert.rs) (`has_forward_fix`)

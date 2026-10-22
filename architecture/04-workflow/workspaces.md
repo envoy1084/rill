@@ -12,9 +12,9 @@ to a workspace; see [checkouts](checkouts.md).
 ```mermaid
 flowchart LR
     C[Create] --> S[Snapshot tree]
-    S --> N[NewChange]
+    S --> N[StartChange]
     N -->|base := new version<br/>working_change := fresh id| S
-    N --> U[UpdateBase]
+    N --> U[SyncWorkspace]
     U -->|rebase working change| S
     X[Undo] -.->|workspace :=<br/>parent op's resulting| S
 ```
@@ -26,10 +26,10 @@ flowchart LR
 | Field | Meaning |
 | --- | --- |
 | `id`, `repo`, `name` | Identity. `WorkspaceId` prints as `ws_<hex>`. |
-| `owner` | The creator, until `Handoff` changes it. |
+| `owner` | The creator, until `HandoffWorkspace` changes it. |
 | `base` | `ChangeVersionHash` the work sits on. `ObjectHash::ZERO` while the repository has no history. |
-| `working_change` | `ChangeId` that the next `NewChange` produces a version of. |
-| `snapshot` | Latest `TreeHash` set by `Snapshot` or `UpdateBase`; `None` until then. |
+| `working_change` | `ChangeId` that the next `StartChange` produces a version of. |
+| `snapshot` | Latest `TreeHash` set by `SnapshotWorkspace` or `SyncWorkspace`; `None` until then. |
 | `sparse` | `SparseProfile { include, exclude }` of directory prefixes. Empty `include` means the whole repo; `exclude` wins over `include`. |
 | `head_op` | Id of the latest `Operation`. |
 
@@ -42,12 +42,12 @@ operation (with `head_op` pointing at it), and writes it with
 `Equals(ws record as the request read it)`, a stamped append to the
 workspace's `op` log, the new `ws` record and the `opi` marker. A
 workspace changed by someone else since the request read it fails the
-operation rather than being overwritten. `NewChange` and `UpdateBase`
+operation rather than being overwritten. `StartChange` and `SyncWorkspace`
 merge the operation into the commit transaction of the version they
 create, so the version never exists without the workspace pointing at it
 (see [changes and stacks](changes-and-stacks.md)).
 
-The `operation_id` in the request is the idempotency key. A retry with the
+The `request_id` in the request is the idempotency key. A retry with the
 same id gets the first response back from the server's idempotency layer
 (see [API surface](../07-runtime/api-surface.md#retries)); the `opi` marker
 is a second guard inside the operation's own transaction. An empty id
@@ -63,18 +63,18 @@ needs `write(root)`. Every other mutating RPC loads the record through
 | RPC | `OperationKind` | Effect |
 | --- | --- | --- |
 | `CreateWorkspace` | `Create` | `base` resolved from the optional `RootSpec` (trunk head when absent, `ZERO` when the repo is empty; a tree hash is `InvalidArgument`). Fresh `working_change`. |
-| `Snapshot` | `Snapshot { tree }` | Sets `snapshot`. The tree must already be stored, else `FailedPrecondition`. |
-| `NewChange` | `NewChange { change, base }` | See below. |
-| `UpdateBase` | `Rebase { from, to }` | See below. |
-| `SetSparseProfile` | `SetSparse { profile }` | Replaces `sparse`. |
-| `Handoff` | `Handoff { to }` | `owner := to`. `to` is required. |
-| `Undo` | `Undo { undone }` | See below. |
-| `ListOperations` | none | Latest `limit` operations (default 50, max 1000), optionally only those before an id. |
+| `SnapshotWorkspace` | `Snapshot { tree }` | Sets `snapshot`. The tree must already be stored, else `FailedPrecondition`. |
+| `StartChange` | `NewChange { change, base }` | See below. |
+| `SyncWorkspace` | `Rebase { from, to }` | See below. |
+| `UpdateWorkspace` | `SetSparse { profile }` | Replaces `sparse`. |
+| `HandoffWorkspace` | `Handoff { to }` | `owner := to`. `to` is required. |
+| `UndoOperation` | `Undo { undone }` | See below. |
+| `ListWorkspaceOperations` | none | One page of operations, newest first. |
 | `GetWorkspace`, `ListWorkspaces` | none | `ListWorkspaces` filters by owner; `limit` default 100, max 10 000. |
-| `WorkspaceDiff` | none | File diffs from the base root to `snapshot`, through the caller's read filter. |
+| `DiffWorkspace` | none | File diffs from the base root to `snapshot`, through the caller's read filter. |
 | `DeleteWorkspace` | none | Deletes the record. Not logged. |
 
-### NewChange
+### StartChange
 
 1. `snapshot` must be set, else `FailedPrecondition`.
 2. `diff_trees(base root, snapshot)`; an empty diff is `FailedPrecondition`.
@@ -86,10 +86,10 @@ needs `write(root)`. Every other mutating RPC loads the record through
    [changes and stacks](changes-and-stacks.md)).
 6. `base := new hash`, `working_change := ChangeId::new()`.
 
-The next `NewChange` is therefore parented on the previous one, which is
+The next `StartChange` is therefore parented on the previous one, which is
 how a workspace builds a stack.
 
-### UpdateBase
+### SyncWorkspace
 
 The new base must resolve to a version. An empty repository gives
 `FailedPrecondition`. If `working_change` already has a version and the
@@ -98,18 +98,18 @@ rebased version is committed, and `snapshot` becomes its root tree.
 Conflicts are recorded in the version and never cause an error (see
 [rebase](../03-core-algorithms/rebase.md)). Then `base := new`.
 
-After a `NewChange`, `working_change` is a fresh id with no versions, so
-`UpdateBase` only moves `base`.
+After a `StartChange`, `working_change` is a fresh id with no versions, so
+`SyncWorkspace` only moves `base`.
 
 ### Undo
 
-`Undo` reads the latest 1000 operations. It finds `target` (default
+`UndoOperation` reads the latest 1000 operations. It finds `target` (default
 `head_op`) and then the target's parent, and makes the workspace equal to
 the parent's `resulting` state (base, snapshot, working change, sparse
 profile, owner, name), keeping only its identity, then records a new
 `Undo` operation. Undoing the first operation is `FailedPrecondition`. A
 target or parent outside the 1000-operation window is `NotFound`. Undo is
-itself an operation, so undoing an `Undo` redoes. Undoing a `NewChange`
+itself an operation, so undoing an `Undo` redoes. Undoing a `StartChange`
 restores the old base and working change; the committed version stays in
 history.
 
@@ -123,11 +123,11 @@ history.
 
 ## Limitations
 
-* `Undo` sees only the latest 1000 operations. Undoing a `Handoff`
+* `UndoOperation` sees only the latest 1000 operations. Undoing a `Handoff`
   returns the workspace to its previous owner.
-* `Snapshot` checks that the root tree exists. It does not check that the
+* `SnapshotWorkspace` checks that the root tree exists. It does not check that the
   tree's blobs exist or that the tree respects the sparse profile. The
-  server never filters a snapshot or a `NewChange` diff by profile.
+  server never filters a snapshot or a `StartChange` diff by profile.
 * `DeleteWorkspace` removes only the record. The operation log and index
   rows stay.
 * `ListWorkspaces` scans every workspace in the repository and has no
@@ -139,7 +139,7 @@ history.
 
 * [rill-types/src/objects/workspace.rs](../../crates/foundation/types/src/objects/workspace.rs)
 * [rill-api/src/services/workspace/mod.rs](../../crates/server/api/src/services/workspace/mod.rs)
-* [rill-api/src/services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs) (`commit_version`, `version_from_diff`)
+* [rill-api/src/services/changes/write.rs](../../crates/server/api/src/services/changes/write.rs) (`commit_version`, `version_from_diff`)
 * [rill-store/src/repo/records.rs](../../crates/foundation/store/src/repo/records.rs) (`append_operation`, `list_operations`)
 * [rill-store/src/keys/repo_keys.rs](../../crates/foundation/store/src/keys/repo_keys.rs)
 * [rill-sdk/src/workspace.rs](../../crates/clients/sdk/src/workspace.rs)

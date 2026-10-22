@@ -3,7 +3,7 @@
 //! [`Client`] holds one connection to a server and hands out typed,
 //! repository-scoped clients: [`RepoClient`] for history, trees, blobs and
 //! writes, plus [`WorkspaceClient`], [`ReviewClient`], [`IntentClient`] and
-//! [`LanderClient`] for the other services and [`AdminClient`] for the
+//! [`TrunkClient`] for the other services and [`AdminClient`] for the
 //! instance. Inputs and outputs are `rill-types` values where one exists
 //! and the small structs in [`types`] otherwise.
 //!
@@ -32,14 +32,16 @@ pub mod client;
 pub mod config;
 pub mod error;
 mod files;
+pub mod filter;
 pub mod grants;
 pub mod intent;
-pub mod lander;
 pub mod local;
+pub mod names;
 pub mod repo;
 pub mod review;
 pub mod stack;
 pub mod stream;
+pub mod trunk;
 pub mod types;
 pub mod workspace;
 
@@ -51,12 +53,12 @@ pub use config::{ClientConfig, SessionConfig, TlsOptions};
 pub use connectrpc::ErrorCode as Code;
 pub use error::{Error, ErrorReason, Result};
 pub use intent::IntentClient;
-pub use lander::LanderClient;
 pub use local::{Checkout, LocalChange, LocalChangeKind};
 pub use repo::{RepoClient, WatchStart};
 pub use review::ReviewClient;
 pub use stack::{Backoff, StackClient};
 pub use stream::EventStream;
+pub use trunk::TrunkClient;
 pub use types::*;
 pub use workspace::WorkspaceClient;
 

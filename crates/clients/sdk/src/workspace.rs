@@ -1,7 +1,7 @@
 //! Server-side workspaces: creation, snapshots, new changes, base updates,
 //! handoff, undo and the operation log.
 
-use rill_proto::convert::{hash_to_proto, id_to_proto, required};
+use rill_proto::convert::{hash_to_proto, required};
 use rill_proto::rill::v1 as pb;
 use rill_types::{
     Operation, OperationId, Principal, RepoPathBuf, SparseProfile, TreeHash, Workspace, WorkspaceId,
@@ -9,6 +9,7 @@ use rill_types::{
 
 use crate::client::Client;
 use crate::error::Result;
+use crate::names;
 use crate::types::{
     DiffFormat, FileDiff, NewChange, NewChangeResult, Page, Root, UpdateBaseResult,
     WorkspaceFilter, WorkspaceOp,
@@ -28,6 +29,10 @@ impl WorkspaceClient {
 
     fn svc(&self) -> crate::client::WorkspaceSvc {
         self.client.workspace_svc()
+    }
+
+    fn name(&self, id: &WorkspaceId) -> String {
+        format!("{}/workspaces/{id}", self.repo)
     }
 
     /// Create a workspace based on `base` (trunk head when `None`).
@@ -50,11 +55,15 @@ impl WorkspaceClient {
         sparse: SparseProfile,
     ) -> Result<WorkspaceOp> {
         let request = pb::CreateWorkspaceRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            name: name.to_string(),
-            base: (base.map(|b| b.to_proto())).into(),
-            sparse: pb::SparseProfile::from(sparse).into(),
+            request_id: names::request_id(&op),
+            parent: self.repo.clone(),
+            workspace: pb::Workspace {
+                display_name: name.to_string(),
+                sparse: pb::SparseProfile::from(sparse).into(),
+                ..Default::default()
+            }
+            .into(),
+            base: base.map(|b| b.to_string()).unwrap_or_default(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
@@ -70,8 +79,7 @@ impl WorkspaceClient {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
             let request = pb::GetWorkspaceRequest {
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
+                name: self.name(&workspace),
             };
             async move { svc.get_workspace(request).await }
         })
@@ -83,10 +91,12 @@ impl WorkspaceClient {
     /// Workspaces matching a filter.
     pub async fn list(&self, filter: WorkspaceFilter) -> Result<Page<Workspace>> {
         let request = pb::ListWorkspacesRequest {
-            repo: self.repo.clone(),
-            owner: filter.owner.as_ref().map(id_to_proto),
-            limit: filter.limit,
-            page_token: filter.page_token,
+            parent: self.repo.clone(),
+            page_size: filter.limit as i32,
+            page_token: filter.page_token.clone().unwrap_or_default(),
+            filter: crate::filter::FilterBuilder::new()
+                .eq_opt("owner", filter.owner.as_deref())
+                .build(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
@@ -99,7 +109,10 @@ impl WorkspaceClient {
             .into_iter()
             .map(|w| Workspace::try_from(w).map_err(Into::into))
             .collect::<Result<_>>()?;
-        Ok(Page::new(items, resp.next_page_token))
+        Ok(Page::new(
+            items,
+            Some(resp.next_page_token).filter(|t| !t.is_empty()),
+        ))
     }
 
     /// Change which directories the workspace materializes.
@@ -119,15 +132,19 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         sparse: SparseProfile,
     ) -> Result<WorkspaceOp> {
-        let request = pb::SetSparseProfileRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            workspace: id_to_proto(&workspace),
-            sparse: pb::SparseProfile::from(sparse).into(),
+        let request = pb::UpdateWorkspaceRequest {
+            request_id: names::request_id(&op),
+            workspace: pb::Workspace {
+                name: self.name(&workspace),
+                sparse: pb::SparseProfile::from(sparse).into(),
+                ..Default::default()
+            }
+            .into(),
+            etag: String::new(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.set_sparse_profile(request).await }
+            async move { svc.update_workspace(request).await }
         })
         .await?
         .into_owned();
@@ -147,19 +164,18 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         tree: TreeHash,
     ) -> Result<Operation> {
-        let request = pb::SnapshotRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            workspace: id_to_proto(&workspace),
+        let request = pb::SnapshotWorkspaceRequest {
+            request_id: names::request_id(&op),
+            name: self.name(&workspace),
             tree_hash: hash_to_proto(&tree),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.snapshot(request).await }
+            async move { svc.snapshot_workspace(request).await }
         })
         .await?
         .into_owned();
-        Ok(required("snapshot.operation", resp.operation)?.try_into()?)
+        Ok(required("snapshot_workspace.operation", resp.operation)?.try_into()?)
     }
 
     /// Turn the current snapshot into a new change.
@@ -179,17 +195,19 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         change: NewChange,
     ) -> Result<NewChangeResult> {
-        let request = pb::NewChangeRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            workspace: id_to_proto(&workspace),
+        let request = pb::StartChangeRequest {
+            request_id: names::request_id(&op),
+            name: self.name(&workspace),
             message: change.message,
-            intent: change.intent.as_ref().map(id_to_proto),
+            intent: change
+                .intent
+                .map(|i| names::intent(&self.repo, &i))
+                .unwrap_or_default(),
             provenance: pb::Provenance::from(&change.provenance).into(),
         };
         crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.new_change(request).await }
+            async move { svc.start_change(request).await }
         })
         .await?
         .into_owned()
@@ -214,15 +232,14 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         new_base: Option<Root>,
     ) -> Result<UpdateBaseResult> {
-        let request = pb::UpdateBaseRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            workspace: id_to_proto(&workspace),
-            new_base: (new_base.map(|b| b.to_proto())).into(),
+        let request = pb::SyncWorkspaceRequest {
+            request_id: names::request_id(&op),
+            name: self.name(&workspace),
+            base: new_base.map(|b| b.to_string()).unwrap_or_default(),
         };
         crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.update_base(request).await }
+            async move { svc.sync_workspace(request).await }
         })
         .await?
         .into_owned()
@@ -242,15 +259,14 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         to: Principal,
     ) -> Result<WorkspaceOp> {
-        let request = pb::HandoffRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            workspace: id_to_proto(&workspace),
+        let request = pb::HandoffWorkspaceRequest {
+            request_id: names::request_id(&op),
+            name: self.name(&workspace),
             to: pb::Principal::from(to).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.handoff(request).await }
+            async move { svc.handoff_workspace(request).await }
         })
         .await?
         .into_owned();
@@ -274,44 +290,48 @@ impl WorkspaceClient {
         workspace: WorkspaceId,
         target: Option<OperationId>,
     ) -> Result<WorkspaceOp> {
-        let request = pb::UndoRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            workspace: id_to_proto(&workspace),
-            target: target.as_ref().map(id_to_proto),
+        let target = target.map_or_else(|| "head".to_string(), |t| t.to_string());
+        let request = pb::UndoOperationRequest {
+            request_id: names::request_id(&op),
+            name: format!("{}/operations/{target}", self.name(&workspace)),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
-            async move { svc.undo(request).await }
+            async move { svc.undo_operation(request).await }
         })
         .await?
         .into_owned();
         WorkspaceOp::from_parts(resp.workspace.into_option(), resp.operation.into_option())
     }
 
-    /// The operation log, newest first, continuing from `before`.
+    /// One page of the operation log, newest first; pass the returned token
+    /// to continue.
     pub async fn operations(
         &self,
         workspace: WorkspaceId,
         limit: u32,
-        before: Option<OperationId>,
-    ) -> Result<Vec<Operation>> {
+        page_token: Option<&str>,
+    ) -> Result<Page<Operation>> {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
-            let request = pb::ListOperationsRequest {
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
-                limit,
-                before: before.as_ref().map(id_to_proto),
+            let request = pb::ListWorkspaceOperationsRequest {
+                parent: self.name(&workspace),
+                page_size: limit as i32,
+                page_token: page_token.unwrap_or_default().to_string(),
             };
-            async move { svc.list_operations(request).await }
+            async move { svc.list_workspace_operations(request).await }
         })
         .await?
         .into_owned();
-        resp.operations
+        let items = resp
+            .operations
             .into_iter()
             .map(|o| Operation::try_from(o).map_err(Into::into))
-            .collect()
+            .collect::<Result<_>>()?;
+        Ok(Page::new(
+            items,
+            Some(resp.next_page_token).filter(|t| !t.is_empty()),
+        ))
     }
 
     /// Delete a workspace.
@@ -322,9 +342,9 @@ impl WorkspaceClient {
     /// [`WorkspaceClient::delete`] with a caller-chosen idempotency key.
     pub async fn delete_with_op(&self, op: OperationId, workspace: WorkspaceId) -> Result<()> {
         let request = pb::DeleteWorkspaceRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            workspace: id_to_proto(&workspace),
+            request_id: names::request_id(&op),
+            name: self.name(&workspace),
+            etag: String::new(),
         };
         crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
@@ -344,14 +364,13 @@ impl WorkspaceClient {
     ) -> Result<Vec<FileDiff>> {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
-            let request = pb::WorkspaceDiffRequest {
-                repo: self.repo.clone(),
-                workspace: id_to_proto(&workspace),
+            let request = pb::DiffWorkspaceRequest {
+                name: self.name(&workspace),
                 paths: paths.iter().map(|p| p.to_string()).collect(),
                 format: format.to_proto().into(),
                 context_lines,
             };
-            async move { svc.workspace_diff(request).await }
+            async move { svc.diff_workspace(request).await }
         })
         .await?
         .into_owned();

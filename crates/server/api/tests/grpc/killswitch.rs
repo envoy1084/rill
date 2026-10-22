@@ -7,7 +7,7 @@ use rill_types::identity::AgentBudgets;
 use rill_types::Principal;
 
 use super::*;
-use crate::common::register_bot;
+use crate::common::{names, register_bot};
 
 fn config() -> ServerConfig {
     ServerConfig {
@@ -29,18 +29,17 @@ async fn repo(server: &TestServer) {
     let c = clients(server, Some(&root)).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "r".into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: "r".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     c.access
-        .add_relation(pb::AddRelationRequest {
-            operation_id: Bytes::new(),
+        .create_relation(pb::CreateRelationRequest {
+            request_id: String::new(),
+            parent: names::repo("r"),
             relation: (pb::Relation {
-                repo: "r".into(),
                 path: String::new(),
                 relation: "writer".into(),
                 subject: format!("principal:{}", Principal::agent("bot").id),
@@ -53,14 +52,10 @@ async fn repo(server: &TestServer) {
 
 fn edit(i: usize) -> pb::ApplyEditsRequest {
     pb::ApplyEditsRequest {
-        operation_id: Bytes::new(),
-        repo: "r".into(),
-        base: None.into(),
+        parent: names::repo("r"),
         edits: vec![set_edit(&format!("f{i}.txt"), b"x\n")],
         message: format!("v{i}"),
-        intent: None,
-        provenance: None.into(),
-        change_id: None,
+        ..Default::default()
     }
 }
 
@@ -80,8 +75,8 @@ async fn a_daily_version_budget_is_never_exceeded() {
     let bot = server.token_for(&Principal::agent("bot"));
     let c = clients(&server, Some(&bot)).await;
     let writes = (0..12).map(|i| {
-        let repo = c.repo.clone();
-        async move { repo.apply_edits(edit(i)).await }
+        let changes = c.changes.clone();
+        async move { changes.apply_edits(edit(i)).await }
     });
     let results = futures::future::join_all(writes).await;
     let stored = results.iter().filter(|r| r.is_ok()).count();
@@ -110,8 +105,8 @@ async fn a_request_rate_budget_refuses_the_excess() {
     let mut codes = Vec::new();
     for _ in 0..5 {
         codes.push(
-            c.admin
-                .who_am_i(pb::WhoAmIRequest {})
+            c.identity
+                .get_caller(pb::GetCallerRequest {})
                 .await
                 .err()
                 .map(|s| s.code),
@@ -140,14 +135,18 @@ async fn killing_an_agent_ejects_its_queued_landing() {
     let bot = api.token_for(&Principal::agent("bot"));
     let root = api.token_for(&Principal::human("root"));
     let agent = clients(&api, Some(&bot)).await;
-    let written = agent.repo.apply_edits(edit(0)).await.unwrap().into_owned();
+    let written = agent
+        .changes
+        .apply_edits(edit(0))
+        .await
+        .unwrap()
+        .into_owned();
     let change_id = written.version.unwrap().change_id;
     agent
         .review
-        .submit_for_review(pb::SubmitForReviewRequest {
-            operation_id: Bytes::new(),
-            repo: "r".into(),
-            change_id: change_id.clone(),
+        .submit_change(pb::SubmitChangeRequest {
+            request_id: String::new(),
+            change: names::change("r", &change_id),
         })
         .await
         .unwrap();
@@ -156,36 +155,34 @@ async fn killing_an_agent_ejects_its_queued_landing() {
         human
             .review
             .vote(pb::VoteRequest {
-                operation_id: Bytes::new(),
-                repo: "r".into(),
-                change_id: change_id.clone(),
+                request_id: String::new(),
+                review: names::review("r", &change_id),
                 label: label.into(),
                 value,
                 reason: None,
-                version: None,
+                version: String::new(),
             })
             .await
             .unwrap();
     }
     let ticket = human
-        .review
+        .landing
         .request_land(pb::RequestLandRequest {
-            operation_id: Bytes::new(),
-            repo: "r".into(),
-            change_id: change_id.clone(),
-            onto: None,
+            request_id: String::new(),
+            change: names::change("r", &change_id),
+            onto: String::new(),
         })
         .await
         .unwrap()
         .into_owned()
-        .ticket
+        .land_request
         .unwrap();
 
     let killed =
         IdentityServiceClient::authed(connect(&api.grpc).await, Bearer(Some(root.clone())))
             .kill_switch(pb::KillSwitchRequest {
-                operation_id: Bytes::new(),
-                org: "default".into(),
+                request_id: String::new(),
+                parent: names::org("default"),
                 target: Some(pb::kill_switch_request::Target::Agent("bot".into())),
                 reason: "misbehaving".into(),
             })
@@ -195,8 +192,8 @@ async fn killing_an_agent_ejects_its_queued_landing() {
     assert_eq!(killed.agents_suspended, ["bot"]);
     assert_eq!(
         agent
-            .admin
-            .who_am_i(pb::WhoAmIRequest {})
+            .identity
+            .get_caller(pb::GetCallerRequest {})
             .await
             .unwrap_err()
             .code,
@@ -209,17 +206,16 @@ async fn killing_an_agent_ejects_its_queued_landing() {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
     let status = loop {
         let status = human
-            .review
-            .get_land_status(pb::GetLandStatusRequest {
-                repo: "r".into(),
-                ticket: ticket.id.clone(),
+            .landing
+            .get_land_request(pb::GetLandRequestRequest {
+                name: ticket.name.clone(),
             })
             .await
             .unwrap()
-            .into_owned();
-        let code =
-            rill_proto::convert::known::<pb::LandStatus>(status.ticket.as_option().unwrap().status)
-                .unwrap();
+            .into_owned()
+            .land_request
+            .unwrap();
+        let code = rill_proto::convert::known::<pb::LandStatus>(status.status).unwrap();
         if !matches!(code, pb::LandStatus::Queued | pb::LandStatus::Rebasing) {
             break status;
         }
@@ -227,7 +223,7 @@ async fn killing_an_agent_ejects_its_queued_landing() {
         tokio::time::sleep(Duration::from_millis(100)).await;
     };
     assert_ne!(
-        rill_proto::convert::known::<pb::LandStatus>(status.ticket.unwrap().status).unwrap(),
+        rill_proto::convert::known::<pb::LandStatus>(status.status).unwrap(),
         pb::LandStatus::Landed
     );
     assert!(

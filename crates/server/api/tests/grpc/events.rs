@@ -4,7 +4,7 @@
 use super::*;
 
 async fn next_event(
-    watch: &mut futures::stream::BoxStream<'static, Result<pb::EventEnvelope, ConnectError>>,
+    watch: &mut futures::stream::BoxStream<'static, Result<pb::WatchEventsResponse, ConnectError>>,
 ) -> (Bytes, pb::event::Kind) {
     let envelope = tokio::time::timeout(Duration::from_secs(5), watch.next())
         .await
@@ -22,22 +22,21 @@ async fn watch_events_sees_each_change_once_and_resumes() {
     let repo = "events";
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            description: None,
-            windows_safe: false,
+            parent: common::names::org("default"),
+            repo_id: repo.into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let watch = |after: Option<Bytes>, kinds: Vec<String>| pb::WatchEventsRequest {
-        repo: repo.into(),
+        parent: common::names::repo(repo),
         after,
         kinds,
         change_id: None,
         ref_prefix: None,
     };
     let mut all = c
-        .repo
+        .events
         .watch_events(watch(Some(Bytes::new()), vec![]))
         .await
         .unwrap()
@@ -45,29 +44,25 @@ async fn watch_events_sees_each_change_once_and_resumes() {
     let mut refs = c
         .repo
         .watch_refs(pb::WatchRefsRequest {
-            repo: repo.into(),
-            prefix: None,
+            parent: common::names::repo(repo),
+            prefix: String::new(),
         })
         .await
         .unwrap()
         .messages();
 
     let created = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            base: None.into(),
+            parent: common::names::repo(repo),
             edits: vec![set_edit("a.txt", b"a\n")],
             message: "a".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned();
-    let change_id = created.version.unwrap().change_id;
+    let change_id = created.info.unwrap().change_id;
     land(&mut c, repo, change_id.clone()).await;
 
     let mut seen = Vec::new();
@@ -92,11 +87,11 @@ async fn watch_events_sees_each_change_once_and_resumes() {
         .unwrap()
         .unwrap()
         .unwrap();
-    assert_eq!(trunk.name, "trunk");
+    assert_eq!(trunk.r#ref, "trunk");
     assert!(trunk.old.is_none() && trunk.new.is_some());
 
     let mut resumed = c
-        .repo
+        .events
         .watch_events(watch(Some(seen[0].0.clone()), vec![]))
         .await
         .unwrap()
@@ -104,7 +99,7 @@ async fn watch_events_sees_each_change_once_and_resumes() {
     assert_eq!(next_event(&mut resumed).await, seen[1].clone());
 
     let mut landed_only = c
-        .repo
+        .events
         .watch_events(watch(Some(Bytes::new()), vec!["landed".into()]))
         .await
         .unwrap()

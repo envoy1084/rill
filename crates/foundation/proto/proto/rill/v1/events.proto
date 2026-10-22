@@ -5,11 +5,18 @@ package rill.v1;
 
 import "rill/v1/types.proto";
 
+// The repository event log, live and replayed.
+service EventService {
+  // Every committed state change, filtered and resumable by cursor.
+  rpc WatchEvents(WatchEventsRequest) returns (stream WatchEventsResponse);
+}
+
 message WatchEventsRequest {
-  string repo = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
   // Absent: start after the newest event, so only new events are sent.
   // Empty: replay from the oldest retained event. Otherwise resume after
-  // this cursor, taken from an earlier EventEnvelope.
+  // this cursor, taken from an earlier response.
   optional bytes after = 2;
   // Event kinds to send ("ref_moved", "landed", ...); empty sends all.
   repeated string kinds = 3;
@@ -19,7 +26,7 @@ message WatchEventsRequest {
   optional string ref_prefix = 5;
 }
 
-message EventEnvelope {
+message WatchEventsResponse {
   bytes cursor = 1;
   Event event = 2;
 }

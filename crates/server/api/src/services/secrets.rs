@@ -5,15 +5,17 @@ use std::sync::Arc;
 
 use rill_exec::remote::secrets::{SecretInfo, SecretScope};
 use rill_proto::convert::timestamp_to_proto;
+use rill_proto::names::SECRET;
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::SecretService;
 use rill_types::identity::IdentityChange;
 
-use super::idem;
+use super::{idem, names};
 use crate::auth::{caller, require_org_admin};
+use crate::listing::Page;
 use crate::services::Call;
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
-use rill_runtime::error::Result;
+use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
 type GrpcResult<T> = std::result::Result<Response<T>, ConnectError>;
@@ -30,17 +32,9 @@ impl SecretSvc {
     }
 }
 
-fn org_of(org: &str) -> String {
-    if org.is_empty() {
-        rill_store::DEFAULT_ORG.to_string()
-    } else {
-        org.to_string()
-    }
-}
-
-fn info_proto(info: SecretInfo) -> pb::SecretInfo {
-    pb::SecretInfo {
-        name: info.name,
+fn secret_proto(org: &str, info: SecretInfo) -> pb::Secret {
+    pb::Secret {
+        name: names::org_resource(&SECRET, org, &info.name),
         repos: info.scope.repos,
         trunk_only: info.scope.trunk_only,
         updated_at: timestamp_to_proto(info.updated_at),
@@ -49,16 +43,37 @@ fn info_proto(info: SecretInfo) -> pb::SecretInfo {
 }
 
 impl SecretSvc {
-    async fn put(&self, request: Call<pb::PutSecretRequest>) -> Result<pb::PutSecretResponse> {
+    async fn update(
+        &self,
+        request: Call<pb::UpdateSecretRequest>,
+    ) -> Result<pb::UpdateSecretResponse> {
         let ctx = caller(&request)?;
         let req = request.into_inner();
-        let org = org_of(&req.org);
+        let given = req
+            .secret
+            .into_option()
+            .ok_or(rill_proto::ConvertError::missing("secret"))?;
+        let (org, name) = names::org_child(&SECRET, &given.name)?;
         require_org_admin(&self.state, &ctx, &org).await?;
-        rill_exec::remote::secrets::validate_secret_name(&req.name)?;
+        rill_exec::remote::secrets::validate_secret_name(&name)?;
+        if !req.allow_missing {
+            let exists = self
+                .state
+                .exec
+                .list_secrets(&org)
+                .await?
+                .iter()
+                .any(|s| s.name == name);
+            if !exists {
+                return Err(Error::not_found(format!(
+                    "secret {name}; set allow_missing to create it"
+                )));
+            }
+        }
         let log = self.state.stores.identity().log(
             IdentityChange::SecretChanged {
                 org: org.clone(),
-                name: req.name.clone(),
+                name: name.clone(),
                 deleted: false,
             },
             &ctx.principal,
@@ -68,19 +83,19 @@ impl SecretSvc {
             .exec
             .put_secret(
                 &org,
-                &req.name,
+                &name,
                 &req.value,
                 SecretScope {
-                    repos: req.repos,
-                    trunk_only: req.trunk_only,
+                    repos: given.repos,
+                    trunk_only: given.trunk_only,
                 },
                 &ctx.principal,
                 log.to_vec(),
             )
             .await?;
         tracing::info!(by = %ctx.principal, org, name = %info.name, "secret set");
-        Ok(pb::PutSecretResponse {
-            secret: info_proto(info).into(),
+        Ok(pb::UpdateSecretResponse {
+            secret: secret_proto(&org, info).into(),
         })
     }
 
@@ -89,13 +104,12 @@ impl SecretSvc {
         request: Call<pb::DeleteSecretRequest>,
     ) -> Result<pb::DeleteSecretResponse> {
         let ctx = caller(&request)?;
-        let req = request.into_inner();
-        let org = org_of(&req.org);
+        let (org, name) = names::org_child(&SECRET, &request.get_ref().name)?;
         require_org_admin(&self.state, &ctx, &org).await?;
         let log = self.state.stores.identity().log(
             IdentityChange::SecretChanged {
                 org: org.clone(),
-                name: req.name.clone(),
+                name: name.clone(),
                 deleted: true,
             },
             &ctx.principal,
@@ -103,19 +117,26 @@ impl SecretSvc {
         let deleted = self
             .state
             .exec
-            .delete_secret(&org, &req.name, log.to_vec())
+            .delete_secret(&org, &name, log.to_vec())
             .await?;
-        tracing::info!(by = %ctx.principal, org, name = %req.name, deleted, "secret deleted");
-        Ok(pb::DeleteSecretResponse { deleted })
+        if !deleted {
+            return Err(Error::not_found(format!("secret {name}")));
+        }
+        tracing::info!(by = %ctx.principal, org, name = %name, "secret deleted");
+        Ok(pb::DeleteSecretResponse {})
     }
 
     async fn list(&self, request: Call<pb::ListSecretsRequest>) -> Result<pb::ListSecretsResponse> {
         let ctx = caller(&request)?;
-        let org = org_of(&request.get_ref().org);
+        let req = request.get_ref();
+        let org = names::org(&req.parent)?;
         require_org_admin(&self.state, &ctx, &org).await?;
+        let page = Page::new(req.page_size, &req.page_token, &[&req.parent])?;
         let secrets = self.state.exec.list_secrets(&org).await?;
+        let (secrets, next_page_token) = page.of(secrets)?;
         Ok(pb::ListSecretsResponse {
-            secrets: secrets.into_iter().map(info_proto).collect(),
+            secrets: secrets.into_iter().map(|s| secret_proto(&org, s)).collect(),
+            next_page_token,
         })
     }
 }
@@ -125,13 +146,13 @@ impl SecretSvc {
 impl SecretService for SecretSvc {
     // Not through `idem`: it keeps a hash of the request, which would
     // hold the value. Setting a secret again is harmless anyway.
-    async fn put_secret(
+    async fn update_secret(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::PutSecretRequest>,
-    ) -> GrpcResult<pb::PutSecretResponse> {
+        request: ServiceRequest<'_, pb::UpdateSecretRequest>,
+    ) -> GrpcResult<pb::UpdateSecretResponse> {
         let request = Call::new(ctx, request);
-        self.put(request)
+        self.update(request)
             .await
             .map(Response::new)
             .map_err(ConnectError::from)

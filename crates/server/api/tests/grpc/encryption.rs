@@ -68,23 +68,23 @@ async fn objects_are_sealed_per_org_and_open_only_where_they_were_written() {
     let c = clients(&server, Some(&server.token_for(&Principal::human("root")))).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            request_id: String::new(),
+            parent: "orgs/default".into(),
+            repo_id: "app".into(),
+            repo: None.into(),
         })
         .await
         .unwrap();
-    c.repo
+    c.changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+            request_id: String::new(),
+            parent: common::names::repo("app"),
             base: None.into(),
             edits: vec![set_edit("notes.txt", marker.as_bytes())],
             message: "notes".into(),
-            intent: None,
+            intent: String::new(),
             provenance: None.into(),
-            change_id: None,
+            change: String::new(),
         })
         .await
         .unwrap();
@@ -128,8 +128,8 @@ async fn objects_are_sealed_per_org_and_open_only_where_they_were_written() {
     let rotated = c
         .protection
         .rotate_data_keys(pb::RotateDataKeysRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
+            request_id: String::new(),
+            parent: "orgs/default".into(),
             rewrap: false,
         })
         .await
@@ -139,8 +139,8 @@ async fn objects_are_sealed_per_org_and_open_only_where_they_were_written() {
     let rewrapped = c
         .protection
         .rotate_data_keys(pb::RotateDataKeysRequest {
-            operation_id: Bytes::new(),
-            org: String::new(),
+            request_id: String::new(),
+            parent: String::new(),
             rewrap: true,
         })
         .await

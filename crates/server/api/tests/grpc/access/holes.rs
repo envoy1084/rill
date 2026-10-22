@@ -23,15 +23,12 @@ async fn grep_is_bounded_by_the_token_paths() {
     let token = acl.server.token_with(&alice(), &narrowed);
     let c = clients(&acl.server, Some(&token)).await;
     let hits = c
-        .repo
+        .content
         .grep(pb::GrepRequest {
-            repo: "acl".into(),
-            root: acl.at_version().into(),
+            repo: common::names::repo("acl"),
+            revision: acl.at_version(),
             pattern: CANARY.into(),
-            case_insensitive: false,
-            path_globs: vec![],
-            max_results: 0,
-            context_lines: 0,
+            ..Default::default()
         })
         .await
         .map(|r| r.into_owned().hits)
@@ -80,12 +77,11 @@ async fn subtree_changes_need_write_on_the_target_and_read_on_the_source() {
     ];
     for (what, at, change) in attempts {
         let result = c
-            .repo
-            .create_change_version(pb::CreateChangeVersionRequest {
-                operation_id: Bytes::new(),
-                repo: "acl".into(),
+            .changes
+            .create_version(pb::CreateVersionRequest {
+                parent: common::names::repo("acl"),
                 version: subtree_version(&acl, at, change).into(),
-                signatures: Vec::new(),
+                ..Default::default()
             })
             .await;
         assert_eq!(
@@ -95,12 +91,11 @@ async fn subtree_changes_need_write_on_the_target_and_read_on_the_source() {
         );
     }
     // The same writer may delete inside its own directory.
-    c.repo
-        .create_change_version(pb::CreateChangeVersionRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
+    c.changes
+        .create_version(pb::CreateVersionRequest {
+            parent: common::names::repo("acl"),
             version: (subtree_version(&acl, "pub", SubtreeChange::Delete)).into(),
-            signatures: Vec::new(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -140,9 +135,9 @@ async fn another_orgs_object_cannot_be_fetched_by_hash() {
     );
     let c = acl.as_principal(&alice()).await;
     let blob = c
-        .repo
-        .get_blob(pb::GetBlobRequest {
-            repo: "acl".into(),
+        .content
+        .read_blob(pb::ReadBlobRequest {
+            repo: common::names::repo("acl"),
             content: (pb::ContentRef {
                 r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
                     hash: Bytes::copy_from_slice(hash.as_bytes()),
@@ -162,6 +157,6 @@ async fn another_orgs_object_cannot_be_fetched_by_hash() {
             matches!(stream.next().await, Some(Ok(_)))
         }
     };
-    assert!(!found, "GetBlob served another org's object");
+    assert!(!found, "ReadBlob served another org's object");
     acl.server.stop().await;
 }

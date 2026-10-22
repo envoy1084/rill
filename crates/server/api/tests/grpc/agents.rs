@@ -10,6 +10,7 @@ use rill_types::identity::{AccountStatus, OrgIdentitySettings, UserRecord};
 use rill_types::{Principal, Timestamp};
 
 use super::*;
+use common::names;
 
 fn config() -> ServerConfig {
     ServerConfig {
@@ -67,14 +68,14 @@ async fn exchange(
             model: model.map(String::from),
         })
         .await
-        .map(|r| r.into_owned())
+        .map(|r| r.into_owned().grant.unwrap())
 }
 
 async fn refused_within(server: &TestServer, token: &str) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
     loop {
         let c = clients(server, Some(token)).await;
-        match c.admin.who_am_i(pb::WhoAmIRequest {}).await {
+        match c.identity.get_caller(pb::GetCallerRequest {}).await {
             Err(s) if s.code == Code::Unauthenticated => return,
             _ => {}
         }
@@ -117,9 +118,10 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
     let root = a.token_for(&Principal::human("root"));
     let admin = identity(&a, &root).await;
     admin
-        .put_workload_issuer(pb::PutWorkloadIssuerRequest {
-            operation_id: Bytes::new(),
+        .update_workload_issuer(pb::UpdateWorkloadIssuerRequest {
+            request_id: String::new(),
             issuer: (pb::WorkloadIssuerSpec {
+                resource_name: String::new(),
                 org: "default".into(),
                 name: "ci".into(),
                 issuer: idp.issuer().into(),
@@ -127,12 +129,14 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
                 audiences: vec!["rill".into()],
             })
             .into(),
+            allow_missing: true,
         })
         .await
         .unwrap();
     admin
-        .register_agent(pb::RegisterAgentRequest {
-            operation_id: Bytes::new(),
+        .create_agent(pb::CreateAgentRequest {
+            request_id: String::new(),
+            parent: names::org("default"),
             agent: (spec("builder", "user:ann", idp.issuer())).into(),
         })
         .await
@@ -149,8 +153,8 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
     let token = grant.access_token;
     let me = clients(&b, Some(&token))
         .await
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .unwrap()
         .into_owned();
@@ -167,19 +171,19 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
         root_clients
             .repo
             .create_repo(pb::CreateRepoRequest {
-                operation_id: Bytes::new(),
-                repo: repo.into(),
-                description: None,
-                windows_safe: false,
+                request_id: String::new(),
+                parent: names::org("default"),
+                repo_id: repo.into(),
+                repo: None.into(),
             })
             .await
             .unwrap();
         root_clients
             .access
-            .add_relation(pb::AddRelationRequest {
-                operation_id: Bytes::new(),
+            .create_relation(pb::CreateRelationRequest {
+                request_id: String::new(),
+                parent: names::repo(repo),
                 relation: (pb::Relation {
-                    repo: repo.to_string(),
                     path: String::new(),
                     relation: "writer".into(),
                     subject: format!("principal:{}", Principal::agent("builder").id),
@@ -191,17 +195,17 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
     }
     let agent = clients(&b, Some(&token)).await;
     let write = |repo: &str, path: &str| pb::ApplyEditsRequest {
-        operation_id: Bytes::new(),
-        repo: repo.into(),
+        request_id: String::new(),
+        parent: names::repo(repo),
         base: None.into(),
         edits: vec![set_edit(path, b"x\n")],
         message: "m".into(),
-        intent: None,
+        intent: String::new(),
         provenance: None.into(),
-        change_id: None,
+        change: String::new(),
     };
     let written = agent
-        .repo
+        .changes
         .apply_edits(write("allowed", "src/a.rs"))
         .await
         .unwrap()
@@ -212,13 +216,13 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
     assert_eq!(provenance.model.as_deref(), Some("model-a"));
     assert_eq!(provenance.sponsor.unwrap().name, "ann");
     let outside = agent
-        .repo
+        .changes
         .apply_edits(write("allowed", "docs/a.md"))
         .await
         .unwrap_err();
     assert_eq!(outside.code, Code::PermissionDenied);
     let other = agent
-        .repo
+        .changes
         .apply_edits(write("other", "src/a.rs"))
         .await
         .unwrap_err();
@@ -273,11 +277,19 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
         .access_token;
     admin
         .update_agent(pb::UpdateAgentRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
-            name: "builder".into(),
-            suspended: Some(true),
-            spec: None.into(),
+            request_id: String::new(),
+            agent: (pb::Agent {
+                name: "orgs/default/agents/builder".into(),
+                status: "suspended".into(),
+                ..Default::default()
+            })
+            .into(),
+            update_mask: (rill_proto::FieldMask {
+                paths: vec!["status".into()],
+                ..Default::default()
+            })
+            .into(),
+            etag: String::new(),
         })
         .await
         .unwrap();
@@ -300,15 +312,17 @@ async fn users_register_only_agents_they_sponsor() {
     let server = TestServer::start_on(config(), stores.clone()).await;
     let ann = server.token_for(&Principal::human("ann"));
     let svc = identity(&server, &ann).await;
-    svc.register_agent(pb::RegisterAgentRequest {
-        operation_id: Bytes::new(),
+    svc.create_agent(pb::CreateAgentRequest {
+        request_id: String::new(),
+        parent: names::org("default"),
         agent: (spec("anns-bot", "user:ann", "https://ci")).into(),
     })
     .await
     .unwrap();
     let denied = svc
-        .register_agent(pb::RegisterAgentRequest {
-            operation_id: Bytes::new(),
+        .create_agent(pb::CreateAgentRequest {
+            request_id: String::new(),
+            parent: names::org("default"),
             agent: (spec("bobs-bot", "user:bob", "https://ci")).into(),
         })
         .await
@@ -316,7 +330,8 @@ async fn users_register_only_agents_they_sponsor() {
     assert_eq!(denied.code, Code::PermissionDenied);
     let listed = svc
         .list_agents(pb::ListAgentsRequest {
-            org: "default".into(),
+            parent: names::org("default"),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -341,8 +356,9 @@ async fn tokens_for_others_go_only_to_agents_one_sponsors() {
     let ann = server.token_for(&Principal::human("ann"));
     identity(&server, &ann)
         .await
-        .register_agent(pb::RegisterAgentRequest {
-            operation_id: Bytes::new(),
+        .create_agent(pb::CreateAgentRequest {
+            request_id: String::new(),
+            parent: names::org("default"),
             agent: (pb::AgentSpec {
                 repos: vec!["*".into()],
                 paths: vec![],
@@ -359,16 +375,16 @@ async fn tokens_for_others_go_only_to_agents_one_sponsors() {
             let repo = format!("repo-of-{}", &owner[owner.len() - 6..]);
             c.repo
                 .create_repo(pb::CreateRepoRequest {
-                    operation_id: Bytes::new(),
-                    repo: repo.clone(),
-                    description: None,
-                    windows_safe: false,
+                    request_id: String::new(),
+                    parent: names::org("default"),
+                    repo_id: repo.clone(),
+                    repo: None.into(),
                 })
                 .await
                 .unwrap();
-            c.admin
+            c.identity
                 .issue_token(pb::IssueTokenRequest {
-                    operation_id: Bytes::new(),
+                    request_id: String::new(),
                     capabilities: vec![pb::Capability {
                         action: "read".into(),
                         scope: format!("repo:{repo}"),

@@ -6,25 +6,26 @@ use rill_proto::convert::{hash_to_proto, id_to_proto, timestamp_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeId, Event, EventKind, LabelVote, RepoPathBuf, ReviewStatus, Timestamp};
 
-use super::reviews::change_id;
+use super::reviews::thread_proto;
 use super::ReviewSvc;
-use crate::services::common::{self, open};
+use crate::services::common::{self, open_repo};
 use crate::services::repo::forward;
-use crate::services::Call;
+use crate::services::{names, Call};
 use rill_runtime::error::Result;
 use rill_runtime::state::RepoContext;
 
 /// Server stream of review events.
-pub type ReviewEventStream = crate::services::repo::EventStream<pb::ReviewEvent>;
+pub type ReviewEventStream = crate::services::repo::EventStream<pb::WatchReviewResponse>;
 
 impl ReviewSvc {
     pub(super) async fn watch_review_impl(
         &self,
         request: Call<pb::WatchReviewRequest>,
     ) -> Result<ReviewEventStream> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        let name = &request.get_ref().name;
+        let opened = open_repo(&self.state, &request, name).await?;
         opened.permit().read(&RepoPathBuf::root()).await?;
-        let id = change_id(&request.get_ref().change_id)?;
+        let id = names::review_in(&opened.repo, name)?;
         let ctx = opened.repo.clone();
         let filter = EventFilter {
             change: Some(id),
@@ -39,8 +40,12 @@ impl ReviewSvc {
     }
 }
 
-fn wrap(change_id: &ChangeId, at: Timestamp, event: pb::review_event::Event) -> pb::ReviewEvent {
-    pb::ReviewEvent {
+fn wrap(
+    change_id: &ChangeId,
+    at: Timestamp,
+    event: pb::watch_review_response::Event,
+) -> pb::WatchReviewResponse {
+    pb::WatchReviewResponse {
         change_id: id_to_proto(change_id),
         at: timestamp_to_proto(at),
         event: Some(event),
@@ -52,8 +57,8 @@ async fn from_event(
     ctx: &RepoContext,
     change_id: &ChangeId,
     event: Event,
-) -> Option<pb::ReviewEvent> {
-    use pb::review_event::Event as E;
+) -> Option<pb::WatchReviewResponse> {
+    use pb::watch_review_response::Event as E;
     let status = |s: ReviewStatus| E::StatusChanged(pb::ReviewStatus::from(s).into());
     let mapped = match event.kind {
         EventKind::ReviewSubmitted { .. } => status(ReviewStatus::Open),
@@ -74,22 +79,25 @@ async fn from_event(
         EventKind::Commented { thread, .. } | EventKind::ThreadResolved { thread, .. } => {
             let state = ctx.review().get(change_id).await.ok()?;
             let thread = state.threads.iter().find(|t| t.id == thread)?;
-            E::ThreadUpdated(pb::Thread::from(thread))
+            E::ThreadUpdated(thread_proto(ctx, change_id, thread))
         }
         EventKind::VersionStored { version, .. } => E::NewVersion(hash_to_proto(&version)),
         EventKind::LandRequested { ticket, .. } => {
             let record = ctx.lander.queue().record(ticket).await.ok()??;
-            E::LandUpdate(common::ticket_proto(&rill_types::LandRequestRecord {
-                status: rill_types::LandStatus::Queued,
-                ..record
-            }))
+            E::LandUpdate(common::land_request_proto(
+                ctx,
+                &rill_types::LandRequestRecord {
+                    status: rill_types::LandStatus::Queued,
+                    ..record
+                },
+            ))
         }
         EventKind::LandStatusChanged { ticket, status, .. } => {
             let record = ctx.lander.queue().record(ticket).await.ok()??;
-            E::LandUpdate(common::ticket_proto(&rill_types::LandRequestRecord {
-                status,
-                ..record
-            }))
+            E::LandUpdate(common::land_request_proto(
+                ctx,
+                &rill_types::LandRequestRecord { status, ..record },
+            ))
         }
         _ => return None,
     };

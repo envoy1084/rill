@@ -1,0 +1,238 @@
+// Repositories, their refs and trunk.
+//
+// A repository is `orgs/{org}/repos/{repo}`. A revision string names a
+// point in its history: `trunk` (the default), `trunk@N`, a version hash
+// (64 hex digits), `tree:<hex>`, `changes/{change}` (its current version),
+// `workspaces/{workspace}` (its snapshot) or a ref name.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+// Repositories, refs, releases and trunk positions.
+service RepoService {
+  // A repository by name.
+  rpc GetRepo(GetRepoRequest) returns (GetRepoResponse);
+  // The repositories of an org, by repository id.
+  rpc ListRepos(ListReposRequest) returns (ListReposResponse);
+  // Create a repository.
+  rpc CreateRepo(CreateRepoRequest) returns (CreateRepoResponse);
+  // What a revision string names: its version, tree and trunk position.
+  rpc ResolveRevision(ResolveRevisionRequest) returns (ResolveRevisionResponse);
+
+  // A ref by name.
+  rpc GetRef(GetRefRequest) returns (GetRefResponse);
+  // The refs of a repository, by name.
+  rpc ListRefs(ListRefsRequest) returns (ListRefsResponse);
+  // Point a ref at a version, if it still has the `etag` given.
+  rpc UpdateRef(UpdateRefRequest) returns (UpdateRefResponse);
+  // Delete a ref, if it still has the `etag` given.
+  rpc DeleteRef(DeleteRefRequest) returns (DeleteRefResponse);
+  // Cut `release/{release_id}` at a trunk position. A release then moves
+  // only through its own lander (LandingService.RequestLand with `onto`).
+  rpc CreateRelease(CreateReleaseRequest) returns (CreateReleaseResponse);
+
+  // A trunk position: `…/trunk/positions/{N}` or `…/trunk/positions/head`.
+  rpc GetTrunkPosition(GetTrunkPositionRequest) returns (GetTrunkPositionResponse);
+  // Trunk positions in order.
+  rpc ListTrunkPositions(ListTrunkPositionsRequest) returns (ListTrunkPositionsResponse);
+
+  // Landings as they happen, resuming after a position.
+  rpc WatchTrunk(WatchTrunkRequest) returns (stream WatchTrunkResponse);
+  // Ref moves as they happen.
+  rpc WatchRefs(WatchRefsRequest) returns (stream WatchRefsResponse);
+  // Every version stored, resumable by cursor.
+  rpc WatchVersions(WatchVersionsRequest) returns (stream WatchVersionsResponse);
+
+  // A derived value of a version (an index, a summary), if computed.
+  rpc GetDerivedValue(GetDerivedValueRequest) returns (GetDerivedValueResponse);
+  // Wait for a derived value to be computed.
+  rpc WaitDerivedValue(WaitDerivedValueRequest) returns (WaitDerivedValueResponse);
+}
+
+message GetRepoRequest {
+  // `orgs/{org}/repos/{repo}`; `{repo}` may also be the `rp_` id. Required.
+  string name = 1;
+}
+message GetRepoResponse {
+  Repo repo = 1;
+}
+
+message ListReposRequest {
+  // `orgs/{org}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListReposResponse {
+  repeated Repo repos = 1;
+  string next_page_token = 2;
+}
+
+message CreateRepoRequest {
+  // Makes the call safe to retry: a UUID.
+  string request_id = 1;
+  // `orgs/{org}`. Required.
+  string parent = 2;
+  // The repository's name within the org. Required.
+  string repo_id = 3;
+  // `description` and `windows_safe` are read; the rest is output only.
+  Repo repo = 4;
+}
+message CreateRepoResponse {
+  Repo repo = 1;
+}
+
+message ResolveRevisionRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  // Defaults to `trunk`.
+  string revision = 2;
+}
+message ResolveRevisionResponse {
+  // `orgs/{org}/repos/{repo}/versions/{hash}`; empty for a bare tree.
+  string version = 1;
+  bytes version_hash = 2;
+  bytes tree_hash = 3;
+  // Set when the version is on trunk.
+  optional uint64 trunk_position = 4;
+}
+
+message GetRefRequest {
+  // `orgs/{org}/repos/{repo}/refs/{ref}`; `{ref}` may hold slashes. Required.
+  string name = 1;
+}
+message GetRefResponse {
+  Ref ref = 1;
+}
+
+message ListRefsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `name` (the short name, `release/1.0`), e.g. `name = "release/*"`.
+  string filter = 4;
+}
+message ListRefsResponse {
+  repeated Ref refs = 1;
+  string next_page_token = 2;
+}
+
+message UpdateRefRequest {
+  string request_id = 1;
+  // `name` and `target` are read. Required.
+  Ref ref = 2;
+  // The ref's current etag; the update fails with ETAG_MISMATCH otherwise.
+  // Empty with `allow_missing` creates the ref, failing if it exists.
+  string etag = 3;
+  // Create the ref if it does not exist.
+  bool allow_missing = 4;
+}
+message UpdateRefResponse {
+  Ref ref = 1;
+}
+
+message DeleteRefRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}/refs/{ref}`. Required.
+  string name = 2;
+  // The ref's current etag. Required.
+  string etag = 3;
+}
+message DeleteRefResponse {}
+
+message CreateReleaseRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // The release's name: the ref is `release/{release_id}`. Required.
+  string release_id = 3;
+  // The trunk position to cut at; the head when absent.
+  optional uint64 trunk_position = 4;
+}
+message CreateReleaseResponse {
+  Ref ref = 1;
+}
+
+message GetTrunkPositionRequest {
+  // `orgs/{org}/repos/{repo}/trunk/positions/{N}`, or `…/head`. Required.
+  string name = 1;
+}
+message GetTrunkPositionResponse {
+  Landing landing = 1;
+}
+
+message ListTrunkPositionsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `position`, e.g. `position >= 100 AND position <= 200`.
+  string filter = 4;
+}
+message ListTrunkPositionsResponse {
+  // Oldest first.
+  repeated Landing landings = 1;
+  string next_page_token = 2;
+}
+
+message WatchTrunkRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // Resume after this position; absent sends only new landings.
+  optional uint64 after_position = 2;
+}
+message WatchTrunkResponse {
+  Landing landing = 1;
+}
+
+message WatchRefsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // Only refs whose short name starts with this.
+  string prefix = 2;
+}
+message WatchRefsResponse {
+  // The ref's short name.
+  string ref = 1;
+  optional bytes old = 2;
+  optional bytes new = 3;
+  int64 at = 4;
+}
+
+message WatchVersionsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // Absent: only versions stored from now on. Empty: the whole log.
+  // Otherwise resume after this cursor, from an earlier response.
+  optional bytes after = 2;
+}
+message WatchVersionsResponse {
+  // Pass as `after` to resume after this version.
+  bytes cursor = 1;
+  ChangeInfo version = 2;
+}
+
+message GetDerivedValueRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string kind = 2;
+  bytes hash = 3;
+}
+message GetDerivedValueResponse {
+  bytes data = 1;
+}
+
+message WaitDerivedValueRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string kind = 2;
+  bytes hash = 3;
+  uint64 timeout_ms = 4;
+}
+message WaitDerivedValueResponse {
+  bool ready = 1;
+  optional bytes data = 2;
+}

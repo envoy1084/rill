@@ -6031,6 +6031,7 @@ dependencies = [
  "tower",
  "tracing",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -6509,6 +6510,7 @@ dependencies = [
  "tokio-stream",
  "toml 1.1.8+spec-1.1.0",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

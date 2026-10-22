@@ -20,8 +20,9 @@ use rill_reapi_proto::reapi::execution_server::ExecutionServer;
 use rill_reapi_proto::remoteworker::operation_queue_server::OperationQueueServer;
 
 use crate::services::{
-    AccessSvc, AdminSvc, AuditSvc, ChecksSvc, ExecSvc, IdentitySvc, IntentSvc, LanderSvc,
-    ProtectionSvc, RepoSvc, ReviewSvc, SecretSvc, SessionSvc, WorkspaceSvc,
+    AccessSvc, AdminSvc, AuditSvc, ChangeSvc, ChecksSvc, ContentSvc, EventSvc, ExecSvc,
+    IdentitySvc, IntentSvc, LandingSvc, OperationSvc, OrgSvc, PolicySvc, ProtectionSvc, RepoSvc,
+    ReviewSvc, SecretSvc, SessionSvc, TrunkSvc, WorkspaceSvc,
 };
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
@@ -171,16 +172,23 @@ fn connect_service(state: &Arc<AppState>) -> Result<(ConnectRpcService, Arc<Stat
     let router = connectrpc::Router::new()
         .add_service(Arc::new(SessionSvc::new(state.clone())))
         .add_service(Arc::new(RepoSvc::new(state.clone())))
+        .add_service(Arc::new(ContentSvc::new(state.clone())))
+        .add_service(Arc::new(ChangeSvc::new(state.clone())))
+        .add_service(Arc::new(EventSvc::new(state.clone())))
         .add_service(Arc::new(WorkspaceSvc::new(state.clone())))
         .add_service(Arc::new(ReviewSvc::new(state.clone())))
         .add_service(Arc::new(IntentSvc::new(state.clone())))
-        .add_service(Arc::new(LanderSvc::new(state.clone())))
+        .add_service(Arc::new(LandingSvc::new(state.clone())))
+        .add_service(Arc::new(TrunkSvc::new(state.clone())))
+        .add_service(Arc::new(OperationSvc::new(state.clone())))
         .add_service(Arc::new(IdentitySvc::new(state.clone())))
         .add_service(Arc::new(AccessSvc::new(state.clone())))
         .add_service(Arc::new(AuditSvc::new(state.clone())))
         .add_service(Arc::new(ProtectionSvc::new(state.clone())))
         .add_service(Arc::new(SecretSvc::new(state.clone())))
         .add_service(Arc::new(ChecksSvc::new(state.clone())))
+        .add_service(Arc::new(PolicySvc::new(state.clone())))
+        .add_service(Arc::new(OrgSvc::new(state.clone())))
         .add_service(Arc::new(AdminSvc::new(state.clone())));
     let services: Vec<String> = rill_proto::SERVICES.iter().map(|s| s.to_string()).collect();
     let (router, health) = connectrpc_health::install_static(router, services);

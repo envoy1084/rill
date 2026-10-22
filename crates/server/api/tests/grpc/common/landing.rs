@@ -6,6 +6,7 @@ use bytes::Bytes;
 use rill_proto::rill::v1 as pb;
 
 use super::clients::Clients;
+use super::names;
 
 pub(crate) async fn land(clients: &mut Clients, repo: &str, change_id: Bytes) -> u64 {
     land_with(clients, repo, change_id, &[]).await
@@ -34,10 +35,9 @@ pub(crate) async fn try_land_with(
 ) -> Result<u64, String> {
     clients
         .review
-        .submit_for_review(pb::SubmitForReviewRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            change_id: change_id.clone(),
+        .submit_change(pb::SubmitChangeRequest {
+            request_id: String::new(),
+            change: names::change(repo, &change_id),
         })
         .await
         .unwrap();
@@ -45,13 +45,12 @@ pub(crate) async fn try_land_with(
         clients
             .review
             .vote(pb::VoteRequest {
-                operation_id: Bytes::new(),
-                repo: repo.into(),
-                change_id: change_id.clone(),
+                request_id: String::new(),
+                review: names::review(repo, &change_id),
                 label: label.into(),
                 value,
                 reason: None,
-                version: None,
+                version: String::new(),
             })
             .await
             .unwrap();
@@ -66,34 +65,30 @@ pub(crate) async fn request_land(
     change_id: Bytes,
 ) -> Result<u64, String> {
     let ticket = clients
-        .review
+        .landing
         .request_land(pb::RequestLandRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            change_id: change_id.clone(),
-            onto: None,
+            request_id: String::new(),
+            change: names::change(repo, &change_id),
+            onto: String::new(),
         })
         .await
         .unwrap()
         .into_owned()
-        .ticket
+        .land_request
         .unwrap();
     for _ in 0..200 {
         let status = clients
-            .review
-            .get_land_status(pb::GetLandStatusRequest {
-                repo: repo.into(),
-                ticket: ticket.id.clone(),
+            .landing
+            .get_land_request(pb::GetLandRequestRequest {
+                name: ticket.name.clone(),
             })
             .await
             .unwrap()
-            .into_owned();
-        match rill_proto::convert::known::<pb::LandStatus>(
-            status.ticket.as_option().unwrap().status,
-        )
-        .unwrap()
-        {
-            pb::LandStatus::Landed => return Ok(status.seq.unwrap()),
+            .into_owned()
+            .land_request
+            .unwrap();
+        match rill_proto::convert::known::<pb::LandStatus>(status.status).unwrap() {
+            pb::LandStatus::Landed => return Ok(status.trunk_position.unwrap()),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 return Err(status.error.unwrap_or_default())
             }

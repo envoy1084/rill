@@ -185,12 +185,14 @@ pub async fn flaky_test(trunk: &Trunk, _slo: &Slo) -> anyhow::Result<Value> {
     let quarantined: Vec<String> = trunk
         .client
         .checks_svc()
-        .list_quarantined(pb::ListQuarantinedRequest {
-            repo: trunk.name.clone(),
+        .list_quarantines(pb::ListQuarantinesRequest {
+            parent: trunk.repo.resource().to_string(),
+            page_size: 1000,
+            page_token: String::new(),
         })
         .await?
         .into_owned()
-        .targets
+        .quarantines
         .into_iter()
         .map(|t| t.target)
         .collect();

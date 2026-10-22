@@ -5,52 +5,48 @@ use rill_types::{ObjectHash, RepoPathBuf, Timestamp};
 
 use super::super::fixture::*;
 use super::callers::Callers;
+use crate::common::names;
 use crate::*;
 
 /// Requests with real inputs for RPCs that validate before they
 /// authorize, so the matrix reaches their permission check.
 pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
     let version = callers.acl.version.clone();
+    let repo = || names::repo("acl");
     let tuple = || pb::Relation {
-        repo: "acl".into(),
         path: String::new(),
         relation: "reader".into(),
         subject: "*".into(),
     };
     let body = match name.trim_start_matches("rill.v1.") {
-        "AccessService/AddRelation" => pb::AddRelationRequest {
-            operation_id: Bytes::new(),
+        "AccessService/CreateRelation" => pb::CreateRelationRequest {
+            parent: repo(),
             relation: tuple().into(),
-        }
-        .encode_to_vec(),
-        "AccessService/RemoveRelation" => pb::RemoveRelationRequest {
-            operation_id: Bytes::new(),
-            relation: tuple().into(),
-        }
-        .encode_to_vec(),
-        "AdminService/GetPolicy" => pb::GetPolicyRequest {
-            name: "acl/submit".into(),
-        }
-        .encode_to_vec(),
-        "AdminService/SetPolicy" => pb::SetPolicyRequest {
-            operation_id: Bytes::new(),
-            name: "acl/submit".into(),
-            text: "permit(principal, action, resource);".into(),
-        }
-        .encode_to_vec(),
-        "ProtectionService/ClearQuarantine" => pb::ClearQuarantineRequest {
-            operation_id: Bytes::new(),
-            repo: "acl".into(),
-            version: version.clone(),
-        }
-        .encode_to_vec(),
-        "AdminService/CreateOrg" => pb::CreateOrgRequest {
-            name: "neworg".into(),
             ..Default::default()
         }
         .encode_to_vec(),
-        "IdentityService/PutIdentityProvider" => pb::PutIdentityProviderRequest {
-            operation_id: Bytes::new(),
+        "AccessService/DeleteRelation" => pb::DeleteRelationRequest {
+            parent: repo(),
+            relation: tuple().into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "PolicyService/UpdatePolicy" => pb::UpdatePolicyRequest {
+            policy: (pb::Policy {
+                name: format!("{}/policies/submit", repo()),
+                text: "permit(principal, action, resource);".into(),
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "OrgService/CreateOrg" => pb::CreateOrgRequest {
+            org_id: "neworg".into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "IdentityService/UpdateIdentityProvider" => pb::UpdateIdentityProviderRequest {
             provider: (pb::IdentityProviderSpec {
                 org: "default".into(),
                 name: "p".into(),
@@ -59,10 +55,11 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
                 ..Default::default()
             })
             .into(),
+            allow_missing: true,
+            ..Default::default()
         }
         .encode_to_vec(),
-        "IdentityService/PutWorkloadIssuer" => pb::PutWorkloadIssuerRequest {
-            operation_id: Bytes::new(),
+        "IdentityService/UpdateWorkloadIssuer" => pb::UpdateWorkloadIssuerRequest {
             issuer: (pb::WorkloadIssuerSpec {
                 org: "default".into(),
                 name: "k8s".into(),
@@ -70,30 +67,78 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
                 ..Default::default()
             })
             .into(),
+            allow_missing: true,
+            ..Default::default()
         }
         .encode_to_vec(),
-        "RepoService/PutBlob" => pb::PutBlobRequest {
-            msg: Some(pb::put_blob_request::Msg::Header(pb::PutBlobHeader {
-                operation_id: Bytes::new(),
-                repo: "acl".into(),
-                size: None,
-                expected_hash: None,
+        "IdentityService/UpdateUser" => pb::UpdateUserRequest {
+            user: (pb::User {
+                name: format!("{}/users/alice", names::org("default")),
+                ..Default::default()
+            })
+            .into(),
+            update_mask: (rill_proto::FieldMask {
+                paths: vec!["status".into()],
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "SecretService/UpdateSecret" => pb::UpdateSecretRequest {
+            secret: (pb::Secret {
+                name: format!("{}/secrets/probe", names::org("default")),
+                ..Default::default()
+            })
+            .into(),
+            value: Bytes::from_static(b"v"),
+            allow_missing: true,
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "RepoService/UpdateRef" => pb::UpdateRefRequest {
+            r#ref: (pb::Ref {
+                name: format!("{}/refs/probe", repo()),
+                target: version.clone(),
+                ..Default::default()
+            })
+            .into(),
+            allow_missing: true,
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "IntentService/UpdateIntent" => pb::UpdateIntentRequest {
+            intent: (pb::Intent {
+                name: format!("{}/intents/{}", repo(), rill_types::IntentId::new()),
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "WorkspaceService/UpdateWorkspace" => pb::UpdateWorkspaceRequest {
+            workspace: (pb::Workspace {
+                name: callers.targets.workspace().into(),
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "ContentService/WriteBlob" => pb::WriteBlobRequest {
+            msg: Some(pb::write_blob_request::Msg::Header(pb::WriteBlobHeader {
+                repo: repo(),
+                ..Default::default()
             })),
         }
         .encode_to_vec(),
-        "RepoService/Grep" => pb::GrepRequest {
-            repo: "acl".into(),
+        "ContentService/Grep" => pb::GrepRequest {
+            repo: repo(),
             pattern: CANARY.into(),
             ..Default::default()
         }
         .encode_to_vec(),
-        "RepoService/Resolve" => pb::ResolveRequest {
-            repo: "acl".into(),
-            hash: version,
-            ..Default::default()
-        }
-        .encode_to_vec(),
-        "RepoService/CreateChangeVersion" => {
+        "ChangeService/CreateVersion" => {
             let mut cv = rill_types::ChangeVersion {
                 change_id: rill_types::ChangeId::new(),
                 parents: vec![ObjectHash::from_slice(&version).unwrap()],
@@ -114,11 +159,10 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
                     rill_types::FileKind::Regular,
                 ),
             );
-            pb::CreateChangeVersionRequest {
-                operation_id: Bytes::new(),
-                repo: "acl".into(),
+            pb::CreateVersionRequest {
+                parent: repo(),
                 version: pb::ChangeVersion::from(cv).into(),
-                signatures: Vec::new(),
+                ..Default::default()
             }
             .encode_to_vec()
         }

@@ -56,9 +56,14 @@ pub struct DeleteArgs {
     pub name: String,
 }
 
-fn secret_json(s: &pb::SecretInfo) -> serde_json::Value {
+/// A secret's own name, the last segment of its resource name.
+fn short(name: &str) -> &str {
+    name.rsplit('/').next().unwrap_or(name)
+}
+
+fn secret_json(s: &pb::Secret) -> serde_json::Value {
     j!({
-        "name": s.name,
+        "name": short(&s.name),
         "repos": s.repos,
         "trunk_only": s.trunk_only,
         "updated_at": s.updated_at,
@@ -93,25 +98,33 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
         SecretCmd::Set(a) => {
             let value = read_value(a.from_file)?;
             let secret = svc
-                .put_secret(pb::PutSecretRequest {
-                    operation_id: Default::default(),
-                    org: a.org.org,
-                    name: a.name,
+                .update_secret(pb::UpdateSecretRequest {
+                    request_id: String::new(),
+                    secret: pb::Secret {
+                        name: format!("{}/secrets/{}", rill_sdk::names::org(&a.org.org), a.name),
+                        repos: a.repos,
+                        trunk_only: a.trunk_only,
+                        ..Default::default()
+                    }
+                    .into(),
                     value: value.into(),
-                    repos: a.repos,
-                    trunk_only: a.trunk_only,
+                    allow_missing: true,
                 })
                 .await?
                 .into_owned()
                 .secret
                 .ok_or_else(|| CliError::conflict("the server returned no secret"))?;
             ctx.emit(secret_json(&secret), |out| {
-                out.line(format!("secret {} set", secret.name))
+                out.line(format!("secret {} set", short(&secret.name)))
             })
         }
         SecretCmd::List(o) => {
             let list = svc
-                .list_secrets(pb::ListSecretsRequest { org: o.org })
+                .list_secrets(pb::ListSecretsRequest {
+                    parent: rill_sdk::names::org(&o.org),
+                    page_size: 1000,
+                    page_token: String::new(),
+                })
                 .await?
                 .into_owned()
                 .secrets;
@@ -121,7 +134,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
                     let mut table = Table::new(&["NAME", "REPOS", "TRUNK ONLY", "UPDATED", "BY"]);
                     for s in &list {
                         table.row(vec![
-                            s.name.clone(),
+                            short(&s.name).to_string(),
                             if s.repos.is_empty() {
                                 "all".into()
                             } else {
@@ -140,21 +153,13 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
             )
         }
         SecretCmd::Delete(a) => {
-            let deleted = svc
-                .delete_secret(pb::DeleteSecretRequest {
-                    operation_id: Default::default(),
-                    org: a.org.org,
-                    name: a.name.clone(),
-                })
-                .await?
-                .into_owned()
-                .deleted;
-            ctx.emit(j!({ "deleted": deleted }), |out| {
-                out.line(if deleted {
-                    format!("secret {} deleted", a.name)
-                } else {
-                    format!("no secret {}", a.name)
-                })
+            svc.delete_secret(pb::DeleteSecretRequest {
+                request_id: String::new(),
+                name: format!("{}/secrets/{}", rill_sdk::names::org(&a.org.org), a.name),
+            })
+            .await?;
+            ctx.emit(j!({ "deleted": true }), |out| {
+                out.line(format!("secret {} deleted", a.name))
             })
         }
     }

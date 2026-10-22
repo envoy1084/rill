@@ -10,9 +10,9 @@ is attached, the CLI treats it as advisory.
 ```mermaid
 flowchart LR
     FS[working files] <--> CO[".rill/checkout.toml<br/>.rill/manifest.toml"]
-    CO -->|ListDir, GetBlob| R[RepoSvc]
-    CO -->|ApplyEdits, PutBlob| R
-    CO -.->|CreateWorkspace, UpdateBase, Undo| W[WorkspaceSvc]
+    CO -->|ListDirectory, ReadBlob| R[RepoSvc]
+    CO -->|ApplyEdits, WriteBlob| R
+    CO -.->|CreateWorkspace, SyncWorkspace, Undo| W[WorkspaceSvc]
 ```
 
 ## Metadata
@@ -34,10 +34,10 @@ updates still read the old base content from the pinned version.
 `.rill/checkout.toml`, and `Checkout::find` walks up to the nearest such
 directory, so a repository's own `.rill/` (policy files) is not mistaken
 for a checkout.
-`remote::list_tree` lists the root one `ListDir` RPC per directory. It does
+`remote::list_tree` lists the root one `ListDirectory` RPC per directory. It does
 not enter a directory that is excluded, or that is neither under an
 include nor an ancestor of one (`dir_may_contain`). Each file is fetched
-with `GetBlob`; inline content needs no round-trip. The file is written and
+with `ReadBlob`; inline content needs no round-trip. The file is written and
 gets a manifest entry.
 
 `rill checkout` calls `CreateWorkspace` first, unless `--no-workspace` is
@@ -77,7 +77,7 @@ working_change`. Pinning matters: a symbolic `trunk` would be re-resolved by
 the server and silently overwrite anything landed since the files were
 materialized. Bytes at or under
 `INLINE_THRESHOLD` (256) travel inline. Larger files are first uploaded
-with the streamed `PutBlob` RPC in `PUT_BLOB_CHUNK_SIZE` (256 KiB)
+with the streamed `WriteBlob` RPC in `PUT_BLOB_CHUNK_SIZE` (256 KiB)
 messages ([blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs)). The
 returned change id is saved as `working_change`.
 
@@ -115,10 +115,10 @@ sequenceDiagram
     participant W as WorkspaceSvc
     participant SDK as Checkout
     participant R as RepoSvc
-    CLI->>W: UpdateBase(ws, onto) (error only logged)
+    CLI->>W: SyncWorkspace(ws, onto) (error only logged)
     CLI->>SDK: update(onto)
-    SDK->>R: ListDir per directory of new root
-    SDK->>R: ReadFile(base_version, path), GetBlob(upstream)
+    SDK->>R: ListDirectory per directory of new root
+    SDK->>R: ReadFile(base_version, path), ReadBlob(upstream)
     SDK->>SDK: merge_file, write markers on conflict
     SDK-->>CLI: UpdateReport { updated, removed, merged, conflicts }
     CLI-->>CLI: clear working_change if it landed; exit 3 on conflicts
@@ -129,27 +129,27 @@ after the user edits the file. `Checkout::mark_resolved` first parses each
 file with `parse_materialized` and refuses one that still has conflicts or
 malformed markers; `--force` skips the check for files whose real content
 looks like markers. After `rill land --wait` lands the checkout's working
-change, the CLI runs the same update as `rill sync` onto trunk. `rill undo` calls the workspace `Undo`,
+change, the CLI runs the same update as `rill sync` onto trunk. `rill undo` calls the workspace `UndoOperation`,
 then `update(Root::Version(workspace.base))`.
 
 ## Relation to the server workspace
 
-A checkout never calls the workspace `Snapshot` or `NewChange` RPCs. Its
+A checkout never calls the workspace `SnapshotWorkspace` or `StartChange` RPCs. Its
 `working_change` comes from `ApplyEdits` and differs from the workspace's
-`working_change`. As a result, the `UpdateBase` sent by `rill sync` only
+`working_change`. As a result, the `SyncWorkspace` sent by `rill sync` only
 moves the workspace `base`; it never rebases the checkout's change. The
 checkout's change follows the new base the next time it is snapshotted.
 `rill new`, when it stacks, moves the checkout with `update` and does not
-call `UpdateBase`.
+call `SyncWorkspace`.
 
 ## Limitations
 
 * The checkout keeps no local history. `rill undo` needs an attached
   workspace and undoes only the workspace's last operation.
 * The workspace record drifts from the checkout. `rill sync` ignores a
-  failed `UpdateBase`, and stacking via `rill new` never updates it.
+  failed `SyncWorkspace`, and stacking via `rill new` never updates it.
 * The sparse profile is fixed when the checkout is created. No command
-  changes it, and `SetSparseProfile` does not touch a checkout.
+  changes it, and `UpdateWorkspace` does not touch a checkout.
 * A partially resolved file cannot be uploaded: resolution is all or
   nothing per file.
 * Every snapshot re-uploads every changed file larger than the inline

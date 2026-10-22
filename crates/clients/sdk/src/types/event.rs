@@ -14,10 +14,10 @@ pub struct LoggedEvent {
     pub event: Event,
 }
 
-impl TryFrom<pb::EventEnvelope> for LoggedEvent {
+impl TryFrom<pb::WatchEventsResponse> for LoggedEvent {
     type Error = crate::error::Error;
 
-    fn try_from(e: pb::EventEnvelope) -> Result<Self> {
+    fn try_from(e: pb::WatchEventsResponse) -> Result<Self> {
         Ok(LoggedEvent {
             cursor: Versionstamp::from_slice(&e.cursor)?,
             event: rill_proto::convert::required("event_envelope.event", e.event)?.try_into()?,

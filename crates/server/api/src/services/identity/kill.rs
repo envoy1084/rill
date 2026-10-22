@@ -19,7 +19,8 @@ pub async fn kill(
 ) -> Result<pb::KillSwitchResponse> {
     let ctx = caller(&request)?;
     let req = request.into_inner();
-    require_org_admin(state, &ctx, &req.org).await?;
+    let org = crate::services::names::org(&req.parent)?;
+    require_org_admin(state, &ctx, &org).await?;
     let store = state.identity.store();
     let actor = &ctx.principal;
     let mut out = pb::KillSwitchResponse::default();
@@ -27,9 +28,9 @@ pub async fn kill(
     match req.target.ok_or_else(|| Error::invalid("name a target"))? {
         Target::Agent(name) => {
             let agent = store
-                .agent(&req.org, &name)
+                .agent(&org, &name)
                 .await?
-                .ok_or_else(|| Error::NotFound(format!("agent {}/{name}", req.org)))?;
+                .ok_or_else(|| Error::NotFound(format!("agent {org}/{name}")))?;
             suspend(state, &agent, actor, &mut out).await?;
         }
         Target::Sponsor(label) => {
@@ -38,7 +39,7 @@ pub async fn kill(
                 Some(("team", n)) => Sponsor::Team(n.into()),
                 _ => return Err(Error::invalid("sponsor: use user:<name> or team:<name>")),
             };
-            for agent in store.agents(&req.org).await? {
+            for agent in store.agents(&org).await? {
                 if agent.sponsor == sponsor {
                     suspend(state, &agent, actor, &mut out).await?;
                 }
@@ -52,23 +53,23 @@ pub async fn kill(
                 .session(&id)
                 .await?
                 .ok_or_else(|| Error::NotFound(format!("session {id}")))?;
-            if session.org != req.org {
+            if session.org != org {
                 return Err(Error::denied("the session belongs to another org"));
             }
             revoke(state, &id, actor).await?;
             out.sessions_revoked.push(id.to_string());
         }
         Target::Model(model) => {
-            let mut settings = store.org_settings(&req.org).await?;
+            let mut settings = store.org_settings(&org).await?;
             if !settings.blocked_models.contains(&model) {
                 settings.blocked_models.push(model.clone());
                 store.put_org_settings(&settings, actor).await?;
             }
-            state.identity.apply(&IdentityChange::OrgSettingsChanged {
-                org: req.org.clone(),
-            });
+            state
+                .identity
+                .apply(&IdentityChange::OrgSettingsChanged { org: org.clone() });
             for session in store.live_sessions(Timestamp::now(), SESSION_SCAN).await? {
-                if session.org == req.org && session.model.as_deref() == Some(model.as_str()) {
+                if session.org == org && session.model.as_deref() == Some(model.as_str()) {
                     revoke(state, &session.id, actor).await?;
                     out.sessions_revoked.push(session.id.to_string());
                 }
@@ -76,7 +77,7 @@ pub async fn kill(
             out.models_blocked.push(model);
         }
     }
-    tracing::warn!(by = %actor, org = %req.org, reason = %req.reason, agents = ?out.agents_suspended, sessions = out.sessions_revoked.len(), models = ?out.models_blocked, "kill switch");
+    tracing::warn!(by = %actor, org = %org, reason = %req.reason, agents = ?out.agents_suspended, sessions = out.sessions_revoked.len(), models = ?out.models_blocked, "kill switch");
     Ok(out)
 }
 

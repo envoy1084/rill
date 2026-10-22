@@ -41,9 +41,10 @@ impl AuditClient {
         let resp = retry_idempotent(|| {
             let svc = self.svc();
             let request = pb::ListAuditEntriesRequest {
-                org: org.to_string(),
+                parent: crate::names::org(org),
+                page_size: limit as i32,
+                page_token: String::new(),
                 after_seq,
-                limit,
             };
             async move { svc.list_audit_entries(request).await }
         })
@@ -73,16 +74,28 @@ impl AuditClient {
 
     /// The chain's seals, oldest first.
     pub async fn roots(&self, org: &str) -> Result<Vec<AuditRoot>> {
-        let resp = retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::ListAuditRootsRequest {
-                org: org.to_string(),
-            };
-            async move { svc.list_audit_roots(request).await }
-        })
-        .await?
-        .into_owned();
-        resp.roots.iter().map(|r| decode(&r.encoded)).collect()
+        let mut out = Vec::new();
+        let mut page_token = String::new();
+        loop {
+            let resp = retry_idempotent(|| {
+                let svc = self.svc();
+                let request = pb::ListAuditRootsRequest {
+                    parent: crate::names::org(org),
+                    page_size: 1000,
+                    page_token: page_token.clone(),
+                };
+                async move { svc.list_audit_roots(request).await }
+            })
+            .await?
+            .into_owned();
+            for root in &resp.roots {
+                out.push(decode(&root.encoded)?);
+            }
+            if resp.next_page_token.is_empty() {
+                return Ok(out);
+            }
+            page_token = resp.next_page_token;
+        }
     }
 
     /// Seal what the chain gained since its last seal.
@@ -90,7 +103,7 @@ impl AuditClient {
         let resp = retry_idempotent(|| {
             let svc = self.svc();
             let request = pb::SealAuditRequest {
-                org: org.to_string(),
+                parent: crate::names::org(org),
             };
             async move { svc.seal_audit(request).await }
         })
@@ -119,13 +132,13 @@ impl AuditClient {
         let stream = self
             .svc()
             .watch_audit(pb::WatchAuditRequest {
-                org: org.to_string(),
+                parent: crate::names::org(org),
                 after_seq,
             })
             .await?;
         Ok(crate::repo::map_stream(
             stream,
-            |e: pb::AuditEntryRecord| decode(&e.encoded),
+            |e: pb::WatchAuditResponse| decode(&e.entry.into_option().unwrap_or_default().encoded),
         ))
     }
 }

@@ -1,0 +1,50 @@
+// Policies: a repository's submit and risk rules, as Cedar text.
+//
+// A policy is `orgs/{org}/repos/{repo}/policies/{policy}` (`submit` or
+// `risk`).
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+// Repository policies.
+service PolicyService {
+  // A policy; the default text when it was never set.
+  rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
+  // Replace a policy's text (repository owners).
+  rpc UpdatePolicy(UpdatePolicyRequest) returns (UpdatePolicyResponse);
+}
+
+// A repository policy.
+message Policy {
+  // `…/policies/{policy}`.
+  string name = 1;
+  // Cedar policy text.
+  string text = 2;
+  // Output only.
+  int64 updated_at = 3;
+  // Output only.
+  Principal updated_by = 4;
+  // Output only.
+  string etag = 5;
+}
+
+message GetPolicyRequest {
+  // `…/policies/{policy}`. Required.
+  string name = 1;
+}
+message GetPolicyResponse {
+  Policy policy = 1;
+}
+
+message UpdatePolicyRequest {
+  string request_id = 1;
+  // The policy, by `name`, with its new text. Required.
+  Policy policy = 2;
+  // The etag read; empty means no condition.
+  string etag = 3;
+}
+message UpdatePolicyResponse {
+  Policy policy = 1;
+}

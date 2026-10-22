@@ -12,14 +12,12 @@ use tonic::{Code, Request, Status};
 /// One RPC as the descriptor describes it.
 #[derive(Debug, Clone)]
 pub struct Method {
-    /// `rill.v1.RepoService/ListDir`.
+    /// `rill.v1.ContentService/ListDirectory`.
     pub name: String,
     pub client_streaming: bool,
     pub server_streaming: bool,
-    /// The input message's `repo` field number, when it has one.
-    pub repo_field: Option<i32>,
-    /// The input message's `workspace` field number, when it has one.
-    pub workspace_field: Option<i32>,
+    /// The input message's top-level string fields: name and number.
+    pub string_fields: Vec<(String, u32)>,
 }
 
 /// Every method of every service in `rill.v1`.
@@ -40,22 +38,21 @@ pub fn methods() -> Vec<Method> {
         for service in &file.service {
             for method in &service.method {
                 let input = messages[method.input_type()];
-                let field = |name: &str, ty: prost_types::field_descriptor_proto::Type| {
-                    input
-                        .field
-                        .iter()
-                        .find(|f| f.name() == name && f.r#type() == ty)
-                        .map(|f| f.number())
-                };
-                use prost_types::field_descriptor_proto::Type;
-                let repo_field = field("repo", Type::String);
-                let workspace_field = field("workspace", Type::Bytes);
+                let string_fields = input
+                    .field
+                    .iter()
+                    .filter(|f| {
+                        f.r#type() == prost_types::field_descriptor_proto::Type::String
+                            && f.label() != prost_types::field_descriptor_proto::Label::Repeated
+                            && f.oneof_index.is_none()
+                    })
+                    .map(|f| (f.name().to_string(), f.number() as u32))
+                    .collect();
                 out.push(Method {
                     name: format!("{}.{}/{}", file.package(), service.name(), method.name()),
                     client_streaming: method.client_streaming(),
                     server_streaming: method.server_streaming(),
-                    repo_field,
-                    workspace_field,
+                    string_fields,
                 });
             }
         }
@@ -63,15 +60,13 @@ pub fn methods() -> Vec<Method> {
     out
 }
 
-/// A request with only `repo` and `workspace` set, where the message has
-/// them.
-pub fn request_body(method: &Method, repo: &str, workspace: &[u8]) -> Bytes {
+/// A request with only the string fields `value` names something for set.
+pub fn request_body(method: &Method, value: impl Fn(&str) -> Option<String>) -> Bytes {
     let mut out = BytesMut::new();
-    if let Some(field) = method.repo_field {
-        prost::encoding::string::encode(field as u32, &repo.to_string(), &mut out);
-    }
-    if let Some(field) = method.workspace_field {
-        prost::encoding::bytes::encode(field as u32, &workspace.to_vec(), &mut out);
+    for (name, number) in &method.string_fields {
+        if let Some(v) = value(name) {
+            prost::encoding::string::encode(*number, &v, &mut out);
+        }
     }
     out.freeze()
 }

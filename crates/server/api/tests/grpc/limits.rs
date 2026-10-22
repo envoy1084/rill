@@ -8,24 +8,20 @@ async fn large_inline_edits_become_blobs_and_huge_messages_are_refused() {
     let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "lim".into(),
-            description: None,
-            windows_safe: false,
+            parent: common::names::org("default"),
+            repo_id: "lim".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let version = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "lim".into(),
+            parent: common::names::repo("lim"),
             base: None.into(),
             edits: vec![set_edit("big.txt", &[b'x'; 4096])],
             message: "big".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -47,16 +43,13 @@ async fn large_inline_edits_become_blobs_and_huge_messages_are_refused() {
 
     let huge = vec![b'y'; 20 << 20];
     let err = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "lim".into(),
+            parent: common::names::repo("lim"),
             base: None.into(),
             edits: vec![set_edit("huge.txt", &huge)],
             message: "huge".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -73,7 +66,7 @@ async fn a_burst_past_the_rate_limit_is_told_when_to_retry() {
     let c = clients(&server, None).await;
     let mut refused = Vec::new();
     for _ in 0..6 {
-        if let Err(status) = c.admin.who_am_i(pb::WhoAmIRequest {}).await {
+        if let Err(status) = c.identity.get_caller(pb::GetCallerRequest {}).await {
             refused.push(status);
         }
     }

@@ -1,12 +1,13 @@
 //! Intents: creation, lookup, update, listing, linking and similarity
 //! search.
 
-use rill_proto::convert::{id_to_proto, required};
+use rill_proto::convert::required;
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeId, Intent, IntentId, OperationId};
 
 use crate::client::Client;
 use crate::error::Result;
+use crate::names;
 use crate::types::{IntentFilter, IntentUpdate, NewIntent, Page, ScoredIntent};
 
 /// Intent operations on one repository.
@@ -25,6 +26,10 @@ impl IntentClient {
         self.client.intent_svc()
     }
 
+    fn name(&self, id: &IntentId) -> String {
+        names::intent(&self.repo, id)
+    }
+
     /// Create an intent.
     pub async fn create(&self, intent: NewIntent) -> Result<Intent> {
         self.create_with_op(OperationId::new(), intent).await
@@ -33,12 +38,12 @@ impl IntentClient {
     /// [`IntentClient::create`] with a caller-chosen idempotency key.
     pub async fn create_with_op(&self, op: OperationId, intent: NewIntent) -> Result<Intent> {
         let request = pb::CreateIntentRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
+            request_id: names::request_id(&op),
+            parent: self.repo.clone(),
             title: intent.title,
             body: intent.body,
             kind: pb::IntentKind::from(intent.kind).into(),
-            parent: intent.parent.as_ref().map(id_to_proto),
+            parent_intent: intent.parent.map(|p| self.name(&p)).unwrap_or_default(),
             risk_override: intent.risk_override.map(|r| pb::RiskClass::from(r).into()),
         };
         let resp = crate::client::retry_idempotent(|| {
@@ -55,8 +60,7 @@ impl IntentClient {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
             let request = pb::GetIntentRequest {
-                repo: self.repo.clone(),
-                id: id_to_proto(&id),
+                name: self.name(&id),
             };
             async move { svc.get_intent(request).await }
         })
@@ -77,20 +81,16 @@ impl IntentClient {
         id: IntentId,
         update: IntentUpdate,
     ) -> Result<Intent> {
+        let (intent, paths) = update.to_proto(self.name(&id));
         let request = pb::UpdateIntentRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            id: id_to_proto(&id),
-            title: update.title,
-            body: update.body,
-            status: update.status.map(|s| pb::IntentStatus::from(s).into()),
-            parent: update.parent.value().map(id_to_proto),
-            clear_parent: update.parent.clears(),
-            risk_override: update
-                .risk_override
-                .value()
-                .map(|r| pb::RiskClass::from(*r).into()),
-            clear_risk_override: update.risk_override.clears(),
+            request_id: names::request_id(&op),
+            intent: intent.into(),
+            update_mask: rill_proto::FieldMask {
+                paths,
+                ..Default::default()
+            }
+            .into(),
+            etag: String::new(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
@@ -104,21 +104,10 @@ impl IntentClient {
     /// Intents matching a filter.
     pub async fn list(&self, filter: IntentFilter) -> Result<Page<Intent>> {
         let request = pb::ListIntentsRequest {
-            repo: self.repo.clone(),
-            status: filter
-                .status
-                .into_iter()
-                .map(|s| pb::IntentStatus::from(s).into())
-                .collect(),
-            kind: filter
-                .kind
-                .into_iter()
-                .map(|k| pb::IntentKind::from(k).into())
-                .collect(),
-            owner: filter.owner.as_ref().map(id_to_proto),
-            parent: filter.parent.as_ref().map(id_to_proto),
-            limit: filter.limit,
-            page_token: filter.page_token,
+            parent: self.repo.clone(),
+            page_size: filter.limit as i32,
+            page_token: filter.page_token.clone().unwrap_or_default(),
+            filter: filter.to_filter(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
@@ -131,7 +120,10 @@ impl IntentClient {
             .into_iter()
             .map(|i| Intent::try_from(i).map_err(Into::into))
             .collect::<Result<_>>()?;
-        Ok(Page::new(items, resp.next_page_token))
+        Ok(Page::new(
+            items,
+            Some(resp.next_page_token).filter(|t| !t.is_empty()),
+        ))
     }
 
     /// Link a change to an intent.
@@ -148,10 +140,9 @@ impl IntentClient {
         change_id: ChangeId,
     ) -> Result<Intent> {
         let request = pb::LinkChangeRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            intent: id_to_proto(&intent),
-            change_id: id_to_proto(&change_id),
+            request_id: names::request_id(&op),
+            name: self.name(&intent),
+            change: names::change(&self.repo, &change_id),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());
@@ -172,10 +163,10 @@ impl IntentClient {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.svc();
             let request = pb::FindSimilarIntentsRequest {
-                repo: self.repo.clone(),
+                parent: self.repo.clone(),
                 title: title.to_string(),
                 body: body.to_string(),
-                limit,
+                max_results: limit as i32,
             };
             async move { svc.find_similar_intents(request).await }
         })

@@ -2,10 +2,11 @@
 
 use connectrpc::client::{ClientConfig, HttpClient};
 use rill_proto::rill::v1::{
-    AccessServiceClient, AdminServiceClient, AuditServiceClient, ChecksServiceClient,
-    IdentityServiceClient, IntentServiceClient, LanderServiceClient, ProtectionServiceClient,
-    RepoServiceClient, ReviewServiceClient, SecretServiceClient, SessionServiceClient,
-    WorkspaceServiceClient,
+    AccessServiceClient, AdminServiceClient, AuditServiceClient, ChangeServiceClient,
+    ChecksServiceClient, ContentServiceClient, EventServiceClient, IdentityServiceClient,
+    IntentServiceClient, LandingServiceClient, OperationServiceClient, OrgServiceClient,
+    PolicyServiceClient, ProtectionServiceClient, RepoServiceClient, ReviewServiceClient,
+    SecretServiceClient, SessionServiceClient, TrunkServiceClient, WorkspaceServiceClient,
 };
 
 use super::server::TestServer;
@@ -85,20 +86,34 @@ authed!(
     AccessServiceClient,
     AdminServiceClient,
     AuditServiceClient,
+    ChangeServiceClient,
     ChecksServiceClient,
+    ContentServiceClient,
+    EventServiceClient,
     IdentityServiceClient,
     IntentServiceClient,
-    LanderServiceClient,
+    LandingServiceClient,
+    OperationServiceClient,
+    OrgServiceClient,
+    PolicyServiceClient,
     ProtectionServiceClient,
     RepoServiceClient,
     ReviewServiceClient,
     SecretServiceClient,
     SessionServiceClient,
+    TrunkServiceClient,
     WorkspaceServiceClient,
 );
 
 pub(crate) struct Clients {
     pub(crate) repo: RepoServiceClient<Svc>,
+    pub(crate) content: ContentServiceClient<Svc>,
+    pub(crate) changes: ChangeServiceClient<Svc>,
+    pub(crate) events: EventServiceClient<Svc>,
+    pub(crate) landing: LandingServiceClient<Svc>,
+    pub(crate) policy: PolicyServiceClient<Svc>,
+    pub(crate) orgs: OrgServiceClient<Svc>,
+    pub(crate) identity: IdentityServiceClient<Svc>,
     pub(crate) audit: AuditServiceClient<Svc>,
     pub(crate) protection: ProtectionServiceClient<Svc>,
     pub(crate) access: AccessServiceClient<Svc>,
@@ -117,6 +132,13 @@ pub(crate) async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
     let bearer = Bearer(token.map(str::to_owned));
     Clients {
         repo: RepoServiceClient::authed(channel.clone(), bearer.clone()),
+        content: ContentServiceClient::authed(channel.clone(), bearer.clone()),
+        changes: ChangeServiceClient::authed(channel.clone(), bearer.clone()),
+        events: EventServiceClient::authed(channel.clone(), bearer.clone()),
+        landing: LandingServiceClient::authed(channel.clone(), bearer.clone()),
+        policy: PolicyServiceClient::authed(channel.clone(), bearer.clone()),
+        orgs: OrgServiceClient::authed(channel.clone(), bearer.clone()),
+        identity: IdentityServiceClient::authed(channel.clone(), bearer.clone()),
         access: AccessServiceClient::authed(channel.clone(), bearer.clone()),
         audit: AuditServiceClient::authed(channel.clone(), bearer.clone()),
         protection: ProtectionServiceClient::authed(channel.clone(), bearer.clone()),

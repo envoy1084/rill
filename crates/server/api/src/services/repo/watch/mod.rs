@@ -5,10 +5,9 @@
 //! watches that report store state (trunk, the version log) use the event
 //! counter only as a wake-up and read what they send from the store.
 
-mod events;
 mod history;
 mod refs;
 mod stream;
 
-pub(crate) use stream::forward;
 pub use stream::EventStream;
+pub(crate) use stream::{forward, start_from};

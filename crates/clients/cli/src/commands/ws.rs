@@ -216,7 +216,8 @@ async fn ops(ctx: &mut Ctx<'_>, args: OpsArgs) -> Result<()> {
         .repo()?
         .workspaces()
         .operations(id, args.limit, None)
-        .await?;
+        .await?
+        .items;
     ctx.emit(
         j!({ "workspace": id.to_string(), "operations": ops.iter().map(json::operation).collect::<Vec<_>>() }),
         |out| {

@@ -93,8 +93,9 @@ async fn refresh_forever(
             .refresh_session(pb::RefreshSessionRequest { refresh_token })
             .await
         {
-            Ok(grant) => {
-                let next = current.renewed(grant.into_owned());
+            Ok(resp) => {
+                let grant = resp.into_owned().grant.into_option().unwrap_or_default();
+                let next = current.renewed(grant);
                 if let Some(store) = &store {
                     if let Err(e) = store.save(&next) {
                         tracing::warn!(error = %e, "saving refreshed credentials failed");

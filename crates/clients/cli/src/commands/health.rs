@@ -1,7 +1,6 @@
 //! `rill trunk health|incidents|freeze|thaw`: whether trunk is red, why,
 //! and stopping landings while it is fixed.
 
-use bytes::Bytes;
 use clap::{Args, Subcommand};
 use rill_proto::rill::v1 as pb;
 use rill_types::Timestamp;
@@ -50,17 +49,12 @@ pub struct FreezeArgs {
 
 /// Run a trunk subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: TrunkCmd) -> Result<()> {
-    let repo = ctx.repo_name()?;
-    let mut svc = ctx.client()?.lander_svc();
+    let trunk = ctx.repo()?.trunk();
     match cmd {
         TrunkCmd::Health => {
-            let reply = svc
-                .get_trunk_health(pb::GetTrunkHealthRequest { repo })
-                .await?
-                .into_owned();
-            let health = reply.health.into_option().unwrap_or_default();
+            let (health, open) = trunk.health().await?;
             ctx.emit(
-                j!({ "health": health_json(&health), "open": reply.open.iter().map(incident_json).collect::<Vec<_>>() }),
+                j!({ "health": health_json(&health), "open": open.iter().map(incident_json).collect::<Vec<_>>() }),
                 |out| {
                     let mut state = health.state.clone();
                     if health.frozen {
@@ -74,48 +68,29 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: TrunkCmd) -> Result<()> {
                         ("since", when(&Timestamp::from_millis(health.since))),
                         ("failing", health.failing_steps.join(", ")),
                     ])?;
-                    incidents_table(out, &reply.open)
+                    incidents_table(out, &open)
                 },
             )
         }
         TrunkCmd::Incidents(args) => {
-            let incidents = svc
-                .list_incidents(pb::ListIncidentsRequest {
-                    repo,
-                    limit: args.limit,
-                })
-                .await?
-                .into_owned()
-                .incidents;
+            let incidents = trunk.incidents(None, args.limit, None).await?.items;
             ctx.emit(
                 j!({ "incidents": incidents.iter().map(incident_json).collect::<Vec<_>>() }),
                 |out| incidents_table(out, &incidents),
             )
         }
-        TrunkCmd::Freeze(args) => freeze(ctx, &mut svc, repo, true, args.reason).await,
-        TrunkCmd::Thaw => freeze(ctx, &mut svc, repo, false, String::new()).await,
+        TrunkCmd::Freeze(args) => freeze(ctx, &trunk, true, args.reason).await,
+        TrunkCmd::Thaw => freeze(ctx, &trunk, false, String::new()).await,
     }
 }
 
 async fn freeze(
     ctx: &mut Ctx<'_>,
-    svc: &mut rill_sdk::client::LanderSvc,
-    repo: String,
+    trunk: &rill_sdk::TrunkClient,
     frozen: bool,
     reason: String,
 ) -> Result<()> {
-    let health = svc
-        .freeze_trunk(pb::FreezeTrunkRequest {
-            operation_id: Bytes::new(),
-            repo,
-            frozen,
-            reason,
-        })
-        .await?
-        .into_owned()
-        .health
-        .into_option()
-        .unwrap_or_default();
+    let health = trunk.set_frozen(frozen, &reason).await?;
     ctx.emit(j!({ "health": health_json(&health) }), |out| {
         out.line(match frozen {
             true => "trunk frozen: only emergency landings land".to_string(),
@@ -194,24 +169,18 @@ fn incident_json(i: &pb::Incident) -> Value {
 /// `rill revert --session …`: preview or queue reverts of every landing a
 /// selector matches.
 pub async fn revert_set(ctx: &mut Ctx<'_>, args: crate::commands::land::RevertArgs) -> Result<()> {
-    let repo = ctx.repo_name()?;
-    let seq = |s: &Option<String>| -> Result<Option<u64>> {
-        s.as_deref()
-            .map(|s| crate::commands::seq_arg(s).map(|q| q.get()))
-            .transpose()
+    let seq = |s: &Option<String>| -> Result<Option<rill_types::TrunkSeq>> {
+        s.as_deref().map(crate::commands::seq_arg).transpose()
     };
     let intent = args
         .intent
         .as_deref()
         .map(|i| {
             i.parse::<rill_types::IntentId>()
-                .map(|id| rill_proto::convert::id_to_proto(&id))
                 .map_err(|e| crate::error::CliError::usage(format!("--intent: {e}")))
         })
         .transpose()?;
-    let request = pb::RevertSetRequest {
-        operation_id: Bytes::new(),
-        repo,
+    let selector = rill_sdk::RevertSelector {
         session: args.session,
         model: args.model,
         sponsor: args.sponsor,
@@ -219,23 +188,25 @@ pub async fn revert_set(ctx: &mut Ctx<'_>, args: crate::commands::land::RevertAr
         intent,
         since: seq(&args.since)?,
         until: seq(&args.until)?,
-        apply: args.apply,
-        reason: args.message,
     };
-    let entries = ctx
-        .client()?
-        .lander_svc()
-        .revert_set(request)
-        .await?
-        .into_owned()
-        .entries;
+    let trunk = ctx.repo()?.trunk();
+    let entries = match args.apply {
+        true => match trunk.bulk_revert(&selector, &args.message).await?.result {
+            Some(pb::operation::Result::BulkRevert(done)) => done.entries,
+            Some(pb::operation::Result::Error(status)) => {
+                return Err(crate::error::CliError::usage(status.message))
+            }
+            None => Vec::new(),
+        },
+        false => trunk.preview_bulk_revert(&selector).await?,
+    };
     let apply = args.apply;
     ctx.emit(
         j!({ "applied": apply, "entries": entries.iter().map(|e| j!({
-            "seq": e.seq,
+            "seq": e.position,
             "summary": e.summary,
             "conflicts": e.conflicts,
-            "ticket": e.ticket,
+            "land_request": e.land_request,
         })).collect::<Vec<_>>() }),
         |out| {
             if entries.is_empty() {
@@ -244,9 +215,8 @@ pub async fn revert_set(ctx: &mut Ctx<'_>, args: crate::commands::land::RevertAr
             if apply {
                 for e in &entries {
                     out.line(format!(
-                        "revert of trunk@{} queued: ticket {}",
-                        e.seq,
-                        e.ticket.clone().unwrap_or_default()
+                        "revert of trunk@{} queued: {}",
+                        e.position, e.land_request
                     ))?;
                 }
                 return Ok(());
@@ -254,7 +224,7 @@ pub async fn revert_set(ctx: &mut Ctx<'_>, args: crate::commands::land::RevertAr
             let mut table = Table::new(&["SEQ", "SUMMARY", "CONFLICTS"]);
             for e in &entries {
                 table.row(vec![
-                    format!("trunk@{}", e.seq),
+                    format!("trunk@{}", e.position),
                     e.summary.clone(),
                     e.conflicts.join(", "),
                 ]);

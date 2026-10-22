@@ -1,7 +1,6 @@
 //! Inputs to the history-writing RPCs.
 
 use bytes::Bytes;
-use rill_proto::convert::id_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::{
     ChangeId, ChangeVersion, ChangeVersionHash, ContentRef, FileKind, IntentId, Provenance,
@@ -20,11 +19,11 @@ pub enum EditBase {
 }
 
 impl EditBase {
-    /// Wire encoding.
-    pub fn to_proto(&self) -> pb::EditBase {
+    /// Wire encoding, for a request to `repo` (a full repository name).
+    pub fn to_proto(&self, repo: &str) -> pb::EditBase {
         let base = match self {
-            EditBase::Root(r) => pb::edit_base::Base::Root(r.to_proto()),
-            EditBase::Change(id) => pb::edit_base::Base::ChangeId(id_to_proto(id)),
+            EditBase::Root(r) => pb::edit_base::Base::Revision(r.to_string()),
+            EditBase::Change(id) => pb::edit_base::Base::Change(crate::names::change(repo, id)),
         };
         pb::EditBase { base: Some(base) }
     }
@@ -169,11 +168,12 @@ pub struct VersionResult {
 impl VersionResult {
     /// Build from the hash and version fields shared by every write response.
     pub(crate) fn from_parts(
-        hash: &[u8],
+        info: Option<pb::ChangeInfo>,
         version: Option<pb::ChangeVersion>,
     ) -> crate::error::Result<Self> {
+        let info = rill_proto::convert::required("response.info", info)?;
         Ok(VersionResult {
-            hash: rill_proto::convert::hash_from_proto("response.hash", hash)?,
+            hash: rill_proto::convert::hash_from_proto("info.hash", &info.hash)?,
             version: rill_proto::convert::required("response.version", version)?.try_into()?,
         })
     }

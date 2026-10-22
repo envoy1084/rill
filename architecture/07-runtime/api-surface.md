@@ -42,73 +42,122 @@ router behind the tower `AuthLayer`. Handlers implement the generated
 traits; each takes the call into a `Call<T>` (the owned message and the
 request context) before its body runs.
 
+Every service follows Google's API design guide (AIP) in place, still as
+`rill.v1` ([ADR 017](../10-decisions/017-api-in-place-on-connect.md)):
+resource names, standard methods, pages, filters, etags and request ids,
+with one service per `.proto` file.
+
 | Service | Proto | Handler | Covers |
 | --- | --- | --- | --- |
-| `RepoService` | `repo.proto` | `services/repo/` | repositories, history, blame, grep, trees and blobs, diff, merge base, writes (`CreateChangeVersion`, `ApplyEdits`, `Rebase`, `Merge`, `Resolve`), refs and trunk, `CutRelease`, `Watch*` streams including `WatchEvents`, derived data |
-| `WorkspaceService` | `workspace.proto` | `services/workspace/mod.rs` | server-side workspaces, snapshots, operation log, `Undo`, `WorkspaceDiff` |
-| `ReviewService` | `review.proto` | `services/review/` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand` and `RequestLandStack` (`onto` trunk or a release), `GetLandStatus`, `WatchReview` |
-| `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
-| `LanderService` | `lander.proto` | `services/lander.rs`, `services/trunk_health.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect`, `GetTrunkHealth`, `ListIncidents`, `FreezeTrunk`, `RevertSet` |
-| `AdminService` | `admin.proto` | `services/admin/mod.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |
-| `AccessService` | `access.proto` | `services/access/` | `AddRelation`, `RemoveRelation`, `ListRelations`, `Check`, `Expand`, `LookupPaths` ([permissions](../05-policy/permissions.md#accessservice)) |
-| `IdentityService` | `identity.proto` | `services/identity/` | `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers (`Put`/`List`/`DeleteIdentityProvider`), `ListUsers`, `UpdateUser`, agents (`RegisterAgent`, `UpdateAgent`, `ListAgents`), workload issuers (`Put`/`List`/`DeleteWorkloadIssuer`), `KillSwitch`, SCIM credentials ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
+| `RepoService` | `repos.proto` | `services/repo/` | `GetRepo`, `ListRepos`, `CreateRepo`, `ResolveRevision`, refs (`GetRef`, `ListRefs`, `UpdateRef`, `DeleteRef`), `CreateRelease`, trunk positions (`GetTrunkPosition`, `ListTrunkPositions`), `WatchTrunk`, `WatchRefs`, `WatchVersions`, derived data |
+| `ContentService` | `content.proto` | `services/content/` | `ReadFile`, `BatchReadFiles`, `Stat`, `ListDirectory`, `GetTree`, `ReadBlob` (stream), `WriteBlob` (client stream), `BatchCheckObjects`, `Diff`, `Blame`, `ListHistory`, `ListPathHistory`, `Grep`, `FindMergeBase`, `IsAncestor` |
+| `ChangeService` | `changes.proto` | `services/changes/` | `GetVersion` (`BASIC` or `FULL` view), `BatchGetVersions`, `ListVersions`, `CreateVersion`, `ApplyEdits`, `RebaseVersion`, `MergeVersions`, `ResolveConflicts` |
+| `EventService` | `events.proto` | `services/events.rs` | `WatchEvents` |
+| `WorkspaceService` | `workspace.proto` | `services/workspace/` | `Create`/`Get`/`List`/`Update`/`DeleteWorkspace`, `SnapshotWorkspace`, `StartChange`, `SyncWorkspace`, `HandoffWorkspace`, `UndoOperation`, `ListWorkspaceOperations`, `DiffWorkspace` |
+| `ReviewService` | `review.proto` | `services/review/` | `GetReview`, `BatchGetReviews`, `ListReviews`, `SubmitChange`, `Vote`, `CreateThread`, `ReplyThread`, `ResolveThread`, `UpdateStack`, `EvaluateLanding`, `AbandonChange`, `WatchReview` |
+| `LandingService` | `landing.proto` | `services/landing/` | `RequestLand`, `RequestLandStack` (`onto` trunk or a release), `GetLandRequest`, `ListLandRequests` (the queue) |
+| `TrunkService` | `trunk.proto` | `services/trunk/` | `GetTrunkStatus`, `ListLandings`, `GetVerification`, `ReportVerification`, `RevertLanding`, `PreviewBulkRevert`, `BulkRevert` (an operation), `Bisect`, `GetTrunkHealth`, `ListIncidents`, `FreezeTrunk`, `UnfreezeTrunk` |
+| `OperationService` | `operations.proto` | `services/operations/` | `GetOperation`, `ListOperations`, `WaitOperation` |
+| `IntentService` | `intent.proto` | `services/intent/` | `CreateIntent`, `GetIntent`, `UpdateIntent` (mask, etag), `ListIntents`, `LinkChange`, `FindSimilarIntents` |
+| `PolicyService` | `policy.proto` | `services/policy/` | `GetPolicy`, `UpdatePolicy` (etag) |
+| `OrgService` | `orgs.proto` | `services/orgs/` | `CreateOrg`, `GetOrg`, `ListOrgs` |
+| `AdminService` | `admin.proto` | `services/admin/` | `GetHealth`, `ImportTrunkPosition` (importers) |
+| `AccessService` | `access.proto` | `services/access/` | `CreateRelation`, `DeleteRelation`, `ListRelations`, `CheckAccess`, `ExpandAccess`, `LookupPaths` ([permissions](../05-policy/permissions.md#accessservice)) |
+| `IdentityService` | `identity.proto` | `services/identity/` | `GetCaller`, `IssueToken`, `RevokeToken`, `RevokeSession`, `RotateTokenKeys`, `ListTokenKeys`, identity providers, users, agents, workload issuers, `KillSwitch`, SCIM credentials ([identity and auth](../05-policy/identity-and-auth.md#the-identity-view)) |
 | `AuditService` | `audit.proto` | `services/audit.rs` | `ListAuditEntries`, `ListAuditRoots`, `SealAudit`, `ListAuditKeys`, `WatchAudit` ([audit log](../05-policy/audit.md)) |
-| `ProtectionService` | `protection.proto` | `services/protection.rs` | `RequestRedaction`, `ApproveRedaction`, `ListRedactions`, `ClearQuarantine`, `RotateDataKeys` ([data protection](../05-policy/data-protection.md)) |
-| `ChecksService` | `checks.proto` | `services/checks/` | `ListRuns`, `GetRun`, `WatchRun` (stream), `ReadLog`, `ReadArtifact`, `ListNonhermetic`, `GetTestHistory`, `ListFlakyTests` (repository read access) ([checks](../06-services/checks.md)) |
-| `SecretService` | `secrets.proto` | `services/secrets.rs` | `PutSecret`, `DeleteSecret`, `ListSecrets` (org administrators; values are write-only) ([exec](../06-services/exec.md#secrets)) |
+| `ProtectionService` | `protection.proto` | `services/protection/` | `CreateRedaction`, `ApproveRedaction`, `ListRedactions`, `ReleaseVersion`, `RotateDataKeys` ([data protection](../05-policy/data-protection.md)) |
+| `ChecksService` | `checks.proto` | `services/checks/` | `ListRuns`, `GetRun`, `WatchRun`, `ReadLog`, `ReadArtifact`, `ListNonhermeticSteps`, `GetTestHistory`, `ListFlakyTests`, `ListQuarantines`, `CreateQuarantine`, `DeleteQuarantine` ([checks](../06-services/checks.md)) |
+| `SecretService` | `secrets.proto` | `services/secrets.rs` | `UpdateSecret`, `DeleteSecret`, `ListSecrets` (org administrators; values are write-only) ([exec](../06-services/exec.md#secrets)) |
+| `SessionService` | `session.proto` | `services/session.rs` | `ListSignInProviders`, `ExchangeToken`, `RefreshSession`; no token needed ([sign-in](../05-policy/identity-and-auth.md#sign-in)) |
 | REAPI `Execution`, `ActionCache`, `ContentAddressableStorage`, `Capabilities`; `google.bytestream.ByteStream`; Buildbarn `OperationQueue` | `rill-reapi-proto` (vendored) | `services/exec/` | remote execution and the worker protocol ([remote execution](../06-services/remote-execution.md)) |
-| `SessionService` | `identity.proto` | `services/session.rs` | `ListSignInProviders`, `ExchangeToken`, `RefreshSession`; no auth layer ([sign-in](../05-policy/identity-and-auth.md#sign-in)) |
 
-`types.proto` holds the shared object model and `events.proto` the event
-log's messages. The streaming RPCs are `GetBlob` (server stream of
-`BlobChunk`), `PutBlob` (client stream: one `PutBlobHeader`, then `data`),
-`WatchRefs`, `WatchTrunk`, `WatchLog` (a stream of `LogEntry { cursor,
-info }`, resumable by cursor), `WatchReview`, and `WatchEvents`: every
-committed state change as `EventEnvelope { cursor, Event }`, where `Event`
-carries the actor, the time and a `kind` oneof with one message per event
-kind. A `WatchEventsRequest` names kinds, a change id and a ref prefix to
-filter by, and `after` (absent: now; empty: from the oldest retained event;
-otherwise a cursor). [Events and workers](events-and-workers.md) describes how the
-watches behave.
+`types.proto` holds the shared object model, `events.proto` the event log's
+messages and `errors.proto` the error reasons. The streaming RPCs are
+`ReadBlob` (server stream), `WriteBlob` (client stream: one
+`WriteBlobHeader`, then `data`), `WatchRefs`, `WatchTrunk`,
+`WatchVersions` (resumable by cursor), `WatchReview`, `WatchRun`,
+`WatchAudit` and `WatchEvents`: every committed state change as an `Event`
+with its cursor, filtered by kinds, a change and a ref prefix, from `after`
+(absent: now; empty: the oldest retained event; otherwise a cursor).
+[Events and workers](events-and-workers.md) describes how the watches
+behave.
 
 `LandStatus` on the wire is `QUEUED | REBASING | LANDED | FAILED | CANCELLED`.
 `land_status_proto` folds `Verifying` and `Landing` into `REBASING`,
-`Conflict` into `FAILED`, and `Returned` into `CANCELLED`. Admin requests
-have no `repo` field. The repository is named inside the token scope or the
-policy name (`<repo>/submit`, `<repo>/risk`); access tuples carry `repo` and
-`path` fields.
+`Conflict` into `FAILED`, and `Returned` into `CANCELLED`.
 
 ## Message conventions
 
-These conventions are stated at the top of `types.proto` and enforced by
-`convert`:
+`convert` enforces these, and `services/names.rs` and `listing/` implement
+the rest:
 
-* Object hashes are 32 raw bytes (BLAKE3). Record ids (`ChangeId`,
-  `RepoId`, `OperationId`, ...) are 16 raw bytes. For an optional id, empty
-  bytes mean absent.
-* Paths are normalized `/`-separated strings, and `""` is the root.
-  Timestamps are `int64` milliseconds since the Unix epoch, UTC.
+* **Resource names.** Requests address resources by `name` (or `parent`
+  for a collection): `orgs/{org}`, `orgs/{org}/repos/{repo}` (the name or
+  `rp_` id), and under a repository `refs/{ref…}`, `changes/{ch_…}`,
+  `changes/{ch_…}/review`, `…/review/threads/{t}`, `versions/{hash}`,
+  `workspaces/{ws_…}` and its `operations/{op_…|head}`,
+  `landRequests/{ticket}`, `trunk/positions/{n|head}`,
+  `incidents/{culprit}`, `runs/{id}`, `quarantines/{target}`,
+  `intents/{in_…}`, `policies/{submit|risk}` and `operations/{op}`; under
+  an org `agents/`, `users/`, `identityProviders/`, `workloadIssuers/`,
+  `secrets/`, `scimCredentials/` and `redactions/`. Every returned resource
+  carries its `name`. A name of the wrong shape, or from another repository
+  than the request's, is `INVALID_ARGUMENT` (`INVALID_NAME`).
+  `rill_proto::names` holds the patterns.
+* **Revisions.** Content requests take `repo` and `revision`: `trunk`,
+  `trunk@N`, a 64-hex version hash, `tree:<hex>`, `changes/ch_…` (its
+  current version), `workspaces/ws_…` (its snapshot) or a ref name.
+  `ResolveRevision` answers what one names.
+* **Request ids.** Every mutation carries `string request_id`, a UUID; see
+  [retries](#retries). A value that is not a UUID is `INVALID_ARGUMENT`.
+* **Pages.** Every list takes `page_size` (default 100, at most 1,000) and
+  `page_token`, and returns `next_page_token`, empty after the last page.
+  A token encodes where the next page starts and a digest of the parent,
+  filter and order it was issued for; used with other parameters it is
+  `INVALID_ARGUMENT` (`INVALID_PAGE_TOKEN`).
+* **Filters.** Lists over many items take `filter`, a subset of AIP-160:
+  `=`, `!=`, `<`, `<=`, `>`, `>=` and `:`, `AND`, `OR`, `NOT`,
+  parentheses, quoted strings, numbers and booleans. Each list names the
+  fields it filters on; any other is `INVALID_FILTER`.
+* **Updates and etags.** `Update*` takes the resource with its `name`, an
+  `update_mask` where the resource has several mutable fields, and the
+  `etag` read; a stale etag is `ABORTED` (`ETAG_MISMATCH`). A ref's etag is
+  its target hash, a workspace's its head operation, anything else a digest
+  of the stored record. `Update*` on a resource that may be created takes
+  `allow_missing`. Deleting something absent is `NOT_FOUND`.
+* **Long-running work.** `BulkRevert` returns an `Operation{name, kind,
+  done, result: error | response}` kept per repository;
+  `OperationService` reads, lists and waits on it.
+* Object hashes are 32 raw bytes (BLAKE3) and record ids 16 raw bytes
+  inside messages. Paths are normalized `/`-separated strings, `""` the
+  root. Timestamps are `int64` milliseconds since the Unix epoch, UTC.
 * Every enum has `*_UNSPECIFIED = 0`. Decoding rejects zero and unknown
   values.
 * `Merge<T>` terms travel as `MergeTerms.terms` in interleaved
   `[add0, remove0, ..., addN]` order. A list of even length is invalid (see
   [merge algebra](../02-data/merge-algebra.md)).
-* `RootSpec` is a `oneof` of `ref`, `version_hash`, `tree_hash` and
-  `trunk_seq`. Absent means the trunk head.
-* Every repo-scoped request carries `string repo`: `org/name`, a bare name
-  in the default org, `rp_<hex>` or bare hex. `Repo.org` names the org.
-  `CreateOrg` takes 1-63 lowercase letters, digits and dashes; only humans
-  may create orgs (anyone in dev mode). Creating `org/name` in a missing
+* `CreateOrg` takes 1-63 lowercase letters, digits and dashes; only humans
+  may create orgs (anyone in dev mode). Creating a repository in a missing
   org is `NOT_FOUND`.
-* Write requests carry `bytes operation_id`, and list requests carry
-  `uint32 limit` (0 means the server default, clamped by `common::limit`).
+
+### Errors
+
+Every error carries `google.rpc.ErrorInfo{reason, domain: "rill.dev"}`,
+the reason being an `ErrorReason` from `errors.proto` without its prefix
+(`NOT_FOUND`, `ETAG_MISMATCH`, `POLICY_DENIED`, …). Malformed input adds
+`BadRequest` naming the field, a policy denial `PreconditionFailure` listing
+what is missing, and a rate or queue limit `RetryInfo` with the delay (and
+`retry-after`). Each detail also carries its JSON as `debug` for readers
+using `curl`. `rill_runtime::error` maps errors to codes and reasons; the
+SDK's `Error::Status` exposes the reason, the missing requirements and the
+retry delay.
 
 ## Retries
 
-Every mutating RPC (35 of them; `PutBlob` is content-addressed and needs
-none) runs through `services/idem.rs::once`. A request with a non-empty
-`operation_id` claims `(principal, operation_id)` in the `idem` table
-before it runs:
+Every mutating RPC except `UpdateSecret` (whose request holds the value)
+and `WriteBlob` (content-addressed) runs through `services/idem.rs::once`.
+A request with a non-empty `request_id` claims `(principal, request_id)` in
+the `idem` table before it runs:
 
 | Found | Result |
 | --- | --- |
@@ -128,7 +177,7 @@ expired claim, finds that version and returns it instead of storing a
 second one. A failed request whose claim recorded such an effect keeps the
 claim (expired at once) for that retry.
 
-The SDK retries every call that carries an operation id while the answer
+The SDK retries every call that carries a request id while the answer
 is `UNAVAILABLE` (a dead or draining server, a cut connection, a claim a
 dead server left), with backoff from 100 ms to 2 s for up to 20 s. With
 three servers behind a load balancer, a server killed between committing a
@@ -197,15 +246,15 @@ HTTP limit answers 413.
 | Paths changed by one version | 100,000 | `limits.rs` `MAX_FILES_PER_CHANGE`; also edits per `ApplyEdits`, checked before any work |
 | Encoded version | 8 MiB | `MAX_CHANGE_BYTES` |
 | Version message | 64 KiB | `MAX_MESSAGE_BYTES` |
-| File | 5 GiB | `MAX_FILE_BYTES`; `PutBlob` streams it |
-| Inline content | 256 bytes | `INLINE_THRESHOLD`: a raw version over it is refused; `ApplyEdits` and `Resolve` store larger inline content as a blob |
+| File | 5 GiB | `MAX_FILE_BYTES`; `WriteBlob` streams it |
+| Inline content | 256 bytes | `INLINE_THRESHOLD`: a raw version over it is refused; `ApplyEdits` and `ResolveConflicts` store larger inline content as a blob |
 | Path, component | 4096, 255 bytes | `MAX_PATH_BYTES`, `MAX_COMPONENT_BYTES` |
 | Conflict terms, extra fields | 63, 32 (64-byte keys, 4 KiB values) | `MAX_MERGE_TERMS`, `MAX_EXTRA_*` |
 | Object `PUT` body | 256 MiB | `objects/mod.rs` `MAX_PUT_BYTES` |
 | Object batch | 10,000 | `MAX_BATCH` |
 | SCIM body | 4 MiB | `scim/mod.rs` `MAX_SCIM_BODY` |
 | Other HTTP bodies | 2 MiB | axum's default |
-| Pages and results | log 10,000, grep 5,000, lander lists and workspace operations 1,000, diff 4 MiB and 1,000 files | each handler's `limit` |
+| Pages and results | 1,000 items a page; grep 5,000 results; diff 4 MiB and 1,000 files | `listing/page.rs` `MAX_PAGE_SIZE`, each handler |
 
 ### Rate limits
 
@@ -222,9 +271,10 @@ size refilled over a minute ([identity](../05-policy/identity-and-auth.md)).
 
 * `SessionService` (sign-in) is not rate limited; nothing limits by
   client address.
-* `next_page_token` exists on list responses, but the server always returns
-  `None`. `limit` truncates and there is no continuation.
-* A request without an `operation_id` is not deduplicated. Only the
+* Most lists page an ordering they read whole per request (offset tokens);
+  only the audit log and trunk positions page by key.
+* `BulkRevert` finishes before it answers, so its operation is always done.
+* A request without a `request_id` is not deduplicated. Only the
   commit path records its effect in the claim; other handlers that fail
   after writing can be redone by a retry.
 * `MergeBaseResponse.bases` is repeated, but the server returns at most one
@@ -237,7 +287,8 @@ size refilled over a minute ([identity](../05-policy/identity-and-auth.md)).
 
 ## Code
 
-* [proto/rill/v1/types.proto](../../crates/foundation/proto/proto/rill/v1/types.proto), [repo.proto](../../crates/foundation/proto/proto/rill/v1/repo.proto), [workspace.proto](../../crates/foundation/proto/proto/rill/v1/workspace.proto), [review.proto](../../crates/foundation/proto/proto/rill/v1/review.proto), [intent.proto](../../crates/foundation/proto/proto/rill/v1/intent.proto), [lander.proto](../../crates/foundation/proto/proto/rill/v1/lander.proto), [admin.proto](../../crates/foundation/proto/proto/rill/v1/admin.proto)
+* [proto/rill/v1/](../../crates/foundation/proto/proto/rill/v1/): [types.proto](../../crates/foundation/proto/proto/rill/v1/types.proto), [errors.proto](../../crates/foundation/proto/proto/rill/v1/errors.proto), [repos.proto](../../crates/foundation/proto/proto/rill/v1/repos.proto), [content.proto](../../crates/foundation/proto/proto/rill/v1/content.proto), [changes.proto](../../crates/foundation/proto/proto/rill/v1/changes.proto), [review.proto](../../crates/foundation/proto/proto/rill/v1/review.proto), [landing.proto](../../crates/foundation/proto/proto/rill/v1/landing.proto), [trunk.proto](../../crates/foundation/proto/proto/rill/v1/trunk.proto), [operations.proto](../../crates/foundation/proto/proto/rill/v1/operations.proto)
+* [src/names.rs](../../crates/foundation/proto/src/names.rs), [rill-api/src/services/names.rs](../../crates/server/api/src/services/names.rs), [services/revision.rs](../../crates/server/api/src/services/revision.rs), [listing/](../../crates/server/api/src/listing/mod.rs)
 * [build.rs](../../crates/foundation/proto/build.rs), [src/lib.rs](../../crates/foundation/proto/src/lib.rs), [src/error.rs](../../crates/foundation/proto/src/error.rs)
 * [convert/mod.rs](../../crates/foundation/proto/src/convert/mod.rs), [convert/primitives.rs](../../crates/foundation/proto/src/convert/primitives.rs), [convert/roundtrip_tests/](../../crates/foundation/proto/src/convert/roundtrip_tests/mod.rs)
 * [rill-api/src/serve.rs](../../crates/server/api/src/serve.rs), [services/mod.rs](../../crates/server/api/src/services/mod.rs)

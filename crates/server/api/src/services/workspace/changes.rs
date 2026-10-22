@@ -2,27 +2,28 @@
 //! diffing the working copy.
 
 use rill_core::{diff_trees, rebase};
-use rill_proto::convert::{hash_to_proto, id_to_proto, opt_id_from_proto};
 use rill_proto::rill::v1 as pb;
 use rill_store::ObjectStoreExt;
 use rill_types::{ChangeId, Encodable, OperationKind, Timestamp};
 
-use super::oplog::{base_of, base_root, commit_with_operation, operation, response_pair};
+use super::oplog::{
+    base_of, base_root, commit_with_operation, operation, operation_proto, response_pair,
+};
 use super::WorkspaceSvc;
-use crate::services::common::{self, open, operation_id, provenance, resolve_version};
+use crate::services::changes::version_from_diff;
+use crate::services::common::{self, open_repo, provenance};
 use crate::services::diff::{file_diffs, DiffOptions};
-use crate::services::repo::version_from_diff;
-use crate::services::Call;
+use crate::services::{names, Call};
 use rill_runtime::error::{Error, Result};
 
 impl WorkspaceSvc {
-    pub(super) async fn snapshot_impl(
+    pub(super) async fn snapshot_workspace_impl(
         &self,
-        request: Call<pb::SnapshotRequest>,
-    ) -> Result<pb::SnapshotResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::SnapshotWorkspaceRequest>,
+    ) -> Result<pb::SnapshotWorkspaceResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().name).await?;
         let req = request.into_inner();
-        let before = self.load_mut(&opened, &req.workspace).await?;
+        let before = self.load_mut(&opened, &req.name).await?;
         let mut ws = before.clone();
         let tree = common::hash("tree_hash", &req.tree_hash)?;
         opened.repo.trees.get_tree(&tree).await.map_err(|_| {
@@ -34,22 +35,22 @@ impl WorkspaceSvc {
                 &opened,
                 Some(&before),
                 &mut ws,
-                operation_id(&req.operation_id)?,
+                names::request_id(&req.request_id)?,
                 OperationKind::Snapshot { tree },
             )
             .await?;
-        Ok(pb::SnapshotResponse {
-            operation: pb::Operation::from(op).into(),
+        Ok(pb::SnapshotWorkspaceResponse {
+            operation: operation_proto(&opened.repo, &op).into(),
         })
     }
 
-    pub(super) async fn new_change_impl(
+    pub(super) async fn start_change_impl(
         &self,
-        request: Call<pb::NewChangeRequest>,
-    ) -> Result<pb::NewChangeResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::StartChangeRequest>,
+    ) -> Result<pb::StartChangeResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().name).await?;
         let req = request.into_inner();
-        let before = self.load_mut(&opened, &req.workspace).await?;
+        let before = self.load_mut(&opened, &req.name).await?;
         let mut ws = before.clone();
         let snapshot = ws.snapshot.ok_or_else(|| {
             Error::precondition("workspace has no snapshot to turn into a change")
@@ -79,7 +80,7 @@ impl WorkspaceSvc {
             opened.principal().clone(),
             req.message,
             provenance(req.provenance.into_option())?,
-            opt_id_from_proto("intent", req.intent.as_ref())?,
+            names::intent(&req.intent)?,
         );
         let change = cv.change_id;
         let base = ws.base;
@@ -89,28 +90,29 @@ impl WorkspaceSvc {
             &opened,
             Some(&before),
             &mut ws,
-            operation_id(&req.operation_id)?,
+            names::request_id(&req.request_id)?,
             OperationKind::NewChange { change, base },
         );
         let (hash, cv) = commit_with_operation(&opened, cv, &before, &op).await?;
-        Ok(pb::NewChangeResponse {
-            change_id: id_to_proto(&change),
-            version_hash: hash_to_proto(&hash),
+        Ok(pb::StartChangeResponse {
+            change: names::change(&opened.repo, &change),
+            info: common::change_info(&opened.repo, &hash).await?.into(),
             version: pb::ChangeVersion::from(cv).into(),
-            operation: pb::Operation::from(op).into(),
+            operation: operation_proto(&opened.repo, &op).into(),
         })
     }
 
-    pub(super) async fn update_base_impl(
+    pub(super) async fn sync_workspace_impl(
         &self,
-        request: Call<pb::UpdateBaseRequest>,
-    ) -> Result<pb::UpdateBaseResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::SyncWorkspaceRequest>,
+    ) -> Result<pb::SyncWorkspaceResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().name).await?;
         let req = request.into_inner();
-        let before = self.load_mut(&opened, &req.workspace).await?;
+        let before = self.load_mut(&opened, &req.name).await?;
         let mut ws = before.clone();
-        let new_base = resolve_version(&opened.repo, req.new_base.as_option())
+        let new_base = crate::services::revision::resolve(&opened.repo, &req.base)
             .await?
+            .version
             .ok_or_else(|| Error::precondition("the repository has no trunk head yet"))?;
         let from = ws.base;
         let current = opened
@@ -121,9 +123,9 @@ impl WorkspaceSvc {
             .last()
             .copied();
         ws.base = new_base;
-        let op_id = operation_id(&req.operation_id)?;
+        let op_id = names::request_id(&req.request_id)?;
         let kind = OperationKind::Rebase { from, to: new_base };
-        let (op, version, version_hash) = match current {
+        let (op, version, info) = match current {
             Some(current) if new_base != from => {
                 let rebased =
                     rebase(&opened.repo.derive, &current, &new_base, Timestamp::now()).await?;
@@ -133,11 +135,8 @@ impl WorkspaceSvc {
                 ws.snapshot = Some(common::root_of(&opened.repo, &hash).await?);
                 let op = operation(&opened, Some(&before), &mut ws, op_id, kind);
                 let (hash, cv) = commit_with_operation(&opened, rebased, &before, &op).await?;
-                (
-                    op,
-                    Some(pb::ChangeVersion::from(cv)),
-                    Some(hash_to_proto(&hash)),
-                )
+                let info = common::change_info(&opened.repo, &hash).await?;
+                (op, Some(pb::ChangeVersion::from(cv)), Some(info))
             }
             _ => (
                 self.record(&opened, Some(&before), &mut ws, op_id, kind)
@@ -146,26 +145,26 @@ impl WorkspaceSvc {
                 None,
             ),
         };
-        let (workspace, operation) = response_pair(&ws, &op);
-        Ok(pb::UpdateBaseResponse {
+        let (workspace, operation) = response_pair(&opened.repo, &ws, &op);
+        Ok(pb::SyncWorkspaceResponse {
             workspace: workspace.into(),
             operation: operation.into(),
+            info: info.into(),
             version: version.into(),
-            version_hash,
         })
     }
 
-    pub(super) async fn workspace_diff_impl(
+    pub(super) async fn diff_workspace_impl(
         &self,
-        request: Call<pb::WorkspaceDiffRequest>,
-    ) -> Result<pb::WorkspaceDiffResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::DiffWorkspaceRequest>,
+    ) -> Result<pb::DiffWorkspaceResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().name).await?;
         let req = request.get_ref();
-        let ws = self.load(&opened, &req.workspace).await?;
+        let ws = self.load(&opened, &req.name).await?;
         let filter = opened.permit().read_filter().await?;
         let options = DiffOptions::new(&req.paths, req.format, req.context_lines, 0, filter)?;
         let base_root = base_root(&opened, &ws).await?;
         let (files, _) = file_diffs(&opened.repo, base_root, ws.snapshot, None, &options).await?;
-        Ok(pb::WorkspaceDiffResponse { files })
+        Ok(pb::DiffWorkspaceResponse { files })
     }
 }

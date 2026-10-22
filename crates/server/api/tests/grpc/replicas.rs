@@ -1,6 +1,7 @@
 //! Several servers over one store: any of them serves any request.
 
 use super::*;
+use crate::common::names;
 
 const DENY_ALL: &str = r#"forbid(principal, action == Rill::Action::"land", resource);"#;
 
@@ -25,25 +26,20 @@ async fn servers_sharing_a_store_serve_any_request() {
     let repo = "shared";
     ca.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            description: None,
-            windows_safe: false,
+            parent: names::org("default"),
+            repo_id: repo.into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let edit = |path: &str, body: &[u8]| pb::ApplyEditsRequest {
-        operation_id: Bytes::new(),
-        repo: repo.into(),
-        base: None.into(),
+        parent: names::repo(repo),
         edits: vec![set_edit(path, body)],
         message: path.into(),
-        intent: None,
-        provenance: None.into(),
-        change_id: None,
+        ..Default::default()
     };
     let first = ca
-        .repo
+        .changes
         .apply_edits(edit("a.txt", b"needle in a\n"))
         .await
         .unwrap()
@@ -57,10 +53,10 @@ async fn servers_sharing_a_store_serve_any_request() {
     // A search on either server finds what the search writer indexed.
     for c in [&mut ca, &mut cb] {
         let hits = c
-            .repo
+            .content
             .grep(pb::GrepRequest {
-                repo: repo.into(),
-                root: trunk().into(),
+                repo: names::repo(repo),
+                revision: trunk(),
                 pattern: "needle".into(),
                 case_insensitive: false,
                 path_globs: vec![],
@@ -77,25 +73,28 @@ async fn servers_sharing_a_store_serve_any_request() {
 
     // A policy set on one server binds the other.
     let second = ca
-        .repo
+        .changes
         .apply_edits(edit("b.txt", b"b\n"))
         .await
         .unwrap()
         .into_owned();
     let change = second.version.unwrap().change_id;
     cb.review
-        .submit_for_review(pb::SubmitForReviewRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            change_id: change.clone(),
+        .submit_change(pb::SubmitChangeRequest {
+            request_id: String::new(),
+            change: names::change(repo, &change),
         })
         .await
         .unwrap();
-    ca.admin
-        .set_policy(pb::SetPolicyRequest {
-            operation_id: Bytes::new(),
-            name: format!("{repo}/submit"),
-            text: DENY_ALL.into(),
+    ca.policy
+        .update_policy(pb::UpdatePolicyRequest {
+            policy: pb::Policy {
+                name: format!("{}/policies/submit", names::repo(repo)),
+                text: DENY_ALL.into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -105,9 +104,8 @@ async fn servers_sharing_a_store_serve_any_request() {
         let change = change.clone();
         async move {
             let decision = review
-                .evaluate_submit(pb::EvaluateSubmitRequest {
-                    repo: repo.into(),
-                    change_id: change,
+                .evaluate_landing(pb::EvaluateLandingRequest {
+                    change: names::change(repo, &change),
                 })
                 .await
                 .unwrap()

@@ -99,8 +99,9 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
                 None => None,
             };
             let saved = svc
-                .put_identity_provider(pb::PutIdentityProviderRequest {
-                    operation_id: Default::default(),
+                .update_identity_provider(pb::UpdateIdentityProviderRequest {
+                    request_id: String::new(),
+                    allow_missing: true,
                     provider: (pb::IdentityProviderSpec {
                         org: a.org.org,
                         name: a.name,
@@ -128,7 +129,11 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
         }
         IdpCmd::List(o) => {
             let providers = svc
-                .list_identity_providers(pb::ListIdentityProvidersRequest { org: o.org })
+                .list_identity_providers(pb::ListIdentityProvidersRequest {
+                    parent: rill_sdk::names::org(&o.org),
+                    page_size: 1000,
+                    page_token: String::new(),
+                })
                 .await?
                 .into_owned()
                 .providers;
@@ -149,21 +154,17 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
             )
         }
         IdpCmd::Remove(a) => {
-            let deleted = svc
-                .delete_identity_provider(pb::DeleteIdentityProviderRequest {
-                    operation_id: Default::default(),
-                    org: a.org.org,
-                    name: a.name.clone(),
-                })
-                .await?
-                .into_owned()
-                .deleted;
-            ctx.emit(json!({ "deleted": deleted }), |out| {
-                out.line(if deleted {
-                    format!("removed {}", a.name)
-                } else {
-                    format!("no provider {}", a.name)
-                })
+            svc.delete_identity_provider(pb::DeleteIdentityProviderRequest {
+                request_id: String::new(),
+                name: format!(
+                    "{}/identityProviders/{}",
+                    rill_sdk::names::org(&a.org.org),
+                    a.name
+                ),
+            })
+            .await?;
+            ctx.emit(json!({ "deleted": true }), |out| {
+                out.line(format!("removed {}", a.name))
             })
         }
     }

@@ -18,11 +18,13 @@ impl RepoClient {
         let stream = self
             .svc()
             .watch_trunk(pb::WatchTrunkRequest {
-                repo: self.repo.clone(),
-                after_seq: after_seq.map(TrunkSeq::get),
+                parent: self.resource.clone(),
+                after_position: after_seq.map(TrunkSeq::get),
             })
             .await?;
-        Ok(convert_stream(stream))
+        Ok(map_stream(stream, |r: pb::WatchTrunkResponse| {
+            rill_proto::convert::required("landing", r.landing)?.try_into()
+        }))
     }
 
     /// Ref moves, optionally restricted to a name prefix.
@@ -30,8 +32,8 @@ impl RepoClient {
         let stream = self
             .svc()
             .watch_refs(pb::WatchRefsRequest {
-                repo: self.repo.clone(),
-                prefix: prefix.map(str::to_string),
+                parent: self.resource.clone(),
+                prefix: prefix.unwrap_or_default().to_string(),
             })
             .await?;
         Ok(convert_stream(stream))
@@ -41,8 +43,8 @@ impl RepoClient {
     pub async fn watch_log(&self, after: WatchStart) -> Result<EventStream<LogEntry>> {
         let stream = self
             .svc()
-            .watch_log(pb::WatchLogRequest {
-                repo: self.repo.clone(),
+            .watch_versions(pb::WatchVersionsRequest {
+                parent: self.resource.clone(),
                 after: after.to_proto(),
             })
             .await?;
@@ -56,9 +58,9 @@ impl RepoClient {
         query: EventQuery,
     ) -> Result<EventStream<LoggedEvent>> {
         let stream = self
-            .svc()
+            .events()
             .watch_events(pb::WatchEventsRequest {
-                repo: self.repo.clone(),
+                parent: self.resource.clone(),
                 after: after.to_proto(),
                 kinds: query.kinds,
                 change_id: query.change.map(|c| id_to_proto(&c)),

@@ -1,14 +1,14 @@
 //! Blob transfer: streamed reads, chunked uploads and existence checks.
 
 use bytes::{Bytes, BytesMut};
-use rill_proto::convert::{hash_to_proto, id_to_proto, required};
+use rill_proto::convert::{hash_to_proto, required};
 use rill_proto::rill::v1 as pb;
 use rill_types::{ContentRef, FileKind, ObjectHash, ObjectKind, OperationId, INLINE_THRESHOLD};
 
 use super::RepoClient;
 use crate::error::Result;
 
-/// Size of each data message in a `PutBlob` stream.
+/// Size of each data message in a `WriteBlob` stream.
 pub const PUT_BLOB_CHUNK_SIZE: usize = 256 * 1024;
 
 impl RepoClient {
@@ -39,20 +39,20 @@ impl RepoClient {
             .map(|h| self.grants().for_hash(&h))
             .unwrap_or_default();
         let mut stream = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::GetBlobRequest {
-                repo: self.repo.clone(),
+            let svc = self.content();
+            let request = pb::ReadBlobRequest {
+                repo: self.resource.clone(),
                 content: pb::ContentRef::from(content).into(),
                 offset,
                 length,
                 grant: grant.clone(),
             };
-            async move { svc.get_blob(request).await }
+            async move { svc.read_blob(request).await }
         })
         .await?;
         let capacity = length.unwrap_or_else(|| content.size()) as usize;
         let mut out = BytesMut::with_capacity(capacity);
-        while let Some(chunk) = stream.message::<pb::BlobChunk>().await? {
+        while let Some(chunk) = stream.message::<pb::ReadBlobResponse>().await? {
             out.extend_from_slice(&chunk.to_owned_message().data);
         }
         Ok(out.freeze())
@@ -66,10 +66,10 @@ impl RepoClient {
 
     /// [`RepoClient::put_blob`] with a caller-chosen idempotency key.
     pub async fn put_blob_with_op(&self, op: OperationId, bytes: Bytes) -> Result<ContentRef> {
-        let header = pb::PutBlobRequest {
-            msg: Some(pb::put_blob_request::Msg::Header(pb::PutBlobHeader {
-                operation_id: id_to_proto(&op),
-                repo: self.repo.clone(),
+        let header = pb::WriteBlobRequest {
+            msg: Some(pb::write_blob_request::Msg::Header(pb::WriteBlobHeader {
+                request_id: crate::names::request_id(&op),
+                repo: self.resource.clone(),
                 size: Some(bytes.len() as u64),
                 expected_hash: None,
             })),
@@ -79,17 +79,17 @@ impl RepoClient {
             let bytes = bytes.clone();
             let chunks = (0..total).step_by(PUT_BLOB_CHUNK_SIZE).map(move |start| {
                 let end = (start + PUT_BLOB_CHUNK_SIZE).min(total);
-                pb::PutBlobRequest {
-                    msg: Some(pb::put_blob_request::Msg::Data(bytes.slice(start..end))),
+                pb::WriteBlobRequest {
+                    msg: Some(pb::write_blob_request::Msg::Data(bytes.slice(start..end))),
                 }
             });
             let stream = tokio_stream::iter(std::iter::once(header.clone()).chain(chunks));
-            let svc = self.svc();
-            async move { svc.put_blob(stream).await }
+            let svc = self.content();
+            async move { svc.write_blob(stream).await }
         })
         .await?
         .into_owned();
-        Ok(required("put_blob.content", resp.content)?.try_into()?)
+        Ok(required("write_blob.content", resp.content)?.try_into()?)
     }
 
     /// Turn file bytes into a content reference: inline when small enough,
@@ -105,9 +105,9 @@ impl RepoClient {
     /// Which of the given objects the server already has, in order.
     pub async fn has_objects(&self, objects: &[(ObjectKind, ObjectHash)]) -> Result<Vec<bool>> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::HasObjectsRequest {
-                repo: self.repo.clone(),
+            let svc = self.content();
+            let request = pb::BatchCheckObjectsRequest {
+                repo: self.resource.clone(),
                 objects: objects
                     .iter()
                     .map(|(kind, hash)| pb::ObjectRef {
@@ -116,7 +116,7 @@ impl RepoClient {
                     })
                     .collect(),
             };
-            async move { svc.has_objects(request).await }
+            async move { svc.batch_check_objects(request).await }
         })
         .await?
         .into_owned();

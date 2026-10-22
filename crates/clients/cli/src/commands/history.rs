@@ -27,6 +27,9 @@ pub struct LogArgs {
     /// Follow only first parents.
     #[arg(long)]
     pub first_parent: bool,
+    /// Continue from a previous page's `next_page_token`.
+    #[arg(long)]
+    pub page_token: Option<String>,
 }
 
 /// `rill blame`.
@@ -122,7 +125,13 @@ pub async fn log(ctx: &mut Ctx<'_>, args: LogArgs) -> Result<()> {
     let start: LogStart = root_arg(args.root.as_deref())?.into();
     let path = args.path.as_deref().map(RepoPathBuf::new).transpose()?;
     let page = repo
-        .log_page(start, args.limit, path.as_deref(), args.first_parent)
+        .log_page(
+            start,
+            args.limit,
+            path.as_deref(),
+            args.first_parent,
+            args.page_token.as_deref(),
+        )
         .await?;
     ctx.emit(json::log_page(&page), |out| {
         if page.entries.is_empty() {
@@ -133,8 +142,8 @@ pub async fn log(ctx: &mut Ctx<'_>, args: LogArgs) -> Result<()> {
             table.row(log_row(out, c));
         }
         out.table(table)?;
-        if let Some(next) = page.next_start {
-            out.line(out.dim(&format!("(more: rill log {})", next.to_hex())))?;
+        if let Some(next) = &page.next_page_token {
+            out.line(out.dim(&format!("(more: rill log --page-token {next})")))?;
         }
         Ok(())
     })

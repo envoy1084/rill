@@ -69,8 +69,8 @@ async fn people_sign_in_through_keycloak() {
     let server = TestServer::start(config).await;
     let root = server.token_for(&Principal::human("root"));
     IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(root)))
-        .put_identity_provider(pb::PutIdentityProviderRequest {
-            operation_id: Bytes::new(),
+        .update_identity_provider(pb::UpdateIdentityProviderRequest {
+            request_id: String::new(),
             provider: (pb::IdentityProviderSpec {
                 org: "default".into(),
                 name: "keycloak".into(),
@@ -86,6 +86,7 @@ async fn people_sign_in_through_keycloak() {
                 saml_sp_entity_id: None,
             })
             .into(),
+            allow_missing: true,
         })
         .await
         .unwrap();
@@ -120,11 +121,13 @@ async fn people_sign_in_through_keycloak() {
         })
         .await
         .unwrap()
-        .into_owned();
+        .into_owned()
+        .grant
+        .unwrap();
     let me = clients(&server, Some(&grant.access_token))
         .await
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .unwrap()
         .into_owned();
@@ -185,8 +188,8 @@ async fn people_sign_in_through_keycloak() {
     assert_eq!(granted["principal"], "bob");
     let me = clients(&server, Some(granted["access_token"].as_str().unwrap()))
         .await
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .unwrap()
         .into_owned();

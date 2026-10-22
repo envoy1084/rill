@@ -44,6 +44,7 @@ pub fn definitions() -> Vec<ToolDef> {
                 .opt("limit", integer("Maximum entries (default 20)"))
                 .opt("path", string("Only versions that touched this path"))
                 .opt("first_parent", boolean("Follow only first parents"))
+                .opt("page_token", string("Continue from a previous page's next_page_token"))
                 .build(),
         },
         ToolDef {
@@ -133,8 +134,15 @@ async fn log(ctx: &ToolContext, args: &Args) -> ToolResult<Value> {
         .map(rill_types::RepoPathBuf::new)
         .transpose()?;
     let first_parent = args.bool_or("first_parent", false)?;
+    let page_token = args.opt_string("page_token")?;
     let page = repo
-        .log_page(start, limit, path.as_deref(), first_parent)
+        .log_page(
+            start,
+            limit,
+            path.as_deref(),
+            first_parent,
+            page_token.as_deref(),
+        )
         .await?;
     Ok(json::log_page(&page))
 }

@@ -57,7 +57,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: KeyCmd) -> Result<()> {
         KeyCmd::Rotate => {
             let rotated = svc
                 .rotate_token_keys(pb::RotateTokenKeysRequest {
-                    operation_id: Default::default(),
+                    request_id: String::new(),
                 })
                 .await?
                 .into_owned();
@@ -90,7 +90,7 @@ pub async fn revoke(ctx: &mut Ctx<'_>, cmd: RevokeCmd) -> Result<()> {
             };
             let revoked = svc
                 .revoke_token(pb::RevokeTokenRequest {
-                    operation_id: Default::default(),
+                    request_id: String::new(),
                     target: Some(target),
                     reason: args.reason,
                 })
@@ -102,7 +102,7 @@ pub async fn revoke(ctx: &mut Ctx<'_>, cmd: RevokeCmd) -> Result<()> {
         }
         RevokeCmd::Session(args) => {
             svc.revoke_session(pb::RevokeSessionRequest {
-                operation_id: Default::default(),
+                request_id: String::new(),
                 session: args.session.clone(),
             })
             .await?;

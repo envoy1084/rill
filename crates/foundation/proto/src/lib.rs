@@ -22,6 +22,8 @@ mod generated {
     connectrpc::include_generated!();
 }
 
+/// The update mask Update requests carry.
+pub use buffa_types::google::protobuf::FieldMask;
 /// The `google.rpc` status and error-detail messages errors carry.
 pub use generated::google;
 

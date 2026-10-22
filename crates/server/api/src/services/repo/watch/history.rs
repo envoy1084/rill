@@ -1,4 +1,4 @@
-//! `WatchTrunk` and `WatchLog`: landings and stored versions, read from
+//! `WatchTrunk` and `WatchVersions`: landings and stored versions, read from
 //! the store each time the event counter moves.
 
 use std::sync::Arc;
@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::stream::{start_from, wait_for_events, EventStream, STREAM_BUFFER};
-use crate::services::common::{self, open};
+use crate::services::common::{self, open_repo};
 use crate::services::repo::RepoSvc;
 use crate::services::Call;
 use connectrpc::ConnectError;
@@ -26,13 +26,13 @@ impl RepoSvc {
     pub(in crate::services::repo) async fn watch_trunk_impl(
         &self,
         request: Call<pb::WatchTrunkRequest>,
-    ) -> Result<EventStream<pb::LandEvent>> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+    ) -> Result<EventStream<pb::WatchTrunkResponse>> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().parent).await?;
         opened.permit().read_any().await?;
         let ctx = opened.repo.clone();
-        // Without `after_seq` the watch starts at the current head: only
-        // new landings are delivered.
-        let mut cursor = match request.get_ref().after_seq {
+        // Without `after_position` the watch starts at the current head:
+        // only new landings are delivered.
+        let mut cursor = match request.get_ref().after_position {
             Some(seq) => TrunkSeq(seq),
             None => ctx
                 .repo
@@ -62,11 +62,11 @@ impl RepoSvc {
         Ok(Box::pin(ReceiverStream::new(out)))
     }
 
-    pub(in crate::services::repo) async fn watch_log_impl(
+    pub(in crate::services::repo) async fn watch_versions_impl(
         &self,
-        request: Call<pb::WatchLogRequest>,
-    ) -> Result<EventStream<pb::LogEntry>> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::WatchVersionsRequest>,
+    ) -> Result<EventStream<pb::WatchVersionsResponse>> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().parent).await?;
         let filter = opened.permit().read_any().await?;
         let ctx = opened.repo.clone();
         let mut cursor = match start_from(request.get_ref().after.as_ref())? {
@@ -100,7 +100,7 @@ impl RepoSvc {
 async fn drain_trunk(
     ctx: &Arc<RepoContext>,
     cursor: &mut TrunkSeq,
-    tx: &Sender<pb::LandEvent>,
+    tx: &Sender<pb::WatchTrunkResponse>,
 ) -> Result<bool> {
     let Some((head, _)) = ctx.repo.trunk_head().await? else {
         return Ok(true);
@@ -109,8 +109,11 @@ async fn drain_trunk(
         return Ok(true);
     }
     for (seq, hash) in ctx.repo.trunk_range(*cursor, head).await? {
-        let event = common::land_event(ctx, seq, hash).await?;
-        if tx.send(Ok(event)).await.is_err() {
+        let landing = common::landing(ctx, seq, hash).await?;
+        let response = pb::WatchTrunkResponse {
+            landing: landing.into(),
+        };
+        if tx.send(Ok(response)).await.is_err() {
             return Ok(false);
         }
         *cursor = seq;
@@ -123,7 +126,7 @@ async fn drain_log(
     ctx: &Arc<RepoContext>,
     filter: &rill_policy::PathFilter,
     cursor: &mut Option<Versionstamp>,
-    tx: &Sender<pb::LogEntry>,
+    tx: &Sender<pb::WatchVersionsResponse>,
 ) -> Result<bool> {
     loop {
         let page = ctx.repo.log_after(*cursor, REPLAY_PAGE).await?;
@@ -132,13 +135,13 @@ async fn drain_log(
         }
         for (stamp, hash) in page {
             *cursor = Some(stamp);
-            let Some(info) = crate::services::repo::visible::info_of(ctx, filter, &hash).await?
+            let Some(info) = crate::services::changes::visible::info_of(ctx, filter, &hash).await?
             else {
                 continue;
             };
-            let entry = pb::LogEntry {
+            let entry = pb::WatchVersionsResponse {
                 cursor: Bytes::copy_from_slice(stamp.as_bytes()),
-                info: pb::ChangeInfo::from(info).into(),
+                version: common::change_info_proto(ctx, &info).into(),
             };
             if tx.send(Ok(entry)).await.is_err() {
                 return Ok(false);

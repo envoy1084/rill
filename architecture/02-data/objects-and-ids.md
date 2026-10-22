@@ -150,7 +150,7 @@ add of the merge supplies the tree entry, so trees never contain conflicts.
 never load a large change map. `Signature` (`signer`, P-256 `public_key`
 and `signature`, `signed_at`) is stored beside a version, not in its hash.
 
-The server owns authorship. `CreateChangeVersion` replaces `author` with
+The server owns authorship. `CreateVersion` replaces `author` with
 the authenticated caller and `created_at` with the server's clock, and
 clears `provenance.sponsor` and `provenance.resolved_by`; the rest of
 `provenance` is recorded as the client's claim. After storing a version the

@@ -19,8 +19,9 @@ impl Harness {
         let repo = Arc::new(repo);
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let svc = repo.clone();
-        let router = connectrpc::Router::new().add_service(svc);
+        let router = connectrpc::Router::new();
+        let router = rill_proto::rill::v1::RepoServiceExt::register(repo.clone(), router);
+        let router = rill_proto::rill::v1::ContentServiceExt::register(repo.clone(), router);
         tokio::spawn(async move {
             axum::serve(
                 listener,

@@ -87,7 +87,6 @@ async fn main() {
     let admin = client(&args.write, &args.admin_token).await;
     let _ = admin.create_repo(&args.repo, None).await;
     let tuple = pb::Relation {
-        repo: args.repo.clone(),
         path: String::new(),
         relation: "reader".into(),
         subject: format!("principal:{}", Principal::human(&args.reader).id),
@@ -97,9 +96,10 @@ async fn main() {
     for round in 0..args.rounds {
         admin
             .access_svc()
-            .add_relation(pb::AddRelationRequest {
-                operation_id: Default::default(),
+            .create_relation(pb::CreateRelationRequest {
+                parent: rill_sdk::names::repo(&args.repo),
                 relation: tuple.clone().into(),
+                ..Default::default()
             })
             .await
             .expect("grant");
@@ -115,9 +115,10 @@ async fn main() {
         }
         let revoked = admin
             .access_svc()
-            .remove_relation(pb::RemoveRelationRequest {
-                operation_id: Default::default(),
+            .delete_relation(pb::DeleteRelationRequest {
+                parent: rill_sdk::names::repo(&args.repo),
                 relation: tuple.clone().into(),
+                ..Default::default()
             })
             .await
             .expect("revoke")
@@ -128,7 +129,7 @@ async fn main() {
             let reader = client(endpoint, &args.reader_token).await;
             reader
                 .relations_seen()
-                .observe(&revoked.repo_id, revoked.relation_version);
+                .observe(&revoked.repo_uid, revoked.relation_version);
             if !can_read(&reader, &args.repo).await {
                 first_refused += 1;
             }

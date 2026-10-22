@@ -70,10 +70,10 @@ pub struct WhoAmI {
     pub model: Option<String>,
 }
 
-impl TryFrom<pb::WhoAmIResponse> for WhoAmI {
+impl TryFrom<pb::GetCallerResponse> for WhoAmI {
     type Error = Error;
 
-    fn try_from(r: pb::WhoAmIResponse) -> Result<Self> {
+    fn try_from(r: pb::GetCallerResponse) -> Result<Self> {
         Ok(WhoAmI {
             principal: required("whoami.principal", r.principal)?.try_into()?,
             teams: r.teams,
@@ -108,11 +108,13 @@ pub struct IssuedToken {
     pub expires_at: Timestamp,
 }
 
-/// A named Cedar policy.
+/// A repository policy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Policy {
-    /// Policy name.
+    /// Policy name, `…/policies/{policy}`.
     pub name: String,
+    /// Changes when the policy does; pass it back to update conditionally.
+    pub etag: String,
     /// Cedar policy text.
     pub text: String,
     /// Last update time.
@@ -121,12 +123,13 @@ pub struct Policy {
     pub updated_by: Principal,
 }
 
-impl TryFrom<pb::GetPolicyResponse> for Policy {
+impl TryFrom<pb::Policy> for Policy {
     type Error = Error;
 
-    fn try_from(r: pb::GetPolicyResponse) -> Result<Self> {
+    fn try_from(r: pb::Policy) -> Result<Self> {
         Ok(Policy {
             name: r.name,
+            etag: r.etag,
             text: r.text,
             updated_at: timestamp_from_proto(r.updated_at),
             updated_by: required("policy.updated_by", r.updated_by)?.try_into()?,
@@ -156,8 +159,8 @@ pub struct Health {
     pub components: Vec<ComponentHealth>,
 }
 
-impl From<pb::HealthResponse> for Health {
-    fn from(r: pb::HealthResponse) -> Self {
+impl From<pb::GetHealthResponse> for Health {
+    fn from(r: pb::GetHealthResponse) -> Self {
         Health {
             ok: r.ok,
             version: r.version,

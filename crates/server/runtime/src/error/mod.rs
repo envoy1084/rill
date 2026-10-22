@@ -10,6 +10,8 @@ mod codes;
 mod reasons;
 mod wire;
 
+pub use wire::status_proto;
+
 use rill_proto::ConvertError;
 use thiserror::Error;
 

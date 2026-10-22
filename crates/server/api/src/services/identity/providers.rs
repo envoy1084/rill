@@ -6,12 +6,15 @@ use rill_types::identity::{IdentityProvider, SamlSettings};
 use rill_types::Timestamp;
 
 use crate::auth::{caller, require_org_admin};
-use crate::services::Call;
+use crate::listing::Page;
+use crate::services::{names, Call};
+use rill_proto::names::IDENTITY_PROVIDER;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
 fn info(p: IdentityProvider) -> pb::IdentityProviderInfo {
     pb::IdentityProviderInfo {
+        resource_name: names::org_resource(&IDENTITY_PROVIDER, &p.org, &p.name),
         org: p.org,
         name: p.name,
         issuer: p.issuer,
@@ -75,21 +78,28 @@ fn check_issuer(state: &AppState, issuer: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn put(
+pub async fn update(
     state: &AppState,
-    request: Call<pb::PutIdentityProviderRequest>,
-) -> Result<pb::PutIdentityProviderResponse> {
+    request: Call<pb::UpdateIdentityProviderRequest>,
+) -> Result<pb::UpdateIdentityProviderResponse> {
     let ctx = caller(&request)?;
-    let spec = request
-        .into_inner()
+    let req = request.into_inner();
+    let spec = req
         .provider
-        .ok_or_else(|| Error::invalid("provider is required"))?;
+        .into_option()
+        .ok_or(rill_proto::ConvertError::missing("provider"))?;
     require_org_admin(state, &ctx, &spec.org).await?;
     if state.stores.get_org(&spec.org).await?.is_none() {
         return Err(Error::NotFound(format!("org {:?}", spec.org)));
     }
     if spec.name.is_empty() {
-        return Err(Error::invalid("name is required"));
+        return Err(rill_proto::ConvertError::missing("provider.name").into());
+    }
+    if !req.allow_missing && find(state, &spec.org, &spec.name).await?.is_none() {
+        return Err(Error::not_found(format!(
+            "identity provider {}; set allow_missing to create it",
+            spec.name
+        )));
     }
     let (issuer, client_id, saml) = match spec.saml_metadata.clone() {
         Some(metadata) => {
@@ -153,7 +163,32 @@ pub async fn put(
             other => other.into(),
         })?;
     tracing::info!(by = %ctx.principal, org = %provider.org, provider = %provider.name, "identity provider saved");
-    Ok(pb::PutIdentityProviderResponse {
+    Ok(pb::UpdateIdentityProviderResponse {
+        provider: info(provider).into(),
+    })
+}
+
+async fn find(state: &AppState, org: &str, name: &str) -> Result<Option<IdentityProvider>> {
+    Ok(state
+        .identity
+        .store()
+        .providers(org)
+        .await?
+        .into_iter()
+        .find(|p| p.name == name))
+}
+
+pub async fn get(
+    state: &AppState,
+    request: Call<pb::GetIdentityProviderRequest>,
+) -> Result<pb::GetIdentityProviderResponse> {
+    let ctx = caller(&request)?;
+    let (org, name) = names::org_child(&IDENTITY_PROVIDER, &request.get_ref().name)?;
+    require_org_admin(state, &ctx, &org).await?;
+    let provider = find(state, &org, &name)
+        .await?
+        .ok_or_else(|| Error::not_found(format!("identity provider {name}")))?;
+    Ok(pb::GetIdentityProviderResponse {
         provider: info(provider).into(),
     })
 }
@@ -163,11 +198,14 @@ pub async fn list(
     request: Call<pb::ListIdentityProvidersRequest>,
 ) -> Result<pb::ListIdentityProvidersResponse> {
     let ctx = caller(&request)?;
-    let org = &request.get_ref().org;
-    require_org_admin(state, &ctx, org).await?;
-    let providers = state.identity.store().providers(org).await?;
+    let req = request.get_ref();
+    let org = names::org(&req.parent)?;
+    require_org_admin(state, &ctx, &org).await?;
+    let page = Page::new(req.page_size, &req.page_token, &[&req.parent])?;
+    let (providers, next_page_token) = page.of(state.identity.store().providers(&org).await?)?;
     Ok(pb::ListIdentityProvidersResponse {
         providers: providers.into_iter().map(info).collect(),
+        next_page_token,
     })
 }
 
@@ -176,12 +214,15 @@ pub async fn delete(
     request: Call<pb::DeleteIdentityProviderRequest>,
 ) -> Result<pb::DeleteIdentityProviderResponse> {
     let ctx = caller(&request)?;
-    let req = request.get_ref();
-    require_org_admin(state, &ctx, &req.org).await?;
+    let (org, name) = names::org_child(&IDENTITY_PROVIDER, &request.get_ref().name)?;
+    require_org_admin(state, &ctx, &org).await?;
     let deleted = state
         .identity
         .store()
-        .delete_provider(&req.org, &req.name, &ctx.principal)
+        .delete_provider(&org, &name, &ctx.principal)
         .await?;
-    Ok(pb::DeleteIdentityProviderResponse { deleted })
+    if !deleted {
+        return Err(Error::not_found(format!("identity provider {name}")));
+    }
+    Ok(pb::DeleteIdentityProviderResponse {})
 }

@@ -37,8 +37,8 @@ async fn register(server: &TestServer, idp: &MockIdp) {
     let root = server.token_for(&Principal::human("root"));
     identity(server, &root)
         .await
-        .put_identity_provider(pb::PutIdentityProviderRequest {
-            operation_id: Bytes::new(),
+        .update_identity_provider(pb::UpdateIdentityProviderRequest {
+            request_id: String::new(),
             provider: (pb::IdentityProviderSpec {
                 org: "default".into(),
                 name: "mock".into(),
@@ -54,6 +54,7 @@ async fn register(server: &TestServer, idp: &MockIdp) {
                 saml_sp_entity_id: None,
             })
             .into(),
+            allow_missing: true,
         })
         .await
         .unwrap();
@@ -104,11 +105,11 @@ async fn access_from_cookie(server: &TestServer, cookie: &str) -> reqwest::Respo
         .unwrap()
 }
 
-async fn who(server: &TestServer, token: &str) -> Result<pb::WhoAmIResponse, ConnectError> {
+async fn who(server: &TestServer, token: &str) -> Result<pb::GetCallerResponse, ConnectError> {
     clients(server, Some(token))
         .await
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .map(|r| r.into_owned())
 }
@@ -265,12 +266,19 @@ async fn suspending_a_user_refuses_their_tokens_everywhere() {
     identity(&a, &root)
         .await
         .update_user(pb::UpdateUserRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
-            name: "carol".into(),
-            suspended: Some(true),
-            set_roles: false,
-            roles: vec![],
+            request_id: String::new(),
+            user: (pb::User {
+                name: "orgs/default/users/carol".into(),
+                status: "suspended".into(),
+                ..Default::default()
+            })
+            .into(),
+            update_mask: (rill_proto::FieldMask {
+                paths: vec!["status".into()],
+                ..Default::default()
+            })
+            .into(),
+            etag: String::new(),
         })
         .await
         .unwrap();
@@ -305,7 +313,10 @@ async fn org_admins_manage_only_their_org() {
         .await
         .unwrap();
     tokens.insert("dana", body["access_token"].as_str().unwrap().into());
-    let list = |org: &str| pb::ListIdentityProvidersRequest { org: org.into() };
+    let list = |org: &str| pb::ListIdentityProvidersRequest {
+        parent: format!("orgs/{org}"),
+        ..Default::default()
+    };
 
     let denied = identity(&server, &tokens["dana"])
         .await
@@ -318,12 +329,19 @@ async fn org_admins_manage_only_their_org() {
     identity(&server, &root)
         .await
         .update_user(pb::UpdateUserRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
-            name: "dana".into(),
-            suspended: None,
-            set_roles: true,
-            roles: vec!["admin".into()],
+            request_id: String::new(),
+            user: (pb::User {
+                name: "orgs/default/users/dana".into(),
+                roles: vec!["admin".into()],
+                ..Default::default()
+            })
+            .into(),
+            update_mask: (rill_proto::FieldMask {
+                paths: vec!["roles".into()],
+                ..Default::default()
+            })
+            .into(),
+            etag: String::new(),
         })
         .await
         .unwrap();

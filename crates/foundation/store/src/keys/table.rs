@@ -132,6 +132,9 @@ pub const TEST_STATS: &str = "tstat";
 pub const TEST_QUARANTINE: &str = "tq";
 /// `(inc, ns, repo, culprit seq)` → Incident: a trunk break and its culprit
 pub const INCIDENT: &str = "inc";
+/// `(lro, ns, repo, operation id)` → a long-running operation, encoded by
+/// the API
+pub const LONG_OPERATION: &str = "lro";
 /// `(xnh, ns, space, label)` → an action label whose re-run gave other
 /// outputs: its results are not cached for a while
 pub const EXEC_NONHERMETIC: &str = "xnh";

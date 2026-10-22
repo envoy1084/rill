@@ -39,50 +39,54 @@ async fn end_to_end(config: ServerConfig) {
 pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
     let mut c = clients_at(endpoint, None).await;
     let repo = "main";
+    let repo_name = common::names::repo(repo);
 
     let created = c
         .repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            description: Some("smoke".into()),
-            windows_safe: false,
+            request_id: String::new(),
+            parent: common::names::org("default"),
+            repo_id: repo.into(),
+            repo: pb::Repo {
+                description: Some("smoke".into()),
+                ..Default::default()
+            }
+            .into(),
         })
         .await
         .unwrap()
         .into_owned();
-    assert_eq!(created.repo.unwrap().name, "main");
+    let created = created.repo.unwrap();
+    assert_eq!(created.name, repo_name);
+    assert_eq!(created.repo_id, "main");
 
     // Watch trunk before anything lands so the event is observed live.
     let mut trunk_watch = c
         .repo
         .watch_trunk(pb::WatchTrunkRequest {
-            repo: repo.into(),
-            after_seq: Some(0),
+            parent: repo_name.clone(),
+            after_position: Some(0),
         })
         .await
         .unwrap()
         .messages();
 
     let first = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            base: None.into(),
+            parent: repo_name.clone(),
             edits: vec![
                 set_edit("README.md", b"hello\nworld\n"),
                 set_edit("src/lib.rs", b"fn a() {}\n"),
             ],
             message: "initial".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned();
-    let change_id = first.version.as_option().unwrap().change_id.clone();
+    let first_info = first.info.unwrap();
+    let change_id = first_info.change_id.clone();
     assert!(first.version.unwrap().parents.is_empty());
 
     let seq = land(&mut c, repo, change_id.clone()).await;
@@ -92,16 +96,18 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         .await
         .expect("trunk event")
         .unwrap()
+        .unwrap()
+        .landing
         .unwrap();
-    assert_eq!(landed.seq, 1);
+    assert_eq!(landed.position, 1);
     assert_eq!(landed.change_id, change_id);
 
     let listing = c
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: repo.into(),
-            root: trunk().into(),
-            path: String::new(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: repo_name.clone(),
+            revision: trunk(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -111,14 +117,10 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
 
     // A second change on top of trunk, amended through a patch.
     let second = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            base: (pb::EditBase {
-                base: Some(pb::edit_base::Base::Root(trunk())),
-            })
-            .into(),
+            parent: repo_name.clone(),
+            base: common::trunk_base().into(),
             edits: vec![pb::Edit {
                 path: "README.md".into(),
                 op: Some(pb::edit::Op::Patch(
@@ -127,27 +129,23 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
                 )),
             }],
             message: "patch readme".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
-        .into_owned();
+        .into_owned()
+        .info
+        .unwrap();
+    let second_rev = hex::encode(&second.hash);
 
     let diff = c
-        .repo
+        .content
         .diff(pb::DiffRequest {
-            repo: repo.into(),
-            base: trunk().into(),
-            target: (pb::RootSpec {
-                root: Some(pb::root_spec::Root::VersionHash(second.hash.clone())),
-            })
-            .into(),
-            paths: vec![],
+            repo: repo_name.clone(),
+            base: trunk(),
+            target: second_rev.clone(),
             format: pb::DiffFormat::Structured.into(),
-            context_lines: 0,
-            limit: 0,
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -160,30 +158,33 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
     assert!(ops.contains(&(pb::diff_line::Op::Insert as i32)));
 
     let blame = c
-        .repo
+        .content
         .blame(pb::BlameRequest {
-            repo: repo.into(),
-            hash: second.hash.clone(),
+            repo: repo_name.clone(),
+            revision: second_rev.clone(),
             path: "README.md".into(),
         })
         .await
         .unwrap()
         .into_owned();
     assert_eq!(blame.lines.len(), 2);
-    assert_eq!(blame.lines[0].version, first.hash);
-    assert_eq!(blame.lines[0].trunk_seq, Some(1));
-    assert_eq!(blame.lines[1].version, second.hash);
+    assert_eq!(
+        blame.lines[0].version,
+        common::names::version(repo, &first_info.hash)
+    );
+    assert_eq!(blame.lines[0].trunk_position, Some(1));
+    assert_eq!(
+        blame.lines[1].version,
+        common::names::version(repo, &second.hash)
+    );
     assert_eq!(blame.lines[1].text, Bytes::from_static(b"there\n"));
 
     // Grep is served from the search index; the root is indexed on demand.
     let found = c
-        .repo
+        .content
         .grep(pb::GrepRequest {
-            repo: repo.into(),
-            root: (pb::RootSpec {
-                root: Some(pb::root_spec::Root::VersionHash(second.hash.clone())),
-            })
-            .into(),
+            repo: repo_name.clone(),
+            revision: second_rev.clone(),
             pattern: "THERE".into(),
             case_insensitive: true,
             path_globs: vec!["*.md".into()],
@@ -199,15 +200,12 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
     assert_eq!(found.hits[0].before.len(), 1);
     assert!(!found.truncated);
     let none = c
-        .repo
+        .content
         .grep(pb::GrepRequest {
-            repo: repo.into(),
-            root: None.into(),
+            repo: repo_name.clone(),
+            revision: trunk(),
             pattern: "THERE".into(),
-            case_insensitive: false,
-            path_globs: vec![],
-            max_results: 0,
-            context_lines: 0,
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -218,20 +216,20 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
     // turn the snapshot into a change.
     let big = vec![b'x'; 300];
     let put = c
-        .repo
-        .put_blob(tokio_stream::iter(vec![
-            pb::PutBlobRequest {
-                msg: Some(pb::put_blob_request::Msg::Header(pb::PutBlobHeader {
-                    operation_id: Bytes::new(),
-                    repo: repo.into(),
+        .content
+        .write_blob(tokio_stream::iter(vec![
+            pb::WriteBlobRequest {
+                msg: Some(pb::write_blob_request::Msg::Header(pb::WriteBlobHeader {
+                    request_id: String::new(),
+                    repo: repo_name.clone(),
                     size: Some(big.len() as u64),
                     expected_hash: Some(Bytes::copy_from_slice(
                         ObjectHash::digest(ObjectKind::Blob, &big).as_bytes(),
                     )),
                 })),
             },
-            pb::PutBlobRequest {
-                msg: Some(pb::put_blob_request::Msg::Data(Bytes::from(big.clone()))),
+            pb::WriteBlobRequest {
+                msg: Some(pb::write_blob_request::Msg::Data(Bytes::from(big.clone()))),
             },
         ]))
         .await
@@ -246,30 +244,29 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
     let ws = c
         .workspace
         .create_workspace(pb::CreateWorkspaceRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            name: "scratch".into(),
-            base: None.into(),
-            sparse: None.into(),
+            request_id: String::new(),
+            parent: repo_name.clone(),
+            workspace: pb::Workspace {
+                display_name: "scratch".into(),
+                ..Default::default()
+            }
+            .into(),
+            base: String::new(),
         })
         .await
         .unwrap()
         .into_owned()
         .workspace
         .unwrap();
-    assert_eq!(ws.base, first.hash);
+    assert_eq!(ws.base, first_info.hash);
 
     // The snapshot tree is built server-side through ApplyEdits (a draft
     // version whose root tree we reuse), as a client's tree builder would.
     let draft = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            base: (pb::EditBase {
-                base: Some(pb::edit_base::Base::Root(trunk())),
-            })
-            .into(),
+            parent: repo_name.clone(),
+            base: common::trunk_base().into(),
             edits: vec![pb::Edit {
                 path: "data.bin".into(),
                 op: Some(pb::edit::Op::SetContent(pb::SetContent {
@@ -279,17 +276,17 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
                 })),
             }],
             message: "draft".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
-        .into_owned();
+        .into_owned()
+        .info
+        .unwrap();
     let draft_root = c
         .repo
-        .get_derived(pb::GetDerivedRequest {
-            repo: repo.into(),
+        .get_derived_value(pb::GetDerivedValueRequest {
+            repo: repo_name.clone(),
             kind: "root@1".into(),
             hash: draft.hash.clone(),
         })
@@ -300,38 +297,35 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
     // Derived records are postcard: a one-byte version then the 32-byte hash.
     let tree_hash = Bytes::copy_from_slice(&draft_root[draft_root.len() - 32..]);
     c.workspace
-        .snapshot(pb::SnapshotRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            workspace: ws.id.clone(),
+        .snapshot_workspace(pb::SnapshotWorkspaceRequest {
+            request_id: String::new(),
+            name: ws.name.clone(),
             tree_hash,
         })
         .await
         .unwrap();
     let new_change = c
         .workspace
-        .new_change(pb::NewChangeRequest {
-            operation_id: Bytes::new(),
-            repo: repo.into(),
-            workspace: ws.id.clone(),
+        .start_change(pb::StartChangeRequest {
+            name: ws.name.clone(),
             message: "from workspace".into(),
-            intent: None,
-            provenance: None.into(),
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned();
-    assert_eq!(new_change.change_id, ws.working_change);
+    assert_eq!(
+        new_change.change,
+        common::names::change(repo, &ws.working_change)
+    );
     let version = new_change.version.unwrap();
-    assert_eq!(version.parents, vec![first.hash.clone()]);
+    assert_eq!(version.parents, vec![first_info.hash.clone()]);
     assert!(version.file_changes.contains_key("data.bin"));
     let ops = c
         .workspace
-        .list_operations(pb::ListOperationsRequest {
-            repo: repo.into(),
-            workspace: ws.id.clone(),
-            limit: 0,
-            before: None,
+        .list_workspace_operations(pb::ListWorkspaceOperationsRequest {
+            parent: ws.name.clone(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -361,15 +355,15 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
     assert_eq!(status, 400);
 
     let me = c
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .unwrap()
         .into_owned();
     assert_eq!(me.principal.unwrap().name, "dev");
     let health = c
         .admin
-        .health(pb::HealthRequest {})
+        .get_health(pb::GetHealthRequest {})
         .await
         .unwrap()
         .into_owned();

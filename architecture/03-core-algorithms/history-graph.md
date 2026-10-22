@@ -55,7 +55,7 @@ entries never go stale. The one mutable part of `ChangeInfo` is
 trunk are cached; the rest are read again.
 
 `ancestors` keeps the info it read to queue each parent and uses it when
-the parent is popped, and the `Log` RPC returns those infos as they are,
+the parent is popped, and the `ListHistory` RPC returns those infos as they are,
 so a page costs one info read per version.
 
 ## is_ancestor
@@ -114,13 +114,13 @@ guarantees the mark reaches a version before it could be emitted. The walk
 stops at `limit` or when nothing interesting is queued. Each result is a
 `LogEntry { info, generation }`.
 
-The server's `Log` RPC
-([repo/history.rs](../../crates/server/api/src/services/repo/history.rs))
+The server's `ListHistory` RPC
+([repo/history.rs](../../crates/server/api/src/services/content/history.rs))
 uses `ancestors(start, limit + 1)` for the full walk, so it can detect
 truncation. A `first_parent` log is a plain first-parent loop in the server,
 and a path filter goes to the path-history derivation; neither uses
 `CommitGraph`. `ancestors_excluding` has no caller outside `rill-core`. The
-`MergeBase` and `IsAncestor` RPCs call the methods above directly.
+`FindMergeBase` and `IsAncestor` RPCs call the methods above directly.
 
 ## Failure behaviour
 

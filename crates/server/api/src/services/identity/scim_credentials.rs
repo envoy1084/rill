@@ -7,7 +7,9 @@ use rill_types::identity::ScimCredential;
 use rill_types::Timestamp;
 
 use crate::auth::{caller, require_org_admin};
-use crate::services::Call;
+use crate::listing::Page;
+use crate::services::{names, Call};
+use rill_proto::names::SCIM_CREDENTIAL;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
@@ -23,8 +25,9 @@ pub fn secret_hash(secret: &str) -> [u8; 32] {
     .as_bytes()
 }
 
-fn info(c: &ScimCredential) -> pb::ScimCredentialInfo {
-    pb::ScimCredentialInfo {
+fn info(c: &ScimCredential) -> pb::ScimCredential {
+    pb::ScimCredential {
+        name: names::org_resource(&SCIM_CREDENTIAL, &c.org, &c.id),
         org: c.org.clone(),
         id: c.id.clone(),
         created_by: pb::Principal::from(&c.created_by).into(),
@@ -38,7 +41,7 @@ pub async fn create(
     request: Call<pb::CreateScimCredentialRequest>,
 ) -> Result<pb::CreateScimCredentialResponse> {
     let ctx = caller(&request)?;
-    let org = request.into_inner().org;
+    let org = names::org(&request.get_ref().parent)?;
     require_org_admin(state, &ctx, &org).await?;
     if state.stores.get_org(&org).await?.is_none() {
         return Err(Error::NotFound(format!("org {org:?}")));
@@ -71,30 +74,30 @@ pub async fn list(
     request: Call<pb::ListScimCredentialsRequest>,
 ) -> Result<pb::ListScimCredentialsResponse> {
     let ctx = caller(&request)?;
-    let org = request.into_inner().org;
+    let req = request.get_ref();
+    let org = names::org(&req.parent)?;
     require_org_admin(state, &ctx, &org).await?;
-    let credentials = state.identity.store().scim_credentials(&org).await?;
+    let page = Page::new(req.page_size, &req.page_token, &[&req.parent])?;
+    let (credentials, next_page_token) =
+        page.of(state.identity.store().scim_credentials(&org).await?)?;
     Ok(pb::ListScimCredentialsResponse {
         credentials: credentials.iter().map(info).collect(),
+        next_page_token,
     })
 }
 
-pub async fn revoke(
+pub async fn delete(
     state: &AppState,
-    request: Call<pb::RevokeScimCredentialRequest>,
-) -> Result<pb::RevokeScimCredentialResponse> {
+    request: Call<pb::DeleteScimCredentialRequest>,
+) -> Result<pb::DeleteScimCredentialResponse> {
     let ctx = caller(&request)?;
-    let req = request.into_inner();
-    require_org_admin(state, &ctx, &req.org).await?;
+    let (org, id) = names::org_child(&SCIM_CREDENTIAL, &request.get_ref().name)?;
+    require_org_admin(state, &ctx, &org).await?;
     let store = state.identity.store();
-    match store.scim_credential(&req.id).await? {
-        Some(c) if c.org == req.org => {
-            store
-                .revoke_scim_credential(&req.id, &ctx.principal)
-                .await?
-        }
-        _ => return Err(Error::NotFound(format!("SCIM credential {}", req.id))),
+    match store.scim_credential(&id).await? {
+        Some(c) if c.org == org => store.revoke_scim_credential(&id, &ctx.principal).await?,
+        _ => return Err(Error::NotFound(format!("SCIM credential {id}"))),
     }
-    tracing::info!(by = %ctx.principal, org = %req.org, credential = %req.id, "SCIM credential revoked");
-    Ok(pb::RevokeScimCredentialResponse {})
+    tracing::info!(by = %ctx.principal, org = %org, credential = %id, "SCIM credential revoked");
+    Ok(pb::DeleteScimCredentialResponse {})
 }

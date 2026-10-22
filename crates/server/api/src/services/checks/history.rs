@@ -6,27 +6,30 @@ use rill_types::Timestamp;
 
 use super::convert;
 use super::service::ChecksSvc;
-use crate::services::common::open;
+use crate::listing::Page;
+use crate::services::common::open_repo;
 use crate::services::Call;
 use rill_runtime::error::Result;
 
 /// Default page of runs.
 const DEFAULT_RUNS: usize = 50;
-/// Default flake score floor and page of flaky targets.
+/// Default flake score floor.
 const DEFAULT_MIN_SCORE: f64 = 0.1;
-const DEFAULT_FLAKY: usize = 50;
 
 impl ChecksSvc {
-    pub(super) async fn history(
+    pub(super) async fn get_test_history_impl(
         &self,
         request: Call<pb::GetTestHistoryRequest>,
     ) -> Result<pb::GetTestHistoryResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        let opened = open_repo(&self.state, &request, &request.get_ref().parent).await?;
         opened.permit().read_any().await?;
         let req = request.into_inner();
-        let limit = match req.limit as usize {
-            0 => DEFAULT_RUNS,
-            n => n.min(RUNS_KEPT),
+        if req.target.is_empty() {
+            return Err(rill_proto::ConvertError::missing("target").into());
+        }
+        let limit = match req.max_results {
+            n if n <= 0 => DEFAULT_RUNS,
+            n => (n as usize).min(RUNS_KEPT),
         };
         let history = TestHistory::new(opened.repo.repo.clone());
         let runs = history.runs(&req.target, limit).await?;
@@ -43,21 +46,25 @@ impl ChecksSvc {
         })
     }
 
-    pub(super) async fn flaky(
+    pub(super) async fn list_flaky_tests_impl(
         &self,
         request: Call<pb::ListFlakyTestsRequest>,
     ) -> Result<pb::ListFlakyTestsResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        let req = request.get_ref();
+        let opened = open_repo(&self.state, &request, &req.parent).await?;
         opened.permit().read_any().await?;
-        let req = request.into_inner();
-        let limit = match req.limit as usize {
-            0 => DEFAULT_FLAKY,
-            n => n,
-        };
+        let min_score = req.min_score.unwrap_or(DEFAULT_MIN_SCORE);
+        let page = Page::new(
+            req.page_size,
+            &req.page_token,
+            &[&req.parent, &min_score.to_string()],
+        )?;
         let flaky = TestHistory::new(opened.repo.repo.clone())
-            .flaky(req.min_score.unwrap_or(DEFAULT_MIN_SCORE), limit)
+            .flaky(min_score, usize::MAX)
             .await?;
+        let (flaky, next_page_token) = page.of(flaky)?;
         Ok(pb::ListFlakyTestsResponse {
+            next_page_token,
             tests: flaky
                 .into_iter()
                 .map(
@@ -73,17 +80,21 @@ impl ChecksSvc {
 }
 
 impl ChecksSvc {
-    pub(super) async fn nonhermetic(
+    pub(super) async fn list_nonhermetic_steps_impl(
         &self,
-        request: Call<pb::ListNonhermeticRequest>,
-    ) -> Result<pb::ListNonhermeticResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::ListNonhermeticStepsRequest>,
+    ) -> Result<pb::ListNonhermeticStepsResponse> {
+        let req = request.get_ref();
+        let opened = open_repo(&self.state, &request, &req.parent).await?;
         opened.permit().read_any().await?;
+        let page = Page::new(req.page_size, &req.page_token, &[&req.parent])?;
         let config = &opened.repo.config;
         let space = self.state.exec.space(&config.org);
         let prefix = format!("verify:{}/", config.name);
         let flags = self.state.exec.nonhermetics(&space, &prefix).await?;
-        Ok(pb::ListNonhermeticResponse {
+        let (flags, next_page_token) = page.of(flags)?;
+        Ok(pb::ListNonhermeticStepsResponse {
+            next_page_token,
             steps: flags
                 .into_iter()
                 .map(|f| pb::NonhermeticStep {

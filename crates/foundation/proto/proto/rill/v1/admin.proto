@@ -1,115 +1,38 @@
-// Admin service: identity, capability tokens and policies.
+// Admin: the server's health, and importing existing history.
 syntax = "proto3";
 
 package rill.v1;
 
-import "rill/v1/types.proto";
-
+// Instance operations.
 service AdminService {
-  rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse);
-  rpc IssueToken(IssueTokenRequest) returns (IssueTokenResponse);
-  rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
-  rpc SetPolicy(SetPolicyRequest) returns (SetPolicyResponse);
-  rpc Health(HealthRequest) returns (HealthResponse);
-  rpc CreateOrg(CreateOrgRequest) returns (CreateOrgResponse);
-  rpc ListOrgs(ListOrgsRequest) returns (ListOrgsResponse);
+  // The server's components and whether each is healthy.
+  rpc GetHealth(GetHealthRequest) returns (GetHealthResponse);
   // Append an imported version to trunk, for importers of existing
-  // history; needs the admin permit.
-  rpc AppendTrunk(AppendTrunkRequest) returns (AppendTrunkResponse);
+  // history (repository owners).
+  rpc ImportTrunkPosition(ImportTrunkPositionRequest) returns (ImportTrunkPositionResponse);
 }
 
-message AppendTrunkRequest {
-  bytes operation_id = 1;
-  string repo = 2;
+message ImportTrunkPositionRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
   // The trunk head the version goes on; absent for an empty trunk.
   optional bytes expected = 3;
+  // Required.
   bytes version = 4;
 }
-message AppendTrunkResponse {
-  uint64 seq = 1;
+message ImportTrunkPositionResponse {
+  uint64 position = 1;
 }
 
-message CreateOrgRequest {
-  bytes operation_id = 1;
-  // 1-63 lowercase letters, digits and dashes.
-  string name = 2;
-  optional string description = 3;
-}
-message CreateOrgResponse {
-  Org org = 1;
-}
-message ListOrgsRequest {}
-message ListOrgsResponse {
-  repeated Org orgs = 1;
-}
-
-message WhoAmIRequest {}
-
-// A capability the caller's token grants, as a human-readable summary.
-message Capability {
-  // Action name, e.g. `repo.write`, `review.vote`, `lander.land`.
-  string action = 1;
-  // Object pattern the action applies to, e.g. `repo:main/*`.
-  string scope = 2;
-  optional int64 expires_at = 3;
-}
-
-message WhoAmIResponse {
-  Principal principal = 1;
-  repeated string teams = 2;
-  repeated Capability capabilities = 3;
-  optional int64 token_expires_at = 4;
-  // The caller's token id (`tk_…`), session (`ss_…`) and organization,
-  // when the caller presented an issued token.
-  optional string token_id = 5;
-  optional string session = 6;
-  optional string org = 7;
-  optional string sponsor = 8;
-  optional string model = 9;
-}
-
-message IssueTokenRequest {
-  bytes operation_id = 1;
-  // Capabilities to attenuate the caller's token to; must be a subset.
-  repeated Capability capabilities = 2;
-  optional int64 expires_at = 3;
-  // Principal the token acts as; defaults to the caller. Used to mint
-  // agent identities sponsored by the caller.
-  optional Principal for_principal = 4;
-}
-message IssueTokenResponse {
-  string token = 1;
-  int64 expires_at = 2;
-}
-
-message GetPolicyRequest {
-  string name = 1;
-}
-message GetPolicyResponse {
-  string name = 1;
-  // Cedar policy text.
-  string text = 2;
-  int64 updated_at = 3;
-  Principal updated_by = 4;
-}
-
-message SetPolicyRequest {
-  bytes operation_id = 1;
-  string name = 2;
-  string text = 3;
-}
-message SetPolicyResponse {
-  int64 updated_at = 1;
-}
-
-message HealthRequest {}
+message GetHealthRequest {}
 
 message ComponentHealth {
   string name = 1;
   bool ok = 2;
   optional string detail = 3;
 }
-message HealthResponse {
+message GetHealthResponse {
   bool ok = 1;
   string version = 2;
   repeated ComponentHealth components = 3;

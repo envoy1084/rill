@@ -39,7 +39,7 @@ patterns! {
     REPO = "repository", "orgs/{org}/repos/{repo}";
     REF = "ref", "orgs/{org}/repos/{repo}/refs/{ref=**}";
     CHANGE = "change", "orgs/{org}/repos/{repo}/changes/{change}";
-    VERSION = "version", "orgs/{org}/repos/{repo}/changes/{change}/versions/{version}";
+    VERSION = "version", "orgs/{org}/repos/{repo}/versions/{version}";
     REVIEW = "review", "orgs/{org}/repos/{repo}/changes/{change}/review";
     THREAD = "thread", "orgs/{org}/repos/{repo}/changes/{change}/review/threads/{thread}";
     WORKSPACE = "workspace", "orgs/{org}/repos/{repo}/workspaces/{workspace}";
@@ -47,9 +47,10 @@ patterns! {
     LAND_REQUEST = "land request", "orgs/{org}/repos/{repo}/landRequests/{ticket}";
     TRUNK_POSITION = "trunk position", "orgs/{org}/repos/{repo}/trunk/positions/{position}";
     INCIDENT = "incident", "orgs/{org}/repos/{repo}/incidents/{incident}";
+    POLICY = "policy", "orgs/{org}/repos/{repo}/policies/{policy}";
     RUN = "run", "orgs/{org}/repos/{repo}/runs/{run}";
     QUARANTINE = "quarantine", "orgs/{org}/repos/{repo}/quarantines/{target=**}";
-    INTENT = "intent", "orgs/{org}/intents/{intent}";
+    INTENT = "intent", "orgs/{org}/repos/{repo}/intents/{intent}";
     AGENT = "agent", "orgs/{org}/agents/{agent}";
     USER = "user", "orgs/{org}/users/{user}";
     IDENTITY_PROVIDER = "identity provider", "orgs/{org}/identityProviders/{provider}";
@@ -57,7 +58,7 @@ patterns! {
     SECRET = "secret", "orgs/{org}/secrets/{secret}";
     SCIM_CREDENTIAL = "SCIM credential", "orgs/{org}/scimCredentials/{credential}";
     REDACTION = "redaction", "orgs/{org}/redactions/{redaction}";
-    OPERATION = "operation", "operations/{operation}";
+    OPERATION = "operation", "orgs/{org}/repos/{repo}/operations/{operation}";
 }
 
 impl Pattern {
@@ -150,9 +151,13 @@ mod tests {
 
     #[test]
     fn names_parse_to_their_variables_and_format_back() {
-        let name = "orgs/acme/repos/mono/changes/ch_1/versions/ab";
+        let name = "orgs/acme/repos/mono/changes/ch_1/review/threads/t1";
+        let parts = THREAD.parse(name).unwrap();
+        assert_eq!(parts, ["acme", "mono", "ch_1", "t1"]);
+        assert_eq!(THREAD.format(&parts), name);
+        let name = "orgs/acme/repos/mono/versions/ab";
         let parts = VERSION.parse(name).unwrap();
-        assert_eq!(parts, ["acme", "mono", "ch_1", "ab"]);
+        assert_eq!(parts, ["acme", "mono", "ab"]);
         assert_eq!(VERSION.format(&parts), name);
         assert_eq!(repo_of(name).unwrap(), ("acme", "mono"));
     }

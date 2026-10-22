@@ -18,52 +18,43 @@ async fn concurrent_searches_of_one_root_share_an_index_job() {
     let created = c
         .repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "r".into(),
-            description: None,
-            windows_safe: false,
+            parent: common::names::org("default"),
+            repo_id: "r".into(),
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned();
-    let id: [u8; 16] = created.repo.unwrap().id.as_ref().try_into().unwrap();
+    let id: [u8; 16] = created.repo.unwrap().uid.as_ref().try_into().unwrap();
     let queue = rill_jobs::Queue::new(
         stores.repo(rill_types::RepoId::from_bytes(id)),
         rill_lander::land::followups::INDEX_QUEUE,
     );
     let version = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "r".into(),
-            base: None.into(),
+            parent: common::names::repo("r"),
             edits: vec![set_edit("a.txt", b"needle\n")],
             message: "a".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
-        .into_owned();
+        .into_owned()
+        .info
+        .unwrap();
 
     let wave = || {
         let searches = (0..20).map(|_| {
-            let repo = c.repo.clone();
+            let content = c.content.clone();
             let request = pb::GrepRequest {
-                repo: "r".into(),
-                root: (pb::RootSpec {
-                    root: Some(pb::root_spec::Root::VersionHash(version.hash.clone())),
-                })
-                .into(),
+                repo: common::names::repo("r"),
+                revision: hex::encode(&version.hash),
                 pattern: "needle".into(),
-                case_insensitive: false,
-                path_globs: vec![],
-                max_results: 0,
-                context_lines: 0,
+                ..Default::default()
             };
             let options = CallOptions::default().with_timeout(Duration::from_millis(500));
-            async move { repo.grep_with_options(request, options).await }
+            async move { content.grep_with_options(request, options).await }
         });
         futures::future::join_all(searches)
     };

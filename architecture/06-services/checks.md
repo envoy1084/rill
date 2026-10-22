@@ -123,7 +123,7 @@ runtime; thresholds in `[verify.flakes]`):
   cases, or is itself quarantined, ends `Quarantined` and does not fail
   the tree, so it neither blocks a landing nor makes trunk red. Its runs
   are still recorded as failures. A quarantine lasts until an owner lifts
-  it (`ReleaseQuarantine`, audited as `test.release`).
+  it (`DeleteQuarantine`, audited as `test.release`).
 
 ## Non-hermetic steps
 
@@ -133,7 +133,7 @@ execution](remote-execution.md#action-cache)) catch it and flag the
 step's label, `verify:<repo>/<step>`, for a week. A flagged step runs
 uncached: `PlanRunner` skips the cache lookup, the step's result is not
 stored, and its run record and result say `nonhermetic`.
-`ListNonhermetic` lists a repository's flagged steps with what differed.
+`ListNonhermeticSteps` lists a repository's flagged steps with what differed.
 
 ## API and CLI
 
@@ -144,14 +144,14 @@ stored, and its run record and result say `nonhermetic`.
   ends (a stopping server ends the stream);
 * `ReadLog(repo, run, step, stdout|stderr, offset, limit)` and
   `ReadArtifact(repo, run, step, path, offset, limit)`;
-* `ListNonhermetic(repo)`: steps flagged non-hermetic, with what
+* `ListNonhermeticSteps(repo)`: steps flagged non-hermetic, with what
   differed and until when;
 * `GetTestHistory(repo, target, limit)`: recent runs, newest first, and
   the target's score;
 * `ListFlakyTests(repo, min_score = 0.1, limit = 50)`: targets at or above
   the score, flakiest first;
-* `ListQuarantined(repo)`; and, for repository owners,
-  `Quarantine(repo, target, reason)` and `ReleaseQuarantine(repo, target)`.
+* `ListQuarantines(repo)`; and, for repository owners,
+  `Quarantine(repo, target, reason)` and `DeleteQuarantine(repo, target)`.
 
 `rill checks runs [--of-version]`, `rill checks run <id> [--watch]`, `rill
 checks log <run> <step> [--stderr] [--tail BYTES]`, `rill checks artifact

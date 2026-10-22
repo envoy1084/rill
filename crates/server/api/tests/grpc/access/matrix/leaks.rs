@@ -15,7 +15,7 @@ pub(super) fn assert_no_leak(what: &str, outcome: &Outcome) {
     if outcome.code == Code::Ok {
         assert!(!contains(b"secret"), "{what}: a hidden path leaked");
         assert!(
-            !contains(secret_hash.as_bytes()),
+            !contains(secret_hash.as_bytes()) && !contains(secret_hash.to_hex().as_bytes()),
             "{what}: a hidden hash leaked"
         );
     }

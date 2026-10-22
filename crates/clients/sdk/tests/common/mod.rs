@@ -1,4 +1,4 @@
-//! In-process mock gRPC services for SDK tests.
+//! In-process mock services for SDK tests.
 //!
 //! `MockRepo` serves trees keyed by root label, a blob store, a canned log
 //! and echoing writes; `MockReview` serves land tickets with scripted
@@ -6,6 +6,8 @@
 
 #![allow(dead_code, unused_imports)]
 
+mod change_service;
+mod content_service;
 mod fixtures;
 mod harness;
 mod mock_repo;

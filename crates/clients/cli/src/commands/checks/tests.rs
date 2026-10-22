@@ -59,9 +59,10 @@ pub async fn flaky(ctx: &mut Ctx<'_>, a: FlakyArgs) -> Result<()> {
     let svc = ctx.client()?.checks_svc();
     let tests = svc
         .list_flaky_tests(pb::ListFlakyTestsRequest {
-            repo,
+            parent: rill_sdk::names::repo(&repo),
+            page_size: a.limit as i32,
+            page_token: String::new(),
             min_score: Some(a.min_score),
-            limit: a.limit,
         })
         .await?
         .into_owned()
@@ -90,9 +91,9 @@ pub async fn history(ctx: &mut Ctx<'_>, a: HistoryArgs) -> Result<()> {
     let svc = ctx.client()?.checks_svc();
     let response = svc
         .get_test_history(pb::GetTestHistoryRequest {
-            repo,
+            parent: rill_sdk::names::repo(&repo),
             target: a.target,
-            limit: a.limit,
+            max_results: a.limit as i32,
         })
         .await?
         .into_owned();
@@ -141,7 +142,11 @@ pub async fn nonhermetic(ctx: &mut Ctx<'_>) -> Result<()> {
     let steps = ctx
         .client()?
         .checks_svc()
-        .list_nonhermetic(pb::ListNonhermeticRequest { repo })
+        .list_nonhermetic_steps(pb::ListNonhermeticStepsRequest {
+            parent: rill_sdk::names::repo(&repo),
+            page_size: 1000,
+            page_token: String::new(),
+        })
         .await?
         .into_owned()
         .steps;

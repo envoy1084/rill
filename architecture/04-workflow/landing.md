@@ -56,7 +56,7 @@ up to 256 pending requests, partitions and processes them, then waits for
 the wake counter to move or `batch_window`, whichever is first.
 `land_now` (reverts, CLI) queues a request and serves until it finishes,
 or until `max_wait` while another process holds the lease.
-`GetLandStatus`, `GetTrunkStatus` and `WatchReview` read the stored
+`GetLandRequest`, `GetTrunkStatus` and `WatchReview` read the stored
 records.
 
 | Lander `LandStatus` | Wire `LandStatus` |
@@ -183,7 +183,7 @@ directories and declared groups). A domain whose conflict rate over
 `window_secs` reaches `conflict_rate` after `min_attempts` attempts is
 throttled to one request per batch until the rate falls.
 
-**Positions and ETAs.** `GetLandStatus` returns, while queued, the
+**Positions and ETAs.** `GetLandRequest` returns, while queued, the
 request's place in the serve order and an ETA from the mean time between
 recent landings. `rill land` prints both. The lease holder exports
 `land_wait_p50_ms`, `land_wait_p99_ms` (queue to trunk), `land_interval_ms`,
@@ -329,12 +329,12 @@ reverse index; `list_landings(limit)` scans the newest records.
 
 ## Release lines
 
-A release is a second line of landings beside trunk. `CutRelease(name,
+A release is a second line of landings beside trunk. `CreateRelease(name,
 at)` (repository owners; audited as `ref.move` with no old target) writes,
 in one transaction, the ref `release/<name>` and the release's head row at
 position 0, the trunk version it was cut at (`RepoStore::cut_release`;
 refused if the release exists). After that the release moves only through
-its lander: `MoveRef` refuses `release/*` like `trunk`.
+its lander: `UpdateRef` refuses `release/*` like `trunk`.
 
 Everything a line needs is keyed by `Line` (`Trunk` or `Release(name)`):
 `RepoKeys::line(&line)` gives trunk's own keys, or the release's rows in
@@ -437,7 +437,7 @@ step.
 
 * [rill-lander/src/land/lander.rs](../../crates/domain/lander/src/land/lander.rs), [sequence.rs](../../crates/domain/lander/src/land/sequence.rs), [prepare.rs](../../crates/domain/lander/src/land/prepare.rs), [commit.rs](../../crates/domain/lander/src/land/commit.rs), [speculate.rs](../../crates/domain/lander/src/land/speculate.rs), [domains.rs](../../crates/domain/lander/src/land/domains.rs), [record.rs](../../crates/domain/lander/src/land/record.rs)
 * [rill-lander/src/schedule/](../../crates/domain/lander/src/schedule/) (footprints, landing rules, fair order, ordered groups, plan, thrash, ETAs), [land/groups.rs](../../crates/domain/lander/src/land/groups.rs)
-* [rill-store/src/keys/line_keys.rs](../../crates/foundation/store/src/keys/line_keys.rs), [rill-runtime/src/state/releases.rs](../../crates/server/runtime/src/state/releases.rs), [rill-api/src/services/repo/refs.rs](../../crates/server/api/src/services/repo/refs.rs) (`CutRelease`)
+* [rill-store/src/keys/line_keys.rs](../../crates/foundation/store/src/keys/line_keys.rs), [rill-runtime/src/state/releases.rs](../../crates/server/runtime/src/state/releases.rs), [rill-api/src/services/repo/refs.rs](../../crates/server/api/src/services/repo/refs.rs) (`CreateRelease`)
 * [rill-lander/src/ladder/](../../crates/domain/lander/src/ladder/) (merge rules, `.gitattributes`, union, the ladder), [land/head_config.rs](../../crates/domain/lander/src/land/head_config.rs) (rules read once per head)
 * [rill-exec/src/verify/regenerate.rs](../../crates/domain/exec/src/verify/regenerate.rs), [rill-runtime/src/workers/regenerator.rs](../../crates/server/runtime/src/workers/regenerator.rs)
 * [rill-lander/src/queue.rs](../../crates/domain/lander/src/queue.rs), [config.rs](../../crates/domain/lander/src/config.rs), [events.rs](../../crates/domain/lander/src/events.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)

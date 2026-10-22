@@ -70,12 +70,12 @@ flowchart LR
   each next sequence key is absent, and writes the positions, their
   landing records, the reviews marked `Landed`, events, the head row and
   the trunk ref together. Sequence numbers are gap-free. In the server the
-  lander is the only caller; `RepoService.MoveRef` refuses `trunk`. The git
+  lander is the only caller; `RepoService.UpdateRef` refuses `trunk`. The git
   importer calls `land_on_trunk`, a one-entry batch, for imported mainline
   history. See [landing](../04-workflow/landing.md).
 - A release ref (`release/<name>`) is a line of its own with the same
-  rule: after `CutRelease` creates it, only `RepoStore::land` on that line
-  moves it, called by the release's lander; `MoveRef` refuses it.
+  rule: after `CreateRelease` creates it, only `RepoStore::land` on that line
+  moves it, called by the release's lander; `UpdateRef` refuses it.
 - A lander lands only while it holds its line's lease (`lander` for
   trunk, `lander:release/<name>` for a release): the land transaction
   checks the lease epoch, so a replaced lander cannot move its line.
@@ -95,8 +95,8 @@ flowchart LR
 
 **Crate boundaries**
 
-- The server hot-swaps the `ReviewService` when `SetPolicy` changes the
-  Cedar text: `AdminService.SetPolicy` validates and stores the text, then
+- The server hot-swaps the `ReviewService` when `UpdatePolicy` changes the
+  Cedar text: `AdminService.UpdatePolicy` validates and stores the text, then
   `RepoContext::reload_policy` rebuilds the service and stores it in an
   `ArcSwap`. Callers must not hold the returned `Arc` across requests.
 - `rill-review` is the only crate that evaluates `rill-policy::submit`. The
@@ -133,7 +133,7 @@ flowchart LR
 - [Lander traits](../../crates/domain/lander/src/traits.rs)
 - [ReviewHooksAdapter](../../crates/server/runtime/src/workers/hooks.rs)
 - [Policy hot-swap](../../crates/server/runtime/src/state/repo_context.rs)
-- [SetPolicy handler](../../crates/server/api/src/services/admin/mod.rs)
+- [UpdatePolicy handler](../../crates/server/api/src/services/admin/mod.rs)
 - [Rebase](../../crates/engine/core/src/rebase.rs)
 - [Search index](../../crates/domain/search/src/index/search_index.rs)
 

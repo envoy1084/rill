@@ -1,6 +1,5 @@
 //! Listing and creating repositories on the server.
 
-use rill_proto::convert::id_to_proto;
 use rill_proto::rill::v1 as pb;
 use rill_types::OperationId;
 
@@ -17,7 +16,11 @@ impl Client {
     ) -> Result<Page<RepoInfo>> {
         let resp = self
             .repo_svc()
-            .list_repos(pb::ListReposRequest { limit, page_token })
+            .list_repos(pb::ListReposRequest {
+                parent: format!("orgs/{}", crate::names::DEFAULT_ORG),
+                page_size: limit as i32,
+                page_token: page_token.unwrap_or_default(),
+            })
             .await?
             .into_owned();
         let items = resp
@@ -25,7 +28,8 @@ impl Client {
             .into_iter()
             .map(RepoInfo::try_from)
             .collect::<Result<_>>()?;
-        Ok(Page::new(items, resp.next_page_token))
+        let next = (!resp.next_page_token.is_empty()).then_some(resp.next_page_token);
+        Ok(Page::new(items, next))
     }
 
     /// Create a repository.
@@ -42,11 +46,19 @@ impl Client {
         description: Option<String>,
         windows_safe: bool,
     ) -> Result<RepoInfo> {
+        let full = crate::names::repo(name);
+        let (org, repo_id) =
+            rill_proto::names::repo_of(&full).map_err(|e| crate::Error::config(e.to_string()))?;
         let request = pb::CreateRepoRequest {
-            operation_id: id_to_proto(&op),
-            repo: name.to_string(),
-            description,
-            windows_safe,
+            request_id: crate::names::request_id(&op),
+            parent: format!("orgs/{org}"),
+            repo_id: repo_id.to_string(),
+            repo: pb::Repo {
+                description,
+                windows_safe,
+                ..Default::default()
+            }
+            .into(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.repo_svc(), request.clone());

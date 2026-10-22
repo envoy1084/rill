@@ -1,0 +1,95 @@
+// Landing changes: asking for a change or a stack to land, and following
+// the request through the queue.
+//
+// A land request is `orgs/{org}/repos/{repo}/landRequests/{ticket}`.
+syntax = "proto3";
+
+package rill.v1;
+
+// Land requests and the landing queue.
+service LandingService {
+  // Ask for a change to land on trunk or a release.
+  rpc RequestLand(RequestLandRequest) returns (RequestLandResponse);
+  // Ask for a change's stack, from its lowest unlanded change up, to land
+  // as one ordered group.
+  rpc RequestLandStack(RequestLandStackRequest) returns (RequestLandStackResponse);
+  // A land request, with its place in the queue or its outcome.
+  rpc GetLandRequest(GetLandRequestRequest) returns (GetLandRequestResponse);
+  // The requests still waiting, in serve order.
+  rpc ListLandRequests(ListLandRequestsRequest) returns (ListLandRequestsResponse);
+}
+
+enum LandStatus {
+  LAND_STATUS_UNSPECIFIED = 0;
+  LAND_STATUS_QUEUED = 1;
+  LAND_STATUS_REBASING = 2;
+  LAND_STATUS_LANDED = 3;
+  LAND_STATUS_FAILED = 4;
+  LAND_STATUS_CANCELLED = 5;
+}
+
+// A request for a change to land.
+message LandRequest {
+  // `orgs/{org}/repos/{repo}/landRequests/{ticket}`.
+  string name = 1;
+  // The ticket id.
+  string ticket = 2;
+  // `…/changes/{change}`.
+  string change = 3;
+  bytes change_id = 4;
+  LandStatus status = 5;
+  int64 requested_at = 6;
+  // Set once landed.
+  optional uint64 trunk_position = 7;
+  optional bytes landed_hash = 8;
+  // Why it did not land.
+  optional string error = 9;
+  // While queued: its place in the serve order (0 = next) and the wait
+  // estimated from the recent landing rate.
+  optional uint32 queue_position = 10;
+  optional uint64 eta_ms = 11;
+}
+
+message RequestLandRequest {
+  string request_id = 1;
+  // `…/changes/{change}`. Required.
+  string change = 2;
+  // The line to land on: `trunk` (the default) or `release/{name}`.
+  string onto = 3;
+}
+message RequestLandResponse {
+  LandRequest land_request = 1;
+}
+
+message RequestLandStackRequest {
+  string request_id = 1;
+  // The top of the stack: `…/changes/{change}`. Required.
+  string change = 2;
+  // Land the longest landable run from the bottom instead of all or none.
+  bool prefix = 3;
+  // The line to land on: `trunk` (the default) or `release/{name}`.
+  string onto = 4;
+}
+message RequestLandStackResponse {
+  // Bottom first.
+  repeated LandRequest land_requests = 1;
+}
+
+message GetLandRequestRequest {
+  // `…/landRequests/{ticket}`. Required.
+  string name = 1;
+}
+message GetLandRequestResponse {
+  LandRequest land_request = 1;
+}
+
+message ListLandRequestsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListLandRequestsResponse {
+  repeated LandRequest land_requests = 1;
+  string next_page_token = 2;
+}

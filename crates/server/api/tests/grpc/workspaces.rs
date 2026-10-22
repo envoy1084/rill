@@ -8,21 +8,24 @@ async fn undo_restores_every_field_and_undoing_it_redoes() {
     let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "ws".into(),
-            description: None,
-            windows_safe: false,
+            request_id: String::new(),
+            parent: common::names::org("default"),
+            repo_id: "ws".into(),
+            repo: None.into(),
         })
         .await
         .unwrap();
     let ws = c
         .workspace
         .create_workspace(pb::CreateWorkspaceRequest {
-            operation_id: Bytes::new(),
-            repo: "ws".into(),
-            name: "w".into(),
-            base: None.into(),
-            sparse: None.into(),
+            request_id: String::new(),
+            parent: common::names::repo("ws"),
+            workspace: (pb::Workspace {
+                display_name: "w".into(),
+                ..Default::default()
+            })
+            .into(),
+            base: String::new(),
         })
         .await
         .unwrap()
@@ -31,15 +34,19 @@ async fn undo_restores_every_field_and_undoing_it_redoes() {
         .unwrap();
     let narrowed = c
         .workspace
-        .set_sparse_profile(pb::SetSparseProfileRequest {
-            operation_id: Bytes::new(),
-            repo: "ws".into(),
-            workspace: ws.id.clone(),
-            sparse: (pb::SparseProfile {
-                include: vec!["src".into()],
-                exclude: vec![],
+        .update_workspace(pb::UpdateWorkspaceRequest {
+            request_id: String::new(),
+            workspace: (pb::Workspace {
+                name: ws.name.clone(),
+                sparse: (pb::SparseProfile {
+                    include: vec!["src".into()],
+                    exclude: vec![],
+                })
+                .into(),
+                ..Default::default()
             })
             .into(),
+            etag: ws.etag.clone(),
         })
         .await
         .unwrap()
@@ -49,13 +56,16 @@ async fn undo_restores_every_field_and_undoing_it_redoes() {
         vec!["src"]
     );
 
-    let undo = |target: Option<Bytes>| pb::UndoRequest {
-        operation_id: Bytes::new(),
-        repo: "ws".into(),
-        workspace: ws.id.clone(),
-        target,
+    let undo = |operation: String| pb::UndoOperationRequest {
+        request_id: String::new(),
+        name: operation,
     };
-    let undone = c.workspace.undo(undo(None)).await.unwrap().into_owned();
+    let undone = c
+        .workspace
+        .undo_operation(undo(format!("{}/operations/head", ws.name)))
+        .await
+        .unwrap()
+        .into_owned();
     let sparse = undone
         .workspace
         .unwrap()
@@ -67,10 +77,10 @@ async fn undo_restores_every_field_and_undoing_it_redoes() {
         "sparse profile restored: {sparse:?}"
     );
 
-    let undo_op = undone.operation.unwrap().id;
+    let undo_op = undone.operation.unwrap().name;
     let redone = c
         .workspace
-        .undo(undo(Some(undo_op)))
+        .undo_operation(undo(undo_op))
         .await
         .unwrap()
         .into_owned();

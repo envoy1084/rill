@@ -8,10 +8,9 @@ async fn requests_carry_ids_and_show_up_in_metrics() {
     let server = TestServer::start(dev_config()).await;
     let c = clients(&server, None).await;
     let request = pb::CreateRepoRequest {
-        operation_id: Bytes::new(),
-        repo: "observed".into(),
-        description: None,
-        windows_safe: false,
+        parent: "orgs/default".into(),
+        repo_id: "observed".into(),
+        ..Default::default()
     };
     let options = CallOptions::default().with_header("x-request-id", "req-42");
     let response = c
@@ -23,7 +22,7 @@ async fn requests_carry_ids_and_show_up_in_metrics() {
     let missing = c
         .repo
         .get_repo(pb::GetRepoRequest {
-            repo: "missing".into(),
+            name: "orgs/default/repos/missing".into(),
         })
         .await
         .unwrap_err();

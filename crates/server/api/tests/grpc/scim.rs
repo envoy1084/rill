@@ -56,8 +56,8 @@ async fn a_provisioning_system_manages_users_and_teams() {
         IdentityServiceClient::authed(connect(&a.grpc).await, Bearer(Some(root.clone())));
     let created = identity
         .create_scim_credential(pb::CreateScimCredentialRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
+            request_id: String::new(),
+            parent: "orgs/default".into(),
         })
         .await
         .unwrap()
@@ -104,19 +104,19 @@ async fn a_provisioning_system_manages_users_and_teams() {
     admin
         .repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "r".into(),
-            description: None,
-            windows_safe: false,
+            request_id: String::new(),
+            parent: "orgs/default".into(),
+            repo_id: "r".into(),
+            repo: None.into(),
         })
         .await
         .unwrap();
     admin
         .access
-        .add_relation(pb::AddRelationRequest {
-            operation_id: Bytes::new(),
+        .create_relation(pb::CreateRelationRequest {
+            request_id: String::new(),
+            parent: common::names::repo("r"),
             relation: (pb::Relation {
-                repo: "r".into(),
                 path: String::new(),
                 relation: "reader".into(),
                 subject: "team:devs".into(),
@@ -126,15 +126,14 @@ async fn a_provisioning_system_manages_users_and_teams() {
         .await
         .unwrap();
     let ann_token = a.token_for(&Principal::human("ann"));
-    let list = || pb::ListDirRequest {
-        repo: "r".into(),
-        root: None.into(),
-        path: String::new(),
+    let list = || pb::ListDirectoryRequest {
+        repo: common::names::repo("r"),
+        ..Default::default()
     };
     let denied = clients(&b, Some(&ann_token))
         .await
-        .repo
-        .list_dir(list())
+        .content
+        .list_directory(list())
         .await
         .unwrap_err();
     assert_eq!(denied.code, Code::PermissionDenied);
@@ -150,8 +149,8 @@ async fn a_provisioning_system_manages_users_and_teams() {
     loop {
         match clients(&b, Some(&ann_token))
             .await
-            .repo
-            .list_dir(list())
+            .content
+            .list_directory(list())
             .await
         {
             Ok(_) => break,
@@ -176,8 +175,8 @@ async fn a_provisioning_system_manages_users_and_teams() {
     loop {
         let refused = clients(&b, Some(&ann_token))
             .await
-            .admin
-            .who_am_i(pb::WhoAmIRequest {})
+            .identity
+            .get_caller(pb::GetCallerRequest {})
             .await
             .is_err();
         if refused {
@@ -188,10 +187,9 @@ async fn a_provisioning_system_manages_users_and_teams() {
     }
 
     identity
-        .revoke_scim_credential(pb::RevokeScimCredentialRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
-            id: created.credential.unwrap().id,
+        .delete_scim_credential(pb::DeleteScimCredentialRequest {
+            request_id: String::new(),
+            name: created.credential.unwrap().name,
         })
         .await
         .unwrap();

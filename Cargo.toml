@@ -149,6 +149,7 @@ gix-parallel = { version = "=0.50.0", features = ["parallel"] }
 toml = "1.1.8"
 dirs = "7.0.0"
 tempfile = "3.27.0"
+uuid = "1.28.0"
 icu_casemap = "2.3.0"
 backon = "1.6.0"
 moka = { version = "0.12.16", features = ["sync"] }

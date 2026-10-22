@@ -153,7 +153,7 @@ allow enqueues `LandRequest { change_id, version: current, requester, risk }`
 with the lander. It does not change the review status; the lander does
 when it picks the request up ([landing](landing.md)).
 
-`SetPolicy` makes `RepoContext::reload_policy` rebuild the `ReviewService`
+`UpdatePolicy` makes `RepoContext::reload_policy` rebuild the `ReviewService`
 and swap it behind an `ArcSwap`.
 
 **Events.** Every review write records its events in the same

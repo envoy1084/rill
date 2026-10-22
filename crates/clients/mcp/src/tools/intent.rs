@@ -1,7 +1,7 @@
 //! Intent tools: create, list, get, link and similarity search.
 
 use rill_sdk::{IntentFilter, NewIntent};
-use rill_types::{ChangeId, IntentId, IntentKind, IntentStatus, PrincipalId};
+use rill_types::{ChangeId, IntentId, IntentKind, IntentStatus};
 use serde_json::{json, Value};
 
 use super::args::Args;
@@ -57,7 +57,10 @@ pub fn definitions() -> Vec<ToolDef> {
                         "items": { "type": "string", "enum": KINDS },
                     }),
                 )
-                .opt("owner", string("Only intents owned by this principal id"))
+                .opt(
+                    "owner",
+                    string("Only intents owned by this principal, as shown (ann, agent:bot)"),
+                )
                 .opt("parent", string("Only children of this intent"))
                 .opt("limit", integer("Page size"))
                 .opt("page_token", string("Continue from a previous page"))
@@ -154,7 +157,7 @@ async fn list(ctx: &ToolContext, args: &Args) -> ToolResult<Value> {
             .iter()
             .map(|k| kind(k))
             .collect::<ToolResult<_>>()?,
-        owner: args.opt_parse::<PrincipalId>("owner")?,
+        owner: args.opt_string("owner")?,
         parent: args.opt_parse::<IntentId>("parent")?,
         limit: args.limit("limit", 0)?,
         page_token: args.opt_string("page_token")?,

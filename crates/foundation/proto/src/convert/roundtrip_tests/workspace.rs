@@ -84,14 +84,14 @@ fn operation_roundtrip_every_kind() {
             at: Timestamp::from_millis(i as i64),
         };
         assert_eq!(
-            Operation::try_from(wire(pb::Operation::from(&op))).unwrap(),
+            Operation::try_from(wire(pb::WorkspaceOperation::from(&op))).unwrap(),
             op
         );
     }
 
-    let bad = pb::Operation {
+    let bad = pb::WorkspaceOperation {
         kind: None.into(),
-        ..pb::Operation::from(Operation {
+        ..pb::WorkspaceOperation::from(Operation {
             id: OperationId::derived("t", "x"),
             workspace: WorkspaceId::derived("t", "w"),
             parent: None,

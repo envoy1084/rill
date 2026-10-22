@@ -7,8 +7,8 @@ use rill_proto::convert::{
 use rill_proto::rill::v1 as pb;
 use rill_types::objects::review::CommentCategory;
 use rill_types::{
-    ChangeId, ChangeVersionHash, IntentId, Label, LabelVote, Principal, PrincipalId, ReviewState,
-    ReviewStatus, RiskClass, Thread, ThreadAnchor, Timestamp, TrunkSeq,
+    ChangeId, ChangeVersionHash, IntentId, Label, LabelVote, Principal, ReviewState, ReviewStatus,
+    RiskClass, Thread, ThreadAnchor, Timestamp, TrunkSeq,
 };
 
 use crate::error::{Error, Result};
@@ -27,14 +27,37 @@ pub struct ReviewInfo {
 pub struct ReviewFilter {
     /// Only these statuses; empty means any.
     pub status: Vec<ReviewStatus>,
-    /// Only reviews owned by this principal.
-    pub owner: Option<PrincipalId>,
+    /// Only reviews owned by this principal, as shown (`ann`, `agent:bot`).
+    pub owner: Option<String>,
     /// Only reviews linked to this intent.
     pub intent: Option<IntentId>,
     /// Page size; `0` lets the server choose.
     pub limit: u32,
     /// Continue from a previous page.
     pub page_token: Option<String>,
+}
+
+impl ReviewFilter {
+    /// The filter text the server takes.
+    pub fn to_filter(&self) -> String {
+        let statuses: Vec<&str> = self.status.iter().map(|s| status_name(*s)).collect();
+        crate::filter::FilterBuilder::new()
+            .any_of("status", &statuses)
+            .eq_opt("owner", self.owner.as_deref())
+            .eq_opt("intent", self.intent.map(|i| i.to_string()))
+            .build()
+    }
+}
+
+/// How a review status reads in filters.
+pub fn status_name(status: ReviewStatus) -> &'static str {
+    match status {
+        ReviewStatus::Open => "open",
+        ReviewStatus::Landable => "landable",
+        ReviewStatus::Landing => "landing",
+        ReviewStatus::Landed => "landed",
+        ReviewStatus::Abandoned => "abandoned",
+    }
 }
 
 /// A new comment opening a thread.
@@ -157,6 +180,8 @@ impl LandStatus {
 /// A landing request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LandTicket {
+    /// The request's name, `…/landRequests/{ticket}`.
+    pub name: String,
     /// Ticket id, used to poll status.
     pub id: String,
     /// The change being landed.
@@ -167,13 +192,14 @@ pub struct LandTicket {
     pub requested_at: Timestamp,
 }
 
-impl TryFrom<pb::LandTicket> for LandTicket {
+impl TryFrom<pb::LandRequest> for LandTicket {
     type Error = Error;
 
-    fn try_from(t: pb::LandTicket) -> Result<Self> {
+    fn try_from(t: pb::LandRequest) -> Result<Self> {
         Ok(LandTicket {
-            id: t.id,
-            change_id: id_from_proto("land_ticket.change_id", &t.change_id)?,
+            name: t.name,
+            id: t.ticket,
+            change_id: id_from_proto("land_request.change_id", &t.change_id)?,
             status: LandStatus::from_proto(t.status.to_i32())?,
             requested_at: timestamp_from_proto(t.requested_at),
         })
@@ -204,20 +230,17 @@ impl LandProgress {
     }
 }
 
-impl TryFrom<pb::GetLandStatusResponse> for LandProgress {
+impl TryFrom<pb::LandRequest> for LandProgress {
     type Error = Error;
 
-    fn try_from(r: pb::GetLandStatusResponse) -> Result<Self> {
+    fn try_from(r: pb::LandRequest) -> Result<Self> {
         Ok(LandProgress {
-            ticket: required("get_land_status.ticket", r.ticket)?.try_into()?,
-            seq: r.seq.map(trunk_seq_from_proto),
-            landed_hash: opt_hash_from_proto(
-                "get_land_status.landed_hash",
-                r.landed_hash.as_ref(),
-            )?,
-            error: r.error,
-            position: r.position,
+            seq: r.trunk_position.map(trunk_seq_from_proto),
+            landed_hash: opt_hash_from_proto("land_request.landed_hash", r.landed_hash.as_ref())?,
+            error: r.error.clone(),
+            position: r.queue_position,
             eta: r.eta_ms.map(std::time::Duration::from_millis),
+            ticket: r.try_into()?,
         })
     }
 }
@@ -248,22 +271,24 @@ pub struct ReviewEvent {
     pub kind: ReviewEventKind,
 }
 
-impl TryFrom<pb::ReviewEvent> for ReviewEvent {
+impl TryFrom<pb::WatchReviewResponse> for ReviewEvent {
     type Error = Error;
 
-    fn try_from(e: pb::ReviewEvent) -> Result<Self> {
+    fn try_from(e: pb::WatchReviewResponse) -> Result<Self> {
         let kind = match required("review_event.event", e.event)? {
-            pb::review_event::Event::StatusChanged(s) => ReviewEventKind::StatusChanged(
+            pb::watch_review_response::Event::StatusChanged(s) => ReviewEventKind::StatusChanged(
                 review_status_from_proto("review_event.status_changed", s)?,
             ),
-            pb::review_event::Event::Voted(v) => ReviewEventKind::Voted(v.try_into()?),
-            pb::review_event::Event::ThreadUpdated(t) => {
+            pb::watch_review_response::Event::Voted(v) => ReviewEventKind::Voted(v.try_into()?),
+            pb::watch_review_response::Event::ThreadUpdated(t) => {
                 ReviewEventKind::ThreadUpdated(t.try_into()?)
             }
-            pb::review_event::Event::NewVersion(h) => {
+            pb::watch_review_response::Event::NewVersion(h) => {
                 ReviewEventKind::NewVersion(hash_from_proto("review_event.new_version", &h)?)
             }
-            pb::review_event::Event::LandUpdate(t) => ReviewEventKind::LandUpdate(t.try_into()?),
+            pb::watch_review_response::Event::LandUpdate(t) => {
+                ReviewEventKind::LandUpdate(t.try_into()?)
+            }
         };
         Ok(ReviewEvent {
             change_id: id_from_proto("review_event.change_id", &e.change_id)?,

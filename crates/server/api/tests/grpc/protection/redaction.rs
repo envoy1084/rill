@@ -14,15 +14,13 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
     repo(&mut root, "app").await;
     let leaked = "customer list: alice, bob\n".repeat(40);
     let (edit, hash) = blob(&server, "data/customers.txt", leaked.as_bytes()).await;
-    let version = apply(&mut root, "app", vec![edit]).await.unwrap().hash;
-    let at = pb::RootSpec {
-        root: Some(pb::root_spec::Root::VersionHash(version.clone())),
-    };
+    let version = apply(&mut root, "app", vec![edit]).await.unwrap();
+    let at = hex(&hash_of(&version));
     let grant = root
-        .repo
-        .resolve_path(pb::ResolvePathRequest {
-            repo: "app".into(),
-            root: at.clone().into(),
+        .content
+        .stat(pb::StatRequest {
+            repo: common::names::repo("app"),
+            revision: at.clone(),
             path: "data/customers.txt".into(),
         })
         .await
@@ -30,37 +28,38 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         .into_owned()
         .read_grant;
     let read = |c: &mut Clients| {
-        let repo = c.repo.clone();
+        let content = c.content.clone();
         let grant = grant.clone();
         let leaked = leaked.clone();
         async move {
-            repo.get_blob(pb::GetBlobRequest {
-                repo: "app".into(),
-                content: (pb::ContentRef {
-                    r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
-                        hash: Bytes::copy_from_slice(hash.as_bytes()),
-                        size: leaked.len() as u64,
-                    })),
+            content
+                .read_blob(pb::ReadBlobRequest {
+                    repo: common::names::repo("app"),
+                    content: (pb::ContentRef {
+                        r#ref: Some(pb::content_ref::Ref::Blob(pb::BlobRef {
+                            hash: Bytes::copy_from_slice(hash.as_bytes()),
+                            size: leaked.len() as u64,
+                        })),
+                    })
+                    .into(),
+                    offset: None,
+                    length: None,
+                    grant,
                 })
-                .into(),
-                offset: None,
-                length: None,
-                grant,
-            })
-            .await?
-            .messages()
-            .next()
-            .await
-            .transpose()
+                .await?
+                .messages()
+                .next()
+                .await
+                .transpose()
         }
     };
     assert!(read(&mut root).await.unwrap().is_some());
 
     let request = root
         .protection
-        .request_redaction(pb::RequestRedactionRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
+        .create_redaction(pb::CreateRedactionRequest {
+            request_id: String::new(),
+            parent: common::names::org("default"),
             kind: pb::ObjectKind::Blob.into(),
             hash: Bytes::copy_from_slice(hash.as_bytes()),
             reason: "customer data committed by mistake".into(),
@@ -72,12 +71,11 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
         .unwrap();
     let approve = |c: &mut Clients| {
         let p = c.protection.clone();
-        let id = request.id.clone();
+        let name = request.name.clone();
         async move {
             p.approve_redaction(pb::ApproveRedactionRequest {
-                operation_id: Bytes::new(),
-                org: "default".into(),
-                id,
+                request_id: String::new(),
+                name,
             })
             .await
         }
@@ -134,10 +132,10 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
     assert!(again.is_err(), "re-adding redacted content is refused");
     // Search skips it rather than failing.
     let hits = root
-        .repo
+        .content
         .grep(pb::GrepRequest {
-            repo: "app".into(),
-            root: at.into(),
+            repo: common::names::repo("app"),
+            revision: at,
             pattern: "customer".into(),
             ..Default::default()
         })
@@ -171,9 +169,8 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
     let actions: Vec<String> = root
         .audit
         .list_audit_entries(pb::ListAuditEntriesRequest {
-            org: "default".into(),
-            after_seq: 0,
-            limit: 0,
+            parent: common::names::org("default"),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -203,21 +200,21 @@ async fn a_redacted_tree_is_refused_even_when_cached() {
         vec![set_edit("private/names.txt", b"alice\nbob\n")],
     )
     .await
-    .unwrap()
-    .hash;
-    let at = pb::RootSpec {
-        root: Some(pb::root_spec::Root::VersionHash(version.clone())),
-    };
+    .unwrap();
+    let version = hash_of(&version);
+    let at = hex(&version);
     let list = |c: &mut Clients| {
-        let repo = c.repo.clone();
+        let content = c.content.clone();
         let at = at.clone();
         async move {
-            repo.list_dir(pb::ListDirRequest {
-                repo: "app".into(),
-                root: at.into(),
-                path: "private".into(),
-            })
-            .await
+            content
+                .list_directory(pb::ListDirectoryRequest {
+                    repo: common::names::repo("app"),
+                    revision: at,
+                    path: "private".into(),
+                    ..Default::default()
+                })
+                .await
         }
     };
     list(&mut root).await.expect("read once, so it is cached");
@@ -237,9 +234,9 @@ async fn a_redacted_tree_is_refused_even_when_cached() {
         .unwrap();
     let id = root
         .protection
-        .request_redaction(pb::RequestRedactionRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
+        .create_redaction(pb::CreateRedactionRequest {
+            request_id: String::new(),
+            parent: common::names::org("default"),
             kind: pb::ObjectKind::Tree.into(),
             hash: Bytes::copy_from_slice(dir.as_bytes()),
             reason: "names".into(),
@@ -249,12 +246,11 @@ async fn a_redacted_tree_is_refused_even_when_cached() {
         .into_owned()
         .redaction
         .unwrap()
-        .id;
+        .name;
     sec.protection
         .approve_redaction(pb::ApproveRedactionRequest {
-            operation_id: Bytes::new(),
-            org: "default".into(),
-            id,
+            request_id: String::new(),
+            name: id,
         })
         .await
         .unwrap();

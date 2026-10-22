@@ -1,6 +1,5 @@
 //! Comparison: diffs, merge bases and ancestry.
 
-use rill_proto::convert::{hash_to_proto, hashes_from_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeVersionHash, RepoPathBuf};
 
@@ -34,15 +33,15 @@ impl RepoClient {
         opts: DiffOptions,
     ) -> Result<DiffResult> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
+            let svc = self.content();
             let request = pb::DiffRequest {
-                repo: self.repo.clone(),
-                base: base.to_proto().into(),
-                target: target.to_proto().into(),
+                repo: self.resource.clone(),
+                base: base.to_string(),
+                target: target.to_string(),
                 paths: opts.paths.iter().map(|p| p.to_string()).collect(),
                 format: opts.format.to_proto().into(),
                 context_lines: opts.context_lines,
-                limit: opts.limit,
+                max_files: opts.limit,
             };
             async move { svc.diff(request).await }
         })
@@ -74,17 +73,20 @@ impl RepoClient {
         b: ChangeVersionHash,
     ) -> Result<Vec<ChangeVersionHash>> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::MergeBaseRequest {
-                repo: self.repo.clone(),
-                a: hash_to_proto(&a),
-                b: hash_to_proto(&b),
+            let svc = self.content();
+            let request = pb::FindMergeBaseRequest {
+                repo: self.resource.clone(),
+                a: a.to_hex(),
+                b: b.to_hex(),
             };
-            async move { svc.merge_base(request).await }
+            async move { svc.find_merge_base(request).await }
         })
         .await?
         .into_owned();
-        Ok(hashes_from_proto("merge_base.bases", &resp.bases)?)
+        resp.bases
+            .iter()
+            .map(|name| crate::names::version_hash(name))
+            .collect()
     }
 
     /// True when `ancestor` is reachable from `descendant`.
@@ -94,11 +96,11 @@ impl RepoClient {
         descendant: ChangeVersionHash,
     ) -> Result<bool> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
+            let svc = self.content();
             let request = pb::IsAncestorRequest {
-                repo: self.repo.clone(),
-                ancestor: hash_to_proto(&ancestor),
-                descendant: hash_to_proto(&descendant),
+                repo: self.resource.clone(),
+                ancestor: ancestor.to_hex(),
+                descendant: descendant.to_hex(),
             };
             async move { svc.is_ancestor(request).await }
         })

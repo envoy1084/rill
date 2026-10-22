@@ -130,29 +130,12 @@ impl Trunk {
 
     /// Trunk's health and its open incidents.
     pub async fn health(&self) -> anyhow::Result<(pb::TrunkHealth, Vec<pb::Incident>)> {
-        let reply = self
-            .client
-            .lander_svc()
-            .get_trunk_health(pb::GetTrunkHealthRequest {
-                repo: self.name.clone(),
-            })
-            .await?
-            .into_owned();
-        Ok((reply.health.into_option().unwrap_or_default(), reply.open))
+        Ok(self.repo.trunk().health().await?)
     }
 
     /// The latest incidents, open or closed, newest first.
     pub async fn incidents(&self) -> anyhow::Result<Vec<pb::Incident>> {
-        let reply = self
-            .client
-            .lander_svc()
-            .list_incidents(pb::ListIncidentsRequest {
-                repo: self.name.clone(),
-                limit: 100,
-            })
-            .await?
-            .into_owned();
-        Ok(reply.incidents)
+        Ok(self.repo.trunk().incidents(None, 100, None).await?.items)
     }
 
     /// The incident whose culprit is `seq`, open or closed.
@@ -169,7 +152,7 @@ impl Trunk {
         use rill_sdk::VerificationStatus::{Pending, Running};
         let deadline = Instant::now() + within;
         while Instant::now() < deadline {
-            let record = self.repo.lander().verification(seq).await?;
+            let record = self.repo.trunk().verification(seq).await?;
             if !matches!(record.status, Pending | Running) {
                 return Ok(());
             }

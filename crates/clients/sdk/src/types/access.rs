@@ -34,21 +34,19 @@ impl Relation {
         }
     }
 
-    /// Wire encoding.
+    /// Wire encoding; the repository travels as the request's parent.
     pub fn to_proto(&self) -> pb::Relation {
         pb::Relation {
-            repo: self.repo.clone(),
             path: self.path.clone(),
             relation: self.relation.clone(),
             subject: self.subject.clone(),
         }
     }
-}
 
-impl From<pb::Relation> for Relation {
-    fn from(r: pb::Relation) -> Self {
+    /// A tuple of `repo` as the server returned it.
+    pub fn from_proto(repo: &str, r: pb::Relation) -> Self {
         Relation {
-            repo: r.repo,
+            repo: repo.to_string(),
             path: r.path,
             relation: r.relation,
             subject: r.subject,
@@ -65,6 +63,17 @@ pub struct RelationFilter {
     pub subject: Option<String>,
     /// Only this relation.
     pub relation: Option<String>,
+}
+
+impl RelationFilter {
+    /// The filter text the server takes.
+    pub fn to_filter(&self) -> String {
+        crate::filter::FilterBuilder::new()
+            .eq_opt("path", self.path.as_deref())
+            .eq_opt("subject", self.subject.as_deref())
+            .eq_opt("relation", self.relation.as_deref())
+            .build()
+    }
 }
 
 /// Whether someone holds a relation, and why.

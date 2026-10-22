@@ -8,27 +8,28 @@ async fn commits_enforce_path_rules() {
     let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "win".into(),
-            description: None,
-            windows_safe: true,
+            parent: common::names::org("default"),
+            repo_id: "win".into(),
+            repo: pb::Repo {
+                windows_safe: true,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
         })
         .await
         .unwrap();
     let edit = |path: &'static str| {
-        let repo = c.repo.clone();
+        let changes = c.changes.clone();
         async move {
-            repo.apply_edits(pb::ApplyEditsRequest {
-                operation_id: Bytes::new(),
-                repo: "win".into(),
-                base: None.into(),
-                edits: vec![set_edit(path, b"x\n")],
-                message: path.into(),
-                intent: None,
-                provenance: None.into(),
-                change_id: None,
-            })
-            .await
+            changes
+                .apply_edits(pb::ApplyEditsRequest {
+                    parent: common::names::repo("win"),
+                    edits: vec![set_edit(path, b"x\n")],
+                    message: path.into(),
+                    ..Default::default()
+                })
+                .await
         }
     };
     assert_eq!(
@@ -41,16 +42,12 @@ async fn commits_enforce_path_rules() {
     );
     edit("README.md").await.unwrap();
     let first = c
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "win".into(),
-            base: None.into(),
+            parent: common::names::repo("win"),
             edits: vec![set_edit("README.md", b"x\n"), set_edit("readme.md", b"y\n")],
             message: "case".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await;
     assert_eq!(first.unwrap_err().code, Code::InvalidArgument);
@@ -62,10 +59,14 @@ async fn server_stamps_authorship_and_attests_commits() {
     let c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "auth".into(),
-            description: None,
-            windows_safe: false,
+            parent: common::names::org("default"),
+            repo_id: "auth".into(),
+            repo: pb::Repo {
+                windows_safe: false,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -98,26 +99,30 @@ async fn server_stamps_authorship_and_attests_commits() {
         ),
     );
     let created = c
-        .repo
-        .create_change_version(pb::CreateChangeVersionRequest {
-            operation_id: Bytes::new(),
-            repo: "auth".into(),
+        .changes
+        .create_version(pb::CreateVersionRequest {
+            request_id: String::new(),
+            parent: common::names::repo("auth"),
             version: pb::ChangeVersion::from(claimed).into(),
             signatures: Vec::new(),
         })
         .await
         .unwrap()
-        .into_owned();
+        .into_owned()
+        .version
+        .unwrap();
 
     let got = c
-        .repo
-        .get_change_version(pb::GetChangeVersionRequest {
-            repo: "auth".into(),
-            hash: created.hash.clone(),
+        .changes
+        .get_version(pb::GetVersionRequest {
+            name: common::names::version("auth", &created.hash),
+            view: pb::VersionView::Full.into(),
         })
         .await
         .unwrap()
-        .into_owned();
+        .into_owned()
+        .version
+        .unwrap();
     let stored = rill_types::ChangeVersion::try_from(got.version.unwrap()).unwrap();
     assert_eq!(stored.author.name, "dev");
     assert!(stored.created_at.millis() > 1);
@@ -136,7 +141,7 @@ async fn server_stamps_authorship_and_attests_commits() {
     let hash = ObjectHash::from_slice(&created.hash).unwrap();
     let health = c
         .admin
-        .health(pb::HealthRequest {})
+        .get_health(pb::GetHealthRequest {})
         .await
         .unwrap()
         .into_owned();

@@ -7,7 +7,6 @@ use clap::{Args, Subcommand};
 use rill_mcp::json;
 use rill_sdk::{Capability, TokenRequest};
 use rill_types::Timestamp;
-use serde_json::json as j;
 
 use crate::context::Ctx;
 use crate::error::CliError;
@@ -100,14 +99,14 @@ pub enum PolicyCmd {
 /// `rill admin policy get`.
 #[derive(Args, Debug)]
 pub struct PolicyGetArgs {
-    /// Policy name.
+    /// `submit` or `risk`.
     pub name: String,
 }
 
 /// `rill admin policy set`.
 #[derive(Args, Debug)]
 pub struct PolicySetArgs {
-    /// Policy name.
+    /// `submit` or `risk`.
     pub name: String,
     /// File holding the Cedar text (`-` for stdin).
     pub file: PathBuf,
@@ -240,7 +239,8 @@ async fn issue(ctx: &mut Ctx<'_>, args: IssueArgs) -> Result<()> {
 }
 
 async fn policy_get(ctx: &mut Ctx<'_>, args: PolicyGetArgs) -> Result<()> {
-    let policy = ctx.client()?.admin().policy(&args.name).await?;
+    let repo = ctx.repo_name()?;
+    let policy = ctx.client()?.admin().policy(&repo, &args.name).await?;
     ctx.emit(json::policy(&policy), |out| {
         out.line(out.dim(&format!(
             "// {} updated {} by {}",
@@ -267,17 +267,19 @@ async fn policy_set(ctx: &mut Ctx<'_>, args: PolicySetArgs) -> Result<()> {
             .await
             .map_err(|e| CliError::Other(anyhow::anyhow!("read task failed: {e}")))??
     };
-    let updated = ctx.client()?.admin().set_policy(&args.name, &text).await?;
-    ctx.emit(
-        j!({ "name": args.name, "updated_at": json::timestamp(&updated) }),
-        |out| {
-            out.line(format!(
-                "policy {} updated at {}",
-                args.name,
-                when(&updated)
-            ))
-        },
-    )
+    let repo = ctx.repo_name()?;
+    let policy = ctx
+        .client()?
+        .admin()
+        .set_policy(&repo, &args.name, &text, None)
+        .await?;
+    ctx.emit(json::policy(&policy), |out| {
+        out.line(format!(
+            "policy {} updated at {}",
+            args.name,
+            when(&policy.updated_at)
+        ))
+    })
 }
 
 async fn health(ctx: &mut Ctx<'_>) -> Result<()> {

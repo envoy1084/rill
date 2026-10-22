@@ -2,6 +2,7 @@
 
 use std::future::Future;
 
+use crate::common::names;
 use crate::*;
 
 const ATTEMPTS: usize = 100;
@@ -28,47 +29,42 @@ where
     panic!("{what}: the cluster never answered");
 }
 
-pub(super) fn op() -> Bytes {
-    Bytes::copy_from_slice(&rill_types::ids::random_id())
+pub(super) fn op() -> String {
+    names::request_id()
 }
 
-pub(super) fn edit(repo: &str, path: &str, op: &Bytes) -> pb::ApplyEditsRequest {
+pub(super) fn edit(repo: &str, path: &str, op: &str) -> pb::ApplyEditsRequest {
     pb::ApplyEditsRequest {
-        operation_id: op.clone(),
-        repo: repo.into(),
-        base: (pb::EditBase {
-            base: Some(pb::edit_base::Base::Root(trunk())),
-        })
-        .into(),
+        request_id: op.into(),
+        parent: names::repo(repo),
+        base: common::trunk_base().into(),
         edits: vec![set_edit(path, path.as_bytes())],
         message: path.into(),
-        intent: None,
+        intent: String::new(),
         provenance: None.into(),
-        change_id: None,
+        change: String::new(),
     }
 }
 
 /// Review and land `change`, retrying every step; returns its position.
 pub(super) async fn land_through(c: &Clients, repo: &str, change: &Bytes) -> u64 {
-    let submit = pb::SubmitForReviewRequest {
-        operation_id: op(),
-        repo: repo.into(),
-        change_id: change.clone(),
+    let submit = pb::SubmitChangeRequest {
+        request_id: op(),
+        change: names::change(repo, change),
     };
     retry("submit", || {
         let (svc, request) = (c.review.clone(), submit.clone());
-        async move { svc.submit_for_review(request).await }
+        async move { svc.submit_change(request).await }
     })
     .await;
     for (label, value) in [("Verified", 1), ("Review", 2)] {
         let vote = pb::VoteRequest {
-            operation_id: op(),
-            repo: repo.into(),
-            change_id: change.clone(),
+            request_id: op(),
+            review: names::review(repo, change),
             label: label.into(),
             value,
             reason: None,
-            version: None,
+            version: String::new(),
         };
         retry("vote", || {
             let (svc, request) = (c.review.clone(), vote.clone());
@@ -77,36 +73,32 @@ pub(super) async fn land_through(c: &Clients, repo: &str, change: &Bytes) -> u64
         .await;
     }
     let land = pb::RequestLandRequest {
-        operation_id: op(),
-        repo: repo.into(),
-        change_id: change.clone(),
-        onto: None,
+        request_id: op(),
+        change: names::change(repo, change),
+        onto: String::new(),
     };
     let ticket = retry("request land", || {
-        let (svc, request) = (c.review.clone(), land.clone());
+        let (svc, request) = (c.landing.clone(), land.clone());
         async move { svc.request_land(request).await }
     })
     .await
-    .ticket
+    .land_request
     .unwrap();
-    let status = pb::GetLandStatusRequest {
-        repo: repo.into(),
-        ticket: ticket.id.clone(),
+    let status = pb::GetLandRequestRequest {
+        name: ticket.name.clone(),
     };
     // Long enough for a survivor to take over a dead server's lease.
     let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
     loop {
         let current = retry("land status", || {
-            let (svc, request) = (c.review.clone(), status.clone());
-            async move { svc.get_land_status(request).await }
+            let (svc, request) = (c.landing.clone(), status.clone());
+            async move { svc.get_land_request(request).await }
         })
-        .await;
-        match rill_proto::convert::known::<pb::LandStatus>(
-            current.ticket.as_option().unwrap().status,
-        )
-        .unwrap()
-        {
-            pb::LandStatus::Landed => return current.seq.unwrap(),
+        .await
+        .land_request
+        .unwrap();
+        match rill_proto::convert::known::<pb::LandStatus>(current.status).unwrap() {
+            pb::LandStatus::Landed => return current.trunk_position.unwrap(),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 panic!("landing failed: {:?}", current.error)
             }
@@ -122,8 +114,8 @@ pub(super) async fn stored_with_message(c: &Clients, repo: &str, message: &str) 
     let mut log = c
         .repo
         .clone()
-        .watch_log(pb::WatchLogRequest {
-            repo: repo.into(),
+        .watch_versions(pb::WatchVersionsRequest {
+            parent: names::repo(repo),
             after: Some(Bytes::new()),
         })
         .await
@@ -134,7 +126,7 @@ pub(super) async fn stored_with_message(c: &Clients, repo: &str, message: &str) 
         .await
         .map(|m| m.transpose().unwrap())
     {
-        count += usize::from(entry.info.unwrap().message == message);
+        count += usize::from(entry.version.unwrap().message == message);
     }
     count
 }
@@ -142,7 +134,7 @@ pub(super) async fn stored_with_message(c: &Clients, repo: &str, message: &str) 
 /// Apply `request`, retrying with its operation id; returns the change id.
 pub(super) async fn write_through(c: &Clients, request: pb::ApplyEditsRequest) -> Bytes {
     retry("write", || {
-        let (svc, request) = (c.repo.clone(), request.clone());
+        let (svc, request) = (c.changes.clone(), request.clone());
         async move { svc.apply_edits(request).await }
     })
     .await

@@ -53,7 +53,7 @@ defaults with a comment header that lists every alternative.
 
 `LandPolicy` durations use serde's default `Duration` form, a table of
 `secs` and `nanos`. Per-repository submit and risk policies are not part of
-this file. They are stored in the repository and set with `SetPolicy`
+this file. They are stored in the repository and set with `UpdatePolicy`
 ([submit policy](../05-policy/submit-policy.md)).
 
 ## Storage backends

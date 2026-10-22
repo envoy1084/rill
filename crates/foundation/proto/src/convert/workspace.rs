@@ -43,13 +43,17 @@ impl TryFrom<pb::SparseProfile> for SparseProfile {
     }
 }
 
+/// The wire form without its resource name and etag, which the server
+/// sets.
 impl From<&Workspace> for pb::Workspace {
     fn from(w: &Workspace) -> Self {
         pb::Workspace {
-            id: id_to_proto(&w.id),
-            repo: id_to_proto(&w.repo),
+            name: String::new(),
+            uid: id_to_proto(&w.id),
+            repo_uid: id_to_proto(&w.repo),
             owner: pb::Principal::from(&w.owner).into(),
-            name: w.name.clone(),
+            display_name: w.name.clone(),
+            etag: String::new(),
             base: hash_to_proto(&w.base),
             working_change: id_to_proto(&w.working_change),
             snapshot: w.snapshot.as_ref().map(hash_to_proto),
@@ -72,10 +76,10 @@ impl TryFrom<pb::Workspace> for Workspace {
 
     fn try_from(w: pb::Workspace) -> Result<Self> {
         Ok(Workspace {
-            id: id_from_proto("workspace.id", &w.id)?,
-            repo: id_from_proto("workspace.repo", &w.repo)?,
+            id: id_from_proto("workspace.uid", &w.uid)?,
+            repo: id_from_proto("workspace.repo_uid", &w.repo_uid)?,
             owner: required("workspace.owner", w.owner)?.try_into()?,
-            name: w.name,
+            name: w.display_name,
             base: hash_from_proto("workspace.base", &w.base)?,
             working_change: id_from_proto("workspace.working_change", &w.working_change)?,
             snapshot: opt_hash_from_proto("workspace.snapshot", w.snapshot.as_ref())?,
@@ -175,9 +179,11 @@ impl TryFrom<pb::OperationKind> for OperationKind {
     }
 }
 
-impl From<&Operation> for pb::Operation {
+/// The wire form without its resource name, which the server sets.
+impl From<&Operation> for pb::WorkspaceOperation {
     fn from(op: &Operation) -> Self {
-        pb::Operation {
+        pb::WorkspaceOperation {
+            name: String::new(),
             id: id_to_proto(&op.id),
             workspace: id_to_proto(&op.workspace),
             parent: op.parent.as_ref().map(id_to_proto),
@@ -189,16 +195,16 @@ impl From<&Operation> for pb::Operation {
     }
 }
 
-impl From<Operation> for pb::Operation {
+impl From<Operation> for pb::WorkspaceOperation {
     fn from(op: Operation) -> Self {
-        pb::Operation::from(&op)
+        pb::WorkspaceOperation::from(&op)
     }
 }
 
-impl TryFrom<pb::Operation> for Operation {
+impl TryFrom<pb::WorkspaceOperation> for Operation {
     type Error = ConvertError;
 
-    fn try_from(op: pb::Operation) -> Result<Self> {
+    fn try_from(op: pb::WorkspaceOperation) -> Result<Self> {
         let actor: Principal = required("operation.actor", op.actor)?.try_into()?;
         Ok(Operation {
             id: id_from_proto("operation.id", &op.id)?,

@@ -8,12 +8,12 @@ use rill_runtime::error::Result;
 use rill_runtime::state::AppState;
 
 impl AdminSvc {
-    pub(super) async fn health_impl(
+    pub(super) async fn get_health_impl(
         &self,
-        _request: Call<pb::HealthRequest>,
-    ) -> Result<pb::HealthResponse> {
+        _request: Call<pb::GetHealthRequest>,
+    ) -> Result<pb::GetHealthResponse> {
         let components = health_components(&self.state).await;
-        Ok(pb::HealthResponse {
+        Ok(pb::GetHealthResponse {
             ok: components.iter().all(|c| c.ok),
             version: env!("CARGO_PKG_VERSION").to_string(),
             components,

@@ -67,12 +67,12 @@ returns `StoredContent { content, blob_hash, size }`, and fails with
 falls back to `store_content`. A 1 GiB upload grows resident memory by less
 than 64 MiB (`tests/streaming_memory.rs`).
 
-Producers: the server's `PutBlob` RPC reads the header message, checks
+Producers: the server's `WriteBlob` RPC reads the header message, checks
 write permission, streams the rest through `store_content_stream`, then
 checks the announced `size` and optional `expected_hash` (the `Blob`-kind
 hash of the bytes, whatever form is chosen) against the result. The SDK's
 `store_content` inlines at or below `INLINE_THRESHOLD` and otherwise sends
-`PutBlob`, so chunking is always decided on the server. The change builder,
+`WriteBlob`, so chunking is always decided on the server. The change builder,
 text merge and patch paths in `rill-core` and `rill-api` call
 `store_content` directly.
 
@@ -100,14 +100,14 @@ reader.
 Range reads touch only what they need. `read_content_range(objects,
 content, offset, len)` returns the requested bytes, fetching only the
 chunks that cover them. `content_parts` returns the same range as a
-`'static` stream of parts, reading up to 16 chunks concurrently. `GetBlob`
+`'static` stream of parts, reading up to 16 chunks concurrently. `ReadBlob`
 streams `content_parts` in 256 KiB messages (`BLOB_CHUNK`), so serving any
 range of any file needs memory for a few chunks, not the file.
 
 ## Limitations
 
 * `read_content` and `store_content` still hold whole content in memory;
-  merge, diff and the SDK use them. Only `PutBlob` and `GetBlob` stream.
+  merge, diff and the SDK use them. Only `WriteBlob` and `ReadBlob` stream.
 * Chunks are put one at a time, so a large file costs one sequential store
   round-trip per chunk.
 * A failure part-way through chunking leaves orphan chunks with no manifest;
@@ -123,7 +123,7 @@ range of any file needs memory for a few chunks, not the file.
 * [rill-core blobs/](../../crates/engine/core/src/blobs/mod.rs): `chunking.rs` (chunk sizes), `reader.rs` (`BlobReader`), `store.rs` (`store_content`, `chunk_boundaries`), `stream.rs` (`store_content_stream`), `read.rs` (`read_content`, `read_content_range`, `content_parts`)
 * [rill-types objects/blob.rs](../../crates/foundation/types/src/objects/blob.rs): `ContentRef`, `ChunkRef`, `BlobManifest`, thresholds
 * [rill-store object.rs](../../crates/foundation/store/src/object.rs): `put_blob`, `get_many`, `verify`
-* [rill-api services/repo/trees.rs](../../crates/server/api/src/services/repo/trees.rs): `PutBlob`, `GetBlob`, `check_content_exists`, `MAX_INLINE`
+* [rill-api services/content/files.rs](../../crates/server/api/src/services/content/files.rs): `WriteBlob`, `ReadBlob`, `check_content_exists`, `MAX_INLINE`
 * [rill-sdk repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs): client-side `store_content` and `put_blob`
 
 ---

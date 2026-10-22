@@ -43,9 +43,9 @@ pub struct LandingsArgs {
     /// Maximum landings.
     #[arg(long, short = 'n', default_value_t = 20)]
     pub limit: u32,
-    /// Only landings before this sequence.
+    /// Continue from a previous page's `next_page_token`.
     #[arg(long)]
-    pub before: Option<String>,
+    pub page_token: Option<String>,
 }
 
 /// `rill verify`.
@@ -176,7 +176,7 @@ pub async fn land(ctx: &mut Ctx<'_>, args: LandArgs) -> Result<()> {
 
 /// Run `rill trunk`.
 pub async fn trunk(ctx: &mut Ctx<'_>) -> Result<()> {
-    let status = ctx.repo()?.lander().trunk_status(10).await?;
+    let status = ctx.repo()?.trunk().trunk_status(10).await?;
     ctx.emit(json::trunk_status(&status), |out| {
         out.kv(&[
             (
@@ -199,9 +199,9 @@ pub async fn trunk(ctx: &mut Ctx<'_>) -> Result<()> {
         for l in &status.in_flight {
             out.line(format!(
                 "  {} {} {:?}",
-                out.id(&l.ticket.id),
-                l.ticket.change_id,
-                l.ticket.status
+                out.id(&l.id),
+                l.change_id,
+                l.status
             ))?;
         }
         if !status.recent.is_empty() {
@@ -243,10 +243,17 @@ fn verification_text(out: &Out<'_>, v: Option<&VerificationRecord>) -> String {
 
 /// Run `rill landings`.
 pub async fn landings(ctx: &mut Ctx<'_>, args: LandingsArgs) -> Result<()> {
-    let before = args.before.as_deref().map(seq_arg).transpose()?;
-    let landings = ctx.repo()?.lander().landings(args.limit, before).await?;
+    let page = ctx
+        .repo()?
+        .trunk()
+        .landings_page(args.limit, args.page_token.as_deref())
+        .await?;
+    let landings = page.items;
     ctx.emit(
-        j!({ "landings": landings.iter().map(json::landing).collect::<Vec<_>>() }),
+        j!({
+            "landings": landings.iter().map(json::landing).collect::<Vec<_>>(),
+            "next_page_token": page.next_page_token,
+        }),
         |out| {
             if landings.is_empty() {
                 return out.line(out.dim("no landings"));
@@ -270,7 +277,7 @@ pub async fn landings(ctx: &mut Ctx<'_>, args: LandingsArgs) -> Result<()> {
 /// Run `rill verify`.
 pub async fn verify(ctx: &mut Ctx<'_>, args: VerifyArgs) -> Result<()> {
     let seq = seq_arg(&args.seq)?;
-    let record = ctx.repo()?.lander().verification(seq).await?;
+    let record = ctx.repo()?.trunk().verification(seq).await?;
     ctx.emit(json::verification_record(&record), |out| {
         out.kv(&[
             ("seq", format!("trunk@{}", record.seq.get())),
@@ -303,7 +310,7 @@ pub async fn revert(ctx: &mut Ctx<'_>, args: RevertArgs) -> Result<()> {
         return crate::commands::health::revert_set(ctx, args).await;
     };
     let seq = seq_arg(seq)?;
-    let result = ctx.repo()?.lander().revert(seq, &args.message).await?;
+    let result = ctx.repo()?.trunk().revert(seq, &args.message).await?;
     ctx.emit(json::revert_result(&result), |out| {
         out.line(format!(
             "reverted trunk@{} as trunk@{} ({})",
@@ -318,7 +325,7 @@ pub async fn revert(ctx: &mut Ctx<'_>, args: RevertArgs) -> Result<()> {
 pub async fn bisect(ctx: &mut Ctx<'_>, args: BisectArgs) -> Result<()> {
     let from = seq_arg(&args.from)?;
     let to = seq_arg(&args.to)?;
-    let result = ctx.repo()?.lander().bisect(from, to, &args.target).await?;
+    let result = ctx.repo()?.trunk().bisect(from, to, &args.target).await?;
     ctx.emit(json::bisect_result(&result), |out| {
         match result.culprit {
             Some(c) => out.line(format!(

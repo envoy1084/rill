@@ -1,9 +1,9 @@
 //! Workspace RPC results.
 
-use rill_proto::convert::{hash_from_proto, id_from_proto, required};
+use rill_proto::convert::required;
 use rill_proto::rill::v1 as pb;
 use rill_types::{
-    ChangeId, ChangeVersion, ChangeVersionHash, IntentId, Operation, PrincipalId, Provenance,
+    ChangeId, ChangeInfo, ChangeVersion, ChangeVersionHash, IntentId, Operation, Provenance,
     Workspace,
 };
 
@@ -21,7 +21,7 @@ pub struct WorkspaceOp {
 impl WorkspaceOp {
     pub(crate) fn from_parts(
         workspace: Option<pb::Workspace>,
-        operation: Option<pb::Operation>,
+        operation: Option<pb::WorkspaceOperation>,
     ) -> Result<Self> {
         Ok(WorkspaceOp {
             workspace: required("response.workspace", workspace)?.try_into()?,
@@ -33,8 +33,8 @@ impl WorkspaceOp {
 /// Filters for listing workspaces.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct WorkspaceFilter {
-    /// Only workspaces owned by this principal.
-    pub owner: Option<PrincipalId>,
+    /// Only workspaces owned by this principal, as shown (`ann`).
+    pub owner: Option<String>,
     /// Page size; `0` lets the server choose.
     pub limit: u32,
     /// Continue from a previous page.
@@ -75,15 +75,16 @@ pub struct NewChangeResult {
     pub operation: Operation,
 }
 
-impl TryFrom<pb::NewChangeResponse> for NewChangeResult {
+impl TryFrom<pb::StartChangeResponse> for NewChangeResult {
     type Error = Error;
 
-    fn try_from(r: pb::NewChangeResponse) -> Result<Self> {
+    fn try_from(r: pb::StartChangeResponse) -> Result<Self> {
+        let info: ChangeInfo = required("start_change.info", r.info)?.try_into()?;
         Ok(NewChangeResult {
-            change_id: id_from_proto("new_change.change_id", &r.change_id)?,
-            hash: hash_from_proto("new_change.version_hash", &r.version_hash)?,
-            version: required("new_change.version", r.version)?.try_into()?,
-            operation: required("new_change.operation", r.operation)?.try_into()?,
+            change_id: info.change_id,
+            hash: info.hash,
+            version: required("start_change.version", r.version)?.try_into()?,
+            operation: required("start_change.operation", r.operation)?.try_into()?,
         })
     }
 }
@@ -99,20 +100,20 @@ pub struct UpdateBaseResult {
     pub rebased: Option<(ChangeVersionHash, ChangeVersion)>,
 }
 
-impl TryFrom<pb::UpdateBaseResponse> for UpdateBaseResult {
+impl TryFrom<pb::SyncWorkspaceResponse> for UpdateBaseResult {
     type Error = Error;
 
-    fn try_from(r: pb::UpdateBaseResponse) -> Result<Self> {
-        let rebased = match (r.version_hash, r.version.into_option()) {
-            (Some(h), Some(v)) => Some((
-                hash_from_proto("update_base.version_hash", &h)?,
-                v.try_into()?,
-            )),
+    fn try_from(r: pb::SyncWorkspaceResponse) -> Result<Self> {
+        let rebased = match (r.info.into_option(), r.version.into_option()) {
+            (Some(info), Some(v)) => {
+                let info: ChangeInfo = info.try_into()?;
+                Some((info.hash, v.try_into()?))
+            }
             _ => None,
         };
         Ok(UpdateBaseResult {
-            workspace: required("update_base.workspace", r.workspace)?.try_into()?,
-            operation: required("update_base.operation", r.operation)?.try_into()?,
+            workspace: required("sync_workspace.workspace", r.workspace)?.try_into()?,
+            operation: required("sync_workspace.operation", r.operation)?.try_into()?,
             rebased,
         })
     }

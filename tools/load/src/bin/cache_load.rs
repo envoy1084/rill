@@ -66,20 +66,18 @@ async fn main() {
     let client = Client::connect(config).await.expect("connect");
     let _ = client.create_repo(&args.repo, None).await;
     let start = client
-        .repo_svc()
+        .change_svc()
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Default::default(),
-            repo: args.repo.clone(),
-            base: None.into(),
-            edits: Vec::new(),
+            parent: rill_sdk::names::repo(&args.repo),
             message: "start".into(),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .expect("start")
         .into_owned()
+        .info
+        .into_option()
+        .expect("info")
         .hash;
     let mut edits = Vec::new();
     for d in 0..args.dirs {
@@ -114,11 +112,12 @@ async fn main() {
     let mut targets: Vec<(String, Vec<ObjectHash>)> = Vec::new();
     for d in 0..args.dirs {
         let listing = client
-            .repo_svc()
-            .list_dir(pb::ListDirRequest {
-                repo: args.repo.clone(),
-                root: Root::Version(version).to_proto().into(),
+            .content_svc()
+            .list_directory(pb::ListDirectoryRequest {
+                repo: rill_sdk::names::repo(&args.repo),
+                revision: version.to_hex(),
                 path: format!("d{d}"),
+                ..Default::default()
             })
             .await
             .expect("list")

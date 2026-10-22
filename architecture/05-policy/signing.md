@@ -61,7 +61,7 @@ file I/O.
 agent's work), `resolved_by` and the free-form `extra` map. The server sets
 `resolved_by` from `Permit::resolved_by()` in `ApplyEdits`. Every commit
 path stamps the rest from the caller's signed token before hashing
-([stamp.rs](../../crates/server/api/src/services/repo/stamp.rs)): `session`
+([stamp.rs](../../crates/server/api/src/services/changes/stamp.rs)): `session`
 and `model` are the token's claims, `sponsor` is the token's user sponsor
 (a team sponsor goes to `extra["sponsor_team"]`), and a client value that
 differs is kept as `extra["claimed_session"]` / `extra["claimed_model"]`.
@@ -72,11 +72,11 @@ bumps a change whose `resolved_by` is `agent`; see
 
 ## Server path
 
-`CreateChangeVersion` accepts `signatures` with the version. It converts each
+`CreateVersion` accepts `signatures` with the version. It converts each
 one with `Signature::try_from` and adds
 `RepoStore::signatures_mutation(&hash, &signatures)` to the transaction that
 commits the version.
-`GetChangeVersion` returns `get_signatures(&hash)` with the version. The SDK
+`GetVersion` returns `get_signatures(&hash)` with the version. The SDK
 exposes both. Signatures are stored as one record-encoded `Vec<Signature>`
 under `sig/<repo>/<hash>`.
 
@@ -88,7 +88,7 @@ versions.
 
 * `Signer` and `verify` have no callers outside `rill-policy`. The CLI, SDK
   and server do not sign or verify.
-* The mutation replaces the whole list. A second `CreateChangeVersion` for
+* The mutation replaces the whole list. A second `CreateVersion` for
   the same hash with different signatures overwrites the first list.
 * No key directory binds public keys to principals, so a stored signature
   proves possession of some key, not the identity in `signer`.
@@ -101,8 +101,8 @@ versions.
 * [`signing.rs`](../../crates/domain/policy/src/signing.rs): `Signer`, `verify`, `KeyFile`.
 * [`objects/change.rs`](../../crates/foundation/types/src/objects/change.rs): `Signature`, `Provenance`.
 * [`rill-store/src/repo/versions.rs`](../../crates/foundation/store/src/repo/versions.rs): `signatures_mutation`, `get_signatures`.
-* [`services/repo/write.rs`](../../crates/server/api/src/services/repo/write.rs): `create_change_version_impl`, provenance handling.
-* [`services/repo/history.rs`](../../crates/server/api/src/services/repo/history.rs): signatures on read.
+* [`services/changes/write.rs`](../../crates/server/api/src/services/changes/write.rs): `create_change_version_impl`, provenance handling.
+* [`services/changes/versions.rs`](../../crates/server/api/src/services/changes/versions.rs): signatures on read.
 * [`rill-sdk/src/repo/write.rs`](../../crates/clients/sdk/src/repo/write.rs), [`rill-sdk/src/repo/history.rs`](../../crates/clients/sdk/src/repo/history.rs): client surface.
 
 ---

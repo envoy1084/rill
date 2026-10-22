@@ -269,6 +269,10 @@ impl RepoKeys {
         seq_key(&self.incidents(), culprit)
     }
 
+    pub fn long_operation(&self, id: &OperationId) -> Bytes {
+        self.row(table::LONG_OPERATION, &id.as_bytes().as_slice())
+    }
+
     pub fn test_quarantine(&self, target: &str) -> Bytes {
         self.row(table::TEST_QUARANTINE, &target)
     }

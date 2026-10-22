@@ -6,7 +6,7 @@ use rill_types::RepoPathBuf;
 
 use super::relations::{object, relation, to_proto};
 use super::subjects;
-use crate::services::common::{open, Opened};
+use crate::services::common::{open_repo, Opened};
 use crate::services::Call;
 use rill_runtime::error::Result;
 use rill_runtime::state::AppState;
@@ -21,9 +21,12 @@ async fn snapshot(opened: &Opened) -> Result<std::sync::Arc<rill_policy::rebac::
 
 /// Whether the subject holds the relation, and why. Asking about oneself
 /// needs nothing beyond being able to name the repository.
-pub async fn check(state: &AppState, request: Call<pb::CheckRequest>) -> Result<pb::CheckResponse> {
+pub async fn check(
+    state: &AppState,
+    request: Call<pb::CheckAccessRequest>,
+) -> Result<pb::CheckAccessResponse> {
     let req = request.get_ref();
-    let opened = open(state, &request, &req.repo).await?;
+    let opened = open_repo(state, &request, &req.parent).await?;
     let (principal, teams) =
         subjects::about(&opened, state.dev_mode(), req.subject.as_deref()).await?;
     let relation = relation(&req.relation)?;
@@ -33,14 +36,7 @@ pub async fn check(state: &AppState, request: Call<pb::CheckRequest>) -> Result<
         .grants_for(relation, &object)
         .into_iter()
         .filter(|t| t.subject.matches(&principal, &teams))
-        .map(|t| {
-            to_proto(
-                &opened,
-                &t.object,
-                t.relation.as_str(),
-                &t.subject.to_string(),
-            )
-        })
+        .map(|t| to_proto(&t.object, t.relation.as_str(), &t.subject.to_string()))
         .collect();
     let org_admin = because.is_empty() && principal.id == opened.ctx.principal.id && {
         crate::auth::administers_org(
@@ -51,7 +47,7 @@ pub async fn check(state: &AppState, request: Call<pb::CheckRequest>) -> Result<
         )
         .await?
     };
-    Ok(pb::CheckResponse {
+    Ok(pb::CheckAccessResponse {
         allowed: !because.is_empty() || org_admin,
         because,
         org_admin,
@@ -63,10 +59,10 @@ pub async fn check(state: &AppState, request: Call<pb::CheckRequest>) -> Result<
 /// team subjects. Owners only.
 pub async fn expand(
     state: &AppState,
-    request: Call<pb::ExpandRequest>,
-) -> Result<pb::ExpandResponse> {
+    request: Call<pb::ExpandAccessRequest>,
+) -> Result<pb::ExpandAccessResponse> {
     let req = request.get_ref();
-    let opened = open(state, &request, &req.repo).await?;
+    let opened = open_repo(state, &request, &req.parent).await?;
     opened.permit().admin().await?;
     let relation = relation(&req.relation)?;
     let snapshot = snapshot(&opened).await?;
@@ -84,13 +80,7 @@ pub async fn expand(
     let tuples = grants
         .into_iter()
         .map(|t| pb::ExpandedTuple {
-            tuple: (to_proto(
-                &opened,
-                &t.object,
-                t.relation.as_str(),
-                &t.subject.to_string(),
-            ))
-            .into(),
+            tuple: (to_proto(&t.object, t.relation.as_str(), &t.subject.to_string())).into(),
             members: match &t.subject {
                 Subject::Team(team) => users
                     .iter()
@@ -101,7 +91,7 @@ pub async fn expand(
             },
         })
         .collect();
-    Ok(pb::ExpandResponse {
+    Ok(pb::ExpandAccessResponse {
         tuples,
         relation_version: snapshot.version(),
     })
@@ -113,7 +103,7 @@ pub async fn lookup_paths(
     request: Call<pb::LookupPathsRequest>,
 ) -> Result<pb::LookupPathsResponse> {
     let req = request.get_ref();
-    let opened = open(state, &request, &req.repo).await?;
+    let opened = open_repo(state, &request, &req.parent).await?;
     let (principal, teams) =
         subjects::about(&opened, state.dev_mode(), req.subject.as_deref()).await?;
     let relation: Relation = relation(&req.relation)?;

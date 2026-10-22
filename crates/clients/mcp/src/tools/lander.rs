@@ -28,7 +28,7 @@ pub async fn call(ctx: &ToolContext, name: &str, args: &Args) -> Option<ToolResu
 }
 
 async fn trunk_status(ctx: &ToolContext, args: &Args) -> ToolResult<Value> {
-    let lander = ctx.repo(args)?.lander();
+    let lander = ctx.repo(args)?.trunk();
     let status = lander.trunk_status(args.limit("recent_limit", 10)?).await?;
     Ok(json::trunk_status(&status))
 }

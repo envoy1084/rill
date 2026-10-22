@@ -63,7 +63,7 @@ object:
 
 * `check` looks up only the objects on the inheritance chain;
 * `grants_for(relation, object)` returns the satisfying tuples, nearest
-  first, which is what `Check` reports as the reason;
+  first, which is what `CheckAccess` reports as the reason;
 * `granted_dirs` lists the directories where a principal directly holds a
   relation.
 
@@ -109,14 +109,14 @@ directory:
 
 | Surface | Behaviour for a path-limited reader |
 | --- | --- |
-| `ListDir` | Lists any directory it `sees_into`. Entries are readable ones, plus directories on the way to them (with a blank summary, so hidden files are not counted). |
-| `ResolvePath`, `PathHistory`, `Blame` | `read(path)` |
+| `ListDirectory` | Lists any directory it `sees_into`. Entries are readable ones, plus directories on the way to them (with a blank summary, so hidden files are not counted). |
+| `Stat`, `ListPathHistory`, `Blame` | `read(path)` |
 | `Diff`, `Grep` | Only readable paths. |
-| `GetChangeVersion`, `GetChangeInfo`, `GetChangeVersions`, `Log`, `WatchLog` | A version that changes nothing readable is not found or skipped: its message and author would describe hidden work. Others show only readable changes, with `files_changed` counting those. |
-| `GetRepo`, `ListRepos`, refs, `TrunkHead`, `TrunkRange`, `WatchTrunk`, `WatchRefs`, `MergeBase`, `IsAncestor` | `read_any`: hashes and names only |
-| `GetTree`, `GetBlob`, object `GET`/`HEAD`/batch | A read grant (below) |
-| `HasObjects` | Write access somewhere (`write_any`): existence answers only to an uploader |
-| `WatchEvents`, `GetDerived`, `WaitDerived`, reviews, intents, lander status, policies, workspaces | Read on the repository root |
+| `GetVersion`, `BatchGetVersions`, `ListVersions`, `ListHistory`, `WatchVersions` | A version that changes nothing readable is not found or skipped: its message and author would describe hidden work. Others show only readable changes, with `files_changed` counting those. |
+| `GetRepo`, `ListRepos`, refs, `GetTrunkPosition`, `ListTrunkPositions`, `WatchTrunk`, `WatchRefs`, `FindMergeBase`, `IsAncestor` | `read_any`: hashes and names only |
+| `GetTree`, `ReadBlob`, object `GET`/`HEAD`/batch | A read grant (below) |
+| `BatchCheckObjects` | Write access somewhere (`write_any`): existence answers only to an uploader |
+| `WatchEvents`, `GetDerivedValue`, `WaitDerivedValue`, reviews, intents, lander status, policies, workspaces | Read on the repository root |
 
 ## Read grants
 
@@ -127,11 +127,11 @@ nothing about the path it was reached through.
 A response that reveals object hashes carries a signed `read_grant` for the
 objects under paths the caller may read:
 
-* `ListDir` grants file content and directories;
-* `ResolvePath` grants the entry;
+* `ListDirectory` grants file content and directories;
+* `Stat` grants the entry;
 * `GetTree` grants every entry of the granted tree;
 * `Diff` grants both sides of each file;
-* `GetChangeVersion` grants the content of readable changes.
+* `GetVersion` grants the content of readable changes.
 
 A grant (`ReadGrant`) lists `(kind, hash, path)` entries for one principal
 and repository, and expires within ten minutes (sooner if the token does).
@@ -143,7 +143,7 @@ of the whole repository.
 Every fetch by hash requires a grant naming the object, for the caller and
 repository ([`grants::require`](../../crates/server/api/src/grants/require.rs)):
 
-* `GetBlob` and `GetTree` take it as `grant`;
+* `ReadBlob` and `GetTree` take it as `grant`;
 * the object protocol takes `x-rill-grant` or `?grant=`;
 * a chunk is fetched through a granted manifest that lists it (`?via=`).
 
@@ -168,18 +168,18 @@ a verb, a relation and a path:
 
 | Method | Verb | Relation | Typical callers |
 | --- | --- | --- | --- |
-| `read(path)` | `Read` | `Reader` | every read RPC, `GetPolicy`, `EvaluateSubmit`, object `GET`/`HEAD` |
+| `read(path)` | `Read` | `Reader` | every read RPC, `GetPolicy`, `EvaluateLanding`, object `GET`/`HEAD` |
 | `write(path)` | `Write` | `Writer` (`Owner` under `.rill/`) | every path a stored version writes, inside its commit (below) |
-| `write_any()` | `Write` | `Writer` somewhere | `Rebase`, `Merge`, `SubmitForReview`, `SetStack`, `Abandon`, `PutBlob`, object `PUT`, `HasObjects` |
-| `write(root)` | `Write` | `Writer` | workspace and intent changes, `MoveRef` |
-| `review()` | `Review` | `Reviewer` | `Vote`, `Comment`, thread reply and resolve |
-| `land()` | `Land` | `Writer` | `RequestLand`, `ReportVerification`, `RevertSeq`, `Bisect` |
-| `admin()` | `Admin` | `Owner` | relation changes and listing, `Expand`, checks about others, `SetPolicy`, `IssueToken` without a token |
+| `write_any()` | `Write` | `Writer` somewhere | `RebaseVersion`, `MergeVersions`, `SubmitChange`, `UpdateStack`, `AbandonChange`, `WriteBlob`, object `PUT`, `BatchCheckObjects` |
+| `write(root)` | `Write` | `Writer` | workspace and intent changes, `UpdateRef` |
+| `review()` | `Review` | `Reviewer` | `Vote`, `CreateThread`, `ReplyThread`, `ResolveThread` |
+| `land()` | `Land` | `Writer` | `RequestLand`, `ReportVerification`, `RevertLanding`, `Bisect` |
+| `admin()` | `Admin` | `Owner` | relation changes and listing, `ExpandAccess`, checks about others, `UpdatePolicy`, `IssueToken` without a token |
 
 ### Writes
 
 Every stored version passes one check inside its commit
-([`services/repo/authorize.rs`](../../crates/server/api/src/services/repo/authorize.rs)),
+([`services/changes/authorize.rs`](../../crates/server/api/src/services/changes/authorize.rs)),
 whichever RPC made it. `write_set` lists what the version writes:
 
 * every file and subtree change;
@@ -217,11 +217,11 @@ repository (`org/name` or a bare name) and a directory path in each tuple.
 
 | RPC | Needs | Does |
 | --- | --- | --- |
-| `AddRelation`, `RemoveRelation` | `admin()` | change a tuple; returns the repository id and relation version |
+| `CreateRelation`, `DeleteRelation` | `admin()` | change a tuple; returns the repository id and relation version |
 | `ListRelations` | `admin()` | tuples, filtered by path, subject or relation |
-| `Check` | nothing about oneself; `admin()` about another `user:`/`agent:` | whether the relation is held, the granting tuples nearest first, and whether by org administration |
-| `Expand` | `admin()` | every granting tuple on a path, with the org's active users in each team subject |
-| `LookupPaths` | as `Check` | the outermost directories where a subject holds a relation (`""` for all) |
+| `CheckAccess` | nothing about oneself; `admin()` about another `user:`/`agent:` | whether the relation is held, the granting tuples nearest first, and whether by org administration |
+| `ExpandAccess` | `admin()` | every granting tuple on a path, with the org's active users in each team subject |
+| `LookupPaths` | as `CheckAccess` | the outermost directories where a subject holds a relation (`""` for all) |
 
 The CLI is `rill access grant/revoke/list/check/who/where`
 ([CLI](../08-clients/cli.md)). The SDK is `Client::access()`

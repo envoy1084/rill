@@ -1,6 +1,5 @@
 //! History writes: new versions, edits, rebase, merge and resolution.
 
-use rill_proto::convert::{hash_from_proto, hash_to_proto, id_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeVersion, ChangeVersionHash, OperationId, Provenance, Signature};
 
@@ -28,19 +27,23 @@ impl RepoClient {
         version: &ChangeVersion,
         signatures: Vec<Signature>,
     ) -> Result<ChangeVersionHash> {
-        let request = pb::CreateChangeVersionRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
+        let request = pb::CreateVersionRequest {
+            request_id: crate::names::request_id(&op),
+            parent: self.resource.clone(),
             version: pb::ChangeVersion::from(version).into(),
             signatures: signatures.into_iter().map(pb::Signature::from).collect(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
-            async move { svc.create_change_version(request).await }
+            let (svc, request) = (self.changes(), request.clone());
+            async move { svc.create_version(request).await }
         })
         .await?
         .into_owned();
-        Ok(hash_from_proto("create_change_version.hash", &resp.hash)?)
+        let info = rill_proto::convert::required("create_version.version", resp.version)?;
+        Ok(rill_proto::convert::hash_from_proto(
+            "version.hash",
+            &info.hash,
+        )?)
     }
 
     /// Apply edits on top of `base`, producing a new version. Large file
@@ -68,22 +71,28 @@ impl RepoClient {
             wire.push(self.edit_to_proto(edit).await?);
         }
         let request = pb::ApplyEditsRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            base: base.to_proto().into(),
+            request_id: crate::names::request_id(&op),
+            parent: self.resource.clone(),
+            base: base.to_proto(&self.resource).into(),
             edits: wire,
             message: opts.message,
-            intent: opts.intent.as_ref().map(id_to_proto),
+            intent: opts
+                .intent
+                .map(|i| crate::names::intent(&self.resource, &i))
+                .unwrap_or_default(),
             provenance: pb::Provenance::from(&opts.provenance).into(),
-            change_id: opts.change_id.as_ref().map(id_to_proto),
+            change: opts
+                .change_id
+                .map(|c| crate::names::change(&self.resource, &c))
+                .unwrap_or_default(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
+            let (svc, request) = (self.changes(), request.clone());
             async move { svc.apply_edits(request).await }
         })
         .await?
         .into_owned();
-        VersionResult::from_parts(&resp.hash, resp.version.into_option())
+        VersionResult::from_parts(resp.info.into_option(), resp.version.into_option())
     }
 
     async fn edit_to_proto(&self, edit: Edit) -> Result<pb::Edit> {
@@ -119,19 +128,18 @@ impl RepoClient {
         hash: ChangeVersionHash,
         new_parent: ChangeVersionHash,
     ) -> Result<VersionResult> {
-        let request = pb::RebaseRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            hash: hash_to_proto(&hash),
-            new_parent: hash_to_proto(&new_parent),
+        let request = pb::RebaseVersionRequest {
+            request_id: crate::names::request_id(&op),
+            name: crate::names::version(&self.resource, &hash),
+            onto: new_parent.to_hex(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
-            async move { svc.rebase(request).await }
+            let (svc, request) = (self.changes(), request.clone());
+            async move { svc.rebase_version(request).await }
         })
         .await?
         .into_owned();
-        VersionResult::from_parts(&resp.hash, resp.version.into_option())
+        VersionResult::from_parts(resp.info.into_option(), resp.version.into_option())
     }
 
     /// Merge two versions into a new change.
@@ -153,22 +161,25 @@ impl RepoClient {
         right: ChangeVersionHash,
         opts: MergeOptions,
     ) -> Result<VersionResult> {
-        let request = pb::MergeRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            left: hash_to_proto(&left),
-            right: hash_to_proto(&right),
+        let request = pb::MergeVersionsRequest {
+            request_id: crate::names::request_id(&op),
+            parent: self.resource.clone(),
+            left: left.to_hex(),
+            right: right.to_hex(),
             message: opts.message,
-            intent: opts.intent.as_ref().map(id_to_proto),
+            intent: opts
+                .intent
+                .map(|i| crate::names::intent(&self.resource, &i))
+                .unwrap_or_default(),
             provenance: pb::Provenance::from(&opts.provenance).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
-            async move { svc.merge(request).await }
+            let (svc, request) = (self.changes(), request.clone());
+            async move { svc.merge_versions(request).await }
         })
         .await?
         .into_owned();
-        VersionResult::from_parts(&resp.hash, resp.version.into_option())
+        VersionResult::from_parts(resp.info.into_option(), resp.version.into_option())
     }
 
     /// Resolve conflicted paths of a version, producing a new version.
@@ -204,19 +215,18 @@ impl RepoClient {
                 resolution: Some(resolution),
             });
         }
-        let request = pb::ResolveRequest {
-            operation_id: id_to_proto(&op),
-            repo: self.repo.clone(),
-            hash: hash_to_proto(&hash),
+        let request = pb::ResolveConflictsRequest {
+            request_id: crate::names::request_id(&op),
+            name: crate::names::version(&self.resource, &hash),
             resolutions: wire,
             provenance: pb::Provenance::from(&provenance).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
-            let (svc, request) = (self.svc(), request.clone());
-            async move { svc.resolve(request).await }
+            let (svc, request) = (self.changes(), request.clone());
+            async move { svc.resolve_conflicts(request).await }
         })
         .await?
         .into_owned();
-        VersionResult::from_parts(&resp.hash, resp.version.into_option())
+        VersionResult::from_parts(resp.info.into_option(), resp.version.into_option())
     }
 }

@@ -3,14 +3,13 @@
 use std::fmt;
 use std::str::FromStr;
 
-use rill_proto::convert::{hash_to_proto, trunk_seq_to_proto};
-use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeVersionHash, ObjectHash, RefName, TreeHash, TrunkSeq};
 
 use crate::error::{Error, Result};
 
 /// A point in history named by ref, version hash, tree hash or trunk
-/// sequence number.
+/// sequence number. Its display form is the revision string requests
+/// carry.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Root {
     /// The current target of a ref.
@@ -32,17 +31,6 @@ impl Root {
     /// Parse a ref name into a root.
     pub fn named(name: &str) -> Result<Self> {
         Ok(Root::Ref(RefName::new(name)?))
-    }
-
-    /// Wire encoding.
-    pub fn to_proto(&self) -> pb::RootSpec {
-        let root = match self {
-            Root::Ref(name) => pb::root_spec::Root::Ref(name.to_string()),
-            Root::Version(h) => pb::root_spec::Root::VersionHash(hash_to_proto(h)),
-            Root::Tree(h) => pb::root_spec::Root::TreeHash(hash_to_proto(h)),
-            Root::Seq(s) => pb::root_spec::Root::TrunkSeq(trunk_seq_to_proto(*s)),
-        };
-        pb::RootSpec { root: Some(root) }
     }
 }
 
@@ -108,11 +96,6 @@ pub enum LogStart {
 }
 
 impl LogStart {
-    /// Wire encoding.
-    pub fn to_proto(&self) -> pb::RootSpec {
-        self.to_root().to_proto()
-    }
-
     /// The equivalent root.
     pub fn to_root(&self) -> Root {
         match self {

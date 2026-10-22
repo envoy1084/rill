@@ -89,21 +89,21 @@ The `IdentityService` RPCs:
 | `RevokeSession` | the session's principal, or administrators |
 | `RotateTokenKeys`, `ListTokenKeys` | administrators |
 | identity providers, users, workload issuers | org administrators |
-| `RegisterAgent`, `UpdateAgent`, `ListAgents` | org administrators, or the sponsoring user |
+| `CreateAgent`, `UpdateAgent`, `ListAgents` | org administrators, or the sponsoring user |
 | `KillSwitch` | org administrators |
-| `Create`/`List`/`RevokeScimCredential` | org administrators |
+| `Create`/`List`/`DeleteScimCredential` | org administrators |
 
 `require_instance_admin` passes in dev mode, or for a principal named in
 `identity.admins` presenting an unnarrowed token.
 
-`WhoAmI` reports the caller's token id, session, org, sponsor and model with
+`GetCaller` reports the caller's token id, session, org, sponsor and model with
 its principal and capability.
 
 ## Sign-in
 
 Each organization registers OpenID Connect providers (or
 [SAML](#saml-20) ones)
-(`PutIdentityProvider`: issuer, a confidential client for browsers whose
+(`UpdateIdentityProvider`: issuer, a confidential client for browsers whose
 secret the key service wraps, an optional public client for the CLI, the
 username and groups claims, and whether a first sign-in provisions the
 user). An issuer belongs to one provider in the instance. Issuers must use
@@ -178,7 +178,7 @@ in; every request by a suspended user is refused through the identity view
 
 A server built with the `saml` feature also signs browsers in through SAML
 2.0 providers ([`rill-identity/src/saml/`](../../crates/domain/identity/src/saml/mod.rs),
-on samael with xmlsec). `PutIdentityProvider` with `saml_metadata` (the
+on samael with xmlsec). `UpdateIdentityProvider` with `saml_metadata` (the
 IdP's metadata XML) stores the provider with the IdP's entity id as its
 issuer and Rill's entity id (`saml_sp_entity_id`, default
 `<public_url>/auth/saml/<org>/<name>`) as its client. Metadata without a
@@ -245,7 +245,7 @@ resume the agents.
 ## Agents and workload identity
 
 An org registers agents ([`AgentRecord`](../../crates/foundation/types/src/identity/agent.rs),
-`RegisterAgent`): a name unique across the instance, a sponsor (`user:<name>`
+`CreateAgent`): a name unique across the instance, a sponsor (`user:<name>`
 or `team:<name>`, the team active while an active member has it), a
 purpose, the repositories (`*` for all) and path prefixes it may use, a
 model allow-list, budgets, workload bindings and an optional expiry. Org
@@ -254,7 +254,7 @@ they sponsor themselves.
 
 Agents hold no secrets. A workload (a Kubernetes pod, a CI job, a SPIFFE
 workload, a cloud function) presents a JWT from an issuer its org trusts
-(`PutWorkloadIssuer`: issuer, keys by discovery, URL or an inline JWKS, and
+(`UpdateWorkloadIssuer`: issuer, keys by discovery, URL or an inline JWKS, and
 accepted audiences) to `ExchangeToken` or `/oauth/token` with
 `subject_token_type` `urn:ietf:params:oauth:token-type:jwt`, the `org`, and
 optionally the `agent` and `model`.
@@ -369,7 +369,7 @@ path and repository. `resolved_by()` maps the caller's kind to the
   accept encrypted assertions.
 * `PrincipalKind` has no serde rename, so a TOML `auth.tokens[].kind` must be
   written `Human`, `Agent` or `Service`. The env var form uses lowercase.
-* `CreateChangeVersion` stores the client-supplied `author` and `provenance`
+* `CreateVersion` stores the client-supplied `author` and `provenance`
   without comparing them to the caller. Only `ApplyEdits` uses the caller.
 * `Provenance::sponsor` is informational. No check ties an agent's token or
   votes to its sponsor.

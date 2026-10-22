@@ -38,11 +38,11 @@ impl TryFrom<pb::Repo> for RepoInfo {
 
     fn try_from(r: pb::Repo) -> Result<Self> {
         Ok(RepoInfo {
-            id: id_from_proto("repo.id", &r.id)?,
-            name: r.name,
+            id: id_from_proto("repo.uid", &r.uid)?,
+            name: r.repo_id,
             description: r.description,
             created_at: timestamp_from_proto(r.created_at),
-            trunk_head_seq: trunk_seq_from_proto(r.trunk_head_seq),
+            trunk_head_seq: trunk_seq_from_proto(r.trunk_head_position),
             windows_safe: r.windows_safe,
             org: r.org,
         })
@@ -63,7 +63,7 @@ pub struct OrgInfo {
 impl From<pb::Org> for OrgInfo {
     fn from(o: pb::Org) -> Self {
         OrgInfo {
-            name: o.name,
+            name: o.org_id,
             description: o.description,
             created_at: timestamp_from_proto(o.created_at),
         }
@@ -75,8 +75,8 @@ impl From<pb::Org> for OrgInfo {
 pub struct LogPage {
     /// Entries in walk order.
     pub entries: Vec<ChangeInfo>,
-    /// Pass as the next start to continue, if more history exists.
-    pub next_start: Option<ChangeVersionHash>,
+    /// Pass to continue the same walk, if more history exists.
+    pub next_page_token: Option<String>,
 }
 
 /// One version in the version log.
@@ -88,13 +88,13 @@ pub struct LogEntry {
     pub info: ChangeInfo,
 }
 
-impl TryFrom<pb::LogEntry> for LogEntry {
+impl TryFrom<pb::WatchVersionsResponse> for LogEntry {
     type Error = crate::error::Error;
 
-    fn try_from(e: pb::LogEntry) -> Result<Self> {
+    fn try_from(e: pb::WatchVersionsResponse) -> Result<Self> {
         Ok(LogEntry {
             cursor: Versionstamp::from_slice(&e.cursor)?,
-            info: rill_proto::convert::required("log_entry.info", e.info)?.try_into()?,
+            info: rill_proto::convert::required("version", e.version)?.try_into()?,
         })
     }
 }
@@ -115,7 +115,8 @@ impl TryFrom<pb::PathHistoryEntry> for PathHistoryEntry {
 
     fn try_from(e: pb::PathHistoryEntry) -> Result<Self> {
         Ok(PathHistoryEntry {
-            info: rill_proto::convert::required("path_history_entry.info", e.info)?.try_into()?,
+            info: rill_proto::convert::required("path_history_entry.version", e.version)?
+                .try_into()?,
             path: RepoPathBuf::new(&e.path)?,
             change: rill_proto::convert::required("path_history_entry.change", e.change)?
                 .try_into()?,
@@ -128,8 +129,8 @@ impl TryFrom<pb::PathHistoryEntry> for PathHistoryEntry {
 pub struct PathHistoryPage {
     /// Entries in walk order.
     pub entries: Vec<PathHistoryEntry>,
-    /// Pass as the next start to continue, if more history exists.
-    pub next_start: Option<ChangeVersionHash>,
+    /// Pass to continue the same walk, if more history exists.
+    pub next_page_token: Option<String>,
 }
 
 /// Attribution of one line of a file.
@@ -153,9 +154,9 @@ impl TryFrom<pb::BlameLine> for BlameLine {
     fn try_from(l: pb::BlameLine) -> Result<Self> {
         Ok(BlameLine {
             line_no: l.line_no,
-            version: hash_from_proto("blame_line.version", &l.version)?,
+            version: crate::names::version_hash(&l.version)?,
             author: rill_proto::convert::required("blame_line.author", l.author)?.try_into()?,
-            trunk_seq: l.trunk_seq.map(trunk_seq_from_proto),
+            trunk_seq: l.trunk_position.map(trunk_seq_from_proto),
             text: l.text,
         })
     }
@@ -177,9 +178,9 @@ impl TryFrom<pb::Ref> for RefInfo {
 
     fn try_from(r: pb::Ref) -> Result<Self> {
         Ok(RefInfo {
-            name: ref_name_from_proto("ref.name", &r.name)?,
+            name: crate::names::ref_short(&r.name)?,
             target: hash_from_proto("ref.target", &r.target)?,
-            trunk_seq: r.trunk_seq.map(trunk_seq_from_proto),
+            trunk_seq: r.trunk_position.map(trunk_seq_from_proto),
         })
     }
 }
@@ -197,12 +198,12 @@ pub struct RefEvent {
     pub at: Timestamp,
 }
 
-impl TryFrom<pb::RefEvent> for RefEvent {
+impl TryFrom<pb::WatchRefsResponse> for RefEvent {
     type Error = crate::error::Error;
 
-    fn try_from(e: pb::RefEvent) -> Result<Self> {
+    fn try_from(e: pb::WatchRefsResponse) -> Result<Self> {
         Ok(RefEvent {
-            name: ref_name_from_proto("ref_event.name", &e.name)?,
+            name: ref_name_from_proto("ref", &e.r#ref)?,
             old: opt_hash_from_proto("ref_event.old", e.old.as_ref())?,
             new: opt_hash_from_proto("ref_event.new", e.new.as_ref())?,
             at: timestamp_from_proto(e.at),
@@ -227,18 +228,18 @@ pub struct LandEvent {
     pub reverts_seq: Option<TrunkSeq>,
 }
 
-impl TryFrom<pb::LandEvent> for LandEvent {
+impl TryFrom<pb::Landing> for LandEvent {
     type Error = crate::error::Error;
 
-    fn try_from(e: pb::LandEvent) -> Result<Self> {
+    fn try_from(e: pb::Landing) -> Result<Self> {
         Ok(LandEvent {
-            seq: trunk_seq_from_proto(e.seq),
-            hash: hash_from_proto("land_event.hash", &e.hash)?,
-            change_id: id_from_proto("land_event.change_id", &e.change_id)?,
-            landed_by: rill_proto::convert::required("land_event.landed_by", e.landed_by)?
+            seq: trunk_seq_from_proto(e.position),
+            hash: hash_from_proto("landing.version_hash", &e.version_hash)?,
+            change_id: id_from_proto("landing.change_id", &e.change_id)?,
+            landed_by: rill_proto::convert::required("landing.landed_by", e.landed_by)?
                 .try_into()?,
-            at: timestamp_from_proto(e.at),
-            reverts_seq: e.reverts_seq.map(trunk_seq_from_proto),
+            at: timestamp_from_proto(e.landed_at),
+            reverts_seq: e.reverts_position.map(trunk_seq_from_proto),
         })
     }
 }

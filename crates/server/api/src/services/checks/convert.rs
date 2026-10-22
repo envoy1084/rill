@@ -43,9 +43,10 @@ pub(super) fn flaky(target: String, score: f64, stats: FlakeStats) -> pb::FlakyT
     }
 }
 
-/// A run, with `steps` when given.
+/// A run, with `steps` when given; the caller names it.
 pub(super) fn run(header: &RunHeader, steps: &[IndexedStep]) -> pb::VerifyRun {
     pb::VerifyRun {
+        name: String::new(),
         id: header.id.clone(),
         version: Bytes::copy_from_slice(header.version.as_bytes()),
         trunk: header.trunk,

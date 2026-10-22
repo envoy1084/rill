@@ -30,59 +30,51 @@ async fn quarantined_versions_wait_for_an_owner() {
     )
     .await
     .expect("quarantine stores the version");
-    let version = held.hash.clone();
+    let version = hash_of(&held);
     let change = held.version.unwrap().change_id;
     c.review
-        .submit_for_review(pb::SubmitForReviewRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            change_id: change.clone(),
+        .submit_change(pb::SubmitChangeRequest {
+            request_id: String::new(),
+            change: common::names::change("app", &change),
         })
         .await
         .unwrap();
     for (label, value) in [("Verified", 1), ("Review", 2)] {
         c.review
             .vote(pb::VoteRequest {
-                operation_id: Bytes::new(),
-                repo: "app".into(),
-                change_id: change.clone(),
+                review: common::names::review("app", &change),
                 label: label.into(),
                 value,
-                reason: None,
-                version: None,
+                ..Default::default()
             })
             .await
             .unwrap();
     }
     let ticket = c
-        .review
+        .landing
         .request_land(pb::RequestLandRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            change_id: change.clone(),
-            onto: None,
+            request_id: String::new(),
+            change: common::names::change("app", &change),
+            onto: String::new(),
         })
         .await
         .unwrap()
         .into_owned()
-        .ticket
+        .land_request
         .unwrap();
     let mut refused = None;
     for _ in 0..100 {
         let status = c
-            .review
-            .get_land_status(pb::GetLandStatusRequest {
-                repo: "app".into(),
-                ticket: ticket.id.clone(),
+            .landing
+            .get_land_request(pb::GetLandRequestRequest {
+                name: ticket.name.clone(),
             })
             .await
             .unwrap()
-            .into_owned();
-        match rill_proto::convert::known::<pb::LandStatus>(
-            status.ticket.as_option().unwrap().status,
-        )
-        .unwrap()
-        {
+            .into_owned()
+            .land_request
+            .unwrap();
+        match rill_proto::convert::known::<pb::LandStatus>(status.status).unwrap() {
             pb::LandStatus::Landed => panic!("a quarantined version landed"),
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
                 refused = status.error;
@@ -107,21 +99,20 @@ async fn quarantined_versions_wait_for_an_owner() {
         .map(|(_, h)| Bytes::copy_from_slice(h.as_bytes()));
     let appended = c
         .admin
-        .append_trunk(pb::AppendTrunkRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+        .import_trunk_position(pb::ImportTrunkPositionRequest {
+            parent: common::names::repo("app"),
             expected: head,
             version: version.clone(),
+            ..Default::default()
         })
         .await
         .unwrap_err();
     assert_eq!(appended.code, Code::FailedPrecondition, "{appended:?}");
 
     c.protection
-        .clear_quarantine(pb::ClearQuarantineRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            version,
+        .release_version(pb::ReleaseVersionRequest {
+            request_id: String::new(),
+            version: common::names::version("app", &version),
         })
         .await
         .unwrap();
@@ -132,7 +123,7 @@ async fn quarantined_versions_wait_for_an_owner() {
         .await
         .unwrap()
         .repo
-        .quarantined(&ObjectHash::from_slice(&held.hash).unwrap())
+        .quarantined(&ObjectHash::from_slice(&version).unwrap())
         .await
         .unwrap()
         .is_none());

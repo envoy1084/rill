@@ -11,8 +11,6 @@ use rill_types::{FileKind, ObjectHash, ObjectKind, INLINE_THRESHOLD};
 
 use super::rpc::Request;
 
-use super::rpc::hex;
-
 /// A file the mock serves.
 #[derive(Clone, Debug)]
 pub struct MockFile {
@@ -79,25 +77,18 @@ impl MockRepo {
         *self.trunk.lock().unwrap() = (seq, hash);
     }
 
-    pub(super) fn root_label(root: Option<&pb::RootSpec>) -> Result<String, Status> {
-        match root.and_then(|r| r.root.as_ref()) {
-            Some(pb::root_spec::Root::Ref(name)) => Ok(name.clone()),
-            Some(pb::root_spec::Root::VersionHash(h)) => Ok(hex(h)),
-            Some(pb::root_spec::Root::TreeHash(h)) => Ok(format!("tree:{}", hex(h))),
-            Some(pb::root_spec::Root::TrunkSeq(n)) => Ok(format!("trunk@{n}")),
-            None => Err(Status::invalid_argument("missing root")),
-        }
-    }
-
-    pub(super) fn tree(
-        &self,
-        root: Option<&pb::RootSpec>,
-    ) -> Result<BTreeMap<String, MockFile>, Status> {
-        let label = Self::root_label(root)?;
+    /// The tree a revision (`trunk`, a hex hash, `tree:<hex>`, `trunk@3`)
+    /// names; revisions are the labels trees are installed under.
+    pub(super) fn tree(&self, revision: &str) -> Result<BTreeMap<String, MockFile>, Status> {
+        let label = if revision.is_empty() {
+            "trunk"
+        } else {
+            revision
+        };
         self.trees
             .lock()
             .unwrap()
-            .get(&label)
+            .get(label)
             .cloned()
             .ok_or_else(|| Status::not_found(format!("root {label}")))
     }

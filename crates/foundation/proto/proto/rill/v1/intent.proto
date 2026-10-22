@@ -1,26 +1,39 @@
-// Intent service: the "why" behind changes.
+// Intents: the "why" behind changes.
+//
+// An intent is `orgs/{org}/repos/{repo}/intents/{intent}`.
 syntax = "proto3";
 
 package rill.v1;
 
+import "google/protobuf/field_mask.proto";
 import "rill/v1/types.proto";
 
+// Intents and the changes linked to them.
 service IntentService {
+  // Record a new intent.
   rpc CreateIntent(CreateIntentRequest) returns (CreateIntentResponse);
+  // One intent.
   rpc GetIntent(GetIntentRequest) returns (GetIntentResponse);
+  // Change an intent's title, body, status, parent or risk override.
   rpc UpdateIntent(UpdateIntentRequest) returns (UpdateIntentResponse);
+  // A repository's intents, most recently updated first.
   rpc ListIntents(ListIntentsRequest) returns (ListIntentsResponse);
+  // Link a change to an intent, on both the intent and the change's review.
   rpc LinkChange(LinkChangeRequest) returns (LinkChangeResponse);
+  // Intents whose words overlap a title and body, best first.
   rpc FindSimilarIntents(FindSimilarIntentsRequest) returns (FindSimilarIntentsResponse);
 }
 
 message CreateIntentRequest {
-  bytes operation_id = 1;
-  string repo = 2;
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // Required.
   string title = 3;
   string body = 4;
   IntentKind kind = 5;
-  optional bytes parent = 6;
+  // The parent intent, `…/intents/{intent}`.
+  string parent_intent = 6;
   optional RiskClass risk_override = 7;
 }
 message CreateIntentResponse {
@@ -28,59 +41,59 @@ message CreateIntentResponse {
 }
 
 message GetIntentRequest {
-  string repo = 1;
-  bytes id = 2;
+  // `…/intents/{intent}`. Required.
+  string name = 1;
 }
 message GetIntentResponse {
   Intent intent = 1;
 }
 
 message UpdateIntentRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes id = 3;
-  optional string title = 4;
-  optional string body = 5;
-  optional IntentStatus status = 6;
-  optional bytes parent = 7;
-  // Explicitly clears the parent when set.
-  bool clear_parent = 8;
-  optional RiskClass risk_override = 9;
-  bool clear_risk_override = 10;
+  string request_id = 1;
+  // The intent, by `name`, with the fields to change. Required.
+  Intent intent = 2;
+  // Which of `title`, `body`, `status`, `parent` and `risk_override` to
+  // change; a masked field left empty is cleared. Required.
+  google.protobuf.FieldMask update_mask = 3;
+  // The etag read; empty means no condition.
+  string etag = 4;
 }
 message UpdateIntentResponse {
   Intent intent = 1;
 }
 
 message ListIntentsRequest {
-  string repo = 1;
-  repeated IntentStatus status = 2;
-  repeated IntentKind kind = 3;
-  optional bytes owner = 4;
-  optional bytes parent = 5;
-  uint32 limit = 6;
-  optional string page_token = 7;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `status` (`open`, `in_progress`, `done`, `abandoned`), `kind`
+  // (`feature`, `bug`, `refactor`, `chore`, `experiment`, `system`), `owner` (`ann`) and `parent` (an intent id).
+  string filter = 4;
 }
 message ListIntentsResponse {
   repeated Intent intents = 1;
-  optional string next_page_token = 2;
+  string next_page_token = 2;
 }
 
 message LinkChangeRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes intent = 3;
-  bytes change_id = 4;
+  string request_id = 1;
+  // `…/intents/{intent}`. Required.
+  string name = 2;
+  // `…/changes/{change}`. Required.
+  string change = 3;
 }
 message LinkChangeResponse {
   Intent intent = 1;
 }
 
 message FindSimilarIntentsRequest {
-  string repo = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
   string title = 2;
   string body = 3;
-  uint32 limit = 4;
+  // Default 10, at most 100.
+  int32 max_results = 4;
 }
 message ScoredIntent {
   Intent intent = 1;

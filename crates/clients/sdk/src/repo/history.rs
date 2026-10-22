@@ -1,6 +1,6 @@
 //! History queries: versions, log, path history and blame.
 
-use rill_proto::convert::{hash_to_proto, id_to_proto, opt_hash_from_proto, required};
+use rill_proto::convert::required;
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeId, ChangeInfo, ChangeVersion, ChangeVersionHash, RepoPath, Signature};
 
@@ -20,25 +20,25 @@ impl RepoClient {
         hash: ChangeVersionHash,
     ) -> Result<(ChangeVersion, Vec<Signature>)> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::GetChangeVersionRequest {
-                repo: self.repo.clone(),
-                hash: hash_to_proto(&hash),
+            let svc = self.changes();
+            let request = pb::GetVersionRequest {
+                name: crate::names::version(&self.resource, &hash),
+                view: pb::VersionView::Full.into(),
             };
-            async move { svc.get_change_version(request).await }
+            async move { svc.get_version(request).await }
         })
         .await?
         .into_owned();
-        let version: ChangeVersion =
-            required("get_change_version.version", resp.version)?.try_into()?;
+        let found = required("get_version.version", resp.version)?;
+        let version: ChangeVersion = required("version.version", found.version)?.try_into()?;
         self.grants().record(
-            &resp.read_grant,
+            &found.read_grant,
             version.file_changes.values().filter_map(|c| match c {
                 rill_types::FileChange::Set { content, .. } => crate::grants::content_hash(content),
                 _ => None,
             }),
         );
-        let signatures = resp
+        let signatures = found
             .signatures
             .into_iter()
             .map(Signature::try_from)
@@ -49,31 +49,41 @@ impl RepoClient {
     /// Metadata of a change version.
     pub async fn change_info(&self, hash: ChangeVersionHash) -> Result<ChangeInfo> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::GetChangeInfoRequest {
-                repo: self.repo.clone(),
-                hash: hash_to_proto(&hash),
+            let svc = self.changes();
+            let request = pb::GetVersionRequest {
+                name: crate::names::version(&self.resource, &hash),
+                view: pb::VersionView::Basic.into(),
             };
-            async move { svc.get_change_info(request).await }
+            async move { svc.get_version(request).await }
         })
         .await?
         .into_owned();
-        Ok(required("get_change_info.info", resp.info)?.try_into()?)
+        let found = required("get_version.version", resp.version)?;
+        Ok(required("version.info", found.info)?.try_into()?)
     }
 
     /// Every version of a change in creation order; the last is current.
     pub async fn change_versions(&self, change_id: ChangeId) -> Result<Vec<ChangeInfo>> {
-        let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::GetChangeVersionsRequest {
-                repo: self.repo.clone(),
-                change_id: id_to_proto(&change_id),
-            };
-            async move { svc.get_change_versions(request).await }
-        })
-        .await?
-        .into_owned();
-        convert_infos(resp.versions)
+        let mut versions = Vec::new();
+        let mut page_token = String::new();
+        loop {
+            let resp = crate::client::retry_idempotent(|| {
+                let svc = self.changes();
+                let request = pb::ListVersionsRequest {
+                    parent: crate::names::change(&self.resource, &change_id),
+                    page_size: 1000,
+                    page_token: page_token.clone(),
+                };
+                async move { svc.list_versions(request).await }
+            })
+            .await?
+            .into_owned();
+            versions.extend(convert_infos(resp.versions)?);
+            if resp.next_page_token.is_empty() {
+                return Ok(versions);
+            }
+            page_token = resp.next_page_token;
+        }
     }
 
     /// The current version of a change.
@@ -94,53 +104,61 @@ impl RepoClient {
         limit: u32,
         path: Option<&RepoPath>,
     ) -> Result<Vec<ChangeInfo>> {
-        Ok(self.log_page(start, limit, path, false).await?.entries)
+        Ok(self
+            .log_page(start, limit, path, false, None)
+            .await?
+            .entries)
     }
 
-    /// [`RepoClient::log`] with the continuation hash and first-parent
-    /// control.
+    /// One page of [`RepoClient::log`], with first-parent control; pass the
+    /// returned `next_page_token` with the same arguments to continue.
     pub async fn log_page(
         &self,
         start: LogStart,
         limit: u32,
         path: Option<&RepoPath>,
         first_parent: bool,
+        page_token: Option<&str>,
     ) -> Result<LogPage> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::LogRequest {
-                repo: self.repo.clone(),
-                start: start.to_proto().into(),
-                limit,
-                path: path.map(|p| p.to_string()),
+            let svc = self.content();
+            let request = pb::ListHistoryRequest {
+                repo: self.resource.clone(),
+                revision: start.to_root().to_string(),
+                path: path.map(|p| p.to_string()).unwrap_or_default(),
                 first_parent,
+                page_size: limit as i32,
+                page_token: page_token.unwrap_or_default().to_string(),
             };
-            async move { svc.log(request).await }
+            async move { svc.list_history(request).await }
         })
         .await?
         .into_owned();
         Ok(LogPage {
-            entries: convert_infos(resp.entries)?,
-            next_start: opt_hash_from_proto("log.next_start", resp.next_start.as_ref())?,
+            entries: convert_infos(resp.versions)?,
+            next_page_token: (!resp.next_page_token.is_empty()).then_some(resp.next_page_token),
         })
     }
 
-    /// Versions that touched `path`, following renames.
+    /// Versions that touched `path`; pass the returned `next_page_token`
+    /// with the same arguments to continue.
     pub async fn path_history(
         &self,
         path: &RepoPath,
         start: LogStart,
         limit: u32,
+        page_token: Option<&str>,
     ) -> Result<PathHistoryPage> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
-            let request = pb::PathHistoryRequest {
-                repo: self.repo.clone(),
+            let svc = self.content();
+            let request = pb::ListPathHistoryRequest {
+                repo: self.resource.clone(),
+                revision: start.to_root().to_string(),
                 path: path.to_string(),
-                start: start.to_proto().into(),
-                limit,
+                page_size: limit as i32,
+                page_token: page_token.unwrap_or_default().to_string(),
             };
-            async move { svc.path_history(request).await }
+            async move { svc.list_path_history(request).await }
         })
         .await?
         .into_owned();
@@ -150,17 +168,17 @@ impl RepoClient {
                 .into_iter()
                 .map(PathHistoryEntry::try_from)
                 .collect::<Result<_>>()?,
-            next_start: opt_hash_from_proto("path_history.next_start", resp.next_start.as_ref())?,
+            next_page_token: (!resp.next_page_token.is_empty()).then_some(resp.next_page_token),
         })
     }
 
     /// Line-by-line attribution of `path` at `hash`.
     pub async fn blame(&self, hash: ChangeVersionHash, path: &RepoPath) -> Result<Vec<BlameLine>> {
         let resp = crate::client::retry_idempotent(|| {
-            let svc = self.svc();
+            let svc = self.content();
             let request = pb::BlameRequest {
-                repo: self.repo.clone(),
-                hash: hash_to_proto(&hash),
+                repo: self.resource.clone(),
+                revision: hash.to_hex(),
                 path: path.to_string(),
             };
             async move { svc.blame(request).await }

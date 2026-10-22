@@ -1,24 +1,24 @@
-//! The `AccessService` gRPC impl: dispatches each RPC to its handler.
+//! The `AccessService` impl: dispatches each RPC to its handler.
 
 use std::sync::Arc;
 
+use connectrpc::{RequestContext, Response, ServiceRequest};
 use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::AccessService;
 
 use super::{queries, relations};
 use crate::services::common::GrpcResult;
-use crate::services::idem;
 use crate::services::Call;
-use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest};
 use rill_runtime::state::AppState;
 
-/// The access service.
+/// The `AccessService`.
 #[derive(Clone)]
 pub struct AccessSvc {
-    state: Arc<AppState>,
+    pub(super) state: Arc<AppState>,
 }
 
 impl AccessSvc {
+    /// A service over `state`.
     pub fn new(state: Arc<AppState>) -> Self {
         AccessSvc { state }
     }
@@ -27,30 +27,32 @@ impl AccessSvc {
 // Handlers return their concrete response types.
 #[allow(refining_impl_trait)]
 impl AccessService for AccessSvc {
-    async fn add_relation(
+    async fn create_relation(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::AddRelationRequest>,
-    ) -> GrpcResult<pb::AddRelationResponse> {
+        request: ServiceRequest<'_, pb::CreateRelationRequest>,
+    ) -> GrpcResult<pb::CreateRelationResponse> {
         let request = Call::new(ctx, request);
-        idem::once(&self.state, request, |r| async move {
-            relations::add(&self.state, r).await.map(Response::new)
-        })
-        .await
-        .map_err(ConnectError::from)
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(relations::create(&self.state, r).await?))
+            })
+            .await?,
+        )
     }
 
-    async fn remove_relation(
+    async fn delete_relation(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::RemoveRelationRequest>,
-    ) -> GrpcResult<pb::RemoveRelationResponse> {
+        request: ServiceRequest<'_, pb::DeleteRelationRequest>,
+    ) -> GrpcResult<pb::DeleteRelationResponse> {
         let request = Call::new(ctx, request);
-        idem::once(&self.state, request, |r| async move {
-            relations::remove(&self.state, r).await.map(Response::new)
-        })
-        .await
-        .map_err(ConnectError::from)
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(relations::delete(&self.state, r).await?))
+            })
+            .await?,
+        )
     }
 
     async fn list_relations(
@@ -59,34 +61,25 @@ impl AccessService for AccessSvc {
         request: ServiceRequest<'_, pb::ListRelationsRequest>,
     ) -> GrpcResult<pb::ListRelationsResponse> {
         let request = Call::new(ctx, request);
-        relations::list(&self.state, request)
-            .await
-            .map(Response::new)
-            .map_err(ConnectError::from)
+        Ok(Response::new(relations::list(&self.state, request).await?))
     }
 
-    async fn check(
+    async fn check_access(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::CheckRequest>,
-    ) -> GrpcResult<pb::CheckResponse> {
+        request: ServiceRequest<'_, pb::CheckAccessRequest>,
+    ) -> GrpcResult<pb::CheckAccessResponse> {
         let request = Call::new(ctx, request);
-        queries::check(&self.state, request)
-            .await
-            .map(Response::new)
-            .map_err(ConnectError::from)
+        Ok(Response::new(queries::check(&self.state, request).await?))
     }
 
-    async fn expand(
+    async fn expand_access(
         &self,
         ctx: RequestContext,
-        request: ServiceRequest<'_, pb::ExpandRequest>,
-    ) -> GrpcResult<pb::ExpandResponse> {
+        request: ServiceRequest<'_, pb::ExpandAccessRequest>,
+    ) -> GrpcResult<pb::ExpandAccessResponse> {
         let request = Call::new(ctx, request);
-        queries::expand(&self.state, request)
-            .await
-            .map(Response::new)
-            .map_err(ConnectError::from)
+        Ok(Response::new(queries::expand(&self.state, request).await?))
     }
 
     async fn lookup_paths(
@@ -95,9 +88,8 @@ impl AccessService for AccessSvc {
         request: ServiceRequest<'_, pb::LookupPathsRequest>,
     ) -> GrpcResult<pb::LookupPathsResponse> {
         let request = Call::new(ctx, request);
-        queries::lookup_paths(&self.state, request)
-            .await
-            .map(Response::new)
-            .map_err(ConnectError::from)
+        Ok(Response::new(
+            queries::lookup_paths(&self.state, request).await?,
+        ))
     }
 }

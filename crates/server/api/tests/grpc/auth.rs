@@ -1,6 +1,7 @@
 //! Authentication on both listeners.
 
 use super::*;
+use common::names;
 
 #[tokio::test]
 async fn issued_tokens_are_bound_by_relations() {
@@ -13,8 +14,8 @@ async fn issued_tokens_are_bound_by_relations() {
     let err = anon
         .repo
         .list_repos(pb::ListReposRequest {
-            limit: 0,
-            page_token: None,
+            parent: names::org("default"),
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -24,20 +25,18 @@ async fn issued_tokens_are_bound_by_relations() {
     alice
         .repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "private".into(),
-            description: None,
-            windows_safe: false,
+            request_id: String::new(),
+            parent: names::org("default"),
+            repo_id: "private".into(),
+            repo: None.into(),
         })
         .await
         .unwrap();
     let relations = alice
         .access
         .list_relations(pb::ListRelationsRequest {
-            repo: "private".into(),
-            path: None,
-            subject: None,
-            relation: None,
+            parent: names::repo("private"),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -48,11 +47,10 @@ async fn issued_tokens_are_bound_by_relations() {
 
     let mallory = clients(&server, Some(&mallory_token)).await;
     let err = mallory
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: "private".into(),
-            root: None.into(),
-            path: String::new(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: names::repo("private"),
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -60,8 +58,8 @@ async fn issued_tokens_are_bound_by_relations() {
     let visible = mallory
         .repo
         .list_repos(pb::ListReposRequest {
-            limit: 0,
-            page_token: None,
+            parent: names::org("default"),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -71,10 +69,10 @@ async fn issued_tokens_are_bound_by_relations() {
     // Granting a reader relation opens reads but not writes.
     alice
         .access
-        .add_relation(pb::AddRelationRequest {
-            operation_id: Bytes::new(),
+        .create_relation(pb::CreateRelationRequest {
+            request_id: String::new(),
+            parent: names::repo("private"),
             relation: (pb::Relation {
-                repo: "private".into(),
                 path: String::new(),
                 relation: "reader".into(),
                 subject: format!("principal:{}", rill_types::Principal::agent("mallory").id),
@@ -84,25 +82,24 @@ async fn issued_tokens_are_bound_by_relations() {
         .await
         .unwrap();
     mallory
-        .repo
-        .list_dir(pb::ListDirRequest {
-            repo: "private".into(),
-            root: None.into(),
-            path: String::new(),
+        .content
+        .list_directory(pb::ListDirectoryRequest {
+            repo: names::repo("private"),
+            ..Default::default()
         })
         .await
         .unwrap();
     let err = mallory
-        .repo
+        .changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "private".into(),
+            request_id: String::new(),
+            parent: names::repo("private"),
             base: None.into(),
             edits: vec![set_edit("x", b"y")],
             message: "nope".into(),
-            intent: None,
+            intent: String::new(),
             provenance: None.into(),
-            change_id: None,
+            change: String::new(),
         })
         .await
         .unwrap_err();

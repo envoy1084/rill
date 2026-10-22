@@ -130,7 +130,7 @@ version with `parents = [left, right]`:
 
 `MergeChangeOptions` supplies `author`, `message`, `created_at`, `change_id`
 (fresh when `None`) and `provenance`. The result has `intent = None`, no
-`predecessor` and no `subtree_changes`. The server's `Merge` RPC sets
+`predecessor` and no `subtree_changes`. The server's `MergeVersions` RPC sets
 `intent` from the request before storing.
 
 ## Conflict markers (`merge/materialize.rs`, `merge/parse.rs`)
@@ -176,7 +176,7 @@ re-materialises to identical bytes.
 - `merge_changes` carries no `subtree_changes` from either side.
 - The checkout uses `parse_materialized` only to refuse a resolution that
   still has markers; resolved files reach the server as plain content
-  through `Resolve` or a new snapshot, so partially resolved files cannot be
+  through `ResolveConflicts` or a new snapshot, so partially resolved files cannot be
   uploaded as conflict terms.
 - Merging reads whole file contents into memory.
 - Structural merge is only as good as weave on a pattern: adjacent `match`

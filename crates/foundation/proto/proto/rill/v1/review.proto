@@ -1,125 +1,153 @@
-// Review service: labels, votes, threads, stacks and submit evaluation.
+// Reviews: votes, threads, stacks and whether a change may land.
+//
+// A change's review is `orgs/{org}/repos/{repo}/changes/{change}/review`;
+// a thread on it is `…/review/threads/{thread}`.
 syntax = "proto3";
 
 package rill.v1;
 
+import "rill/v1/landing.proto";
 import "rill/v1/types.proto";
 
+// Reviews of changes.
 service ReviewService {
+  // A change's review and the labels it is voted on.
   rpc GetReview(GetReviewRequest) returns (GetReviewResponse);
+  // Up to 1,000 reviews.
+  rpc BatchGetReviews(BatchGetReviewsRequest) returns (BatchGetReviewsResponse);
+  // A repository's reviews.
   rpc ListReviews(ListReviewsRequest) returns (ListReviewsResponse);
-  rpc SubmitForReview(SubmitForReviewRequest) returns (SubmitForReviewResponse);
+  // Submit a change for review.
+  rpc SubmitChange(SubmitChangeRequest) returns (SubmitChangeResponse);
+  // Vote on a label.
   rpc Vote(VoteRequest) returns (VoteResponse);
-  rpc Comment(CommentRequest) returns (CommentResponse);
+  // Start a thread on a review.
+  rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
+  // Reply on a thread.
   rpc ReplyThread(ReplyThreadRequest) returns (ReplyThreadResponse);
+  // Resolve or reopen a thread.
   rpc ResolveThread(ResolveThreadRequest) returns (ResolveThreadResponse);
-  rpc SetStack(SetStackRequest) returns (SetStackResponse);
-  rpc EvaluateSubmit(EvaluateSubmitRequest) returns (EvaluateSubmitResponse);
-  rpc Abandon(AbandonRequest) returns (AbandonResponse);
-  rpc RequestLand(RequestLandRequest) returns (RequestLandResponse);
-  rpc RequestLandStack(RequestLandStackRequest) returns (RequestLandStackResponse);
-  rpc GetLandStatus(GetLandStatusRequest) returns (GetLandStatusResponse);
-  rpc WatchReview(WatchReviewRequest) returns (stream ReviewEvent);
+  // Order changes into a stack, bottom first.
+  rpc UpdateStack(UpdateStackRequest) returns (UpdateStackResponse);
+  // Whether the repository's policy lets a change land now, and why not.
+  rpc EvaluateLanding(EvaluateLandingRequest) returns (EvaluateLandingResponse);
+  // Abandon a change.
+  rpc AbandonChange(AbandonChangeRequest) returns (AbandonChangeResponse);
+  // A review's updates as they happen.
+  rpc WatchReview(WatchReviewRequest) returns (stream WatchReviewResponse);
 }
 
 message GetReviewRequest {
-  string repo = 1;
-  bytes change_id = 2;
+  // `…/changes/{change}/review`. Required.
+  string name = 1;
 }
 message GetReviewResponse {
   ReviewState review = 1;
   repeated Label labels = 2;
 }
 
+message BatchGetReviewsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // At most 1,000 review names.
+  repeated string names = 2;
+}
+message BatchGetReviewsResponse {
+  // Parallel to `names`.
+  repeated ReviewState reviews = 1;
+}
+
 message ListReviewsRequest {
-  string repo = 1;
-  repeated ReviewStatus status = 2;
-  optional bytes owner = 3;
-  optional bytes intent = 4;
-  uint32 limit = 5;
-  optional string page_token = 6;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // On `status` (`open`, `approved`, `landing`, `landed`, `abandoned`, …),
+  // `owner` (`ann`, `agent:bot`) and `intent` (an intent id).
+  string filter = 4;
 }
 message ListReviewsResponse {
   repeated ReviewState reviews = 1;
-  optional string next_page_token = 2;
+  string next_page_token = 2;
 }
 
-message SubmitForReviewRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes change_id = 3;
+message SubmitChangeRequest {
+  string request_id = 1;
+  // `…/changes/{change}`. Required.
+  string change = 2;
 }
-message SubmitForReviewResponse {
+message SubmitChangeResponse {
   ReviewState review = 1;
 }
 
 message VoteRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes change_id = 3;
-  string label = 4;
-  int32 value = 5;
-  optional string reason = 6;
-  // Defaults to the current version.
-  optional bytes version = 7;
+  string request_id = 1;
+  // `…/changes/{change}/review`. Required.
+  string review = 2;
+  // Required.
+  string label = 3;
+  int32 value = 4;
+  optional string reason = 5;
+  // The version voted on, `…/versions/{hash}`; the current one when empty.
+  string version = 6;
 }
 message VoteResponse {
   ReviewState review = 1;
 }
 
-message CommentRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes change_id = 3;
-  ThreadAnchor anchor = 4;
-  string body = 5;
-  optional CommentCategory category = 6;
-  optional uint32 confidence = 7;
-  optional Principal to = 8;
+message CreateThreadRequest {
+  string request_id = 1;
+  // `…/changes/{change}/review`. Required.
+  string parent = 2;
+  ThreadAnchor anchor = 3;
+  // Required.
+  string body = 4;
+  optional CommentCategory category = 5;
+  optional uint32 confidence = 6;
+  optional Principal to = 7;
 }
-message CommentResponse {
-  string thread_id = 1;
-  Thread thread = 2;
+message CreateThreadResponse {
+  Thread thread = 1;
 }
 
 message ReplyThreadRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes change_id = 3;
-  string thread_id = 4;
-  string body = 5;
-  optional CommentCategory category = 6;
-  optional uint32 confidence = 7;
+  string request_id = 1;
+  // `…/review/threads/{thread}`. Required.
+  string name = 2;
+  // Required.
+  string body = 3;
+  optional CommentCategory category = 4;
+  optional uint32 confidence = 5;
 }
 message ReplyThreadResponse {
   Thread thread = 1;
 }
 
 message ResolveThreadRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes change_id = 3;
-  string thread_id = 4;
-  // False re-opens the thread.
-  bool resolved = 5;
+  string request_id = 1;
+  // `…/review/threads/{thread}`. Required.
+  string name = 2;
+  // False reopens the thread.
+  bool resolved = 3;
 }
 message ResolveThreadResponse {
   Thread thread = 1;
 }
 
-message SetStackRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  // Bottom-to-top; every change gets the same stack.
-  repeated bytes change_ids = 3;
+message UpdateStackRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // Change names, bottom first; every change gets the same stack.
+  repeated string changes = 3;
 }
-message SetStackResponse {
+message UpdateStackResponse {
   repeated ReviewState reviews = 1;
 }
 
-message EvaluateSubmitRequest {
-  string repo = 1;
-  bytes change_id = 2;
+message EvaluateLandingRequest {
+  // `…/changes/{change}`. Required.
+  string change = 1;
 }
 message SubmitDecision {
   bool allowed = 1;
@@ -128,86 +156,26 @@ message SubmitDecision {
   RiskClass risk = 4;
   repeated string risk_reasons = 5;
 }
-message EvaluateSubmitResponse {
+message EvaluateLandingResponse {
   SubmitDecision decision = 1;
 }
 
-message AbandonRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes change_id = 3;
-  optional string reason = 4;
+message AbandonChangeRequest {
+  string request_id = 1;
+  // `…/changes/{change}`. Required.
+  string change = 2;
+  optional string reason = 3;
 }
-message AbandonResponse {
+message AbandonChangeResponse {
   ReviewState review = 1;
 }
 
-enum LandStatus {
-  LAND_STATUS_UNSPECIFIED = 0;
-  LAND_STATUS_QUEUED = 1;
-  LAND_STATUS_REBASING = 2;
-  LAND_STATUS_LANDED = 3;
-  LAND_STATUS_FAILED = 4;
-  LAND_STATUS_CANCELLED = 5;
-}
-
-message LandTicket {
-  string id = 1;
-  bytes change_id = 2;
-  LandStatus status = 3;
-  int64 requested_at = 4;
-}
-
-message RequestLandRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes change_id = 3;
-  // The line to land on: "trunk" (the default) or "release/<name>".
-  optional string onto = 4;
-}
-message RequestLandResponse {
-  LandTicket ticket = 1;
-}
-
-// Land a change's stack, from its lowest unlanded change up to change_id,
-// as one ordered group. Each change must be based on the current version
-// of the one below it.
-message RequestLandStackRequest {
-  bytes operation_id = 1;
-  string repo = 2;
-  bytes change_id = 3;
-  // Land the longest landable run from the bottom instead of all or none.
-  bool prefix = 4;
-  // The line to land on: "trunk" (the default) or "release/<name>".
-  optional string onto = 5;
-}
-message RequestLandStackResponse {
-  // Bottom first.
-  repeated LandTicket tickets = 1;
-}
-
-message GetLandStatusRequest {
-  string repo = 1;
-  string ticket = 2;
-}
-message GetLandStatusResponse {
-  LandTicket ticket = 1;
-  // Set once landed.
-  optional uint64 seq = 2;
-  optional bytes landed_hash = 3;
-  optional string error = 4;
-  // While queued: its place in the serve order (0 = next) and the
-  // estimated wait at the recent landing rate.
-  optional uint32 position = 5;
-  optional uint64 eta_ms = 6;
-}
-
 message WatchReviewRequest {
-  string repo = 1;
-  bytes change_id = 2;
+  // `…/changes/{change}/review`. Required.
+  string name = 1;
 }
 
-message ReviewEvent {
+message WatchReviewResponse {
   bytes change_id = 1;
   int64 at = 2;
   oneof event {
@@ -215,6 +183,6 @@ message ReviewEvent {
     LabelVote voted = 4;
     Thread thread_updated = 5;
     bytes new_version = 6;
-    LandTicket land_update = 7;
+    LandRequest land_update = 7;
   }
 }

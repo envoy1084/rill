@@ -196,9 +196,12 @@ impl TryFrom<pb::ChangeVersion> for ChangeVersion {
     }
 }
 
+/// The wire form without its resource name, which needs the repository;
+/// the server sets it.
 impl From<&ChangeInfo> for pb::ChangeInfo {
     fn from(ci: &ChangeInfo) -> Self {
         pb::ChangeInfo {
+            name: String::new(),
             hash: hash_to_proto(&ci.hash),
             change_id: id_to_proto(&ci.change_id),
             parents: ci.parents.iter().map(hash_to_proto).collect(),

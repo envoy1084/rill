@@ -51,12 +51,7 @@ impl SessionService for SessionSvc {
         request: ServiceRequest<'_, pb::ListSignInProvidersRequest>,
     ) -> GrpcResult<pb::ListSignInProvidersResponse> {
         let request = Call::new(ctx, request);
-        let org = request.into_inner().org;
-        let org = if org.is_empty() {
-            rill_store::DEFAULT_ORG.to_string()
-        } else {
-            org
-        };
+        let org = super::names::org(&request.get_ref().parent)?;
         let providers = flows::sign_in_providers(&self.state, &org)
             .await
             .map_err(ConnectError::from)?;
@@ -80,7 +75,7 @@ impl SessionService for SessionSvc {
         &self,
         ctx: RequestContext,
         request: ServiceRequest<'_, pb::ExchangeTokenRequest>,
-    ) -> GrpcResult<pb::SessionGrant> {
+    ) -> GrpcResult<pb::ExchangeTokenResponse> {
         let request = Call::new(ctx, request);
         let req = request.into_inner();
         let result = match req.subject_token_type.as_str() {
@@ -114,14 +109,20 @@ impl SessionService for SessionSvc {
                 "unsupported subject_token_type {other:?}"
             ))),
         };
-        result.map(Response::new).map_err(ConnectError::from)
+        result
+            .map(|grant| {
+                Response::new(pb::ExchangeTokenResponse {
+                    grant: grant.into(),
+                })
+            })
+            .map_err(ConnectError::from)
     }
 
     async fn refresh_session(
         &self,
         ctx: RequestContext,
         request: ServiceRequest<'_, pb::RefreshSessionRequest>,
-    ) -> GrpcResult<pb::SessionGrant> {
+    ) -> GrpcResult<pb::RefreshSessionResponse> {
         let request = Call::new(ctx, request);
         let result = async {
             let token: RefreshToken = request.get_ref().refresh_token.parse()?;
@@ -129,7 +130,11 @@ impl SessionService for SessionSvc {
         }
         .await;
         result
-            .map(|t| Response::new(grant(t)))
+            .map(|t| {
+                Response::new(pb::RefreshSessionResponse {
+                    grant: grant(t).into(),
+                })
+            })
             .map_err(ConnectError::from)
     }
 }

@@ -51,7 +51,7 @@ pattern is `Error::InvalidGlob`.
 | `max_lines` | 1000 | More lines bumps one step. |
 
 The server's fallback is `ServerConfig.risk`. A per-repository override is
-stored with `SetPolicy` as described in [submit policy](submit-policy.md).
+stored with `UpdatePolicy` as described in [submit policy](submit-policy.md).
 
 ## Algorithm
 

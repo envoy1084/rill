@@ -137,7 +137,7 @@ Rust rather than through Datalog, and before the relation check, even in dev
 mode. The effective right is the capability AND the stored relations.
 
 `AdminService.IssueToken`
-([admin/tokens.rs](../../crates/server/api/src/services/admin/tokens.rs)) mints tokens:
+([admin/tokens.rs](../../crates/server/api/src/services/identity/tokens.rs)) mints tokens:
 
 * Each `pb::Capability.scope` is `repo:<name>[/<dir>][/*]`. All scopes must
   name one repository.
@@ -153,7 +153,7 @@ mode. The effective right is the capability AND the stored relations.
   allowed only for a registered agent the caller sponsors (by name, or
   through one of its teams), or for an instance administrator.
 
-`WhoAmI` reports the caller's capability as one `pb::Capability` per
+`GetCaller` reports the caller's capability as one `pb::Capability` per
 verb and path, with action `repo.<verb>` and scope `repo:<name>/<path>/*`.
 
 ## Limitations
@@ -172,7 +172,7 @@ verb and path, with action `repo.<verb>` and scope `repo:<name>/<path>/*`.
 * [`tokens/issuer.rs`](../../crates/domain/policy/src/tokens/issuer.rs): `Issuer`, `attenuate`, `inspect`.
 * [`tokens/verifier.rs`](../../crates/domain/policy/src/tokens/verifier.rs): `TokenRequest`, `Verified`, `Verifier`.
 * [`tokens/tests/`](../../crates/domain/policy/src/tokens/tests/mod.rs): issue, attenuate and reject cases.
-* [`services/admin/mod.rs`](../../crates/server/api/src/services/admin/mod.rs): `IssueToken`, `WhoAmI`, `parse_scope`, `parse_action`.
+* [`services/admin/mod.rs`](../../crates/server/api/src/services/admin/mod.rs): `IssueToken`, `GetCaller`, `parse_scope`, `parse_action`.
 
 ---
 ← Previous: [Identity and authentication](identity-and-auth.md) · [Index](../index.md) · Next: [Token keys](token-keys.md) →

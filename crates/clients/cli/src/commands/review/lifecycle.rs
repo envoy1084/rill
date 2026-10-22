@@ -2,7 +2,7 @@
 
 use rill_mcp::json;
 use rill_sdk::ReviewFilter;
-use rill_types::{PrincipalId, ReviewStatus};
+use rill_types::ReviewStatus;
 
 use super::args::{AbandonArgs, ChangeArg, ListArgs, SubmitArgs, VoteArgs};
 use super::render::{print_state, status_text};
@@ -57,14 +57,7 @@ pub(super) async fn list(ctx: &mut Ctx<'_>, args: ListArgs) -> Result<()> {
             .transpose()?
             .into_iter()
             .collect(),
-        owner: args
-            .owner
-            .as_deref()
-            .map(|o| {
-                o.parse::<PrincipalId>()
-                    .map_err(|e| CliError::usage(format!("invalid principal id {o:?}: {e}")))
-            })
-            .transpose()?,
+        owner: args.owner.clone(),
         intent: None,
         limit: args.limit,
         page_token: None,

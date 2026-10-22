@@ -87,7 +87,7 @@ server:
 
 * `refresh_status` evaluates as the review's owner and flips `Open` to
   `Landable` or back. It leaves other statuses alone.
-* `EvaluateSubmit` (requires `read`) and `RequestLand` (requires `land`)
+* `EvaluateLanding` (requires `read`) and `RequestLand` (requires `land`)
   evaluate as the caller via `evaluate_for`. `RequestLand` fails with
   `FAILED_PRECONDITION` and the joined reasons when the policy denies.
 
@@ -108,14 +108,14 @@ sequenceDiagram
     participant A as AdminService
     participant S as misc keyspace
     participant R as RepoContext
-    C->>A: SetPolicy(name, text)
+    C->>A: UpdatePolicy(name, text)
     A->>A: permit().admin(), policy::validate
     A->>S: store StoredPolicy
     A->>R: reload_policy()
     R->>R: build_review, ArcSwap store
 ```
 
-* `SetPolicy` requires `admin()`. `policy::validate` fully parses the text
+* `UpdatePolicy` requires `admin()`. `policy::validate` fully parses the text
   (Cedar validation, or JSON parse plus glob compilation). Failure is
   `INVALID_ARGUMENT`, and nothing is stored.
 * `reload_policy` rebuilds the `ReviewService` from `effective_submit` (stored
@@ -130,7 +130,7 @@ sequenceDiagram
 ## Limitations
 
 * `.rill/submit.cedar` in the tree is not read. Policies come only from
-  `SetPolicy`.
+  `UpdatePolicy`.
 * `Provenance::sponsor` and `stack_depth` are not entity attributes, and no
   default rule uses `author_kind`.
 * Changing the policy does not re-evaluate existing reviews until their next
@@ -147,7 +147,7 @@ sequenceDiagram
 * [`submit/tests.rs`](../../crates/domain/policy/src/submit/tests.rs): default-policy cases.
 * [`rill-review/src/evaluate.rs`](../../crates/domain/review/src/evaluate.rs): `evaluate_for`, `refresh_status`.
 * [`state/policy.rs`](../../crates/server/runtime/src/state/policy.rs), [`state/repo_context.rs`](../../crates/server/runtime/src/state/repo_context.rs): storage and `reload_policy`.
-* [`services/admin/mod.rs`](../../crates/server/api/src/services/admin/mod.rs): `GetPolicy`, `SetPolicy`.
+* [`services/admin/mod.rs`](../../crates/server/api/src/services/admin/mod.rs): `GetPolicy`, `UpdatePolicy`.
 
 ---
 ← Previous: [Risk classification](risk-classification.md) · [Index](../index.md) · Next: [Signing](signing.md) →

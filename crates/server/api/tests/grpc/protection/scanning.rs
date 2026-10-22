@@ -68,12 +68,11 @@ async fn a_planted_secret_is_blocked_at_every_write() {
         ),
     );
     let raw = c
-        .repo
-        .create_change_version(pb::CreateChangeVersionRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+        .changes
+        .create_version(pb::CreateVersionRequest {
+            parent: common::names::repo("app"),
             version: pb::ChangeVersion::from(cv).into(),
-            signatures: Vec::new(),
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -82,11 +81,13 @@ async fn a_planted_secret_is_blocked_at_every_write() {
     let ws = c
         .workspace
         .create_workspace(pb::CreateWorkspaceRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            name: "w".into(),
-            base: None.into(),
-            sparse: None.into(),
+            parent: common::names::repo("app"),
+            workspace: (pb::Workspace {
+                display_name: "w".into(),
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -106,23 +107,19 @@ async fn a_planted_secret_is_blocked_at_every_write() {
     // A snapshot only records the working copy; the version is made when
     // it becomes a change, and that is refused.
     c.workspace
-        .snapshot(pb::SnapshotRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            workspace: ws.id.clone(),
+        .snapshot_workspace(pb::SnapshotWorkspaceRequest {
+            request_id: String::new(),
+            name: ws.name.clone(),
             tree_hash: Bytes::copy_from_slice(tree.as_bytes()),
         })
         .await
         .unwrap();
     let change = c
         .workspace
-        .new_change(pb::NewChangeRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            workspace: ws.id,
+        .start_change(pb::StartChangeRequest {
+            name: ws.name,
             message: "from the working copy".into(),
-            intent: None,
-            provenance: None.into(),
+            ..Default::default()
         })
         .await
         .unwrap_err();
@@ -138,9 +135,8 @@ async fn a_planted_secret_is_blocked_at_every_write() {
     let blocked = c
         .audit
         .list_audit_entries(pb::ListAuditEntriesRequest {
-            org: "default".into(),
-            after_seq: 0,
-            limit: 0,
+            parent: common::names::org("default"),
+            ..Default::default()
         })
         .await
         .unwrap()

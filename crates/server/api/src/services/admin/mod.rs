@@ -1,16 +1,8 @@
-//! `rill.v1.AdminService`: identity, capability tokens and policies.
-//!
-//! Admin requests carry no `repo` field; the repository is named inside
-//! the scope or policy name instead:
-//!
-//! * capability scopes are `repo:<repo>` or `repo:<repo>/<dir>[/*]`;
-//! * policy names are `<repo>/submit` (Cedar) or `<repo>/risk` (JSON).
+//! `rill.v1.AdminService`: the server's health, and importing existing
+//! history onto trunk.
 
 mod health;
-mod policies;
-mod scopes;
 mod service;
-mod tokens;
 mod trunk;
 
 pub use health::health_components;

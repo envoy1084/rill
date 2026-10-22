@@ -22,7 +22,7 @@ write that commits records its event even if its acknowledgement is lost.
 | Event kind | Written by |
 | --- | --- |
 | `RepoCreated` | `Stores::create_repo_with` |
-| `RefMoved` | `RepoStore::update_ref` (`MoveRef`) |
+| `RefMoved` | `RepoStore::update_ref` (`UpdateRef`) |
 | `VersionStored` | `put_change_version`, and the commit transaction |
 | `ReviewSubmitted` | `create_review` |
 | `Voted`, `Commented`, `ThreadResolved`, `StackSet`, `StatusChanged` | `review_writes`, from the difference between the review read and the one written; used by every review write, the commit transaction and landing |
@@ -30,7 +30,7 @@ write that commits records its event even if its acknowledgement is lost.
 | `WorkspaceChanged`, `WorkspaceDeleted` | `operation_tx`, `delete_workspace` |
 | `IntentChanged` | `put_intent` |
 | `RelationChanged` | `add_relation`, `remove_relation` (`Authorizer::grant` / `revoke`) |
-| `PolicyChanged` | `SetPolicy`, through `set_misc_with_event` |
+| `PolicyChanged` | `UpdatePolicy`, through `set_misc_with_event` |
 
 Each writer takes the principal that caused the change; the review service
 uses `Principal::service("review")` for changes it makes on its own
@@ -61,7 +61,7 @@ away.
 | --- | --- | --- |
 | `WatchEvents` | the event log through `tail`, with the request's kinds, change and ref prefix | `after`: absent is now, empty is the beginning, otherwise a cursor from an earlier `EventEnvelope` |
 | `WatchRefs` | `RefMoved` and `Landed` events; a landing is reported as a `trunk` move with the previous trunk entry as `old` | now |
-| `WatchTrunk`, `WatchLog` | the trunk and version log from a cursor (`trunk_range`, `log_after` in pages of 512), re-read whenever the event counter moves | `after_seq` / `after` as before |
+| `WatchTrunk`, `WatchVersions` | the trunk and version log from a cursor (`trunk_range`, `log_after` in pages of 512), re-read whenever the event counter moves | `after_seq` / `after` as before |
 | `WatchReview` | the log, filtered to one change, including its land requests' `LandRequested` and `LandStatusChanged` events | now |
 
 ## Jobs

@@ -9,32 +9,41 @@ use futures::Stream;
 use rill_exec::remote::BlobDigest;
 use rill_exec::runs::{Run, RunStore};
 use rill_proto::rill::v1 as pb;
-use rill_types::ObjectHash;
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::convert;
 use super::service::ChecksSvc;
-use crate::services::common::{open, Opened};
-use crate::services::Call;
+use crate::listing::{Page, Position};
+use crate::services::common::{open_repo, Opened};
+use crate::services::{names, Call};
 use connectrpc::ConnectError;
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
 
-/// Default page of runs.
-const DEFAULT_RUNS: usize = 20;
 /// Most bytes one read returns.
 const MAX_READ: u64 = 1 << 20;
 /// A watch re-reads the run at least this often.
 const KEEPALIVE: Duration = Duration::from_secs(30);
 
 pub(super) type RunStream =
-    Pin<Box<dyn Stream<Item = std::result::Result<pb::VerifyRun, ConnectError>> + Send>>;
+    Pin<Box<dyn Stream<Item = std::result::Result<pb::WatchRunResponse, ConnectError>> + Send>>;
 
 fn runs_of(state: &AppState, opened: &Opened) -> RunStore {
     RunStore::new(
         opened.repo.repo.clone(),
         Duration::from_secs(state.config.verify.retention_days * 24 * 3600),
     )
+}
+
+fn run_proto(
+    opened: &Opened,
+    header: &rill_exec::runs::RunHeader,
+    steps: &[rill_exec::runs::IndexedStep],
+) -> pb::VerifyRun {
+    pb::VerifyRun {
+        name: names::run(&opened.repo, &header.id),
+        ..convert::run(header, steps)
+    }
 }
 
 async fn run(runs: &RunStore, id: &str) -> Result<Run> {
@@ -44,41 +53,68 @@ async fn run(runs: &RunStore, id: &str) -> Result<Run> {
 }
 
 impl ChecksSvc {
-    pub(super) async fn list_runs(
+    pub(super) async fn list_runs_impl(
         &self,
         request: Call<pb::ListRunsRequest>,
     ) -> Result<pb::ListRunsResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        let req = request.get_ref();
+        let opened = open_repo(&self.state, &request, &req.parent).await?;
         opened.permit().read_any().await?;
-        let req = request.into_inner();
         let version = match req.version.is_empty() {
             true => None,
-            false => Some(ObjectHash::from_slice(&req.version)?),
+            false => Some(names::version_in(&opened.repo, &req.version)?),
         };
-        let limit = match req.limit as usize {
-            0 => DEFAULT_RUNS,
-            n => n,
+        let page = Page::new(req.page_size, &req.page_token, &[&req.parent, &req.version])?;
+        let skip = match &page.start {
+            Position::Start => 0,
+            Position::Offset(n) => *n as usize,
+            Position::After(_) => {
+                return Err(Error::InvalidPageToken("not a token for this list".into()))
+            }
         };
-        let headers = runs_of(&self.state, &opened)
-            .list(version.as_ref(), limit)
+        let mut headers = runs_of(&self.state, &opened)
+            .list(version.as_ref(), skip + page.size + 1)
             .await?;
+        let more = headers.len() > skip + page.size;
+        headers.truncate(skip + page.size);
+        let runs = headers
+            .iter()
+            .skip(skip)
+            .map(|h| run_proto(&opened, h, &[]))
+            .collect();
         Ok(pb::ListRunsResponse {
-            runs: headers.iter().map(|h| convert::run(h, &[])).collect(),
+            runs,
+            next_page_token: match more {
+                true => page.token(Position::Offset((skip + page.size) as u64)),
+                false => String::new(),
+            },
         })
     }
 
-    pub(super) async fn get_run(&self, request: Call<pb::GetRunRequest>) -> Result<pb::VerifyRun> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+    pub(super) async fn get_run_impl(
+        &self,
+        request: Call<pb::GetRunRequest>,
+    ) -> Result<pb::GetRunResponse> {
+        let name = &request.get_ref().name;
+        let opened = open_repo(&self.state, &request, name).await?;
         opened.permit().read_any().await?;
-        let found = run(&runs_of(&self.state, &opened), &request.get_ref().run).await?;
-        Ok(convert::run(&found.header, &found.steps))
+        let id = names::run_in(&opened.repo, name)?;
+        let found = run(&runs_of(&self.state, &opened), &id).await?;
+        Ok(pb::GetRunResponse {
+            run: run_proto(&opened, &found.header, &found.steps).into(),
+        })
     }
 
-    pub(super) async fn watch_run(&self, request: Call<pb::GetRunRequest>) -> Result<RunStream> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+    pub(super) async fn watch_run_impl(
+        &self,
+        request: Call<pb::WatchRunRequest>,
+    ) -> Result<RunStream> {
+        let name = &request.get_ref().name;
+        let opened = open_repo(&self.state, &request, name).await?;
         opened.permit().read_any().await?;
         let runs = runs_of(&self.state, &opened);
-        let id = request.into_inner().run;
+        let id = names::run_in(&opened.repo, name)?;
+        let run_name = names::run(&opened.repo, &id);
         run(&runs, &id).await?;
         let (tx, rx) = tokio::sync::mpsc::channel(4);
         let state: Arc<AppState> = self.state.clone();
@@ -99,7 +135,13 @@ impl ChecksSvc {
                     }
                 };
                 let done = current.header.end.is_some();
-                let message = convert::run(&current.header, &current.steps);
+                let message = pb::WatchRunResponse {
+                    run: pb::VerifyRun {
+                        name: run_name.clone(),
+                        ..convert::run(&current.header, &current.steps)
+                    }
+                    .into(),
+                };
                 if tx.send(Ok(message)).await.is_err() || done {
                     return;
                 }
@@ -116,14 +158,15 @@ impl ChecksSvc {
         Ok(Box::pin(ReceiverStream::new(rx)))
     }
 
-    pub(super) async fn read_log(
+    pub(super) async fn read_log_impl(
         &self,
         request: Call<pb::ReadLogRequest>,
-    ) -> Result<pb::ReadBytesResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+    ) -> Result<pb::ReadLogResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().run).await?;
         opened.permit().read_any().await?;
         let req = request.into_inner();
-        let found = run(&runs_of(&self.state, &opened), &req.run).await?;
+        let id = names::run_in(&opened.repo, &req.run)?;
+        let found = run(&runs_of(&self.state, &opened), &id).await?;
         let step = found
             .step(req.step)
             .ok_or_else(|| Error::not_found(format!("step {} of run {}", req.step, req.run)))?;
@@ -132,20 +175,23 @@ impl ChecksSvc {
             _ => step.stdout,
         };
         let Some(digest) = digest else {
-            return Ok(pb::ReadBytesResponse::default());
+            return Ok(pb::ReadLogResponse::default());
         };
-        self.read_range(&opened, digest.into(), req.offset, req.limit)
-            .await
+        let (data, offset, size) = self
+            .read_range(&opened, digest.into(), req.offset, req.limit)
+            .await?;
+        Ok(pb::ReadLogResponse { data, offset, size })
     }
 
-    pub(super) async fn read_artifact(
+    pub(super) async fn read_artifact_impl(
         &self,
         request: Call<pb::ReadArtifactRequest>,
-    ) -> Result<pb::ReadBytesResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+    ) -> Result<pb::ReadArtifactResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().run).await?;
         opened.permit().read_any().await?;
         let req = request.into_inner();
-        let found = run(&runs_of(&self.state, &opened), &req.run).await?;
+        let id = names::run_in(&opened.repo, &req.run)?;
+        let found = run(&runs_of(&self.state, &opened), &id).await?;
         let step = found
             .step(req.step)
             .ok_or_else(|| Error::not_found(format!("step {} of run {}", req.step, req.run)))?;
@@ -155,19 +201,21 @@ impl ChecksSvc {
             .find(|(path, _)| *path == req.path)
             .map(|(_, d)| *d)
             .ok_or_else(|| Error::not_found(format!("artifact {:?}", req.path)))?;
-        self.read_range(&opened, digest.into(), req.offset, req.limit)
-            .await
+        let (data, offset, size) = self
+            .read_range(&opened, digest.into(), req.offset, req.limit)
+            .await?;
+        Ok(pb::ReadArtifactResponse { data, offset, size })
     }
 
     /// `limit` bytes of `digest` from `offset`, a negative offset counting
-    /// from the end.
+    /// from the end, with where they start and the whole size.
     async fn read_range(
         &self,
         opened: &Opened,
         digest: BlobDigest,
         offset: i64,
         limit: u32,
-    ) -> Result<pb::ReadBytesResponse> {
+    ) -> Result<(bytes::Bytes, u64, u64)> {
         let size = digest.size;
         let start = match offset {
             o if o < 0 => size.saturating_sub(o.unsigned_abs()),
@@ -183,10 +231,6 @@ impl ChecksSvc {
             .read_range(&digest, start, len)
             .await?
             .ok_or_else(|| Error::not_found(format!("content {digest} is no longer stored")))?;
-        Ok(pb::ReadBytesResponse {
-            data,
-            offset: start,
-            size,
-        })
+        Ok((data, start, size))
     }
 }

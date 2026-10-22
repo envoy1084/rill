@@ -8,26 +8,21 @@ use rill_types::Line;
 use super::*;
 
 async fn change_on(c: &mut Clients, base: Option<Bytes>, path: &str, body: &str) -> Bytes {
-    c.repo
+    c.changes
         .apply_edits(pb::ApplyEditsRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
+            parent: common::names::repo("app"),
             base: (base.map(|b| pb::EditBase {
-                base: Some(pb::edit_base::Base::Root(pb::RootSpec {
-                    root: Some(pb::root_spec::Root::VersionHash(b)),
-                })),
+                base: Some(pb::edit_base::Base::Revision(hex::encode(b))),
             }))
             .into(),
             edits: vec![set_edit(path, body.as_bytes())],
             message: format!("edit {path}"),
-            intent: None,
-            provenance: None.into(),
-            change_id: None,
+            ..Default::default()
         })
         .await
         .unwrap()
         .into_owned()
-        .version
+        .info
         .unwrap()
         .change_id
 }
@@ -38,10 +33,9 @@ async fn a_release_is_cut_and_landed_on_only_through_its_lander() {
     let mut c = clients(&server, None).await;
     c.repo
         .create_repo(pb::CreateRepoRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            description: None,
-            windows_safe: false,
+            parent: common::names::org("default"),
+            repo_id: "app".into(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -49,37 +43,56 @@ async fn a_release_is_cut_and_landed_on_only_through_its_lander() {
     land(&mut c, "app", base).await;
     let cut = c
         .repo
-        .cut_release(pb::CutReleaseRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            name: "1.0".into(),
-            at: None,
-        })
-        .await
-        .unwrap()
-        .into_owned();
-    assert_eq!((cut.r#ref.as_str(), cut.trunk_seq), ("release/1.0", 1));
-
-    // Trunk moves on; a fix based on the release lands on it alone.
-    let next = change_on(&mut c, Some(cut.hash.clone()), "VERSION", "2.0\n").await;
-    land(&mut c, "app", next).await;
-    let fix = change_on(&mut c, Some(cut.hash.clone()), "FIX", "fixed\n").await;
-    approve(&mut c, &fix).await;
-    let ticket = c
-        .review
-        .request_land(pb::RequestLandRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            change_id: fix,
-            onto: Some("release/1.0".into()),
+        .create_release(pb::CreateReleaseRequest {
+            request_id: String::new(),
+            parent: common::names::repo("app"),
+            release_id: "1.0".into(),
+            trunk_position: None,
         })
         .await
         .unwrap()
         .into_owned()
-        .ticket
+        .r#ref
         .unwrap();
-    let status = wait(&mut c, &ticket.id).await;
-    assert_eq!(status.seq, Some(1), "the release's first landing");
+    assert_eq!(
+        cut.name,
+        format!("{}/refs/release/1.0", common::names::repo("app"))
+    );
+    let first = c
+        .repo
+        .get_trunk_position(pb::GetTrunkPositionRequest {
+            name: common::names::position("app", 1),
+        })
+        .await
+        .unwrap()
+        .into_owned()
+        .landing
+        .unwrap();
+    assert_eq!(cut.target, first.version_hash, "cut at trunk position 1");
+
+    // Trunk moves on; a fix based on the release lands on it alone.
+    let next = change_on(&mut c, Some(cut.target.clone()), "VERSION", "2.0\n").await;
+    land(&mut c, "app", next).await;
+    let fix = change_on(&mut c, Some(cut.target.clone()), "FIX", "fixed\n").await;
+    approve(&mut c, &fix).await;
+    let ticket = c
+        .landing
+        .request_land(pb::RequestLandRequest {
+            request_id: String::new(),
+            change: common::names::change("app", &fix),
+            onto: "release/1.0".into(),
+        })
+        .await
+        .unwrap()
+        .into_owned()
+        .land_request
+        .unwrap();
+    let status = wait(&mut c, &ticket.name).await;
+    assert_eq!(
+        status.trunk_position,
+        Some(1),
+        "the release's first landing"
+    );
 
     let ctx = server.state.repos.resolve("app").await.unwrap();
     let (_, head) = ctx
@@ -106,29 +119,29 @@ async fn a_release_is_cut_and_landed_on_only_through_its_lander() {
 
     let moved = c
         .repo
-        .move_ref(pb::MoveRefRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            update: (pb::RefUpdate {
-                name: "release/1.0".into(),
-                expected: Some(Bytes::copy_from_slice(head.as_bytes())),
-                target: Some(cut.hash.clone()),
-            })
+        .update_ref(pb::UpdateRefRequest {
+            request_id: String::new(),
+            r#ref: pb::Ref {
+                name: cut.name.clone(),
+                target: cut.target.clone(),
+                ..Default::default()
+            }
             .into(),
+            etag: head.to_hex(),
+            allow_missing: false,
         })
         .await
         .unwrap_err();
     assert_eq!(moved.code, connectrpc::ErrorCode::PermissionDenied);
 
-    let other = change_on(&mut c, Some(cut.hash.clone()), "OTHER", "x\n").await;
+    let other = change_on(&mut c, Some(cut.target.clone()), "OTHER", "x\n").await;
     approve(&mut c, &other).await;
     let missing = c
-        .review
+        .landing
         .request_land(pb::RequestLandRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            change_id: other,
-            onto: Some("release/9.9".into()),
+            request_id: String::new(),
+            change: common::names::change("app", &other),
+            onto: "release/9.9".into(),
         })
         .await
         .unwrap_err();
@@ -137,51 +150,44 @@ async fn a_release_is_cut_and_landed_on_only_through_its_lander() {
 
 async fn approve(c: &mut Clients, change_id: &Bytes) {
     c.review
-        .submit_for_review(pb::SubmitForReviewRequest {
-            operation_id: Bytes::new(),
-            repo: "app".into(),
-            change_id: change_id.clone(),
+        .submit_change(pb::SubmitChangeRequest {
+            request_id: String::new(),
+            change: common::names::change("app", change_id),
         })
         .await
         .unwrap();
     for (label, value) in [("Verified", 1), ("Review", 2)] {
         c.review
             .vote(pb::VoteRequest {
-                operation_id: Bytes::new(),
-                repo: "app".into(),
-                change_id: change_id.clone(),
+                request_id: String::new(),
+                review: common::names::review("app", change_id),
                 label: label.into(),
                 value,
                 reason: None,
-                version: None,
+                version: String::new(),
             })
             .await
             .unwrap();
     }
 }
 
-async fn wait(c: &mut Clients, ticket: &str) -> pb::GetLandStatusResponse {
+async fn wait(c: &mut Clients, name: &str) -> pb::LandRequest {
     for _ in 0..200 {
         let status = c
-            .review
-            .get_land_status(pb::GetLandStatusRequest {
-                repo: "app".into(),
-                ticket: ticket.into(),
-            })
+            .landing
+            .get_land_request(pb::GetLandRequestRequest { name: name.into() })
             .await
             .unwrap()
-            .into_owned();
-        match rill_proto::convert::known::<pb::LandStatus>(
-            status.ticket.as_option().unwrap().status,
-        )
-        .unwrap()
-        {
+            .into_owned()
+            .land_request
+            .unwrap();
+        match rill_proto::convert::known::<pb::LandStatus>(status.status).unwrap() {
             pb::LandStatus::Landed => return status,
             pb::LandStatus::Failed | pb::LandStatus::Cancelled => {
-                panic!("{ticket} did not land: {:?}", status.error)
+                panic!("{name} did not land: {:?}", status.error)
             }
             _ => tokio::time::sleep(Duration::from_millis(50)).await,
         }
     }
-    panic!("{ticket} did not finish")
+    panic!("{name} did not finish")
 }

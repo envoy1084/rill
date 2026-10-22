@@ -159,7 +159,7 @@ round trips in `src/convert/roundtrip_tests/`.
   `run_forever` shutdown.
 - **Search**: case and glob filters, regex without literals, path filter,
   re-indexing as a no-op, flush and reopen, symbol lookup.
-- **SDK**: streamed blob reassembly, chunked `PutBlob`, log conversion,
+- **SDK**: streamed blob reassembly, chunked `WriteBlob`, log conversion,
   `apply_edits` round trips, bearer metadata, status codes preserved,
   `watch_trunk`, `await_land` backoff and timeout, stack submit, sync and
   land, and checkout create, sparse, `.rillignore` and update with merge.
@@ -168,7 +168,7 @@ round trips in `src/convert/roundtrip_tests/`.
   tools.
 - **Server**: `dev_mode_end_to_end` (and, with `fdb`, `end_to_end_on_foundationdb`, the same flow with metadata in FoundationDB) covers repo create, `WatchTrunk`, edits,
   submit, vote, land, log, diff, grep, object `GET` with `ETag`, a malformed
-  object path (400), `/healthz`, `WhoAmI`, `Health` and `AddRelation`.
+  object path (400), `/healthz`, `GetCaller`, `GetHealth` and `CreateRelation`.
   `static_auth_denies_unrelated_principal` checks `PERMISSION_DENIED`.
   `commits_enforce_path_rules` and
   `server_stamps_authorship_and_attests_commits` cover path rules, spoofed

@@ -71,9 +71,10 @@ async fn a_kubernetes_service_account_acts_as_its_agent() {
     let root = server.token_for(&Principal::human("root"));
     let admin = IdentityServiceClient::authed(connect(&server.grpc).await, Bearer(Some(root)));
     admin
-        .put_workload_issuer(pb::PutWorkloadIssuerRequest {
-            operation_id: Bytes::new(),
+        .update_workload_issuer(pb::UpdateWorkloadIssuerRequest {
+            request_id: String::new(),
             issuer: (pb::WorkloadIssuerSpec {
+                resource_name: String::new(),
                 org: "default".into(),
                 name: "cluster".into(),
                 issuer: issuer.clone(),
@@ -81,12 +82,14 @@ async fn a_kubernetes_service_account_acts_as_its_agent() {
                 audiences: vec!["rill".into()],
             })
             .into(),
+            allow_missing: true,
         })
         .await
         .unwrap();
     admin
-        .register_agent(pb::RegisterAgentRequest {
-            operation_id: Bytes::new(),
+        .create_agent(pb::CreateAgentRequest {
+            request_id: String::new(),
+            parent: "orgs/default".into(),
             agent: (pb::AgentSpec {
                 org: "default".into(),
                 name: "builder".into(),
@@ -121,11 +124,11 @@ async fn a_kubernetes_service_account_acts_as_its_agent() {
                 .await
         }
     };
-    let grant = exchange(token).await.unwrap().into_owned();
+    let grant = exchange(token).await.unwrap().into_owned().grant.unwrap();
     let me = clients(&server, Some(&grant.access_token))
         .await
-        .admin
-        .who_am_i(pb::WhoAmIRequest {})
+        .identity
+        .get_caller(pb::GetCallerRequest {})
         .await
         .unwrap()
         .into_owned();

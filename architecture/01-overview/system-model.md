@@ -69,7 +69,7 @@ sequenceDiagram
   participant P as Permit
   participant R as RepoStore
   C->>S: rill cat src/main.rs --at trunk@42
-  S->>A: RepoService.GetBlob (bearer token)
+  S->>A: RepoService.ReadBlob (bearer token)
   A->>A: authenticate, attach AuthContext
   A->>H: request
   H->>H: open(): resolve RepoContext from registry
@@ -101,10 +101,10 @@ key ring and revocations), a static token on a dev server, or the fixed
 - **Relations** (ReBAC) on `repo` and `dir:/path` objects, inherited down the
   tree. A principal that cannot read a directory never sees its names in
   listings, diffs, blame or search. See [permissions](../05-policy/permissions.md).
-- **Submit policy** (Cedar), evaluated by `rill-review` at `EvaluateSubmit`
+- **Submit policy** (Cedar), evaluated by `rill-review` at `EvaluateLanding`
   and `RequestLand` over facts about the change: risk class, votes by label
   and principal kind, unresolved threads, intent. The text is per repository
-  and hot-swapped by `SetPolicy`. See [submit policy](../05-policy/submit-policy.md).
+  and hot-swapped by `UpdatePolicy`. See [submit policy](../05-policy/submit-policy.md).
 
 ## Durable work
 

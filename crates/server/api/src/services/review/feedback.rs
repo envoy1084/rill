@@ -6,10 +6,10 @@ use rill_review::threads::CommentMeta;
 use rill_types::{ChangeId, Principal, ThreadAnchor};
 
 use super::owners;
-use super::reviews::{change_id, review_response};
+use super::reviews::{review_proto, thread_proto};
 use super::ReviewSvc;
-use crate::services::common::{self, open, Opened};
-use crate::services::Call;
+use crate::services::common::{open_repo, Opened};
+use crate::services::{names, Call};
 use rill_runtime::error::{Error, Result};
 
 async fn thread_of(opened: &Opened, change_id: &ChangeId, thread_id: &str) -> Result<pb::Thread> {
@@ -18,7 +18,7 @@ async fn thread_of(opened: &Opened, change_id: &ChangeId, thread_id: &str) -> Re
         .threads
         .iter()
         .find(|t| t.id == thread_id)
-        .map(pb::Thread::from)
+        .map(|t| thread_proto(&opened.repo, change_id, t))
         .ok_or_else(|| Error::not_found(format!("thread {thread_id}")))
 }
 
@@ -27,16 +27,17 @@ impl ReviewSvc {
         &self,
         request: Call<pb::VoteRequest>,
     ) -> Result<pb::VoteResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().review().await?;
         let req = request.get_ref();
-        let id = change_id(&req.change_id)?;
+        let opened = open_repo(&self.state, &request, &req.review).await?;
+        opened.permit().review().await?;
+        let id = names::review_in(&opened.repo, &req.review)?;
         let value = i8::try_from(req.value)
             .map_err(|_| Error::invalid(format!("vote value {} out of range", req.value)))?;
         if req.label == owners::OWNER_LABEL && value > 0 {
             owners::check_approval(&opened, &id).await?;
         }
-        if let Some(version) = common::opt_hash("version", req.version.as_ref())? {
+        if !req.version.is_empty() {
+            let version = names::version_in(&opened.repo, &req.version)?;
             let current = opened.repo.review().get(&id).await?.current_version();
             if current != Some(version) {
                 return Err(Error::precondition(format!(
@@ -56,18 +57,18 @@ impl ReviewSvc {
             )
             .await?;
         Ok(pb::VoteResponse {
-            review: review_response(state).into(),
+            review: review_proto(&opened.repo, state).into(),
         })
     }
 
-    pub(super) async fn comment_impl(
+    pub(super) async fn create_thread_impl(
         &self,
-        request: Call<pb::CommentRequest>,
-    ) -> Result<pb::CommentResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        request: Call<pb::CreateThreadRequest>,
+    ) -> Result<pb::CreateThreadResponse> {
+        let opened = open_repo(&self.state, &request, &request.get_ref().parent).await?;
         opened.permit().review().await?;
         let req = request.into_inner();
-        let id = change_id(&req.change_id)?;
+        let id = names::review_in(&opened.repo, &req.parent)?;
         let anchor = match req.anchor.into_option() {
             Some(a) => ThreadAnchor::try_from(a)?,
             None => ThreadAnchor::Change,
@@ -95,8 +96,7 @@ impl ReviewSvc {
             )
             .await?;
         let thread = thread_of(&opened, &id, &thread_id).await?;
-        Ok(pb::CommentResponse {
-            thread_id,
+        Ok(pb::CreateThreadResponse {
             thread: thread.into(),
         })
     }
@@ -105,10 +105,10 @@ impl ReviewSvc {
         &self,
         request: Call<pb::ReplyThreadRequest>,
     ) -> Result<pb::ReplyThreadResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        let opened = open_repo(&self.state, &request, &request.get_ref().name).await?;
         opened.permit().review().await?;
         let req = request.into_inner();
-        let id = change_id(&req.change_id)?;
+        let (id, thread_id) = names::thread_in(&opened.repo, &req.name)?;
         let meta = CommentMeta {
             category: req
                 .category
@@ -122,9 +122,9 @@ impl ReviewSvc {
         opened
             .repo
             .review()
-            .reply(&id, &req.thread_id, opened.principal(), req.body, meta)
+            .reply(&id, &thread_id, opened.principal(), req.body, meta)
             .await?;
-        let thread = thread_of(&opened, &id, &req.thread_id).await?;
+        let thread = thread_of(&opened, &id, &thread_id).await?;
         Ok(pb::ReplyThreadResponse {
             thread: thread.into(),
         })
@@ -134,19 +134,17 @@ impl ReviewSvc {
         &self,
         request: Call<pb::ResolveThreadRequest>,
     ) -> Result<pb::ResolveThreadResponse> {
-        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
-        opened.permit().review().await?;
         let req = request.get_ref();
-        let id = change_id(&req.change_id)?;
+        let opened = open_repo(&self.state, &request, &req.name).await?;
+        opened.permit().review().await?;
+        let (id, thread_id) = names::thread_in(&opened.repo, &req.name)?;
         let review = opened.repo.review();
         if req.resolved {
-            review
-                .resolve(&id, &req.thread_id, opened.principal())
-                .await?;
+            review.resolve(&id, &thread_id, opened.principal()).await?;
         } else {
-            review.unresolve(&id, &req.thread_id).await?;
+            review.unresolve(&id, &thread_id).await?;
         }
-        let thread = thread_of(&opened, &id, &req.thread_id).await?;
+        let thread = thread_of(&opened, &id, &thread_id).await?;
         Ok(pb::ResolveThreadResponse {
             thread: thread.into(),
         })
