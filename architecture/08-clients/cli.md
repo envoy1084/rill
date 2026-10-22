@@ -41,7 +41,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Stacks | `stack show`, `stack sync`, `stack submit`, `stack land` |
 | Review | `submit`, `review show/list/vote/comment/threads/resolve-thread/evaluate/abandon` |
 | Landing | `land [--wait] [--timeout 300] [--no-sync]`, `trunk`, `landings`, `verify`, `revert`, `bisect` |
-| Checks | `checks runs [--version]`, `checks run <id> [--watch]`, `checks log <run> <step> [--stderr] [--tail]`, `checks artifact <run> <step> <path> [-o]`, `checks nonhermetic`, `checks flaky [--min-score] [--limit]`, `checks history <target>` ([checks](../06-services/checks.md)) |
+| Checks | `checks runs [--of-version]`, `checks run <id> [--watch]`, `checks log <run> <step> [--stderr] [--tail]`, `checks artifact <run> <step> <path> [-o]`, `checks nonhermetic`, `checks flaky [--min-score] [--limit]`, `checks history <target>` ([checks](../06-services/checks.md)) |
 | Intents | `intent create/list/show/update/link/similar` |
 | Workspaces, refs | `ws create/list/show/handoff/ops/delete`, `ref list/show/set/delete` |
 | Sign-in | `login [--org] [--provider]` (device flow through the org's identity provider), `logout` |

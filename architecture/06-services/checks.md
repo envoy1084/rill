@@ -124,7 +124,7 @@ stored, and its run record and result say `nonhermetic`.
 * `ListFlakyTests(repo, min_score = 0.1, limit = 50)`: targets at or above
   the score, flakiest first.
 
-`rill checks runs [--version]`, `rill checks run <id> [--watch]`, `rill
+`rill checks runs [--of-version]`, `rill checks run <id> [--watch]`, `rill
 checks log <run> <step> [--stderr] [--tail BYTES]`, `rill checks artifact
 <run> <step> <path> [-o FILE]`, `rill checks nonhermetic`, `rill checks
 flaky [--min-score] [--limit]` and `rill checks history <target>

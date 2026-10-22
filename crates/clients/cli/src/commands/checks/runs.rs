@@ -18,8 +18,8 @@ use crate::Result;
 #[derive(Args, Debug)]
 pub struct RunsArgs {
     /// Only runs of this version (hex).
-    #[arg(long)]
-    pub version: Option<String>,
+    #[arg(long, value_name = "VERSION")]
+    pub of_version: Option<String>,
     /// At most this many.
     #[arg(long, default_value_t = 20)]
     pub limit: u32,
@@ -150,7 +150,7 @@ fn print_run(ctx: &mut Ctx<'_>, run: &pb::VerifyRun) -> Result<()> {
 /// `rill checks runs`.
 pub async fn list(ctx: &mut Ctx<'_>, a: RunsArgs) -> Result<()> {
     let repo = ctx.repo_name()?;
-    let version = match &a.version {
+    let version = match &a.of_version {
         Some(v) => hex::decode(v).map_err(|_| CliError::usage(format!("invalid version {v:?}")))?,
         None => Vec::new(),
     };
