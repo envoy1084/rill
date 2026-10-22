@@ -117,6 +117,15 @@ between actions empties `/tmp` and kills leftover processes.
 gVisor (for macOS and engines without it) and runs a sample build and the
 escape suite. In Kubernetes, the runner pod uses the `gvisor` RuntimeClass.
 
+## Metrics
+
+`rill_exec_requests_total{outcome}` counts `Execute` calls served from
+the cache (`cache_hit`), `queued`, or `merged` into a running action;
+`rill_exec_completions_total{outcome}` counts actions workers finished
+(`ok`, `failed` for a non-zero exit, `error` when they could not run).
+Both are on the queues dashboard. Queue depths appear with every other
+`rill-jobs` queue.
+
 ## Limitations
 
 * The scheduler tries each org's queue in turn on every idle worker
