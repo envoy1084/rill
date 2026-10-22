@@ -103,6 +103,39 @@ metadata. At 50% of D1 the one laptop running load, server and database
 saturates: reads are dropped and every latency rises, commits to 384 ms
 p99.
 
+### Contended landing
+
+`--contended` seeds five plain-text registries declared `union` and a
+`deps.lock` regenerated offline (`ls deps > deps.lock`) in
+`.rill/merge.toml`; agents append registry entries (50%), add a
+dependency (30%) or edit a file of their own (20%), and land their oldest
+work first, so bases are stale and most landings conflict.
+`--burst-every`/`--burst-secs` double the land rate in windows. The
+report counts give-ups (requests that did not land) by reason and which
+merge driver resolved each landing.
+
+```
+cargo run --release -p rill-load -- --contended --percent 0 --lands-per-sec 10 \
+  --burst-every 30 --burst-secs 10 --duration 90          # embedded server, 16 local workers
+```
+
+90 s, 10 lands/s with three 10 s bursts at 20/s (13.3/s on average), one
+laptop:
+
+| Server | Landed | Lands/s sustained | Land p50 | Give-ups | Resolved by a driver |
+| --- | --- | --- | --- | --- | --- |
+| embedded, memory | 1,199 | 13.3 | 254 ms | 0 | 68% |
+| `rill api`, local FoundationDB, objects on local disk | 1,196 | about 11–12 | 21 s | 0 | 66% |
+| same, steady 10/s for 30 s | 299 | 10.0 | 1.3 s | 0 | 70% |
+
+On FoundationDB the lander keeps up with 10/s and absorbs bursts as a
+backlog that drains afterwards. The limit is the lockfile: each
+dependency change regenerates it on top of the one before, 100–250 ms a
+step (rebase, building the input root, the action on a local worker that
+writes ~800 input files), so lockfile landings top out near 4–6 a second.
+Storing a version with its land-critical values takes about 20 ms
+(one transaction; objects and tree nodes written concurrently).
+
 ### Execution
 
 `exec_load` (in `rill-load`) puts verification-shaped load on remote

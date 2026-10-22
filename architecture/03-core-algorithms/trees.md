@@ -78,7 +78,11 @@ object store to a `moka` cache (`Cache<TreeHash, NodeRef>`, TinyLFU
 eviction) of decoded nodes. The
 server uses `DEFAULT_TREE_CACHE = 4096` nodes per repository. Clones share
 the cache. `nodes_written()` counts nodes actually written, for tests and
-benchmarks.
+benchmarks. A `TreeBuilder::build` holds the nodes it creates (reads see
+them) and writes them together at the end, concurrently, rather than each
+as it is made; a caller that stores several builds at once (the lander's
+line-up) passes operations that are already holding nodes and writes them
+all itself.
 
 | Method | Behaviour |
 | --- | --- |

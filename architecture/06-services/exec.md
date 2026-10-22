@@ -194,9 +194,12 @@ leases and the reaper treat it like any other worker:
 
 * idle, it reports and is offered the next action for its platform;
 * it stages the input root from the execution space into a temporary
-  directory, creates the working directory and output parents, runs the
-  command in its `Sandbox`, and stores standard output, standard error and
-  each output path that is a regular file;
+  directory (directories first, each distinct file content read once,
+  concurrently, files written from several threads), creates the working
+  directory and output parents, runs the command in its `Sandbox`, and
+  stores standard output, standard error and each output path that is a
+  regular file; the temporary directory is removed after the result is
+  reported;
 * while running it reports progress every `report_every_secs`, which
   renews its claim; a reply that gives it another state means the claim
   was lost, and it drops the action;

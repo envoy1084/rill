@@ -97,7 +97,7 @@ version-keyed kind with its schedule:
 
 | Schedule | Kinds | Computed |
 | --- | --- | --- |
-| `LandCritical` | `root@1`, `changed@1`, `anc@1` | by `ensure_land_critical`, which the server's `commit_version` calls after storing a version and before replying, and the lander calls before moving trunk. A change whose tree cannot be built fails the request, and every trunk version has all three. |
+| `LandCritical` | `root@1`, `changed@1`, `anc@1` | committed in the same transaction as the version: `land_critical_writes` computes them from the parents' values as rows for the storing transaction (the server's `commit_version`), `store_version` stores one version with them, and `store_chain` a chain of versions each on the one before in one transaction (the lander's line-up). `ensure_land_critical` fills in any that are missing. A change whose tree cannot be built fails the request, and every trunk version has all three. |
 | `Background` | `phist@1`, `summary@1` | by a derive job (`ensure_background`) for every version that lands |
 | `OnDemand` | blame (keyed by path) | by the first reader |
 

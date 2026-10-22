@@ -156,10 +156,11 @@ Each window of up to `MAX_BATCH` (64):
    between its base and the tip is disjoint from it: the new version is
    the same edits on a new parent, keeping what its rebase recorded
    (`merge_drivers`, `structural_merge`). It cannot conflict and is not
-   verified again. The re-parented versions are stored together: the
-   versions concurrently, root trees in chain order, the other
-   land-critical values concurrently; a storage failure fails that request
-   and returns what was lined up after it to the queue. Requests placed on
+   verified again. The re-parented versions are stored together
+   (`store_chain`): their values computed in order in memory, their
+   objects and tree nodes written at once, and one transaction for all of
+   them; a storage failure fails the first and returns what was lined up
+   after it to the queue. Requests placed on
    the lined-up batch are prepared on the stored tip.
 6. **Commit** the chain in one `RepoStore::land` batch on the head read at
    the start. A conflict (trunk moved, or a review changed after it was
