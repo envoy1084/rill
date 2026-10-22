@@ -2,12 +2,12 @@
 //! the trunk head in parallel; a request that overlaps earlier ones is
 //! rebased on top of them. At commit the batch is lined up: each request
 //! is re-parented onto the one before it, which for disjoint changes is a
-//! pure tree operation that cannot conflict.
+//! new parent for the same edits and cannot conflict.
 
 use std::collections::HashMap;
 
 use futures::future::join_all;
-use rill_types::{ChangeVersionHash, GroupMode, LandGroup, LandTicket};
+use rill_types::{ChangeVersion, ChangeVersionHash, GroupMode, LandGroup, LandTicket, Timestamp};
 
 use super::head_config::HeadRules;
 use super::lander::Lander;
@@ -15,6 +15,7 @@ use super::prepare::{Candidate, Prepared};
 use crate::error::Result;
 use crate::queue::QueuedRequest;
 use crate::schedule::{group_failure, group_of, Footprint, Plan, Slot};
+use rill_core::RootTree;
 
 impl Lander {
     /// Prepare `batch` (in commit order) as a chain on `head`. Returns the
@@ -70,7 +71,10 @@ impl Lander {
             }
         }
 
+        let lining = std::time::Instant::now();
         let mut chain: Vec<Candidate> = Vec::new();
+        // Re-parented versions not stored yet, by place in `chain`.
+        let mut unstored: Vec<usize> = Vec::new();
         let mut held = Vec::new();
         let mut tip = head;
         for i in 0..n {
@@ -84,21 +88,26 @@ impl Lander {
                 continue;
             }
             let lined = match (placed[i] == Slot::Linear, ready[i].take()) {
-                (true, _) => match self.prepare(&batch[i].0, tip, rules).await {
-                    Ok(Prepared::Ready(c)) => Some(*c),
-                    Ok(_) => None,
-                    Err(e) => {
-                        self.fail(&batch[i].0, e.to_string()).await;
-                        None
+                (true, _) => {
+                    // It is rebased onto the tip, which must be stored.
+                    self.store_lined(&mut chain, &mut unstored, &mut held).await;
+                    tip = chain.last().map(|c| c.version).or(head);
+                    match self.prepare(&batch[i].0, tip, rules).await {
+                        Ok(Prepared::Ready(c)) => Some(*c),
+                        Ok(_) => None,
+                        Err(e) => {
+                            self.fail(&batch[i].0, e.to_string()).await;
+                            None
+                        }
                     }
-                },
-                (false, Some(c)) => match self.reparent(c, tip, rules).await {
-                    Ok(c) => c,
-                    Err(e) => {
-                        self.fail(&batch[i].0, e.to_string()).await;
-                        None
+                }
+                (false, Some(c)) => {
+                    let (c, moved) = reparent(c, tip);
+                    if moved {
+                        unstored.push(chain.len());
                     }
-                },
+                    Some(c)
+                }
                 (false, None) => None,
             };
             match (lined, group) {
@@ -111,13 +120,85 @@ impl Lander {
                     if group.mode == GroupMode::All {
                         let dropped = self.drop_group(&mut chain, group.id()).await;
                         held.extend(dropped);
+                        unstored.retain(|at| *at < chain.len());
                         tip = chain.last().map(|c| c.version).or(head);
                     }
                 }
                 (None, None) => {}
             }
         }
+        self.store_lined(&mut chain, &mut unstored, &mut held).await;
+        tracing::debug!(
+            waves = plan.waves().len(),
+            line_up_ms = lining.elapsed().as_millis() as u64,
+            "speculated"
+        );
         (chain, held)
+    }
+
+    /// Store the re-parented versions at `unstored` places of `chain`
+    /// with their land-critical values: the versions all at once, root
+    /// trees in chain order (each builds on its parent's), then the rest
+    /// all at once. A failure fails that request and takes everything
+    /// lined up after it off the chain, to be served again.
+    async fn store_lined(
+        &self,
+        chain: &mut Vec<Candidate>,
+        unstored: &mut Vec<usize>,
+        held: &mut Vec<QueuedRequest>,
+    ) {
+        let places = std::mem::take(unstored);
+        if places.is_empty() {
+            return;
+        }
+        let first_error = |results: Vec<Result<()>>| {
+            results
+                .into_iter()
+                .zip(&places)
+                .find_map(|(r, at)| r.err().map(|e| (*at, e.to_string())))
+        };
+        let lined: &Vec<Candidate> = chain;
+        let mut failed = first_error(
+            join_all(places.iter().map(|&at| async move {
+                self.repo.put_change_version(&lined[at].cv).await?;
+                Ok(())
+            }))
+            .await,
+        );
+        if failed.is_none() {
+            for &at in &places {
+                if let Err(e) = self.derive.get::<RootTree>(&lined[at].version).await {
+                    failed = Some((at, e.to_string()));
+                    break;
+                }
+            }
+        }
+        if failed.is_none() {
+            failed = first_error(
+                join_all(places.iter().map(|&at| async move {
+                    self.derive.ensure_land_critical(&lined[at].version).await?;
+                    Ok(())
+                }))
+                .await,
+            );
+        }
+        let Some((at, reason)) = failed else {
+            return;
+        };
+        let dropped = chain.split_off(at);
+        let groups: Vec<LandTicket> = dropped
+            .iter()
+            .filter_map(|c| group_of(&c.queued).map(LandGroup::id))
+            .collect();
+        let mut dropped = dropped.into_iter();
+        if let Some(first) = dropped.next() {
+            self.fail(&first.queued, reason).await;
+        }
+        held.extend(dropped.map(|c| c.queued));
+        // A group lands whole: what of it was lined up before goes too.
+        for id in groups {
+            held.extend(self.drop_group(chain, id).await);
+        }
     }
 
     /// Take group `id`'s members, and everything lined up after the first
@@ -139,36 +220,35 @@ impl Lander {
         }
         held
     }
+}
 
-    /// `candidate` on `tip`. It was speculated against an earlier state
-    /// holding everything it overlaps, so this only adds disjoint changes.
-    async fn reparent(
-        &self,
-        candidate: Candidate,
-        tip: Option<ChangeVersionHash>,
-        rules: &HeadRules,
-    ) -> Result<Option<Candidate>> {
-        let Some(tip) = tip else {
-            return Ok(Some(candidate));
-        };
-        if candidate.base == Some(tip) || candidate.cv.first_parent() == Some(tip) {
-            return Ok(Some(candidate));
-        }
-        let Some(rebased) = self
-            .rebase_through_ladder(&candidate.queued, &candidate.version, &tip, rules)
-            .await?
-        else {
-            return Ok(None);
-        };
-        let version = self.repo.put_change_version(&rebased).await?;
-        self.derive.ensure_land_critical(&version).await?;
-        Ok(Some(Candidate {
-            version,
-            cv: rebased,
-            base: Some(tip),
-            ..candidate
-        }))
+/// `candidate` on `tip`, and whether that is a new version. It was
+/// speculated against an earlier state holding everything it overlaps, so
+/// everything between that state and `tip` is disjoint from it: the same
+/// edits on a new parent, keeping what its rebase recorded (merge drivers,
+/// structural merges).
+fn reparent(candidate: Candidate, tip: Option<ChangeVersionHash>) -> (Candidate, bool) {
+    let Some(tip) = tip else {
+        return (candidate, false);
+    };
+    if candidate.base == Some(tip) || candidate.cv.first_parent() == Some(tip) {
+        return (candidate, false);
     }
+    let mut parents = vec![tip];
+    parents.extend(candidate.cv.parents.iter().skip(1).filter(|p| **p != tip));
+    let cv = ChangeVersion {
+        parents,
+        predecessor: Some(candidate.version),
+        created_at: Timestamp::now(),
+        ..candidate.cv.clone()
+    };
+    let moved = Candidate {
+        version: cv.version_hash(),
+        cv,
+        base: Some(tip),
+        ..candidate
+    };
+    (moved, true)
 }
 
 /// Groups with a member that will not land, by the lowest such member.

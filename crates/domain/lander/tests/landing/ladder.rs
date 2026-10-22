@@ -214,3 +214,39 @@ async fn a_failed_regeneration_returns_the_change_saying_why() {
         returned[0].1
     );
 }
+
+#[tokio::test]
+async fn what_a_driver_resolved_stays_recorded_when_its_landing_is_lined_up() {
+    let fx = Fixture::new().await;
+    let lander = fx.lander(
+        Arc::new(RecordingHooks::default()),
+        Arc::new(AlwaysGreen),
+        fast_policy(),
+    );
+    let base = trunk(&fx, &[("registry.txt", "a\n"), ("other", "0\n")]).await;
+    let (moved, _) = fx
+        .commit(Some(base), &[("registry.txt", "a\nz\n")], "z")
+        .await;
+    fx.repo.land_on_trunk(Some(base), moved).await.unwrap();
+    // A disjoint request lands first, so the resolved one is re-parented
+    // onto it when the batch is lined up.
+    let (_, first) = fx.commit(Some(moved), &[("other", "1\n")], "other").await;
+    let (_, resolved) = fx
+        .commit(Some(base), &[("registry.txt", "a\ny\n")], "y")
+        .await;
+    for cv in [&first, &resolved] {
+        lander
+            .enqueue(request(cv, RiskClass::Normal))
+            .await
+            .unwrap();
+    }
+    lander.run_once().await.unwrap();
+    let (seq, head) = fx.head().await;
+    assert_eq!(seq, TrunkSeq(4), "both landed in one batch");
+    let landed = fx.repo.get_change_version(&head).await.unwrap().unwrap();
+    assert_eq!(landed.change_id, resolved.change_id);
+    assert_eq!(
+        landed.extra.get(MERGE_DRIVERS_EXTRA).map(|b| b.as_ref()),
+        Some(&b"union: registry.txt"[..])
+    );
+}

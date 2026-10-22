@@ -3,6 +3,7 @@
 //! in groups of up to [`MAX_BATCH`] per transaction.
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
+use futures::future::join_all;
 use rill_store::repo::Lease;
 use rill_types::{GroupMode, LandStatus, LandTicket};
 
@@ -58,6 +59,7 @@ impl Lander {
     ) -> Window {
         let (mut live, mut held) = self.gate_groups(window).await;
         for attempt in 0..=self.policy.max_retries {
+            let started = std::time::Instant::now();
             let head = match self.repo.line_head(&self.line).await {
                 Ok(head) => head,
                 Err(e) => {
@@ -73,26 +75,34 @@ impl Lander {
                     return Window::Done(held);
                 }
             };
+            // Taking requests up and reading their footprints are
+            // independent reads and writes per request: all at once.
+            let fresh: Vec<bool> = live.iter().map(|q| marked.insert(q.ticket)).collect();
+            let rules_ref = &rules;
+            let outcomes = join_all(live.iter().zip(&fresh).map(|(queued, fresh)| async move {
+                if *fresh && !self.accept(queued).await {
+                    return None;
+                }
+                Some(self.footprint(queued, &rules_ref.landing).await)
+            }))
+            .await;
             let mut batch: Vec<(QueuedRequest, Footprint)> = Vec::new();
             // The lowest member of each group that dropped out here.
             let mut lost: HashMap<LandTicket, u32> = HashMap::new();
-            for queued in &live {
-                let mut lose = |q: &QueuedRequest| {
-                    if let Some(g) = group_of(q) {
-                        let lowest = lost.entry(g.id()).or_insert(g.index);
-                        *lowest = (*lowest).min(g.index);
-                    }
-                };
-                if marked.insert(queued.ticket) && !self.accept(queued).await {
-                    lose(queued);
-                    continue;
+            let mut lose = |q: &QueuedRequest| {
+                if let Some(g) = group_of(q) {
+                    let lowest = lost.entry(g.id()).or_insert(g.index);
+                    *lowest = (*lowest).min(g.index);
                 }
-                match self.footprint(queued, &rules.landing).await {
-                    Ok(mut f) => {
+            };
+            for (queued, outcome) in live.iter().zip(outcomes) {
+                match outcome {
+                    None => lose(queued),
+                    Some(Ok(mut f)) => {
                         f.groups.extend(group_of(queued).map(group_domain));
                         batch.push((queued.clone(), f));
                     }
-                    Err(e) => {
+                    Some(Err(e)) => {
                         lose(queued);
                         self.fail(queued, e.to_string()).await;
                     }
@@ -102,13 +112,24 @@ impl Lander {
             let (batch, later) = self.admit(batch, &rules.landing.throttle);
             let (batch, later) = hold_split_groups(batch, later);
             held.extend(later);
+            let admitted = started.elapsed();
             let (chain, dropped) = self.speculate(tip, &batch, &rules).await;
+            let speculated = started.elapsed();
             held.extend(dropped);
             live = chain.iter().map(|c| c.queued.clone()).collect();
             if chain.is_empty() {
                 return Window::Done(held);
             }
-            match self.commit(head, chain, lease).await {
+            let size = chain.len();
+            let committed = self.commit(head, chain, lease).await;
+            tracing::debug!(
+                size,
+                admit_ms = admitted.as_millis() as u64,
+                speculate_ms = (speculated - admitted).as_millis() as u64,
+                commit_ms = (started.elapsed() - speculated).as_millis() as u64,
+                "window"
+            );
+            match committed {
                 Ok(()) => return Window::Done(held),
                 Err(Error::Fenced) => return Window::Fenced,
                 Err(e) if is_conflict(&e) => {

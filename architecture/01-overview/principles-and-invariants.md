@@ -73,9 +73,12 @@ flowchart LR
   lander is the only caller; `RepoService.MoveRef` refuses `trunk`. The git
   importer calls `land_on_trunk`, a one-entry batch, for imported mainline
   history. See [landing](../04-workflow/landing.md).
-- A lander lands only while it holds the repository's `lander` lease: the
-  land transaction checks the lease epoch, so a replaced lander cannot
-  move trunk.
+- A release ref (`release/<name>`) is a line of its own with the same
+  rule: after `CutRelease` creates it, only `RepoStore::land` on that line
+  moves it, called by the release's lander; `MoveRef` refuses it.
+- A lander lands only while it holds its line's lease (`lander` for
+  trunk, `lander:release/<name>` for a release): the land transaction
+  checks the lease epoch, so a replaced lander cannot move its line.
 - What a commit or a landing makes visible commits in one transaction;
   objects and derived values, which are immutable, may be written before
   it.

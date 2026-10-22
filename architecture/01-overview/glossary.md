@@ -86,9 +86,16 @@ flowchart LR
 - **Sequence number** (`TrunkSeq`): gap-free position on trunk, written as
   `trunk@N`. Assigned by `RepoStore::land_on_trunk`. See
   [landing](../04-workflow/landing.md).
-- **Stack**: an ordered chain of dependent changes that land bottom-up; after
-  one lands, the next is restacked onto it. See
+- **Stack**: an ordered chain of dependent changes that land as one ordered
+  group (all or nothing, or the longest landable prefix); what stays above a
+  landing is restacked onto it. See
   [changes and stacks](../04-workflow/changes-and-stacks.md).
+- **Release** (`release/<name>`): a line of landings cut from a trunk
+  position, moved only by its own lander. See
+  [landing](../04-workflow/landing.md#release-lines).
+- **Merge driver**: how `.rill/merge.toml` says a conflicted file merges at
+  landing (`union`, `generated`, `regenerate`); a rung of the conflict
+  ladder. See [landing](../04-workflow/landing.md#conflict-ladder).
 - **Intent**: a record (`in_...`) of what work is for: kind, status, owner, optional
   risk override, linked changes. A version may carry an intent id. See
   [intents](../04-workflow/intents.md).
