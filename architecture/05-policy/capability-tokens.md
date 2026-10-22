@@ -42,7 +42,7 @@ of one token:
 | `repo: RepoId` | The single repository the token applies to. |
 | `workspace: Option<WorkspaceId>` | When set, the Datalog check requires a matching `request_workspace`. |
 | `paths: Vec<RepoPathBuf>` | Prefixes covered. The root covers everything. Empty fails `validate`. |
-| `verbs: Vec<Verb>` | `Read`, `Write`, `Land`, `Review`, `Admin` (wire names lowercase). |
+| `verbs: Vec<Verb>` | `Read`, `Write`, `Land`, `Review`, `Admin`, `Execute` (wire names lowercase). `Execute` gates the remote execution service for the token's org. |
 | `expires_at: Timestamp` | The token is refused once `now >= expires_at`. |
 
 `check_narrower_than(parent)` returns `Error::Widening` unless all of these
@@ -143,7 +143,7 @@ mode. The effective right is the capability AND the stored relations.
   name one repository.
 * Actions accept `read`/`repo.read`, `write`/`repo.write`,
   `land`/`repo.land`/`lander.land`, `review`/`repo.review`/`review.vote`,
-  `admin`/`repo.admin`.
+  `admin`/`repo.admin`, `execute`/`exec.execute`.
 * Expiry defaults to the longest lifetime the subject's kind allows. A past
   value is `INVALID_ARGUMENT`, a longer one is refused by the issuer.
 * A caller holding a capability must pass `check_narrower_than`, which is the

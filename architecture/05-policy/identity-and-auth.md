@@ -288,6 +288,7 @@ A registered agent's budgets travel in its `AgentScope`:
 | `versions_per_day` | in the commit transaction: a counter per agent and UTC day (`idb` table) is read and set with compare-and-set alongside the version, so concurrent writes never exceed it and failed commits never spend it |
 | `lands_per_day` | at `RequestLand`, before the request is queued |
 | `requests_per_minute` | per server, in the identity view: a `governor` token bucket of the budget refilled over a minute; a cluster of n servers admits up to n times the budget |
+| `executions_per_day` | at `Execute`, for actions not served from the action cache, before queueing ([remote execution](../06-services/remote-execution.md)) |
 
 Exhausted budgets are `RESOURCE_EXHAUSTED`.
 

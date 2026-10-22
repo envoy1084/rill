@@ -46,6 +46,7 @@ defaults with a comment header that lists every alternative.
 | `[risk]` | `RiskConfig::default()` | risk rules, used when a repository has no stored `risk` policy |
 | `[labels]` | `LabelSet::default()` | vote labels for every repository |
 | `[verify]` | `enabled = false`, `sandbox = "local"` (or `confined`, `gvisor`), `network = false`, `runsc = "runsc"` | pre-land `.rill/verify.toml` runs; when disabled the lander uses `AlwaysGreen` |
+| `[exec]` | `enabled = true`, `worker_secret_file` (none), `idle_wait_secs = 5`, `report_every_secs = 10`, `lease_secs = 45`, `max_attempts = 3`, `default_timeout_secs = 1800`, `max_timeout_secs = 7200` | remote execution: REAPI services, worker secrets (one per line, presented as `Bearer rwk_<secret>`), worker protocol timings, action timeouts ([remote execution](../06-services/remote-execution.md)) |
 | `[rate_limit]` | `per_principal_per_sec = 1000`, `burst = 2000` | per-principal token bucket on every authenticated request; 0 turns it off ([rate limits](api-surface.md#rate-limits)) |
 | `[postland]` | `enabled = false`, `interval_secs = 30`, `batch_size = 8` | post-land verifier loop |
 
@@ -140,7 +141,8 @@ instance comes from `rill api mint-token`. See
 | `RILL_AWS_KMS_KEY`, `RILL_AWS_KMS_ENDPOINT` | AWS KMS key service (`AWS_REGION` and the default credential chain) |
 | `RILL_GCP_KMS_KEY` | Google Cloud KMS key service (application default credentials) |
 | `RILL_ADMINS` | comma-separated instance administrators |
-| `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED` | booleans |
+| `RILL_VERIFY_ENABLED`, `RILL_POSTLAND_ENABLED`, `RILL_EXEC_ENABLED` | booleans |
+| `RILL_EXEC_WORKER_SECRET_FILE` | the worker secrets file (also read by `rill dev`) |
 | `RILL_POSTLAND_INTERVAL_SECS` | integer seconds |
 | `RUST_LOG` | `tracing` filter for the binary (default `info`, logs to stderr) |
 

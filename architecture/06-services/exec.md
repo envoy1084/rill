@@ -172,4 +172,4 @@ The lander picks a `VerifyMode` per risk class: `None` skips verification;
 * Lander: [config.rs](../../crates/domain/lander/src/config.rs), [land/prepare.rs](../../crates/domain/lander/src/land/prepare.rs)
 
 ---
-← Previous: [Search](search.md) · [Index](../index.md) · Next: [Git import](git-import.md) →
+← Previous: [Search](search.md) · [Index](../index.md) · Next: [Remote execution](remote-execution.md) →

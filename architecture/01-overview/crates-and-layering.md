@@ -1,6 +1,6 @@
 # Crates and layering
 
-Rill is one Cargo workspace of twenty product crates under `crates/`, grouped
+Rill is one Cargo workspace of twenty-one product crates under `crates/`, grouped
 by layer, plus tooling under `tools/`. Each crate owns one boundary, and
 dependencies only point down the stack, so the algorithms and policy crates
 stay free of RPC and storage-layout concerns.
@@ -9,7 +9,7 @@ stay free of RPC and storage-layout concerns.
 
 ```
 crates/
-  foundation/   types  proto  store  events  jobs
+  foundation/   types  proto  reapi-proto  store  events  jobs
   engine/       core  merge-syntax
   domain/       policy  review  lander  search  exec  identity  git-import
   server/       runtime  api  cache
@@ -37,6 +37,7 @@ only needs a folder in the right group. `tools/fuzz` is a separate
 | --- | --- | --- |
 | `rill-types` | Object model, ids, BLAKE3 hashing, canonical encoding, `Merge<T>` | I/O, policy decisions |
 | `rill-proto` | `rill.v1` protobufs, generated tonic services, domain/wire conversion | Handlers |
+| `rill-reapi-proto` | Vendored REAPI v2, Google API and Buildbarn worker protos, generated tonic services | Execution logic |
 | `rill-store` | `ObjectStore` / `MetaStore` traits, the keyspace layer, object backends (memory, files, S3) and metadata engines (memory, redb, FoundationDB), typed `RepoStore`, trunk CAS | Diff, merge, authorization |
 | `rill-events` | Reading the event log: filtered, resumable tails that wait on the event counter; retention | Writing events (each writer does, in its own transaction) |
 | `rill-jobs` | Durable job queues: priorities, shards, leased claims with fencing tokens, backoff, dead-letter queue, counters, a worker runtime | What jobs do (handlers live with their callers) |
@@ -46,7 +47,7 @@ only needs a folder in the right group. `tools/fuzz` is a separate
 | `rill-review` | Labels, votes, threads, interdiff, stacks, submit evaluation, review agents | Landing |
 | `rill-lander` | Queue, sequencer, rebase onto trunk, CAS land, landing records, post-land verification, bisect, revert | Review state (through `ReviewHooks`), execution (through `Verifier`) |
 | `rill-search` | Trigram index, symbol extraction, query execution | Permission filtering (the server passes a `PathFilter`) |
-| `rill-exec` | Action cache, sandbox materialization and confinement, verify plans | Scheduling policy |
+| `rill-exec` | Action cache, sandbox materialization and confinement, verify plans; remote execution's content store, action cache, operations and scheduler | Serving the protocols (`rill-api`), running actions (Buildbarn workers) |
 | `rill-identity` | Token signing keys and the key services that wrap them (local, Vault, AWS KMS, Google Cloud KMS), key rotation, OIDC and SAML | Request authentication (the server owns it) |
 | `rill-git-import` | One-way git history import onto trunk | Export, mirroring |
 | `rill-runtime` | A server process's state: configuration, stores, `AppState` and per-repository `RepoContext`s, background workers and job handlers, telemetry, the identity view, the audit log, rate limits, the checks every stored version passes (`writes`, `secrets`, `quarantine`), and the server error type with its gRPC status mapping | Requests (`rill-api` serves them) |
@@ -79,12 +80,13 @@ flowchart BT
   review[rill-review] --> core & policy
   lander[rill-lander] --> core & jobs
   search[rill-search] --> core
-  exec[rill-exec] --> core
+  exec[rill-exec] --> core & jobs & reapi
+  reapi[rill-reapi-proto]
   import[rill-git-import] --> core
   identity[rill-identity] --> policy
   proto[rill-proto] --> types
   runtime[rill-runtime] --> review & lander & search & exec & identity & proto & events & mergesyn
-  api[rill-api] --> runtime
+  api[rill-api] --> runtime & reapi
   cache[rill-cache] --> policy
   sdk[rill-sdk] --> proto & core & mergesyn
   mcp[rill-mcp] --> sdk & core
