@@ -59,26 +59,41 @@ impl ExecVerifier {
         Ok(Ok(outcome))
     }
 
-    /// What failed in `outcome`, with flake scores.
+    /// What failed in `outcome`, with flake scores. A step whose report
+    /// names failed tests failed because of them, so it is as flaky as the
+    /// least flaky of them.
     async fn failures(&self, outcome: &rill_exec::VerificationOutcome) -> Vec<Failure> {
-        let now = Timestamp::now().millis();
         let mut out = Vec::new();
         for step in outcome.steps.iter().filter(|s| !s.status.is_ok()) {
-            let mut targets = vec![step.target()];
-            targets.extend(step.failed_tests());
-            for target in targets {
-                let flake = match self.history.stats(&target).await {
-                    Ok(Some(stats)) => stats.score(now),
-                    _ => 0.0,
-                };
-                out.push(Failure {
+            let mut tests = Vec::new();
+            for target in step.failed_tests() {
+                let flake_permille = self.flake_permille(&target).await;
+                tests.push(Failure {
                     target,
                     step: step.step.clone(),
-                    flake_permille: (flake * 1000.0).round() as u32,
+                    flake_permille,
                 });
             }
+            let target = step.target();
+            let flake_permille = match tests.iter().map(|t| t.flake_permille).min() {
+                Some(least) => least,
+                None => self.flake_permille(&target).await,
+            };
+            out.push(Failure {
+                target,
+                step: step.step.clone(),
+                flake_permille,
+            });
+            out.extend(tests);
         }
         out
+    }
+
+    async fn flake_permille(&self, target: &str) -> u32 {
+        match self.history.stats(target).await {
+            Ok(Some(stats)) => (stats.score(Timestamp::now().millis()) * 1000.0).round() as u32,
+            _ => 0,
+        }
     }
 
     /// Quarantine every failure that has flipped often enough, opening an
@@ -238,6 +253,12 @@ mod tests {
     /// A repository whose one step fails the first time it runs and passes
     /// after, and whose history already flipped `flips` times.
     async fn setup(flips: usize) -> Setup {
+        setup_with(flips, false).await
+    }
+
+    /// Like `setup`; with `junit` the step reports one test case,
+    /// `suite::flaky`, failing with it, and the history is that test's.
+    async fn setup_with(flips: usize, junit: bool) -> Setup {
         let stores = Stores::memory();
         let repo = stores.repo(stores.create_repo("app", "").await.unwrap().id);
         let trees = TreeOps::new(repo.objects().clone(), 64);
@@ -257,11 +278,26 @@ mod tests {
         let worker = tokio::spawn(worker.run(std::future::pending()));
         let marker = tempfile::tempdir().unwrap();
         let seen = marker.path().join("seen");
-        let plan = format!(
-            "[[step]]\nname = \"unit\"\ncommand = [\"sh\", \"-c\", \
-             \"test -e {0} || {{ touch {0}; exit 1; }}\"]\n",
-            seen.display()
-        );
+        let plan = if junit {
+            let report = |case: &str| {
+                format!(
+                    r#"printf '%s' '<testsuites><testsuite name="suite"><testcase name="flaky" classname="suite">{case}</testcase></testsuite></testsuites>' > report.xml"#
+                )
+            };
+            format!(
+                "[[step]]\nname = \"unit\"\njunit = \"report.xml\"\ncommand = [\"sh\", \"-c\", \
+                 '''if test -e {0}; then {1}; else touch {0}; {2}; exit 1; fi''']\n",
+                seen.display(),
+                report(""),
+                report(r#"<failure message="x"/>"#),
+            )
+        } else {
+            format!(
+                "[[step]]\nname = \"unit\"\ncommand = [\"sh\", \"-c\", \
+                 \"test -e {0} || {{ touch {0}; exit 1; }}\"]\n",
+                seen.display()
+            )
+        };
         let mut builder = TreeBuilder::new();
         let content = store_content(repo.objects().as_ref(), Bytes::from(plan))
             .await
@@ -280,7 +316,7 @@ mod tests {
             };
             history
                 .record(&TestRun {
-                    target: "step:unit".into(),
+                    target: if junit { "test:suite::flaky" } else { "step:unit" }.into(),
                     outcome,
                     retried: false,
                     duration_ms: None,
@@ -332,6 +368,13 @@ mod tests {
             s.history.quarantined().await.unwrap().is_empty(),
             "two flips are not chronic"
         );
+    }
+
+    #[tokio::test]
+    async fn a_step_failing_only_in_a_flaky_test_is_run_again() {
+        let s = setup_with(2, true).await;
+        let outcome = s.verifier.verify(request(s.root)).await.unwrap();
+        assert!(outcome.green && outcome.flaky, "{}", outcome.details);
     }
 
     #[tokio::test]

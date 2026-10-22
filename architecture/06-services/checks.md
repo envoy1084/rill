@@ -106,7 +106,8 @@ runtime; thresholds in `[verify.flakes]`):
 * **Re-run.** A verification whose every failing target (the failed
   steps and their failed test cases) scores above
   `rerun_above_permille` (200, a score of 0.2) runs again, up to `reruns`
-  (2) times. Passing steps come from the action cache; failed ones run
+  (2) times. A step whose report names failed test cases is scored as
+  the least flaky of them: it failed because they did. Passing steps come from the action cache; failed ones run
   again, since failures are not cached, and each run is recorded, so a
   re-run is itself evidence. If a re-run passes, the outcome is green and
   `flaky`: before landing it lands, after landing the position is `Flaky`,
