@@ -33,7 +33,13 @@ impl RetryPolicy {
     pub fn delay(&self, attempt: u32) -> Duration {
         let factor = 1u32 << attempt.saturating_sub(1).min(20);
         let full = self.base_delay.saturating_mul(factor).min(self.max_delay);
-        full.mul_f64(rand::random_range(0.5..=1.0))
+        // From the id source, which simulations seed, so a run replays.
+        let draw = u64::from_le_bytes(
+            rill_types::ids::random_id()[..8]
+                .try_into()
+                .expect("8 of 16"),
+        );
+        full.mul_f64(0.5 + 0.5 * (draw as f64 / u64::MAX as f64))
     }
 }
 

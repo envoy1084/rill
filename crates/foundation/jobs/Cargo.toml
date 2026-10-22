@@ -8,7 +8,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-rand = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true }
 serde = { workspace = true }

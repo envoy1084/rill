@@ -5908,7 +5908,6 @@ dependencies = [
  "async-trait",
  "bytes",
  "parking_lot",
- "rand 0.10.3",
  "rill-store",
  "rill-types",
  "serde",
