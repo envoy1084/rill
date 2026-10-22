@@ -111,6 +111,39 @@ impl ReviewService for MockReview {
         }))
     }
 
+    async fn request_land_stack(
+        &self,
+        req: Request<pb::RequestLandStackRequest>,
+    ) -> RpcResult<pb::RequestLandStackResponse> {
+        let req = req.into_inner();
+        let id: ChangeId = rill_proto::convert::id_from_proto("change_id", &req.change_id)?;
+        let stack = self
+            .stacks
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find(|s| s.contains(&id))
+            .cloned()
+            .unwrap_or_else(|| vec![id]);
+        self.land_requests
+            .lock()
+            .unwrap()
+            .extend(stack.iter().copied());
+        Ok(Response::new(pb::RequestLandStackResponse {
+            tickets: stack
+                .iter()
+                .map(|c| {
+                    self.ticket(
+                        &format!("ticket-{c}"),
+                        id_to_proto(c),
+                        pb::LandStatus::Queued,
+                    )
+                })
+                .collect(),
+        }))
+    }
+
     async fn get_land_status(
         &self,
         req: Request<pb::GetLandStatusRequest>,

@@ -27,10 +27,10 @@ pub enum LandEvent {
     },
     /// A request failed for a reason other than a conflict.
     Failed { change_id: ChangeId, reason: String },
-    /// Changes stacked on a landed change may now be landed.
-    DependentsReady {
+    /// Changes stacked on a landed change were rebased onto it.
+    DependentsRestacked {
         landed: ChangeId,
-        dependents: Vec<ChangeId>,
+        restacked: Vec<crate::traits::Restacked>,
     },
     /// Most rebases in `domain` conflict: it is served one request per
     /// batch until that drops.

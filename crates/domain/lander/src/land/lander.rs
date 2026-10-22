@@ -5,16 +5,17 @@ use std::sync::Arc;
 use rill_core::{CommitGraph, DeriveManager};
 use rill_store::repo::{Lease, LeaseHolder};
 use rill_store::RepoStore;
-use rill_types::ChangeId;
+use rill_types::{ChangeId, GroupMode};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
 use super::record::{list_landings, Landing};
+use super::sequence::MAX_BATCH;
 use crate::config::LandPolicy;
 use crate::error::Result;
 use crate::events::LandEvent;
 use crate::queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest, SWEEP_LIMIT};
-use crate::schedule::{serve_order, share_key, Eta, Thrash, Timings};
+use crate::schedule::{keep_groups_together, serve_order, share_key, Eta, Thrash, Timings};
 use crate::traits::{
     ConflictResolver, NoRegenerator, Regenerator, ReviewHooks, TargetGraph, Verifier,
 };
@@ -180,43 +181,88 @@ impl Lander {
         if let Some(ticket) = self.repo.active_land_request(&change_id).await? {
             return Ok(ticket);
         }
-        if request.lane != rill_types::Lane::Emergency {
-            let pending = self.queue.pending(self.policy.max_queued + 1).await?;
-            if pending.len() >= self.policy.max_queued {
-                let wait = self.timings.snapshot().interval * pending.len() as u32;
-                return Err(crate::error::Error::QueueFull {
-                    pending: pending.len(),
-                    retry_after_secs: wait.as_secs().clamp(1, 600),
-                });
-            }
-            let mine = pending
-                .iter()
-                .filter(|q| q.request.requester.id == request.requester.id)
-                .count();
-            if mine >= self.policy.max_in_flight {
-                return Err(crate::error::Error::TooManyRequests {
-                    requester: request.requester.name.clone(),
-                    limit: self.policy.max_in_flight,
-                });
-            }
-            if let Some(sponsor) = &request.sponsor {
-                let sponsored = pending
-                    .iter()
-                    .filter(|q| q.request.sponsor.as_ref() == Some(sponsor))
-                    .count();
-                if sponsored >= self.policy.max_sponsor_in_flight {
-                    return Err(crate::error::Error::TooManyRequests {
-                        requester: sponsor.clone(),
-                        limit: self.policy.max_sponsor_in_flight,
-                    });
-                }
-            }
-        }
+        self.admit_requests(std::slice::from_ref(&request)).await?;
         let (ticket, new) = self.queue.enqueue(&request).await?;
         if new {
             self.publish(LandEvent::Queued { ticket, change_id });
         }
         Ok(ticket)
+    }
+
+    /// Queue `requests` (bottom first) as one ordered group that lands
+    /// whole or, in `Prefix` mode, as far as it can. Returns their tickets
+    /// in order.
+    pub async fn enqueue_group(
+        &self,
+        requests: Vec<LandRequest>,
+        mode: GroupMode,
+    ) -> Result<Vec<LandTicket>> {
+        if requests.is_empty() || requests.len() > MAX_BATCH {
+            return Err(crate::error::Error::GroupSize {
+                size: requests.len(),
+                limit: MAX_BATCH,
+            });
+        }
+        for request in &requests {
+            if let Some(ticket) = self.repo.active_land_request(&request.change_id).await? {
+                return Err(crate::error::Error::AlreadyQueued {
+                    change: request.change_id,
+                    ticket,
+                });
+            }
+        }
+        self.admit_requests(&requests).await?;
+        let tickets = self.repo.queue_land_group(&requests, mode).await?;
+        for (ticket, request) in tickets.iter().zip(&requests) {
+            self.publish(LandEvent::Queued {
+                ticket: *ticket,
+                change_id: request.change_id,
+            });
+        }
+        Ok(tickets)
+    }
+
+    /// Refuse `requests` when the queue, their requester or their sponsor
+    /// has no room for them; the emergency lane always has room.
+    async fn admit_requests(&self, requests: &[LandRequest]) -> Result<()> {
+        let Some(first) = requests.first() else {
+            return Ok(());
+        };
+        if first.lane == rill_types::Lane::Emergency {
+            return Ok(());
+        }
+        let adding = requests.len();
+        let pending = self.queue.pending(self.policy.max_queued + 1).await?;
+        if pending.len() + adding > self.policy.max_queued {
+            let wait = self.timings.snapshot().interval * pending.len() as u32;
+            return Err(crate::error::Error::QueueFull {
+                pending: pending.len(),
+                retry_after_secs: wait.as_secs().clamp(1, 600),
+            });
+        }
+        let mine = pending
+            .iter()
+            .filter(|q| q.request.requester.id == first.requester.id)
+            .count();
+        if mine + adding > self.policy.max_in_flight {
+            return Err(crate::error::Error::TooManyRequests {
+                requester: first.requester.name.clone(),
+                limit: self.policy.max_in_flight,
+            });
+        }
+        if let Some(sponsor) = &first.sponsor {
+            let sponsored = pending
+                .iter()
+                .filter(|q| q.request.sponsor.as_ref() == Some(sponsor))
+                .count();
+            if sponsored + adding > self.policy.max_sponsor_in_flight {
+                return Err(crate::error::Error::TooManyRequests {
+                    requester: sponsor.clone(),
+                    limit: self.policy.max_sponsor_in_flight,
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Queue `request`, serve the queue, and return the request's status
@@ -250,7 +296,7 @@ impl Lander {
         if queued.is_empty() {
             return Ok(0);
         }
-        let queued = serve_order(queued, &self.policy.sponsor_weights);
+        let queued = keep_groups_together(serve_order(queued, &self.policy.sponsor_weights));
         Ok(self.sequence(queued, &lease).await)
     }
 
@@ -261,10 +307,10 @@ impl Lander {
         &self,
         ticket: LandTicket,
     ) -> Result<Option<(usize, std::time::Duration)>> {
-        let queued = serve_order(
+        let queued = keep_groups_together(serve_order(
             self.queue.pending(SWEEP_LIMIT).await?,
             &self.policy.sponsor_weights,
-        );
+        ));
         Ok(queued
             .iter()
             .position(|q| q.ticket == ticket)

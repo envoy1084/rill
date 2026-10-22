@@ -167,8 +167,9 @@ next_page_token}`.
 `StackClient` (`stack.rs`) combines review and repo calls. `submit_stack`
 submits each change, then calls `set_stack`. `sync_stack` rebases bottom-up,
 each change onto the previous result, and reports conflicts instead of
-raising them. `land_stack` requests a land for each change and waits for it
-before the next. `await_land` polls land status with `Backoff`, a `backon`
+raising them. `land_stack` declares the stack, asks for it to land as one
+ordered group (`RequestLandStack`, all or nothing, or `prefix`) and waits for
+every ticket, returning a `StackLanding` of what landed and what did not. `await_land` polls land status with `Backoff`, a `backon`
 exponential builder (250 ms initial, factor 1.6, 5 s max). It is not
 jittered: one client polls its own ticket, and jitter only delayed noticing
 the landing (up to 500 ms instead of 250). It returns `Error::LandFailed` on a failed or

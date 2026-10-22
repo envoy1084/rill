@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use rill_types::{
-    ids::random_id, ChangeId, EventKind, LandRequest, LandRequestRecord, LandStatus, LandTicket,
-    Principal, Timestamp,
+    ids::random_id, ChangeId, EventKind, GroupMode, LandGroup, LandRequest, LandRequestRecord,
+    LandStatus, LandTicket, Principal, Timestamp,
 };
 
 use super::codec::{decode_record, encode_record, parse_seq};
@@ -30,38 +30,10 @@ impl RepoStore {
         if let Some(ticket) = self.active_land_request(&request.change_id).await? {
             return Ok((ticket, false));
         }
-        let keys = self.keys();
-        let ticket = LandTicket(u64::from_be_bytes(
-            random_id()[..8]
-                .try_into()
-                .expect("16 random bytes split into 8"),
-        ));
-        let record = LandRequestRecord {
-            ticket,
-            request: request.clone(),
-            status: LandStatus::Queued,
-            updated_at: Timestamp::now(),
-        };
-        let by_change = keys.land_by_change(&request.change_id);
-        let record_key = keys.land_request(ticket.0);
-        let mut tx = Transaction::new()
-            .expect_absent(by_change.clone())
-            .expect_absent(record_key.clone())
-            .set(record_key, encode_record(&record)?)
-            .set(self.pending_key(&record), Bytes::new())
-            .set(by_change, Bytes::copy_from_slice(&ticket.0.to_be_bytes()));
-        tx.mutations.extend(self.event_by(
-            &request.requester,
-            EventKind::LandRequested {
-                ticket,
-                change: request.change_id,
-                lane: request.lane,
-            },
-        )?);
-        tx.mutations.push(Mutation::Add {
-            key: keys.table(table::LAND_WAKE),
-            delta: 1,
-        });
+        let ticket = new_ticket();
+        let tx = self
+            .queue_tx(ticket, request.clone())?
+            .merge(self.wake_tx());
         match self.meta().transact(tx).await {
             Ok(_) => Ok((ticket, true)),
             Err(Error::Conflict(_)) => match self.active_land_request(&request.change_id).await? {
@@ -70,6 +42,71 @@ impl RepoStore {
             },
             Err(e) => Err(e),
         }
+    }
+
+    /// Queue `requests` (bottom first) as one ordered group, all in one
+    /// transaction, and return their tickets in the same order. Fails with
+    /// a conflict when a member already has an unfinished request.
+    pub async fn queue_land_group(
+        &self,
+        requests: &[LandRequest],
+        mode: GroupMode,
+    ) -> Result<Vec<LandTicket>> {
+        let tickets: Vec<LandTicket> = requests.iter().map(|_| new_ticket()).collect();
+        let mut tx = self.wake_tx();
+        for (index, request) in requests.iter().enumerate() {
+            let mut request = request.clone();
+            request.group = Some(LandGroup {
+                mode,
+                tickets: tickets.clone(),
+                index: index as u32,
+            });
+            tx = tx.merge(self.queue_tx(tickets[index], request)?);
+        }
+        match self.meta().transact(tx).await {
+            Ok(_) => Ok(tickets),
+            Err(Error::Conflict(_)) => Err(Error::Conflict(
+                "a change in the group already has a land request".into(),
+            )),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// The writes queueing `request` as `ticket`: its record, its rows in
+    /// the pending and by-change indexes, and its event.
+    fn queue_tx(&self, ticket: LandTicket, request: LandRequest) -> Result<Transaction> {
+        let keys = self.keys();
+        let by_change = keys.land_by_change(&request.change_id);
+        let record_key = keys.land_request(ticket.0);
+        let event = EventKind::LandRequested {
+            ticket,
+            change: request.change_id,
+            lane: request.lane,
+        };
+        let requester = request.requester.clone();
+        let record = LandRequestRecord {
+            ticket,
+            request,
+            status: LandStatus::Queued,
+            updated_at: Timestamp::now(),
+        };
+        let mut tx = Transaction::new()
+            .expect_absent(by_change.clone())
+            .expect_absent(record_key.clone())
+            .set(record_key, encode_record(&record)?)
+            .set(self.pending_key(&record), Bytes::new())
+            .set(by_change, Bytes::copy_from_slice(&ticket.0.to_be_bytes()));
+        tx.mutations.extend(self.event_by(&requester, event)?);
+        Ok(tx)
+    }
+
+    fn wake_tx(&self) -> Transaction {
+        let mut tx = Transaction::new();
+        tx.mutations.push(Mutation::Add {
+            key: self.keys().table(table::LAND_WAKE),
+            delta: 1,
+        });
+        tx
     }
 
     /// The request with `ticket`, finished or not.
@@ -218,4 +255,12 @@ impl RepoStore {
             record.ticket.0,
         )
     }
+}
+
+fn new_ticket() -> LandTicket {
+    LandTicket(u64::from_be_bytes(
+        random_id()[..8]
+            .try_into()
+            .expect("16 random bytes split into 8"),
+    ))
 }

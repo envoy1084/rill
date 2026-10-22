@@ -136,23 +136,42 @@ SDK helpers in [stack.rs](../../crates/clients/sdk/src/stack.rs):
 * `sync_stack`: rebases bottom-up, each current version onto the previous
   result, starting from the resolved `onto`. Conflicts are reported per
   change, not raised. The CLI exits 3 if any change conflicts.
-* `land_stack`: calls `RequestLand` for each change bottom-up and polls
-  `await_land` with backoff before requesting the next. The lander rebases
-  each change onto the new trunk head (see [landing](landing.md)).
+* `land_stack`: declares the list a stack (`set_stack`), calls
+  `RequestLandStack` on its top and awaits every ticket, returning what
+  landed and what did not, with why.
 
-After a landing, the lander asks `ReviewHooks::dependents_of` for the
-members above the landed change and publishes `DependentsReady`. Nothing
-rebases those dependents automatically.
+**Landing a stack.** `RequestLandStack(change, prefix)` takes the declared
+stack from its lowest unlanded member up to `change`. Every member must be
+landable by the caller (status, submit policy) and based on the current
+version of the one below it ("sync the stack first" otherwise). The members
+are queued in one transaction as an ordered group (`LandGroup { mode,
+tickets, index }`, at most 64): `all` (the default) lands every member in
+one batch or none, `prefix` (`rill stack land --prefix`) lands the longest
+run from the bottom that can. The sequencer keeps a group together and in
+order, never splits it across windows or batches, and gives its members a
+shared domain, so each is speculated and verified on top of the one below
+([landing](landing.md#stacks-as-ordered-groups)).
+
+**Restack.** After a batch lands, for each landed change whose change
+above it did not land in the same batch, the lander calls
+`ReviewHooks::restack`. `ReviewService::restack` rebases the members above
+it bottom-up, each onto the landed version (or the previous restacked
+member), and records the results as new versions (`add_version`, so a
+trivial rebase keeps its votes). A member already based on its new base is
+left alone, and it stops at the first member that takes no new versions
+(landing, landed, abandoned). A rebase that conflicts is still recorded,
+with the conflict as data, and the owner gets a comment saying where.
+`LandEvent::DependentsRestacked` lists what moved.
 
 ## Limitations
 
 * `change_versions` is creation order, not a DAG. Amending an older
   version makes the amendment current regardless of its predecessor.
-* A declared stack is validated only at `set_stack`. Later amends or
-  rebases of members do not update or invalidate `ReviewState.stack`.
+* A declared stack is validated at `set_stack` and when it is asked to
+  land; amending a lower member does not restack the ones above (only a
+  landing does).
 * `stack_depth` is computed into `ChangeFacts`, but no risk rule or Cedar
   attribute reads it.
-* `ReviewService::restack_after_land` is called only from tests.
 * No RPC changes only the message; `describe` sends every edit again.
 
 ## Code

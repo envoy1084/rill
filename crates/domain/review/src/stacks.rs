@@ -1,6 +1,6 @@
 //! Stacks: ordered chains of dependent changes that land in sequence.
 
-use rill_types::{ChangeId, ChangeVersionHash, ReviewState};
+use rill_types::{ChangeId, ChangeVersionHash, RepoPathBuf, ReviewState, ReviewStatus, Timestamp};
 
 use crate::error::{Error, Result};
 use crate::lifecycle::service_actor;
@@ -17,7 +17,60 @@ pub struct Restack {
     pub dependents: Vec<ChangeId>,
 }
 
+/// A stacked change moved onto the landed change below it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RestackedChange {
+    pub change_id: ChangeId,
+    pub version: ChangeVersionHash,
+    /// Paths the rebase left in conflict, kept in the version as data.
+    pub conflicts: Vec<RepoPathBuf>,
+}
+
 impl ReviewService {
+    /// `landed_change_id` landed as `landed_version`: rebase the changes
+    /// above it in its stack onto it, bottom up, each recorded as a new
+    /// version (a trivial rebase keeps its votes). Stops at the first
+    /// change that takes no new versions (landing, landed, abandoned).
+    pub async fn restack(
+        &self,
+        landed_change_id: &ChangeId,
+        landed_version: ChangeVersionHash,
+    ) -> Result<Vec<RestackedChange>> {
+        let Some(restack) = self
+            .restack_after_land(landed_change_id, landed_version)
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
+        let mut base = restack.base;
+        let mut out = Vec::new();
+        for change_id in restack.dependents {
+            let state = self.get(&change_id).await?;
+            if !matches!(state.status, ReviewStatus::Open | ReviewStatus::Landable) {
+                break;
+            }
+            let current = state
+                .current_version()
+                .ok_or(Error::NoVersions(change_id))?;
+            if self.derive.change(&current).await?.first_parent() == Some(base) {
+                base = current;
+                continue;
+            }
+            let rebased =
+                rill_core::rebase(&self.derive, &current, &base, Timestamp::now()).await?;
+            let conflicts: Vec<RepoPathBuf> = rebased.conflicted_paths().cloned().collect();
+            let version = self.repo.put_change_version(&rebased).await?;
+            self.add_version(&change_id, version).await?;
+            out.push(RestackedChange {
+                change_id,
+                version,
+                conflicts,
+            });
+            base = version;
+        }
+        Ok(out)
+    }
+
     /// Declare `change_ids` (bottom to top) as a stack. Every change must be
     /// under review and each one's current version must have the previous
     /// change's current version as its first parent. The stack is stored
@@ -166,5 +219,57 @@ mod tests {
             })
         );
         assert_eq!(fx.service.restack_after_land(&c2, v2).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn restack_moves_what_is_above_a_landing_onto_it_bottom_up() {
+        let fx = fixture().await;
+        let (_, base) = fx.root_change("a.txt", "1\n").await;
+        let (c1, v1) = fx.child_change(base, "b.txt", "2\n").await;
+        let (c2, v2) = fx.child_change(v1, "c.txt", "3\n").await;
+        let (c3, _) = fx.child_change(v2, "d.txt", "4\n").await;
+        for c in [&c1, &c2, &c3] {
+            fx.service.submit(c, &fx.alice).await.unwrap();
+        }
+        fx.service.set_stack(&[c1, c2, c3]).await.unwrap();
+        // c1 landed on a trunk that had moved: as a rebase of its version.
+        let (_, moved) = fx.child_change(base, "x.txt", "x\n").await;
+        let landed = rill_core::rebase(&fx.service.derive, &v1, &moved, Timestamp::now())
+            .await
+            .unwrap();
+        let landed = fx.repo.put_change_version(&landed).await.unwrap();
+
+        let restacked = fx.service.restack(&c1, landed).await.unwrap();
+        assert_eq!(
+            restacked.iter().map(|r| r.change_id).collect::<Vec<_>>(),
+            vec![c2, c3]
+        );
+        assert!(restacked.iter().all(|r| r.conflicts.is_empty()));
+        let c2_now = fx
+            .service
+            .get(&c2)
+            .await
+            .unwrap()
+            .current_version()
+            .unwrap();
+        assert_eq!(c2_now, restacked[0].version);
+        assert_eq!(
+            fx.service
+                .derive
+                .change(&c2_now)
+                .await
+                .unwrap()
+                .first_parent(),
+            Some(landed)
+        );
+        assert_eq!(
+            fx.service
+                .derive
+                .change(&restacked[1].version)
+                .await
+                .unwrap()
+                .first_parent(),
+            Some(c2_now)
+        );
     }
 }

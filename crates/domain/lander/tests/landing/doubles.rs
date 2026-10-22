@@ -159,3 +159,60 @@ impl rill_lander::ConflictResolver for TakingResolver {
         Ok(Some("agent:fixer".into()))
     }
 }
+
+/// Hooks for one declared stack: reports its dependents and records
+/// restacks.
+pub struct StackHooks {
+    pub stack: Vec<ChangeId>,
+    pub restacked: Mutex<Vec<(ChangeId, ChangeVersionHash)>>,
+    pub returned: Mutex<Vec<(ChangeId, String)>>,
+}
+
+impl StackHooks {
+    pub fn new(stack: Vec<ChangeId>) -> Self {
+        StackHooks {
+            stack,
+            restacked: Mutex::new(Vec::new()),
+            returned: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+#[async_trait]
+impl ReviewHooks for StackHooks {
+    async fn mark_landing(&self, _change: ChangeId) -> rill_lander::Result<()> {
+        Ok(())
+    }
+
+    async fn mark_landed(
+        &self,
+        _change: ChangeId,
+        _seq: TrunkSeq,
+        _version: ChangeVersionHash,
+    ) -> rill_lander::Result<()> {
+        Ok(())
+    }
+
+    async fn return_to_owner(&self, change: ChangeId, reason: String) -> rill_lander::Result<()> {
+        self.returned.lock().await.push((change, reason));
+        Ok(())
+    }
+
+    async fn dependents_of(&self, change: ChangeId) -> rill_lander::Result<Vec<ChangeId>> {
+        Ok(self
+            .stack
+            .iter()
+            .position(|c| *c == change)
+            .map(|at| self.stack[at + 1..].to_vec())
+            .unwrap_or_default())
+    }
+
+    async fn restack(
+        &self,
+        change: ChangeId,
+        landed: ChangeVersionHash,
+    ) -> rill_lander::Result<Vec<rill_lander::Restacked>> {
+        self.restacked.lock().await.push((change, landed));
+        Ok(Vec::new())
+    }
+}

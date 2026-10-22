@@ -1,7 +1,9 @@
 //! The land transaction for a prepared chain and what is reported after.
 
 use rill_store::repo::{LandBatch, LandEntry, Lease};
-use rill_types::{ChangeVersion, ChangeVersionHash, LandStatus, Timestamp, TrunkSeq};
+use std::collections::HashSet;
+
+use rill_types::{ChangeId, ChangeVersion, ChangeVersionHash, LandStatus, Timestamp, TrunkSeq};
 
 use super::lander::{Lander, LANDER_LEASE};
 use super::prepare::Candidate;
@@ -82,11 +84,41 @@ impl Lander {
             self.timings
                 .landed(candidate.queued.request.requested_at.millis(), now);
         }
+        let landed: Vec<_> = landings.iter().map(|l| (l.change_id, l.version)).collect();
         for (landing, candidate) in landings.into_iter().zip(&chain) {
             self.announce(&candidate.queued, landing, &candidate.cv)
                 .await;
         }
+        self.restack(&landed).await;
         Ok(())
+    }
+
+    /// Rebase what is stacked on the changes in `landed` onto them: for
+    /// each, unless the change directly above it landed in the same batch.
+    async fn restack(&self, landed: &[(ChangeId, ChangeVersionHash)]) {
+        let ids: HashSet<ChangeId> = landed.iter().map(|(c, _)| *c).collect();
+        for (change, version) in landed {
+            let dependents = match self.hooks.dependents_of(*change).await {
+                Ok(dependents) => dependents,
+                Err(e) => {
+                    tracing::error!(%change, error = %e, "dependents_of hook failed");
+                    continue;
+                }
+            };
+            if dependents.first().is_none_or(|above| ids.contains(above)) {
+                continue;
+            }
+            match self.hooks.restack(*change, *version).await {
+                Ok(restacked) if !restacked.is_empty() => {
+                    self.publish(LandEvent::DependentsRestacked {
+                        landed: *change,
+                        restacked,
+                    });
+                }
+                Ok(_) => {}
+                Err(e) => tracing::error!(%change, error = %e, "restack hook failed"),
+            }
+        }
     }
 
     /// Report a landing the land transaction recorded.
@@ -107,17 +139,5 @@ impl Lander {
             change_id: cv.change_id,
             version,
         });
-        match self.hooks.dependents_of(cv.change_id).await {
-            Ok(dependents) if !dependents.is_empty() => {
-                self.publish(LandEvent::DependentsReady {
-                    landed: cv.change_id,
-                    dependents,
-                });
-            }
-            Ok(_) => {}
-            Err(e) => {
-                tracing::error!(change_id = %cv.change_id, error = %e, "dependents_of hook failed");
-            }
-        }
     }
 }

@@ -17,6 +17,7 @@ service ReviewService {
   rpc EvaluateSubmit(EvaluateSubmitRequest) returns (EvaluateSubmitResponse);
   rpc Abandon(AbandonRequest) returns (AbandonResponse);
   rpc RequestLand(RequestLandRequest) returns (RequestLandResponse);
+  rpc RequestLandStack(RequestLandStackRequest) returns (RequestLandStackResponse);
   rpc GetLandStatus(GetLandStatusRequest) returns (GetLandStatusResponse);
   rpc WatchReview(WatchReviewRequest) returns (stream ReviewEvent);
 }
@@ -164,6 +165,21 @@ message RequestLandRequest {
 }
 message RequestLandResponse {
   LandTicket ticket = 1;
+}
+
+// Land a change's stack, from its lowest unlanded change up to change_id,
+// as one ordered group. Each change must be based on the current version
+// of the one below it.
+message RequestLandStackRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  bytes change_id = 3;
+  // Land the longest landable run from the bottom instead of all or none.
+  bool prefix = 4;
+}
+message RequestLandStackResponse {
+  // Bottom first.
+  repeated LandTicket tickets = 1;
 }
 
 message GetLandStatusRequest {

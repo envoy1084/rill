@@ -349,6 +349,29 @@ impl ReviewClient {
         required("request_land.ticket", resp.ticket)?.try_into()
     }
 
+    /// Ask the lander to land `change_id`'s stack, from its lowest
+    /// unlanded change up to it, as one ordered group: all or nothing, or
+    /// with `prefix` as far as it can. Returns the tickets, bottom first.
+    pub async fn request_land_stack(
+        &self,
+        change_id: ChangeId,
+        prefix: bool,
+    ) -> Result<Vec<LandTicket>> {
+        let request = pb::RequestLandStackRequest {
+            operation_id: id_to_proto(&OperationId::new()),
+            repo: self.repo.clone(),
+            change_id: id_to_proto(&change_id),
+            prefix,
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.request_land_stack(request).await }
+        })
+        .await?
+        .into_inner();
+        resp.tickets.into_iter().map(LandTicket::try_from).collect()
+    }
+
     /// Where a landing is, by ticket id.
     pub async fn land_status(&self, ticket: &str) -> Result<LandProgress> {
         crate::client::retry_idempotent(|| {

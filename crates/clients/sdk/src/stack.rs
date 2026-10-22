@@ -66,6 +66,26 @@ pub struct LandedChange {
     pub hash: ChangeVersionHash,
 }
 
+/// A change of a stack that did not land, and why.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnlandedChange {
+    /// The change.
+    pub change_id: ChangeId,
+    /// Why it did not land.
+    pub message: String,
+}
+
+/// What [`StackClient::land_stack`] landed.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct StackLanding {
+    /// Bottom first.
+    pub landed: Vec<LandedChange>,
+    /// The changes that did not land, bottom first: every change for a
+    /// stack that lands whole, the ones from the first failure for a
+    /// prefix.
+    pub unlanded: Vec<UnlandedChange>,
+}
+
 /// Helpers that treat a list of change ids as a stack, bottom first.
 #[derive(Clone, Debug)]
 pub struct StackClient {
@@ -126,34 +146,45 @@ impl StackClient {
         Ok(result)
     }
 
-    /// Land the stack bottom-up, waiting for each landing to finish before
-    /// requesting the next. `timeout` bounds each individual landing.
+    /// Declare `change_ids` (bottom first) a stack and land it as one
+    /// ordered group: every change in one landing or none, or with
+    /// `prefix` the longest run from the bottom that can land. Waits up to
+    /// `timeout` for each landing to finish.
     pub async fn land_stack(
         &self,
         change_ids: &[ChangeId],
+        prefix: bool,
         timeout: Duration,
-    ) -> Result<Vec<LandedChange>> {
-        let mut landed = Vec::with_capacity(change_ids.len());
-        for id in change_ids {
-            let ticket = self.reviews.request_land(*id).await?;
-            let progress = self.await_land(&ticket.id, timeout).await?;
-            let (seq, hash) = match (progress.seq, progress.landed_hash) {
-                (Some(seq), Some(hash)) => (seq, hash),
-                _ => {
-                    return Err(Error::LandFailed {
-                        ticket: ticket.id,
-                        status: LandStatus::Landed,
-                        message: "landed without a sequence or hash".into(),
-                    })
-                }
-            };
-            landed.push(LandedChange {
-                change_id: *id,
-                seq,
-                hash,
-            });
+    ) -> Result<StackLanding> {
+        let Some(top) = change_ids.last() else {
+            return Ok(StackLanding::default());
+        };
+        if change_ids.len() > 1 {
+            self.reviews.set_stack(change_ids).await?;
         }
-        Ok(landed)
+        let tickets = self.reviews.request_land_stack(*top, prefix).await?;
+        let mut out = StackLanding::default();
+        for ticket in tickets {
+            match self.await_land(&ticket.id, timeout).await {
+                Ok(progress) => match (progress.seq, progress.landed_hash) {
+                    (Some(seq), Some(hash)) => out.landed.push(LandedChange {
+                        change_id: ticket.change_id,
+                        seq,
+                        hash,
+                    }),
+                    _ => out.unlanded.push(UnlandedChange {
+                        change_id: ticket.change_id,
+                        message: "landed without a sequence or hash".into(),
+                    }),
+                },
+                Err(Error::LandFailed { message, .. }) => out.unlanded.push(UnlandedChange {
+                    change_id: ticket.change_id,
+                    message,
+                }),
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(out)
     }
 
     /// Poll a land ticket with backoff until it lands. Fails with

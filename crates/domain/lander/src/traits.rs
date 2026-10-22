@@ -53,6 +53,17 @@ pub trait ReviewHooks: Send + Sync {
     /// Changes stacked directly on `change`.
     async fn dependents_of(&self, change: ChangeId) -> Result<Vec<ChangeId>>;
 
+    /// `change` landed as `landed`: rebase the changes stacked on it onto
+    /// it, bottom up, as new versions of those changes. The default is for
+    /// changes without review, which have no stacks.
+    async fn restack(
+        &self,
+        _change: ChangeId,
+        _landed: ChangeVersionHash,
+    ) -> Result<Vec<Restacked>> {
+        Ok(Vec::new())
+    }
+
     /// Whether `requester` may land `version` of `change` now, judged on
     /// the review as read; the lander lands only if that review is still
     /// what it was when the landing commits. The default is for changes
@@ -65,6 +76,16 @@ pub trait ReviewHooks: Send + Sync {
     ) -> Result<Approval> {
         Ok(Approval::default())
     }
+}
+
+/// A stacked change rebased onto the landed change below it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Restacked {
+    pub change: ChangeId,
+    /// Its new version.
+    pub version: ChangeVersionHash,
+    /// Paths the rebase left in conflict, kept in the version as data.
+    pub conflicts: Vec<RepoPathBuf>,
 }
 
 /// Hooks that do nothing; for tests and repositories without review.

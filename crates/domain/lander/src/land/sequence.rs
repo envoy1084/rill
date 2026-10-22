@@ -1,16 +1,18 @@
 //! The sequencer: requests served in fair order, placed by what they
 //! touch, speculated in parallel where they are independent, and landed
 //! in groups of up to [`MAX_BATCH`] per transaction.
-use std::collections::{BTreeSet, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use rill_store::repo::Lease;
-use rill_types::{LandStatus, LandTicket};
+use rill_types::{GroupMode, LandStatus, LandTicket};
 
 use super::lander::Lander;
 use crate::error::Error;
 use crate::events::LandEvent;
 use crate::queue::QueuedRequest;
-use crate::schedule::Footprint;
+use crate::schedule::{
+    group_domain, group_failure, group_of, hold_split_groups, window_len, Footprint,
+};
 
 /// Landings committed together at most.
 pub const MAX_BATCH: usize = 64;
@@ -31,7 +33,7 @@ impl Lander {
         let mut marked = HashSet::new();
         let mut pending: VecDeque<QueuedRequest> = queued.into();
         while !pending.is_empty() {
-            let take = pending.len().min(MAX_BATCH);
+            let take = window_len(pending.make_contiguous(), MAX_BATCH);
             let window: Vec<QueuedRequest> = pending.drain(..take).collect();
             match self.land_window(window, lease, &mut marked).await {
                 Window::Fenced => break,
@@ -54,8 +56,7 @@ impl Lander {
         lease: &Lease,
         marked: &mut HashSet<LandTicket>,
     ) -> Window {
-        let mut live = window;
-        let mut held = Vec::new();
+        let (mut live, mut held) = self.gate_groups(window).await;
         for attempt in 0..=self.policy.max_retries {
             let head = match self.repo.trunk_head().await {
                 Ok(head) => head,
@@ -73,18 +74,36 @@ impl Lander {
                 }
             };
             let mut batch: Vec<(QueuedRequest, Footprint)> = Vec::new();
+            // The lowest member of each group that dropped out here.
+            let mut lost: HashMap<LandTicket, u32> = HashMap::new();
             for queued in &live {
+                let mut lose = |q: &QueuedRequest| {
+                    if let Some(g) = group_of(q) {
+                        let lowest = lost.entry(g.id()).or_insert(g.index);
+                        *lowest = (*lowest).min(g.index);
+                    }
+                };
                 if marked.insert(queued.ticket) && !self.accept(queued).await {
+                    lose(queued);
                     continue;
                 }
                 match self.footprint(queued, &rules.landing).await {
-                    Ok(f) => batch.push((queued.clone(), f)),
-                    Err(e) => self.fail(queued, e.to_string()).await,
+                    Ok(mut f) => {
+                        f.groups.extend(group_of(queued).map(group_domain));
+                        batch.push((queued.clone(), f));
+                    }
+                    Err(e) => {
+                        lose(queued);
+                        self.fail(queued, e.to_string()).await;
+                    }
                 }
             }
+            let batch = self.without_lost_members(batch, &lost).await;
             let (batch, later) = self.admit(batch, &rules.landing.throttle);
+            let (batch, later) = hold_split_groups(batch, later);
             held.extend(later);
-            let chain = self.speculate(tip, &batch, &rules).await;
+            let (chain, dropped) = self.speculate(tip, &batch, &rules).await;
+            held.extend(dropped);
             live = chain.iter().map(|c| c.queued.clone()).collect();
             if chain.is_empty() {
                 return Window::Done(held);
@@ -114,6 +133,28 @@ impl Lander {
             .await;
         }
         Window::Done(held)
+    }
+
+    /// `batch` without the members of groups that lost a member: all of
+    /// them for a group that lands whole, those above it for a prefix.
+    async fn without_lost_members(
+        &self,
+        batch: Vec<(QueuedRequest, Footprint)>,
+        lost: &HashMap<LandTicket, u32>,
+    ) -> Vec<(QueuedRequest, Footprint)> {
+        if lost.is_empty() {
+            return batch;
+        }
+        let mut kept = Vec::with_capacity(batch.len());
+        for (queued, footprint) in batch {
+            match group_of(&queued).and_then(|g| lost.get(&g.id()).map(|at| (g, *at))) {
+                Some((g, at)) if g.mode == GroupMode::All || g.index > at => {
+                    self.fail(&queued, group_failure(g.mode).into()).await;
+                }
+                _ => kept.push((queued, footprint)),
+            }
+        }
+        kept
     }
 
     /// Split `batch` into what lands now and what waits: a configuration

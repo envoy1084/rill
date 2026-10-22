@@ -52,6 +52,15 @@ pub enum Error {
         retry_after_secs: u64,
     },
 
+    #[error("a stack lands 1 to {limit} changes at once, not {size}")]
+    GroupSize { size: usize, limit: usize },
+
+    #[error("change {change} already has a land request ({ticket})")]
+    AlreadyQueued {
+        change: rill_types::ChangeId,
+        ticket: rill_types::LandTicket,
+    },
+
     #[error("codec error: {0}")]
     Codec(String),
 

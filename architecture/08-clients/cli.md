@@ -38,7 +38,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Checkout | `checkout`, `status`, `diff` |
 | History | `log`, `blame`, `show`, `ls`, `cat`, `grep` |
 | Changes | `new`, `describe`, `amend`, `sync`, `resolve`, `undo` |
-| Stacks | `stack show`, `stack sync`, `stack submit`, `stack land` |
+| Stacks | `stack show`, `stack sync`, `stack submit`, `stack land [--prefix]` (one ordered group: all or nothing, or the longest landable prefix) |
 | Review | `submit`, `review show/list/vote/comment/threads/resolve-thread/evaluate/abandon` |
 | Landing | `land [--wait] [--timeout 300] [--no-sync]`, `trunk`, `landings`, `verify`, `revert`, `bisect` |
 | Checks | `checks runs [--of-version]`, `checks run <id> [--watch]`, `checks log <run> <step> [--stderr] [--tail]`, `checks artifact <run> <step> <path> [-o]`, `checks nonhermetic`, `checks flaky [--min-score] [--limit]`, `checks history <target>` ([checks](../06-services/checks.md)) |

@@ -70,18 +70,25 @@ async fn await_land_times_out_and_reports_failures() {
 }
 
 #[tokio::test]
-async fn land_stack_lands_bottom_up() {
+async fn land_stack_declares_the_stack_and_requests_it_as_one_group() {
     let review = MockReview::with_script(&[PbLandStatus::Queued, PbLandStatus::Landed]);
     let h = Harness::start(MockRepo::new(), review, None).await;
     let stack = h.client.repo("main").stack().with_backoff(fast());
     let ids = [ChangeId::new(), ChangeId::new()];
-    let landed = stack
-        .land_stack(&ids, Duration::from_secs(5))
+    let landing = stack
+        .land_stack(&ids, false, Duration::from_secs(5))
         .await
         .unwrap();
-    assert_eq!(landed.len(), 2);
-    assert_eq!(landed[0].change_id, ids[0]);
-    assert_eq!(landed[1].change_id, ids[1]);
+    assert!(landing.unlanded.is_empty());
+    assert_eq!(
+        landing
+            .landed
+            .iter()
+            .map(|l| l.change_id)
+            .collect::<Vec<_>>(),
+        ids.to_vec()
+    );
+    assert_eq!(*h.review.stacks.lock().unwrap(), vec![ids.to_vec()]);
     assert_eq!(*h.review.land_requests.lock().unwrap(), ids.to_vec());
 }
 

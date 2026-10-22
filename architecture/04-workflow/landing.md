@@ -10,7 +10,8 @@ to 64 approved requests then land in one transaction that checks the trunk
 head, the lease and every review it was approved on, assigns gap-free
 sequence numbers, and writes landing records, reviews, request statuses,
 events and follow-up jobs. A request whose approval no longer holds is
-ejected with the reason.
+ejected with the reason. A stack lands as an ordered group, whole or as a
+prefix, and what stays stacked above a landing is rebased onto it.
 
 ```mermaid
 flowchart LR
@@ -178,6 +179,32 @@ recent landings. `rill land` prints both. The lease holder exports
 `land_conflict_permille{key=domain}` and `land_queued_by_share{key}` (the
 busiest 20 of each).
 
+## Stacks as ordered groups
+
+A stack asked to land with `RequestLandStack` is queued as one ordered
+group: each member's request carries `LandGroup { mode, tickets, index }`,
+and `queue_land_group` writes them all in one transaction (refused if any
+member already has a request). The sequencer:
+
+* serves a group where its first member falls in the serve order, members
+  bottom first (`keep_groups_together`), and never ends a window inside a
+  group (`window_len`; a group is at most `MAX_BATCH`);
+* holds the group when a lower member is still queued outside the window,
+  and fails members above a lower one that finished without landing
+  (`gate_groups`);
+* gives members the domain `stack:<id>`, so each is speculated, verified
+  and approved on top of the one below;
+* holds the whole group when admission holds back any member;
+* lands an `All` group only if every member is ready: one that fails
+  (conflict, red, ejected, refused) fails the rest with "another change in
+  its stack did not land", including members already lined up, which are
+  taken off the chain with everything after them (those wait for the next
+  batch). A `Prefix` group lands the members below the first failure and
+  fails the ones above it.
+
+After the batch lands, changes still stacked above a landed one are
+restacked onto it ([stacks](changes-and-stacks.md#stacks)).
+
 ## Conflict ladder
 
 A rebase that still conflicts climbs a ladder before anyone sees it
@@ -276,9 +303,11 @@ land with `Fenced` even while it still believes it holds the lease. See
 
 After the transaction (which also set the request `Landed`), `announce` calls
 `hooks.mark_landed` (a notification: the review service publishes its
-events, the record is already written), publishes `LandEvent::Landed`, and
-publishes `DependentsReady` when `hooks.dependents_of` returns stack
-members above the change. Hook errors are logged, never fatal.
+events, the record is already written), publishes `LandEvent::Landed`. Then, for every landed change whose
+change above it (`hooks.dependents_of`) did not land in the same batch,
+`hooks.restack` moves the rest of its stack onto it and
+`LandEvent::DependentsRestacked` lists what moved. Hook errors are logged,
+never fatal.
 
 Every trunk position has a `Landing { seq, change_id, version,
 requested_version, requester, risk, landed_at, policy, approvals }`
@@ -352,7 +381,7 @@ step.
 ## Code
 
 * [rill-lander/src/land/lander.rs](../../crates/domain/lander/src/land/lander.rs), [sequence.rs](../../crates/domain/lander/src/land/sequence.rs), [prepare.rs](../../crates/domain/lander/src/land/prepare.rs), [commit.rs](../../crates/domain/lander/src/land/commit.rs), [speculate.rs](../../crates/domain/lander/src/land/speculate.rs), [domains.rs](../../crates/domain/lander/src/land/domains.rs), [record.rs](../../crates/domain/lander/src/land/record.rs)
-* [rill-lander/src/schedule/](../../crates/domain/lander/src/schedule/) (footprints, landing rules, fair order, plan, thrash, ETAs)
+* [rill-lander/src/schedule/](../../crates/domain/lander/src/schedule/) (footprints, landing rules, fair order, ordered groups, plan, thrash, ETAs), [land/groups.rs](../../crates/domain/lander/src/land/groups.rs)
 * [rill-lander/src/ladder/](../../crates/domain/lander/src/ladder/) (merge rules, `.gitattributes`, union, the ladder), [land/head_config.rs](../../crates/domain/lander/src/land/head_config.rs) (rules read once per head)
 * [rill-exec/src/verify/regenerate.rs](../../crates/domain/exec/src/verify/regenerate.rs), [rill-runtime/src/workers/regenerator.rs](../../crates/server/runtime/src/workers/regenerator.rs)
 * [rill-lander/src/queue.rs](../../crates/domain/lander/src/queue.rs), [config.rs](../../crates/domain/lander/src/config.rs), [events.rs](../../crates/domain/lander/src/events.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)

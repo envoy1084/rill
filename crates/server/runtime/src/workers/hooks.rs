@@ -135,6 +135,49 @@ impl ReviewHooks for ReviewHooksAdapter {
             .unwrap_or_default())
     }
 
+    async fn restack(
+        &self,
+        change: ChangeId,
+        landed: ChangeVersionHash,
+    ) -> rill_lander::Result<Vec<rill_lander::Restacked>> {
+        let service = self.service();
+        let restacked = match service.restack(&change, landed).await {
+            Ok(restacked) => restacked,
+            Err(ReviewError::ReviewNotFound(_)) => return Ok(Vec::new()),
+            Err(e) => return Err(hook_err(e)),
+        };
+        for r in restacked.iter().filter(|r| !r.conflicts.is_empty()) {
+            let state = service.get(&r.change_id).await.map_err(hook_err)?;
+            let paths: Vec<String> = r.conflicts.iter().map(ToString::to_string).collect();
+            let body = format!(
+                "The change below this one landed, so it was rebased onto it as version {}. \
+                 The rebase conflicts at: {}. Resolve them and push a new version.",
+                r.version.short(),
+                paths.join(", ")
+            );
+            service
+                .comment(
+                    &r.change_id,
+                    &rill_lander::revert::lander_principal(),
+                    ThreadAnchor::Change,
+                    body,
+                    None,
+                    None,
+                    Some(state.owner.clone()),
+                )
+                .await
+                .map_err(hook_err)?;
+        }
+        Ok(restacked
+            .into_iter()
+            .map(|r| rill_lander::Restacked {
+                change: r.change_id,
+                version: r.version,
+                conflicts: r.conflicts,
+            })
+            .collect())
+    }
+
     /// Judge the review as stored now: still landing, still the version
     /// that was requested, and still allowed by the policy for the
     /// requester. The lander commits only against this very snapshot.

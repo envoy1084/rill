@@ -3,13 +3,15 @@
 use rill_lander::LandRequest;
 use rill_proto::convert::hash_to_proto;
 use rill_proto::rill::v1 as pb;
-use rill_types::{RepoPathBuf, ReviewStatus};
+use rill_types::{
+    ChangeId, ChangeVersionHash, GroupMode, RepoPathBuf, ReviewState, ReviewStatus, RiskClass,
+};
 use tonic::Request;
 
 use super::reviews::change_id;
 use super::ReviewSvc;
 use crate::services::budget;
-use crate::services::common::{self, open};
+use crate::services::common::{self, open, Opened};
 use rill_runtime::error::{Error, Result};
 
 impl ReviewSvc {
@@ -20,45 +22,72 @@ impl ReviewSvc {
         let opened = open(&self.state, &request, &request.get_ref().repo).await?;
         opened.permit().land().await?;
         let id = change_id(&request.get_ref().change_id)?;
-        let review = opened.repo.review();
-        let state = review.get(&id).await?;
-        match state.status {
-            ReviewStatus::Landed => {
-                return Err(Error::precondition(format!("change {id} already landed")))
-            }
-            ReviewStatus::Landing => {
-                return Err(Error::precondition(format!(
-                    "change {id} is already landing"
-                )))
-            }
-            ReviewStatus::Abandoned => {
-                return Err(Error::precondition(format!("change {id} is abandoned")))
-            }
-            _ => {}
-        }
-        let decision = review.evaluate_for(&state, opened.principal()).await?;
-        if !decision.allowed {
-            return Err(Error::precondition(format!(
-                "submit policy does not allow landing: {}",
-                decision.reasons.join("; ")
-            )));
-        }
-        let version = state
-            .current_version()
-            .ok_or_else(|| Error::precondition(format!("change {id} has no versions")))?;
+        let state = opened.repo.review().get(&id).await?;
+        let version = landable_version(&opened, &state).await?;
         budget::spend_now(&opened, budget::LANDS).await?;
         let ticket = opened
             .repo
             .lander
-            .enqueue(
-                LandRequest::new(id, version, opened.principal().clone(), state.risk)
-                    .sponsored_by(opened.ctx.claims.as_ref().and_then(|c| c.sponsor.clone())),
-            )
+            .enqueue(land_request(&opened, id, version, state.risk))
             .await?;
         let (proto, _) = common::ticket_status(&opened.repo, ticket).await?;
         Ok(pb::RequestLandResponse {
             ticket: Some(proto),
         })
+    }
+
+    pub(super) async fn request_land_stack_impl(
+        &self,
+        request: Request<pb::RequestLandStackRequest>,
+    ) -> Result<pb::RequestLandStackResponse> {
+        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        opened.permit().land().await?;
+        let id = change_id(&request.get_ref().change_id)?;
+        let review = opened.repo.review();
+        let stack = review.stack_of(&id).await?;
+        let top = stack.iter().position(|c| *c == id).unwrap_or(0);
+        let mut states = Vec::with_capacity(top + 1);
+        for member in &stack[..=top] {
+            let state = review.get(member).await?;
+            if state.status != ReviewStatus::Landed {
+                states.push(state);
+            }
+        }
+        if states.is_empty() {
+            return Err(Error::precondition(format!(
+                "every change in the stack up to {id} already landed"
+            )));
+        }
+        let mut requests = Vec::with_capacity(states.len());
+        let mut below: Option<ChangeVersionHash> = None;
+        for state in &states {
+            let version = landable_version(&opened, state).await?;
+            if let Some(below) = below {
+                let cv = opened.repo.derive.change(&version).await?;
+                if cv.first_parent() != Some(below) {
+                    return Err(Error::precondition(format!(
+                        "change {} is not based on the current version of the change \
+                         below it; sync the stack first",
+                        state.change_id
+                    )));
+                }
+            }
+            below = Some(version);
+            requests.push(land_request(&opened, state.change_id, version, state.risk));
+        }
+        for _ in &requests {
+            budget::spend_now(&opened, budget::LANDS).await?;
+        }
+        let mode = match request.get_ref().prefix {
+            true => GroupMode::Prefix,
+            false => GroupMode::All,
+        };
+        let tickets = opened.repo.lander.enqueue_group(requests, mode).await?;
+        let mut out = Vec::with_capacity(tickets.len());
+        for ticket in tickets {
+            out.push(common::ticket_status(&opened.repo, ticket).await?.0);
+        }
+        Ok(pb::RequestLandStackResponse { tickets: out })
     }
 
     pub(super) async fn get_land_status_impl(
@@ -105,6 +134,49 @@ impl ReviewSvc {
             eta_ms: place.map(|(_, wait)| wait.as_millis() as u64),
         })
     }
+}
+
+/// The version of `state` that may be asked to land by the caller now.
+async fn landable_version(opened: &Opened, state: &ReviewState) -> Result<ChangeVersionHash> {
+    let id = state.change_id;
+    match state.status {
+        ReviewStatus::Landed => {
+            return Err(Error::precondition(format!("change {id} already landed")))
+        }
+        ReviewStatus::Landing => {
+            return Err(Error::precondition(format!(
+                "change {id} is already landing"
+            )))
+        }
+        ReviewStatus::Abandoned => {
+            return Err(Error::precondition(format!("change {id} is abandoned")))
+        }
+        _ => {}
+    }
+    let decision = opened
+        .repo
+        .review()
+        .evaluate_for(state, opened.principal())
+        .await?;
+    if !decision.allowed {
+        return Err(Error::precondition(format!(
+            "submit policy does not allow landing {id}: {}",
+            decision.reasons.join("; ")
+        )));
+    }
+    state
+        .current_version()
+        .ok_or_else(|| Error::precondition(format!("change {id} has no versions")))
+}
+
+fn land_request(
+    opened: &Opened,
+    id: ChangeId,
+    version: ChangeVersionHash,
+    risk: RiskClass,
+) -> LandRequest {
+    LandRequest::new(id, version, opened.principal().clone(), risk)
+        .sponsored_by(opened.ctx.claims.as_ref().and_then(|c| c.sponsor.clone()))
 }
 
 fn status_is_queued(ticket: &pb::LandTicket) -> bool {

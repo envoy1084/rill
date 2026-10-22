@@ -82,6 +82,38 @@ pub struct LandRequest {
     /// Who an agent's request is charged to for fair sharing and limits
     /// (`user:ann`, `team:core`), from its token.
     pub sponsor: Option<String>,
+    /// The ordered group (a stack) it lands with, if any.
+    pub group: Option<LandGroup>,
+}
+
+/// Whether an ordered group lands whole or as far as it can.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GroupMode {
+    /// Every member lands in one transaction, or none does.
+    #[default]
+    All,
+    /// The longest landable run from the bottom lands.
+    Prefix,
+}
+
+/// A request's place in an ordered group: requests queued together that
+/// land in order, each on the one before it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LandGroup {
+    pub mode: GroupMode,
+    /// Every member's ticket, bottom first; this request is `index`.
+    pub tickets: Vec<LandTicket>,
+    pub index: u32,
+}
+
+impl LandGroup {
+    /// The group's identity: its bottom member's ticket.
+    pub fn id(&self) -> LandTicket {
+        // The store writes a group's tickets with its members, so there
+        // is always a first one.
+        self.tickets[0]
+    }
 }
 
 impl LandRequest {
@@ -102,6 +134,7 @@ impl LandRequest {
             requested_at: Timestamp::now(),
             verify_override: None,
             sponsor: None,
+            group: None,
         }
     }
 

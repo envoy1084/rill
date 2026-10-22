@@ -25,7 +25,7 @@ pub enum StackCmd {
     Sync(StackSyncArgs),
     /// Submit every change in the stack for review and declare the stack.
     Submit(StackArgs),
-    /// Land the stack bottom-up.
+    /// Land the stack as one unit: all or nothing, or `--prefix`.
     Land(StackLandArgs),
 }
 
@@ -60,6 +60,10 @@ pub struct StackLandArgs {
     /// Seconds to wait for each landing.
     #[arg(long, default_value_t = 300)]
     pub timeout: u64,
+    /// Land as many changes from the bottom as can land, rather than all
+    /// or none.
+    #[arg(long)]
+    pub prefix: bool,
 }
 
 /// Run a stack subcommand.
@@ -195,14 +199,20 @@ async fn land(ctx: &mut Ctx<'_>, args: StackLandArgs) -> Result<()> {
     if chain.is_empty() {
         return Err(CliError::usage("nothing to land: the stack is empty"));
     }
-    let landed = repo
+    let landing = repo
         .stack()
-        .land_stack(&ids(&chain), Duration::from_secs(args.timeout))
+        .land_stack(&ids(&chain), args.prefix, Duration::from_secs(args.timeout))
         .await?;
     ctx.emit(
-        j!({ "landed": landed.iter().map(json::landed_change).collect::<Vec<_>>() }),
+        j!({
+            "landed": landing.landed.iter().map(json::landed_change).collect::<Vec<_>>(),
+            "unlanded": landing.unlanded.iter().map(|u| j!({
+                "change_id": u.change_id.to_string(),
+                "message": u.message,
+            })).collect::<Vec<_>>(),
+        }),
         |out| {
-            for l in &landed {
+            for l in &landing.landed {
                 out.line(format!(
                     "landed {} as trunk@{} ({})",
                     out.id(&l.change_id.to_string()),
@@ -210,7 +220,21 @@ async fn land(ctx: &mut Ctx<'_>, args: StackLandArgs) -> Result<()> {
                     crate::output::short(&l.hash)
                 ))?;
             }
+            for u in &landing.unlanded {
+                out.line(format!(
+                    "did not land {}: {}",
+                    out.id(&u.change_id.to_string()),
+                    u.message
+                ))?;
+            }
             Ok(())
         },
-    )
+    )?;
+    match landing.unlanded.is_empty() {
+        true => Ok(()),
+        false => Err(CliError::conflict(format!(
+            "{} of the stack's changes did not land",
+            landing.unlanded.len()
+        ))),
+    }
 }

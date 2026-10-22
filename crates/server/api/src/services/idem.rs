@@ -73,6 +73,7 @@ idempotent!(
     SetStackRequest,
     AbandonRequest,
     RequestLandRequest,
+    RequestLandStackRequest,
     AppendTrunkRequest,
     RevokeTokenRequest,
     RevokeSessionRequest,

@@ -34,6 +34,6 @@ pub use agents::{
 pub use error::{Error, Result};
 pub use lifecycle::VersionRelation;
 pub use service::{ReviewEvent, ReviewService};
-pub use stacks::Restack;
+pub use stacks::{Restack, RestackedChange};
 pub use threads::{context_hash, CommentMeta};
 pub use votes::LabelSet;

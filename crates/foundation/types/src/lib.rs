@@ -43,7 +43,7 @@ pub use objects::change::{
 pub use objects::event::{Event, EventKind};
 pub use objects::intent::{Intent, IntentKind, IntentStatus, RiskClass};
 pub use objects::land_request::{
-    LandRequest, LandRequestRecord, LandStatus, LandTicket, Lane, VerifyMode,
+    GroupMode, LandGroup, LandRequest, LandRequestRecord, LandStatus, LandTicket, Lane, VerifyMode,
 };
 pub use objects::landing::Landing;
 pub use objects::refs::{RefName, RefUpdate, TrunkSeq};

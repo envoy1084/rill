@@ -143,6 +143,19 @@ impl ReviewService for ReviewSvc {
         .map_err(Status::from)
     }
 
+    /// Queue a stack as one ordered group: every change from the lowest
+    /// unlanded one up to the given change.
+    async fn request_land_stack(
+        &self,
+        request: Request<pb::RequestLandStackRequest>,
+    ) -> GrpcResult<pb::RequestLandStackResponse> {
+        idem::once(&self.state, request, |r| async move {
+            self.request_land_stack_impl(r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
     async fn get_land_status(
         &self,
         request: Request<pb::GetLandStatusRequest>,

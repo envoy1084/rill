@@ -28,6 +28,7 @@ mod scim;
 mod search;
 mod shutdown;
 mod signin;
+mod stacks;
 mod structural;
 mod telemetry;
 mod verification;
