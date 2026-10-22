@@ -8,6 +8,7 @@
 
 pub mod convert;
 pub mod error;
+pub mod names;
 
 pub use error::{ConvertError, Result};
 
