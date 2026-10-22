@@ -1,0 +1,66 @@
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
+from google.protobuf import descriptor as _descriptor
+from typing import ClassVar as _ClassVar
+
+DESCRIPTOR: _descriptor.FileDescriptor
+
+class ErrorReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ERROR_REASON_UNSPECIFIED: _ClassVar[ErrorReason]
+    ERROR_REASON_INVALID_FIELD: _ClassVar[ErrorReason]
+    ERROR_REASON_INVALID_NAME: _ClassVar[ErrorReason]
+    ERROR_REASON_INVALID_REVISION: _ClassVar[ErrorReason]
+    ERROR_REASON_INVALID_FILTER: _ClassVar[ErrorReason]
+    ERROR_REASON_INVALID_PAGE_TOKEN: _ClassVar[ErrorReason]
+    ERROR_REASON_REQUEST_ID_REUSED: _ClassVar[ErrorReason]
+    ERROR_REASON_TOO_LARGE: _ClassVar[ErrorReason]
+    ERROR_REASON_UNAUTHENTICATED: _ClassVar[ErrorReason]
+    ERROR_REASON_PERMISSION_DENIED: _ClassVar[ErrorReason]
+    ERROR_REASON_CAPABILITY_DENIED: _ClassVar[ErrorReason]
+    ERROR_REASON_POLICY_DENIED: _ClassVar[ErrorReason]
+    ERROR_REASON_NOT_FOUND: _ClassVar[ErrorReason]
+    ERROR_REASON_MISSING_OBJECTS: _ClassVar[ErrorReason]
+    ERROR_REASON_ALREADY_EXISTS: _ClassVar[ErrorReason]
+    ERROR_REASON_ETAG_MISMATCH: _ClassVar[ErrorReason]
+    ERROR_REASON_REF_MOVED: _ClassVar[ErrorReason]
+    ERROR_REASON_CONTENDED: _ClassVar[ErrorReason]
+    ERROR_REASON_VERSION_SUPERSEDED: _ClassVar[ErrorReason]
+    ERROR_REASON_CONFLICTS_UNRESOLVED: _ClassVar[ErrorReason]
+    ERROR_REASON_INVALID_STATE: _ClassVar[ErrorReason]
+    ERROR_REASON_REDACTED: _ClassVar[ErrorReason]
+    ERROR_REASON_RATE_LIMITED: _ClassVar[ErrorReason]
+    ERROR_REASON_QUEUE_FULL: _ClassVar[ErrorReason]
+    ERROR_REASON_BUDGET_EXHAUSTED: _ClassVar[ErrorReason]
+    ERROR_REASON_UNAVAILABLE: _ClassVar[ErrorReason]
+    ERROR_REASON_UNIMPLEMENTED: _ClassVar[ErrorReason]
+    ERROR_REASON_TIMEOUT: _ClassVar[ErrorReason]
+    ERROR_REASON_INTERNAL: _ClassVar[ErrorReason]
+ERROR_REASON_UNSPECIFIED: ErrorReason
+ERROR_REASON_INVALID_FIELD: ErrorReason
+ERROR_REASON_INVALID_NAME: ErrorReason
+ERROR_REASON_INVALID_REVISION: ErrorReason
+ERROR_REASON_INVALID_FILTER: ErrorReason
+ERROR_REASON_INVALID_PAGE_TOKEN: ErrorReason
+ERROR_REASON_REQUEST_ID_REUSED: ErrorReason
+ERROR_REASON_TOO_LARGE: ErrorReason
+ERROR_REASON_UNAUTHENTICATED: ErrorReason
+ERROR_REASON_PERMISSION_DENIED: ErrorReason
+ERROR_REASON_CAPABILITY_DENIED: ErrorReason
+ERROR_REASON_POLICY_DENIED: ErrorReason
+ERROR_REASON_NOT_FOUND: ErrorReason
+ERROR_REASON_MISSING_OBJECTS: ErrorReason
+ERROR_REASON_ALREADY_EXISTS: ErrorReason
+ERROR_REASON_ETAG_MISMATCH: ErrorReason
+ERROR_REASON_REF_MOVED: ErrorReason
+ERROR_REASON_CONTENDED: ErrorReason
+ERROR_REASON_VERSION_SUPERSEDED: ErrorReason
+ERROR_REASON_CONFLICTS_UNRESOLVED: ErrorReason
+ERROR_REASON_INVALID_STATE: ErrorReason
+ERROR_REASON_REDACTED: ErrorReason
+ERROR_REASON_RATE_LIMITED: ErrorReason
+ERROR_REASON_QUEUE_FULL: ErrorReason
+ERROR_REASON_BUDGET_EXHAUSTED: ErrorReason
+ERROR_REASON_UNAVAILABLE: ErrorReason
+ERROR_REASON_UNIMPLEMENTED: ErrorReason
+ERROR_REASON_TIMEOUT: ErrorReason
+ERROR_REASON_INTERNAL: ErrorReason

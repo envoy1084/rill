@@ -122,9 +122,10 @@ Tiered, so a phase spends its time on work rather than rebuilds:
   `cargo nextest run -p <touched crates>` (or the touched test binary,
   e.g. `-p rill-api --test grpc access`) and
   `cargo clippy -p <touched crates> --all-targets -- -D warnings`.
-* **When a `.proto` changes:** in `crates/foundation/proto`, `buf lint` and
-  `buf generate --exclude-path proto/google` (regenerates the API
-  reference; needs `buf` and `protoc-gen-doc` on the path).
+* **When a `.proto` changes:** `sdks/generate.sh` (lints, regenerates the
+  API reference and the SDKs' code; needs `buf`, `protoc` 36.2,
+  `protoc-gen-doc`, `protoc-gen-go`, `protoc-gen-connect-go`, Node and
+  `uv`), then `sdks/conformance/run.sh`.
 * **End of a work item:** `cargo clippy --workspace --all-targets -- -D warnings`.
 * **End of a phase (the full sweep):** `cargo fmt --check`,
   `cargo nextest run --workspace`, `cargo test --workspace --doc`, clippy
@@ -139,9 +140,11 @@ Tiered, so a phase spends its time on work rather than rebuilds:
 
 `.github/workflows/ci.yml` has two jobs. `check` runs `cargo fmt --check`,
 `cargo deny check` (licences, advisories, sources per `deny.toml`),
-`cargo clippy -D warnings`, `cargo test --workspace`, `buf lint` on the
-protos, and regenerates the API reference (`buf generate` with
-`protoc-gen-doc`), failing on any diff. `foundationdb`
+`cargo clippy -D warnings`, `cargo test --workspace`, then regenerates
+everything derived from the protos (`sdks/generate.sh`: `buf lint`, the
+API reference, the Go, TypeScript and Python SDKs' code), failing on any
+diff, and runs the SDK conformance suites against `rill dev`
+(`sdks/conformance/run.sh`). `foundationdb`
 installs a pinned FoundationDB (version and package checksums in the job's
 env) and runs the store conformance suite and the end-to-end server test
 with the `fdb` feature. Keep it that small; anything else is run locally or

@@ -23,25 +23,39 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
       - run: cargo clippy --workspace --all-targets
       - run: cargo test --workspace
-      # The API protos follow buf's lint rules, and the generated API
-      # reference matches them.
+      # Everything generated from the protos (the API reference and the
+      # Go, TypeScript and Python SDKs) matches them, and every SDK passes
+      # the conformance scenarios against `rill dev`.
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
           cache: false
-      - name: Install buf and protoc-gen-doc
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install buf, protoc and the protoc plugins
         env:
           BUF_VERSION: 1.75.0
           BUF_SHA256: fad1e38d6909bbb583a4da81d8c02a01046e2cd663bde7e337dd24277393764b
+          PROTOC_VERSION: "36.2"
+          PROTOC_SHA256: 121f6c7afe1d4d0e3ea6aab9432038599250134cbf4474cb1167d2c7decd4278
+        working-directory: ${{ runner.temp }}
         run: |
           curl -fsSL -o buf "https://github.com/bufbuild/buf/releases/download/v$BUF_VERSION/buf-Linux-x86_64"
           echo "$BUF_SHA256  buf" | sha256sum -c
           sudo install buf /usr/local/bin/buf
+          zip="protoc-$PROTOC_VERSION-linux-x86_64.zip"
+          curl -fsSLO "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$zip"
+          echo "$PROTOC_SHA256  $zip" | sha256sum -c
+          sudo unzip -q -o "$zip" -d /usr/local bin/protoc 'include/*'
           go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v1.5.1
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.21.1
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-      - run: buf lint && buf generate --exclude-path proto/google
-        working-directory: crates/foundation/proto
-      - run: git diff --exit-code
+      - run: sdks/generate.sh
+      - run: git diff --exit-code && test -z "$(git status --porcelain)"
+      - run: sdks/conformance/run.sh
 
   # The metadata store conformance suite and the end-to-end server test
   # against a real single-node FoundationDB.

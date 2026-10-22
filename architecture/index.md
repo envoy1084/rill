@@ -89,19 +89,20 @@ Read in this order the first time; each page ends with Previous / Next links.
 **08 Clients**
 
 48. [SDK](08-clients/sdk.md)
-49. [CLI](08-clients/cli.md)
-50. [MCP server](08-clients/mcp.md)
+49. [SDKs in other languages](08-clients/other-sdks.md)
+50. [CLI](08-clients/cli.md)
+51. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-51. [Development](09-engineering/development.md)
-52. [Testing](09-engineering/testing.md)
-53. [Simulation](09-engineering/simulation.md)
-54. [Performance](09-engineering/performance.md)
+52. [Development](09-engineering/development.md)
+53. [Testing](09-engineering/testing.md)
+54. [Simulation](09-engineering/simulation.md)
+55. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-55. [Architecture decisions](10-decisions/README.md): the seventeen ADRs that
+56. [Architecture decisions](10-decisions/README.md): the seventeen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 

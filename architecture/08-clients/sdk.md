@@ -247,4 +247,4 @@ scenarios](../../sdks/conformance/README.md) against it.
 - [names.rs](../../crates/clients/sdk/src/names.rs), [filter.rs](../../crates/clients/sdk/src/filter.rs), [paging.rs](../../crates/clients/sdk/src/paging.rs), [testing.rs](../../crates/clients/sdk/src/testing.rs), [tests/conformance.rs](../../crates/clients/sdk/tests/conformance.rs)
 
 ---
-← Previous: [Cache tier](../07-runtime/cache.md) · [Index](../index.md) · Next: [CLI](cli.md) →
+← Previous: [Cache tier](../07-runtime/cache.md) · [Index](../index.md) · Next: [SDKs in other languages](other-sdks.md) →

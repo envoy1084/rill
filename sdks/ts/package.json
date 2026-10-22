@@ -1,0 +1,24 @@
+{
+  "name": "@rill/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript client for the rill.v1 API: generated Connect clients and a thin layer",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "tsc -p . && node --test \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
+    "@connectrpc/connect": "2.2.0",
+    "@connectrpc/connect-node": "2.2.0"
+  },
+  "devDependencies": {
+    "@bufbuild/protoc-gen-es": "2.16.0",
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2"
+  }
+}

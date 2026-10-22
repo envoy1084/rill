@@ -39,11 +39,14 @@ No `protoc` is needed. `rill-proto/build.rs` compiles the protobufs with
 `crates/foundation/proto/buf.yaml` holds the lint rules (buf's `STANDARD`
 set plus a comment on every service and RPC) and the `FILE`
 breaking-change rules, which are not enforced while Rill is pre-release.
-From `crates/foundation/proto`, `buf lint` checks the protos and
-`buf generate --exclude-path proto/google` regenerates the
-[API reference](../07-runtime/api-reference.md) with `protoc-gen-doc`
-(`go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@v1.5.1`).
-CI runs both and fails when the committed reference differs.
+`sdks/generate.sh` lints the protos and regenerates the
+[API reference](../07-runtime/api-reference.md) (`protoc-gen-doc`) and the
+[Go, TypeScript and Python SDKs](../08-clients/other-sdks.md)' code; CI
+runs it and fails when the committed output differs. It needs `buf`,
+`protoc` 36.2 and, from `go install`, `protoc-gen-doc@v1.5.1`,
+`protoc-gen-go@v1.36.12` and `protoc-gen-connect-go@v1.21.1`; the
+TypeScript and Python generators come from those SDKs' lockfiles (Node
+and `uv`).
 
 ## Build profiles
 

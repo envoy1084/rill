@@ -162,4 +162,4 @@ the root `CancellationToken`. See
 - [bin/rill.rs](../../crates/clients/cli/src/bin/rill.rs)
 
 ---
-← Previous: [SDK](sdk.md) · [Index](../index.md) · Next: [MCP server](mcp.md) →
+← Previous: [SDKs in other languages](other-sdks.md) · [Index](../index.md) · Next: [MCP server](mcp.md) →

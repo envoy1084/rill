@@ -1,0 +1,8 @@
+version: v2
+plugins:
+  - protoc_builtin: python
+    out: sdks/python/src
+  - protoc_builtin: pyi
+    out: sdks/python/src
+  - local: sdks/python/.venv/bin/protoc-gen-connect-python
+    out: sdks/python/src
