@@ -22,6 +22,10 @@ pub struct ExecConfig {
     pub lease_secs: u64,
     /// Workers lost before an action fails.
     pub max_attempts: u32,
+    /// Seconds an action may run when it sets no timeout.
+    pub default_timeout_secs: u64,
+    /// The longest timeout, in seconds, an action may ask for.
+    pub max_timeout_secs: u64,
 }
 
 impl Default for ExecConfig {
@@ -33,6 +37,8 @@ impl Default for ExecConfig {
             report_every_secs: 10,
             lease_secs: 45,
             max_attempts: 3,
+            default_timeout_secs: 30 * 60,
+            max_timeout_secs: 2 * 60 * 60,
         }
     }
 }

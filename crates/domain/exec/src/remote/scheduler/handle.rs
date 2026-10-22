@@ -27,6 +27,10 @@ pub struct SchedulerConfig {
     pub lease: Duration,
     /// Attempts before an action whose workers keep vanishing fails.
     pub max_attempts: u32,
+    /// The timeout of an action that sets none.
+    pub default_timeout: Duration,
+    /// The longest timeout an action may ask for.
+    pub max_timeout: Duration,
 }
 
 impl Default for SchedulerConfig {
@@ -36,6 +40,8 @@ impl Default for SchedulerConfig {
             report_every: Duration::from_secs(10),
             lease: Duration::from_secs(45),
             max_attempts: 3,
+            default_timeout: Duration::from_secs(30 * 60),
+            max_timeout: Duration::from_secs(2 * 60 * 60),
         }
     }
 }

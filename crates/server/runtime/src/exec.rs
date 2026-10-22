@@ -19,6 +19,8 @@ pub fn scheduler_config(config: &ExecConfig) -> SchedulerConfig {
         report_every: Duration::from_secs(config.report_every_secs),
         lease: Duration::from_secs(config.lease_secs),
         max_attempts: config.max_attempts,
+        default_timeout: Duration::from_secs(config.default_timeout_secs),
+        max_timeout: Duration::from_secs(config.max_timeout_secs),
     }
 }
 

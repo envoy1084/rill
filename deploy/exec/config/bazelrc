@@ -1,0 +1,7 @@
+# Bazel options for building against Rill's remote execution.
+startup --digest_function=blake3
+build --remote_executor=grpc://host.orb.internal:7470
+build --remote_default_exec_properties=OSFamily=linux
+build --remote_default_exec_properties=container-image=rill-exec-runner
+build --remote_timeout=600
+build --jobs=32

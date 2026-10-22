@@ -27,6 +27,12 @@ impl Scheduler {
         let state = request
             .current_state
             .and_then(|CurrentState { worker_state }| worker_state);
+        tracing::debug!(
+            worker,
+            state = ?state.as_ref().map(state_name),
+            session = ?session.as_ref().map(|s| s.action.short()),
+            "worker report"
+        );
         match (state, session) {
             (Some(current_state::WorkerState::Executing(executing)), Some(session)) => {
                 let reported = executing
@@ -42,7 +48,7 @@ impl Scheduler {
                     self.complete(&worker, &session, response).await?;
                 } else {
                     return match self.keep(&worker, &session).await {
-                        Ok(()) => Ok(self.executing(&session)),
+                        Ok(()) => Ok(self.carry_on()),
                         Err(Error::Jobs(rill_jobs::Error::Lost(_))) => {
                             Ok(self.idle(Timestamp::now()))
                         }
@@ -250,7 +256,9 @@ impl Scheduler {
     }
 
     fn executing(&self, session: &WorkerSession) -> SynchronizeResponse {
-        let action = Action::decode(session.action_bytes.clone()).ok();
+        let action = Action::decode(session.action_bytes.clone())
+            .ok()
+            .map(|a| self.bounded(a));
         SynchronizeResponse {
             next_synchronization_at: Some(timestamp(
                 Timestamp::now().millis() + self.config.report_every.as_millis() as i64,
@@ -277,6 +285,34 @@ impl Scheduler {
         }
     }
 
+    /// No new desired state: the worker carries on with its action. (Any
+    /// `Executing` state, even for the same action, restarts it.)
+    fn carry_on(&self) -> SynchronizeResponse {
+        SynchronizeResponse {
+            next_synchronization_at: Some(timestamp(
+                Timestamp::now().millis() + self.config.report_every.as_millis() as i64,
+            )),
+            desired_state: None,
+        }
+    }
+
+    /// `action` with a timeout within the configured bounds; workers need
+    /// one, and clients often leave it unset.
+    fn bounded(&self, mut action: Action) -> Action {
+        let asked = action
+            .timeout
+            .as_ref()
+            .filter(|t| t.seconds > 0 || t.nanos > 0)
+            .map(|t| std::time::Duration::new(t.seconds.max(0) as u64, t.nanos.max(0) as u32))
+            .unwrap_or(self.config.default_timeout);
+        let timeout = asked.min(self.config.max_timeout);
+        action.timeout = Some(prost_types::Duration {
+            seconds: timeout.as_secs() as i64,
+            nanos: timeout.subsec_nanos() as i32,
+        });
+        action
+    }
+
     fn idle(&self, now: Timestamp) -> SynchronizeResponse {
         SynchronizeResponse {
             next_synchronization_at: Some(timestamp(now.millis())),
@@ -284,6 +320,21 @@ impl Scheduler {
                 worker_state: Some(desired_state::WorkerState::Idle(())),
             }),
         }
+    }
+}
+
+fn state_name(state: &current_state::WorkerState) -> String {
+    match state {
+        current_state::WorkerState::Idle(()) => "idle".into(),
+        current_state::WorkerState::Executing(e) => format!(
+            "executing {} {}",
+            e.action_digest.as_ref().map_or("?", |d| &d.hash[..12]),
+            match &e.execution_state {
+                Some(current_state::executing::ExecutionState::Completed(_)) => "completed",
+                Some(_) => "progress",
+                None => "unset",
+            }
+        ),
     }
 }
 

@@ -3,7 +3,7 @@
 //! like repository content and found through an index from its digest.
 
 use bytes::Bytes;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use rill_core::blobs::{read_content, read_content_range, store_content_stream};
 use rill_reapi_proto::reapi::{Digest, Directory};
 use rill_types::objects::blob::CHUNK_THRESHOLD;
@@ -99,23 +99,45 @@ impl ExecSpace {
 
     /// Store `bytes` as the content `digest` names; a mismatch is refused.
     pub async fn write(&self, digest: &BlobDigest, bytes: Bytes) -> Result<()> {
-        digest.verify(&bytes)?;
-        if digest.is_empty() {
-            return Ok(());
-        }
         if digest.size < CHUNK_THRESHOLD {
-            self.objects
-                .put(ObjectKind::Blob, &digest.hash, bytes)
-                .await?;
-            return Ok(());
+            return self.put_whole(digest, bytes).await;
         }
-        self.write_stream(digest, futures::stream::iter([Ok(bytes)]))
+        digest.verify(&bytes)?;
+        self.put_chunked(digest, futures::stream::iter([Ok(bytes)]))
             .await
     }
 
     /// Store content arriving as `parts`, checked against `digest` once it
-    /// is complete.
-    pub async fn write_stream<S>(&self, digest: &BlobDigest, parts: S) -> Result<()>
+    /// is complete. Content below the chunking threshold is collected and
+    /// stored as one blob (repository storage would inline the smallest).
+    pub async fn write_stream<S>(&self, digest: &BlobDigest, mut parts: S) -> Result<()>
+    where
+        S: Stream<Item = rill_core::Result<Bytes>> + Unpin + Send,
+    {
+        if digest.size >= CHUNK_THRESHOLD {
+            return self.put_chunked(digest, parts).await;
+        }
+        let mut whole = bytes::BytesMut::with_capacity(digest.size as usize);
+        while let Some(part) = parts.next().await {
+            whole.extend_from_slice(&part?);
+            if whole.len() as u64 > digest.size {
+                return Err(Error::DigestMismatch(digest.to_string()));
+            }
+        }
+        self.put_whole(digest, whole.freeze()).await
+    }
+
+    async fn put_whole(&self, digest: &BlobDigest, bytes: Bytes) -> Result<()> {
+        digest.verify(&bytes)?;
+        if !digest.is_empty() {
+            self.objects
+                .put(ObjectKind::Blob, &digest.hash, bytes)
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn put_chunked<S>(&self, digest: &BlobDigest, parts: S) -> Result<()>
     where
         S: Stream<Item = rill_core::Result<Bytes>> + Unpin + Send,
     {

@@ -7,6 +7,7 @@ use std::path::PathBuf;
 const PROTOS: &[&str] = &[
     "build/bazel/remote/execution/v2/remote_execution.proto",
     "google/bytestream/bytestream.proto",
+    "google/rpc/error_details.proto",
     "buildbarn/remoteworker/remoteworker.proto",
 ];
 

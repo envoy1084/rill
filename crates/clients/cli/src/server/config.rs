@@ -48,6 +48,10 @@ pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
             drain_secs: 0,
             grace_secs: 5,
         },
+        exec: rill_runtime::config::ExecConfig {
+            worker_secret_file: std::env::var_os("RILL_EXEC_WORKER_SECRET_FILE").map(PathBuf::from),
+            ..Default::default()
+        },
         ..ServerConfig::default()
     })
 }

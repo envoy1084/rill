@@ -113,12 +113,42 @@ impl Execution for ExecSvc {
     }
 }
 
+/// `FAILED_PRECONDITION` naming the missing blobs as REAPI asks, so the
+/// client uploads them and retries.
+fn missing(blobs: &[BlobDigest]) -> Status {
+    use rill_reapi_proto::rpc::{precondition_failure::Violation, PreconditionFailure};
+    let failure = PreconditionFailure {
+        violations: blobs
+            .iter()
+            .map(|d| Violation {
+                r#type: "MISSING".into(),
+                subject: format!("blobs/{}/{}", d.hash, d.size),
+                description: String::new(),
+            })
+            .collect(),
+    };
+    let message = format!("{} input blob(s) are not in the CAS", blobs.len());
+    let status = rill_reapi_proto::rpc::Status {
+        code: tonic::Code::FailedPrecondition as i32,
+        message: message.clone(),
+        details: vec![prost_types::Any {
+            type_url: "type.googleapis.com/google.rpc.PreconditionFailure".into(),
+            value: failure.encode_to_vec(),
+        }],
+    };
+    Status::with_details(
+        tonic::Code::FailedPrecondition,
+        message,
+        status.encode_to_vec().into(),
+    )
+}
+
 async fn load_action(space: &ExecSpace, digest: &BlobDigest) -> Result<Action, Status> {
     let bytes = space
         .read(digest)
         .await
         .map_err(Error::from)?
-        .ok_or_else(|| Status::failed_precondition(format!("action {digest} is not in the CAS")))?;
+        .ok_or_else(|| missing(&[*digest]))?;
     Action::decode(bytes).map_err(|e| Status::invalid_argument(format!("action {digest}: {e}")))
 }
 
@@ -130,12 +160,9 @@ async fn check_inputs(caller: &ExecCaller, action: &Action) -> Result<(), Status
     {
         needed.push(BlobDigest::parse(digest).map_err(Error::from)?);
     }
-    let missing = caller.space.missing(&needed).await.map_err(Error::from)?;
-    if let Some(first) = missing.first() {
-        return Err(Status::failed_precondition(format!(
-            "MISSING: blobs/{}/{} is not in the CAS",
-            first.hash, first.size
-        )));
+    let absent = caller.space.missing(&needed).await.map_err(Error::from)?;
+    if !absent.is_empty() {
+        return Err(missing(&absent));
     }
     Ok(())
 }
