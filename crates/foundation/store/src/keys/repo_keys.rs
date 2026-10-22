@@ -172,6 +172,34 @@ impl RepoKeys {
         self.row(table::MISC, &name)
     }
 
+    pub fn exec_operation(&self, operation: &str) -> Bytes {
+        self.row(table::EXEC_OPERATION, &operation)
+    }
+
+    pub fn exec_operation_count(&self, operation: &str) -> Bytes {
+        self.row(table::EXEC_OPERATION_COUNT, &operation)
+    }
+
+    pub fn exec_in_flight(&self, action: &ObjectHash) -> Bytes {
+        self.row(table::EXEC_IN_FLIGHT, &action.as_bytes().as_slice())
+    }
+
+    pub fn exec_worker(&self, worker: &str) -> Bytes {
+        self.row(table::EXEC_WORKER, &worker)
+    }
+
+    pub fn exec_platform(&self, platform: &str) -> Bytes {
+        self.row(table::EXEC_PLATFORM, &platform)
+    }
+
+    pub fn exec_platforms(&self) -> Bytes {
+        self.table(table::EXEC_PLATFORM)
+    }
+
+    pub fn exec_wake(&self) -> Bytes {
+        self.table(table::EXEC_WAKE)
+    }
+
     pub fn land_request(&self, ticket: u64) -> Bytes {
         self.row(table::LAND_REQUEST, &(ticket as i64))
     }

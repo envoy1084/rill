@@ -3,13 +3,15 @@
 use bytes::Bytes;
 use rill_store::Condition;
 use rill_types::Timestamp;
+use serde::{Deserialize, Serialize};
 
 use crate::job::Job;
 
 /// A claimed job. The claim's token stays the same across renewals, so
 /// writes fenced on it fail once the job was taken back, however often
-/// the claim was renewed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// the claim was renewed. It serializes, so a holder whose requests reach
+/// different servers can keep it between them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Claim {
     pub job: Job,
     pub holder: String,

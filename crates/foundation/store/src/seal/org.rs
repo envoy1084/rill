@@ -100,7 +100,8 @@ impl OrgSealer {
         self.orgs.write().remove(org);
     }
 
-    fn keys(&self, org: &str) -> Result<Arc<OrgKeys>> {
+    fn keys(&self, namespace: &str) -> Result<Arc<OrgKeys>> {
+        let org = super::org_of(namespace);
         self.orgs
             .read()
             .get(org)
@@ -130,6 +131,7 @@ impl OrgSealer {
 #[async_trait]
 impl Sealer for OrgSealer {
     async fn ready(&self, namespace: &str) -> Result<()> {
+        let namespace = super::org_of(namespace);
         if let Some(keys) = self.orgs.read().get(namespace) {
             if keys.loaded_at.elapsed() < KEY_REFRESH {
                 return Ok(());
@@ -279,6 +281,25 @@ mod tests {
         assert!(
             sealer.open(at("initech"), stored).is_err(),
             "keys never loaded"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_side_namespace_seals_with_its_orgs_keys_but_stays_apart() {
+        let sealer = sealer(&[("acme", vec![key(1, 1, 0)])]).await;
+        sealer.ready("acme.exec").await.unwrap();
+        let plain = b"build output".to_vec();
+        let hash = ObjectHash::digest(ObjectKind::Blob, &plain);
+        let at = |namespace| ObjectAt {
+            namespace,
+            kind: ObjectKind::Blob,
+            hash: &hash,
+        };
+        let stored = sealer.seal(at("acme.exec"), plain.clone()).unwrap();
+        assert_eq!(sealer.open(at("acme.exec"), stored.clone()).unwrap(), plain);
+        assert!(
+            sealer.open(at("acme"), stored).is_err(),
+            "an execution object never opens as the org's repository content"
         );
     }
 

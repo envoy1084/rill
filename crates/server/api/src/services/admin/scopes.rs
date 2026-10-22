@@ -34,6 +34,7 @@ pub(super) fn parse_action(action: &str) -> Result<Verb> {
         "lander.land" | "repo.land" | "land" => Ok(Verb::Land),
         "review.vote" | "repo.review" | "review" => Ok(Verb::Review),
         "repo.admin" | "admin" => Ok(Verb::Admin),
+        "exec.execute" | "execute" => Ok(Verb::Execute),
         other => Err(Error::invalid(format!("unknown action {other:?}"))),
     }
 }

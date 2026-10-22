@@ -48,3 +48,9 @@ impl Sealer for Plaintext {
 
 /// The namespace of the default org's objects; every org has its own.
 pub const DEFAULT_NAMESPACE: &str = "default";
+
+/// The org whose data keys seal `namespace`: an org's own namespace, or a
+/// namespace beside it such as `acme.exec` (org names have no dots).
+pub fn org_of(namespace: &str) -> &str {
+    namespace.split('.').next().unwrap_or(namespace)
+}

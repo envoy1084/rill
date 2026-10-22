@@ -22,16 +22,19 @@ pub enum Verb {
     Review,
     /// Manage relations, policy and tokens.
     Admin,
+    /// Run actions on the remote execution service.
+    Execute,
 }
 
 impl Verb {
     /// All verbs.
-    pub const ALL: [Verb; 5] = [
+    pub const ALL: [Verb; 6] = [
         Verb::Read,
         Verb::Write,
         Verb::Land,
         Verb::Review,
         Verb::Admin,
+        Verb::Execute,
     ];
 
     /// Wire name.
@@ -42,6 +45,7 @@ impl Verb {
             Verb::Land => "land",
             Verb::Review => "review",
             Verb::Admin => "admin",
+            Verb::Execute => "execute",
         }
     }
 }

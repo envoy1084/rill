@@ -83,6 +83,20 @@ pub const REBAC_VERSION: &str = "rebacv";
 pub const QUARANTINE: &str = "quar";
 /// `(misc, ns, repo, name)` → small values (policy, rings, cursors)
 pub const MISC: &str = "misc";
+/// `(xop, ns, space, operation)` → a remote execution operation
+pub const EXEC_OPERATION: &str = "xop";
+/// `(xopn, ns, space, operation)` → counter moved by every update of the
+/// operation; waiters watch it
+pub const EXEC_OPERATION_COUNT: &str = "xopn";
+/// `(xif, ns, space, action)` → the operation running the action now
+pub const EXEC_IN_FLIGHT: &str = "xif";
+/// `(xwk, ns, space, worker)` → what a worker is executing
+pub const EXEC_WORKER: &str = "xwk";
+/// `(xpl, ns, space, platform)` → a platform actions were queued for
+pub const EXEC_PLATFORM: &str = "xpl";
+/// `(xwake, ns, space)` → counter moved by every queued action; idle
+/// workers watch it
+pub const EXEC_WAKE: &str = "xwake";
 /// `(meta, "format")` → store format
 pub const META: &str = "meta";
 /// `(org, name)` → OrgConfig
