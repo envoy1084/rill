@@ -21,6 +21,10 @@ pub enum StepStatus {
     Unaffected,
     /// Not run: it does not gate the change's risk class.
     NotGating,
+    /// Failed, but only in quarantined targets, so it does not count.
+    Quarantined {
+        exit_code: i32,
+    },
 }
 
 impl StepStatus {
@@ -33,6 +37,9 @@ impl StepStatus {
             StepStatus::Error(message) => format!("could not run: {message}"),
             StepStatus::Unaffected => "was unaffected".into(),
             StepStatus::NotGating => "was not gating".into(),
+            StepStatus::Quarantined { exit_code } => {
+                format!("failed with exit code {exit_code} in quarantined targets")
+            }
         }
     }
 
@@ -40,7 +47,10 @@ impl StepStatus {
     pub fn is_ok(&self) -> bool {
         matches!(
             self,
-            StepStatus::Passed | StepStatus::Unaffected | StepStatus::NotGating
+            StepStatus::Passed
+                | StepStatus::Unaffected
+                | StepStatus::NotGating
+                | StepStatus::Quarantined { .. }
         )
     }
 }
@@ -91,6 +101,37 @@ impl StepResult {
         match self.shard {
             Some((index, total)) => format!("{:?} shard {}/{total}", self.step, index + 1),
             None => format!("{:?}", self.step),
+        }
+    }
+
+    /// Its name in the test history: `step:<name>` or `step:<name>#2/4`.
+    pub fn target(&self) -> String {
+        match self.shard {
+            Some((index, total)) => format!("step:{}#{}/{total}", self.step, index + 1),
+            None => format!("step:{}", self.step),
+        }
+    }
+
+    /// The test-history names of its failed test cases.
+    pub fn failed_tests(&self) -> Vec<String> {
+        self.tests
+            .iter()
+            .filter(|t| t.outcome == TestOutcome::Failed)
+            .map(|t| format!("test:{}", t.id))
+            .collect()
+    }
+
+    /// Count a failure as quarantined when the step itself is, or it
+    /// failed only in test cases that are.
+    pub fn excuse(&mut self, quarantined: &std::collections::HashSet<String>) {
+        let StepStatus::Failed { exit_code } = self.status else {
+            return;
+        };
+        let failed = self.failed_tests();
+        let excused = quarantined.contains(&self.target())
+            || (!failed.is_empty() && failed.iter().all(|t| quarantined.contains(t)));
+        if excused {
+            self.status = StepStatus::Quarantined { exit_code };
         }
     }
 }
@@ -150,14 +191,13 @@ impl VerificationOutcome {
         for step in self.steps.iter().filter(|s| !s.cached) {
             let outcome = match &step.status {
                 StepStatus::Passed => TestOutcome::Passed,
-                StepStatus::Failed { .. } | StepStatus::TimedOut => TestOutcome::Failed,
+                StepStatus::Failed { .. }
+                | StepStatus::TimedOut
+                | StepStatus::Quarantined { .. } => TestOutcome::Failed,
                 StepStatus::Error(_) => TestOutcome::Error,
                 StepStatus::Unaffected | StepStatus::NotGating => continue,
             };
-            let target = match step.shard {
-                Some((index, total)) => format!("step:{}#{}/{total}", step.step, index + 1),
-                None => format!("step:{}", step.step),
-            };
+            let target = step.target();
             let action = step.action.map(|a| a.hash);
             runs.push(TestRun {
                 target,

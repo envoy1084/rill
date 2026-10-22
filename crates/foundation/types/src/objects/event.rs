@@ -70,6 +70,20 @@ pub enum EventKind {
     },
     /// A stored policy was replaced.
     PolicyChanged { name: String },
+    /// A test or step was quarantined, or its quarantine lifted.
+    QuarantineChanged { target: String, quarantined: bool },
+    /// A trunk-red incident was opened or moved on (`open`, `fixing`,
+    /// `closed`).
+    IncidentChanged {
+        incident: String,
+        culprit: TrunkSeq,
+        state: String,
+    },
+    /// Trunk's health changed (`green`, `red`, `fixing`, `guarded`), or
+    /// it was frozen or thawed.
+    TrunkHealthChanged { state: String, frozen: bool },
+    /// Reverts of every landing a selector matched were requested.
+    RevertsRequested { selector: String, count: u32 },
     /// A change version was stored.
     VersionStored {
         version: ChangeVersionHash,
@@ -135,6 +149,10 @@ impl EventKind {
             EventKind::IntentChanged { .. } => "intent_changed",
             EventKind::RelationChanged { .. } => "relation_changed",
             EventKind::PolicyChanged { .. } => "policy_changed",
+            EventKind::QuarantineChanged { .. } => "quarantine_changed",
+            EventKind::IncidentChanged { .. } => "incident_changed",
+            EventKind::TrunkHealthChanged { .. } => "trunk_health_changed",
+            EventKind::RevertsRequested { .. } => "reverts_requested",
         }
     }
 

@@ -3,6 +3,8 @@ syntax = "proto3";
 
 package rill.v1;
 
+import "rill/v1/types.proto";
+
 service ChecksService {
   // Recent runs of a step or test, newest first.
   rpc GetTestHistory(GetTestHistoryRequest) returns (GetTestHistoryResponse);
@@ -20,6 +22,47 @@ service ChecksService {
   // Steps a hermeticity probe caught giving different outputs on a re-run;
   // they run uncached until the flag expires.
   rpc ListNonhermetic(ListNonhermeticRequest) returns (ListNonhermeticResponse);
+  // Targets whose failures neither block landings nor make trunk red.
+  rpc ListQuarantined(ListQuarantinedRequest) returns (ListQuarantinedResponse);
+  // Quarantine a step or test (repository owners).
+  rpc Quarantine(QuarantineRequest) returns (QuarantineResponse);
+  // Lift a quarantine (repository owners).
+  rpc ReleaseQuarantine(ReleaseQuarantineRequest) returns (ReleaseQuarantineResponse);
+}
+
+message QuarantinedTarget {
+  // `step:<name>[#shard]` or `test:<id>`.
+  string target = 1;
+  int64 since = 2;
+  Principal by = 3;
+  string reason = 4;
+  // The intent tracking the fix, when one was opened.
+  optional bytes intent = 5;
+}
+message ListQuarantinedRequest {
+  string repo = 1;
+}
+message ListQuarantinedResponse {
+  repeated QuarantinedTarget targets = 1;
+}
+message QuarantineRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  string target = 3;
+  string reason = 4;
+}
+message QuarantineResponse {
+  // False when it was already quarantined.
+  bool added = 1;
+}
+message ReleaseQuarantineRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  string target = 3;
+}
+message ReleaseQuarantineResponse {
+  // False when it was not quarantined.
+  bool released = 1;
 }
 
 message NonhermeticStep {

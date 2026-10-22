@@ -116,6 +116,17 @@ impl ReviewHooks for NoopHooks {
     }
 }
 
+/// Something that failed in a verification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Failure {
+    /// `step:<name>[#shard]` or `test:<id>`.
+    pub target: String,
+    /// The step it belongs to (for a test case, the step that ran it).
+    pub step: String,
+    /// Its flake score in per mille (0 to 1000); 0 without a history.
+    pub flake_permille: u32,
+}
+
 /// Result of verifying one tree.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationOutcome {
@@ -123,6 +134,11 @@ pub struct VerificationOutcome {
     pub green: bool,
     /// Human-readable detail: failing step, log excerpt, cache status.
     pub details: String,
+    /// What failed, when red.
+    pub failures: Vec<Failure>,
+    /// It failed at first and passed when its flaky failures were run
+    /// again: a flake, not a break.
+    pub flaky: bool,
 }
 
 impl VerificationOutcome {
@@ -131,6 +147,8 @@ impl VerificationOutcome {
         VerificationOutcome {
             green: true,
             details: details.into(),
+            failures: Vec::new(),
+            flaky: false,
         }
     }
 
@@ -139,7 +157,20 @@ impl VerificationOutcome {
         VerificationOutcome {
             green: false,
             details: details.into(),
+            failures: Vec::new(),
+            flaky: false,
         }
+    }
+
+    /// The same outcome, naming what failed.
+    pub fn with_failures(mut self, failures: Vec<Failure>) -> Self {
+        self.failures = failures;
+        self
+    }
+
+    /// The step names its failures belong to.
+    pub fn failing_steps(&self) -> std::collections::BTreeSet<String> {
+        self.failures.iter().map(|f| f.step.clone()).collect()
     }
 }
 

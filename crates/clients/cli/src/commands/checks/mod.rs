@@ -1,5 +1,6 @@
 //! `rill checks`: what verification ran, test by test and run by run.
 
+mod quarantine;
 mod runs;
 mod tests;
 
@@ -26,6 +27,9 @@ pub enum ChecksCmd {
     /// Steps a hermeticity probe caught giving different outputs, which
     /// run uncached for now.
     Nonhermetic,
+    /// Targets whose failures neither block landings nor make trunk red.
+    #[command(subcommand)]
+    Quarantine(quarantine::QuarantineCmd),
 }
 
 /// Run a checks subcommand.
@@ -38,5 +42,6 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ChecksCmd) -> Result<()> {
         ChecksCmd::Log(a) => runs::log(ctx, a).await,
         ChecksCmd::Artifact(a) => runs::artifact(ctx, a).await,
         ChecksCmd::Nonhermetic => tests::nonhermetic(ctx).await,
+        ChecksCmd::Quarantine(cmd) => quarantine::run(ctx, cmd).await,
     }
 }

@@ -43,6 +43,11 @@ impl TestHistory {
         TestHistory { repo }
     }
 
+    /// The repository whose history this is.
+    pub fn repo(&self) -> &RepoStore {
+        &self.repo
+    }
+
     /// Record `run`: compare it with the last run on the same action,
     /// update the target's statistics, and drop runs past
     /// [`RUNS_KEPT`].

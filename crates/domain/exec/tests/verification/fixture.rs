@@ -14,6 +14,7 @@ use rill_types::{FileKind, RepoPathBuf, TreeHash};
 use tokio::task::JoinHandle;
 
 pub struct Fixture {
+    pub repo: rill_store::RepoStore,
     pub trees: TreeOps,
     pub runs: rill_exec::runs::RunStore,
     pub runner: PlanRunner,
@@ -74,8 +75,10 @@ impl Fixture {
             trees.clone(),
             Default::default(),
         )
-        .with_runs(runs.clone());
+        .with_runs(runs.clone())
+        .with_quarantine(rill_exec::history::TestHistory::new(repo.clone()));
         Fixture {
+            repo,
             trees,
             runs,
             runner,

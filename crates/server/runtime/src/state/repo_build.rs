@@ -87,6 +87,7 @@ impl RepoRegistry {
                     self.config.verify.platform.clone(),
                 )
                 .with_env(self.config.verify.env.clone())
+                .with_quarantine(TestHistory::new(repo.clone()))
                 .with_runs(RunStore::new(
                     repo.clone(),
                     std::time::Duration::from_secs(self.config.verify.retention_days * 24 * 3600),
@@ -97,6 +98,7 @@ impl RepoRegistry {
             Some(runner) => Arc::new(workers::ExecVerifier::new(
                 runner.clone(),
                 TestHistory::new(repo.clone()),
+                self.config.verify.flakes,
             )),
             None => Arc::new(AlwaysGreen),
         };
@@ -137,11 +139,13 @@ impl RepoRegistry {
         };
         let lander = Arc::new(build(rill_types::Line::Trunk));
         let releases = Arc::new(ReleaseLanders::new(repo.clone(), build));
-        let postland = self
-            .config
-            .postland
-            .enabled
-            .then(|| PostLandVerifier::new(lander.clone(), self.config.postland.batch_size));
+        let postland = self.config.postland.enabled.then(|| {
+            PostLandVerifier::with_full_every(
+                lander.clone(),
+                self.config.postland.batch_size,
+                std::time::Duration::from_secs(self.config.postland.full_every_secs),
+            )
+        });
         let search =
             SearchIndex::open(repo.clone(), derive.clone(), IndexConfig::default()).await?;
 

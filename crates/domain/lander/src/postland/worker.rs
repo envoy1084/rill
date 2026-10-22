@@ -1,30 +1,27 @@
 //! The worker that follows trunk and verifies what landed.
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use rill_core::RootTree;
 use rill_store::repo::LeaseHolder;
-use rill_types::{Timestamp, TrunkSeq};
+use rill_types::TrunkSeq;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
+use super::batch::BatchSize;
 use super::record::{
-    load_cursor, put_record, recent_records, record_at, store_cursor, VerificationRecord,
-    VerificationStatus,
+    load_cursor, load_marks, recent_records, record_at, store_cursor, store_marks,
+    VerificationRecord, VerificationStatus,
 };
-use super::reverts::schedule_auto_revert;
-use crate::error::{Error, Result};
-use crate::events::LandEvent;
+use crate::error::Result;
 use crate::land::Lander;
-use crate::traits::{VerifyRequest, VerifyStage};
 
-/// Positions a bisection round splits its range into.
-pub const BISECT_WAYS: u64 = 8;
+/// Most consecutive landings verified as one batch by default.
+pub const DEFAULT_BATCH_SIZE: u64 = 32;
 
-/// Default number of consecutive landings verified as one batch when the
-/// worker is behind.
-pub const DEFAULT_BATCH_SIZE: u64 = 8;
+/// How often the whole plan runs on the head by default; between, batches
+/// run only the steps their landings touched.
+pub const DEFAULT_FULL_EVERY: Duration = Duration::from_secs(15 * 60);
 
 /// What one sweep did.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,17 +29,21 @@ pub struct Sweep {
     /// Positions covered, `(from, to]`.
     pub from: TrunkSeq,
     pub to: TrunkSeq,
-    /// Whether the batch tip verified green.
+    /// Whether the batch tip passed.
     pub green: bool,
     /// Culprit found by bisection, if the batch went red on a green base.
     pub culprit: Option<TrunkSeq>,
+    /// The tip ran the whole plan.
+    pub full: bool,
 }
 
 /// Verifies trunk positions after they land, bisects red batches to the
 /// first red position and, when policy allows, reverts it.
 pub struct PostLandVerifier {
-    lander: Arc<Lander>,
-    batch_size: u64,
+    pub(super) lander: Arc<Lander>,
+    batch: BatchSize,
+    full_every: Duration,
+    last_full: parking_lot::Mutex<Option<Instant>>,
     /// One sweep at a time; a second caller waits rather than racing on
     /// the cursor.
     sweep_lock: Mutex<()>,
@@ -53,12 +54,21 @@ pub struct PostLandVerifier {
 pub const POSTLAND_LEASE: &str = "postland";
 
 impl PostLandVerifier {
-    /// A worker over `lander`'s repository and verifier.
-    pub fn new(lander: Arc<Lander>, batch_size: u64) -> Arc<Self> {
+    /// A worker over `lander`'s repository and verifier, verifying at most
+    /// `max_batch` landings together.
+    pub fn new(lander: Arc<Lander>, max_batch: u64) -> Arc<Self> {
+        Self::with_full_every(lander, max_batch, DEFAULT_FULL_EVERY)
+    }
+
+    /// [`PostLandVerifier::new`], running the whole plan every
+    /// `full_every`.
+    pub fn with_full_every(lander: Arc<Lander>, max_batch: u64, full_every: Duration) -> Arc<Self> {
         Arc::new(PostLandVerifier {
             lease: LeaseHolder::new(lander.repo().clone(), POSTLAND_LEASE),
             lander,
-            batch_size: batch_size.max(1),
+            batch: BatchSize::new(max_batch),
+            full_every,
+            last_full: parking_lot::Mutex::new(None),
             sweep_lock: Mutex::new(()),
         })
     }
@@ -99,29 +109,37 @@ impl PostLandVerifier {
         if head <= cursor {
             return Ok(None);
         }
-        let to = TrunkSeq(head.get().min(cursor.get() + self.batch_size));
-        let base_culprit = if cursor == TrunkSeq::ZERO {
-            None
-        } else {
-            match record_at(repo, cursor).await? {
-                Some(record) if record.status == VerificationStatus::Red => {
-                    Some(record.culprit.unwrap_or(cursor))
-                }
-                _ => None,
+        let to = TrunkSeq(head.get().min(cursor.get() + self.batch.get()));
+        let marks = load_marks(repo).await?;
+        let mut next_marks = marks;
+        let full = self.full_due();
+        let base_culprit = match record_at(repo, cursor).await? {
+            Some(record) if record.status == VerificationStatus::Red => {
+                Some(record.culprit.unwrap_or(cursor))
             }
+            _ => None,
         };
 
-        let tip = self.verify_seq(to).await?;
+        // Only steps something touched since the last passing position
+        // can have changed outcome.
+        let tip = self.verify_seq(to, (!full).then_some(marks.green)).await?;
+        if full {
+            *self.last_full.lock() = Some(Instant::now());
+        }
         let mut culprit = None;
-        if tip.is_green() {
+        if tip.passed() {
             self.fill(
                 cursor,
                 to,
                 VerificationStatus::Green,
                 None,
-                "green batch tip",
+                "passing batch tip",
             )
             .await?;
+            next_marks.green = to;
+            if full {
+                next_marks.full_green = to;
+            }
         } else if let Some(previous) = base_culprit {
             // Still red since an earlier culprit; nothing new to find.
             self.fill(
@@ -134,11 +152,14 @@ impl PostLandVerifier {
             .await?;
             self.set_culprit(to, previous).await?;
         } else {
-            let found = self.bisect(cursor, to).await?;
+            // A full run can find what selection missed before the cursor:
+            // search from the last full pass.
+            let from = if full { marks.full_green } else { cursor };
+            let found = self.bisect_with(from, to, full).await?;
             culprit = Some(found);
             self.set_culprit(to, found).await?;
             self.fill(
-                cursor,
+                from,
                 found,
                 VerificationStatus::Green,
                 None,
@@ -162,17 +183,33 @@ impl PostLandVerifier {
                     }
                 }
             }
+            // Everything before the culprit passed.
+            next_marks.green = TrunkSeq(found.get() - 1);
+            if full {
+                next_marks.full_green = next_marks.green;
+            }
         }
+        self.batch.after(tip.passed());
         if let Err(e) = store_cursor(repo, cursor, to, &lease).await {
             self.lease.lost().await;
             return Err(e);
         }
+        store_marks(repo, marks, next_marks, &lease).await?;
         Ok(Some(Sweep {
             from: cursor,
             to,
-            green: tip.is_green(),
+            green: tip.passed(),
             culprit,
+            full,
         }))
+    }
+
+    /// Whether the next tip should run the whole plan.
+    fn full_due(&self) -> bool {
+        match *self.last_full.lock() {
+            None => true,
+            Some(at) => at.elapsed() >= self.full_every,
+        }
     }
 
     /// Poll trunk every `interval` until `shutdown` is cancelled.
@@ -191,161 +228,5 @@ impl PostLandVerifier {
         }
         self.lease.release().await;
         tracing::info!("post-land verifier stopped");
-    }
-
-    /// Verify one position directly and record the result. A result that
-    /// disagrees with an earlier direct verification marks the position
-    /// flaky.
-    pub async fn verify_seq(&self, seq: TrunkSeq) -> Result<VerificationRecord> {
-        let repo = self.lander.repo();
-        let version = repo.trunk_at(seq).await?.ok_or(Error::NotLanded(seq))?;
-        let root = self.lander.derive().get::<RootTree>(&version).await?;
-        let base = match seq.0.checked_sub(1).filter(|p| *p > 0) {
-            Some(previous) => match repo.trunk_at(TrunkSeq(previous)).await? {
-                Some(before) => Some(self.lander.derive().get::<RootTree>(&before).await?),
-                None => None,
-            },
-            None => None,
-        };
-        let outcome = self
-            .lander
-            .verifier()
-            .verify(VerifyRequest {
-                root,
-                version,
-                base,
-                risk: None,
-                stage: VerifyStage::PostLand,
-            })
-            .await?;
-        let mut status = if outcome.green {
-            VerificationStatus::Green
-        } else {
-            VerificationStatus::Red
-        };
-        if let Some(previous) = record_at(repo, seq).await? {
-            if !previous.inferred && previous.status != status {
-                tracing::warn!(%seq, ?previous.status, ?status, "verification result changed");
-                status = VerificationStatus::Flaky;
-            }
-        }
-        let record = VerificationRecord {
-            seq,
-            version,
-            status,
-            details: outcome.details,
-            culprit: None,
-            at: Timestamp::now(),
-            inferred: false,
-        };
-        put_record(repo, &record).await?;
-        self.lander.publish(LandEvent::Verification {
-            seq,
-            green: outcome.green,
-        });
-        Ok(record)
-    }
-
-    /// Find the first red position in `(green, red]`, where `green` is a
-    /// known-green position (or zero) and `red` a known-red one. Each round
-    /// verifies [`BISECT_WAYS`]` - 1` evenly spaced positions at once, so a
-    /// range of 64 takes two rounds instead of six.
-    ///
-    /// Verifier results are content-addressed in practice, so re-verifying
-    /// a position costs nothing beyond the first time.
-    pub async fn bisect(self: &Arc<Self>, green: TrunkSeq, red: TrunkSeq) -> Result<TrunkSeq> {
-        let (mut lo, mut hi) = (green.get(), red.get());
-        while hi - lo > 1 {
-            let points = probes(lo, hi);
-            let results =
-                futures::future::join_all(points.iter().map(|p| self.verify_seq(TrunkSeq(*p))))
-                    .await;
-            for (point, record) in points.iter().zip(results) {
-                if record?.is_green() {
-                    lo = *point;
-                } else {
-                    hi = *point;
-                    break;
-                }
-            }
-        }
-        let culprit = TrunkSeq(hi);
-        self.set_culprit(culprit, culprit).await?;
-        tracing::warn!(%culprit, "post-land verification found a culprit");
-        self.lander.publish(LandEvent::Culprit { seq: culprit });
-        if self.lander.policy().auto_revert {
-            schedule_auto_revert(&self.lander, culprit).await?;
-        }
-        Ok(culprit)
-    }
-
-    /// Record `status` for every position in `(from, to)` that has no
-    /// direct record yet.
-    async fn fill(
-        &self,
-        from: TrunkSeq,
-        to: TrunkSeq,
-        status: VerificationStatus,
-        culprit: Option<TrunkSeq>,
-        why: &str,
-    ) -> Result<()> {
-        let repo = self.lander.repo();
-        for (seq, version) in repo.trunk_range(from, to).await? {
-            if seq == to {
-                break;
-            }
-            if record_at(repo, seq).await?.is_some() {
-                continue;
-            }
-            let record = VerificationRecord {
-                seq,
-                version,
-                status,
-                details: format!("inferred: {why} ({from}..{to})"),
-                culprit,
-                at: Timestamp::now(),
-                inferred: true,
-            };
-            put_record(repo, &record).await?;
-            self.lander.publish(LandEvent::Verification {
-                seq,
-                green: status == VerificationStatus::Green,
-            });
-        }
-        Ok(())
-    }
-
-    async fn set_culprit(&self, seq: TrunkSeq, culprit: TrunkSeq) -> Result<()> {
-        let repo = self.lander.repo();
-        if let Some(mut record) = record_at(repo, seq).await? {
-            record.culprit = Some(culprit);
-            put_record(repo, &record).await?;
-        }
-        Ok(())
-    }
-}
-
-/// The positions strictly between `lo` and `hi` a bisection round checks,
-/// ascending.
-fn probes(lo: u64, hi: u64) -> Vec<u64> {
-    let span = hi - lo;
-    let mut points: Vec<u64> = (1..BISECT_WAYS)
-        .map(|i| lo + span * i / BISECT_WAYS)
-        .filter(|p| *p > lo && *p < hi)
-        .collect();
-    points.dedup();
-    points
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn probes_split_evenly_and_shrink_to_one() {
-        assert_eq!(probes(0, 64), vec![8, 16, 24, 32, 40, 48, 56]);
-        assert_eq!(probes(32, 40), vec![33, 34, 35, 36, 37, 38, 39]);
-        assert_eq!(probes(4, 6), vec![5]);
-        assert!(probes(4, 5).is_empty());
     }
 }

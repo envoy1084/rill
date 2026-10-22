@@ -80,4 +80,33 @@ impl ChecksService for ChecksSvc {
     ) -> GrpcResult<pb::ListNonhermeticResponse> {
         reply(self.nonhermetic(request).await)
     }
+
+    async fn list_quarantined(
+        &self,
+        request: Request<pb::ListQuarantinedRequest>,
+    ) -> GrpcResult<pb::ListQuarantinedResponse> {
+        reply(self.quarantined(request).await)
+    }
+
+    async fn quarantine(
+        &self,
+        request: Request<pb::QuarantineRequest>,
+    ) -> GrpcResult<pb::QuarantineResponse> {
+        crate::services::idem::once(&self.state, request, |r| async move {
+            self.quarantine_impl(r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
+
+    async fn release_quarantine(
+        &self,
+        request: Request<pb::ReleaseQuarantineRequest>,
+    ) -> GrpcResult<pb::ReleaseQuarantineResponse> {
+        crate::services::idem::once(&self.state, request, |r| async move {
+            self.release_impl(r).await.map(Response::new)
+        })
+        .await
+        .map_err(Status::from)
+    }
 }

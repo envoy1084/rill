@@ -98,6 +98,32 @@ prior on the flip rate, `(flips + 0.1) / (repeats + 5.1)`: a new test
 scores 0.02, one flip in one repeat 0.18, and a test that stops flipping
 drifts back down.
 
+## Re-runs and quarantine
+
+Flake scores decide what a failure counts for (`ExecVerifier`, in the
+runtime; thresholds in `[verify.flakes]`):
+
+* **Re-run.** A verification whose every failing target (the failed
+  steps and their failed test cases) scores above
+  `rerun_above_permille` (200, a score of 0.2) runs again, up to `reruns`
+  (2) times. Passing steps come from the action cache; failed ones run
+  again, since failures are not cached, and each run is recorded, so a
+  re-run is itself evidence. If a re-run passes, the outcome is green and
+  `flaky`: before landing it lands, after landing the position is `Flaky`,
+  which counts as passing and finds no culprit.
+* **Quarantine.** A failing target scoring above
+  `quarantine_above_permille` (500) with at least `quarantine_flips` (5)
+  flips is quarantined automatically: a `Quarantine { target, since, by:
+  svc:verifier, reason, intent }` row in `tq/(target)`, a
+  `QuarantineChanged` event (audited as `test.quarantine`), and an intent
+  of kind `System`, "Fix flaky <target>", to track the fix.
+  `PlanRunner::with_quarantine` reads the quarantined targets at the start
+  of every verification: a step that failed only in quarantined test
+  cases, or is itself quarantined, ends `Quarantined` and does not fail
+  the tree, so it neither blocks a landing nor makes trunk red. Its runs
+  are still recorded as failures. A quarantine lasts until an owner lifts
+  it (`ReleaseQuarantine`, audited as `test.release`).
+
 ## Non-hermetic steps
 
 A step whose re-run gives other outputs reads something besides its
@@ -122,13 +148,16 @@ stored, and its run record and result say `nonhermetic`.
 * `GetTestHistory(repo, target, limit)`: recent runs, newest first, and
   the target's score;
 * `ListFlakyTests(repo, min_score = 0.1, limit = 50)`: targets at or above
-  the score, flakiest first.
+  the score, flakiest first;
+* `ListQuarantined(repo)`; and, for repository owners,
+  `Quarantine(repo, target, reason)` and `ReleaseQuarantine(repo, target)`.
 
 `rill checks runs [--of-version]`, `rill checks run <id> [--watch]`, `rill
 checks log <run> <step> [--stderr] [--tail BYTES]`, `rill checks artifact
 <run> <step> <path> [-o FILE]`, `rill checks nonhermetic`, `rill checks
-flaky [--min-score] [--limit]` and `rill checks history <target>
-[--limit]` use them.
+flaky [--min-score] [--limit]`, `rill checks history <target>
+[--limit]` and `rill checks quarantine list|add <target> [--reason]|release
+<target>` use them.
 
 ## Limitations
 
@@ -138,8 +167,10 @@ flaky [--min-score] [--limit]` and `rill checks history <target>
   and artifacts waits for the store's garbage collector.
 * A repository that stops verifying keeps its last runs until it runs
   again, since expiry happens as runs start.
-* Flake scores are reported, not acted on: retries of flaky targets and
-  quarantine come with post-land v1.
+* A failure is re-run only when every failing target is flaky; one stable
+  failure among flaky ones counts at once.
+* Nothing lifts a quarantine on its own once the test is fixed; its
+  owner does.
 * `ListFlakyTests` reads every target's statistics; fine for thousands of
   targets per repository, not millions.
 * Test cases in a cached step are not recorded again, so a test only

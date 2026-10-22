@@ -1,7 +1,7 @@
 //! Verifying a tree: select the steps a change needs, compile them to
 //! actions, and run them through the scheduler.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use bytes::Bytes;
@@ -18,6 +18,7 @@ use super::plan::{load_plan, Step};
 use super::progress::Progress;
 use super::select::{select, Selection};
 use crate::error::Result;
+use crate::history::TestHistory;
 use crate::remote::{ExecSpace, Scheduler};
 use crate::runs::{RunStore, StepRecord};
 
@@ -52,6 +53,8 @@ pub struct PlanRunner {
     pub(crate) repo: String,
     pub(crate) requester: String,
     pub(crate) runs: Option<RunStore>,
+    /// Whose quarantined targets do not fail a step.
+    pub(crate) quarantine: Option<TestHistory>,
 }
 
 impl PlanRunner {
@@ -75,7 +78,14 @@ impl PlanRunner {
             repo: repo.to_string(),
             requester: format!("verify:{repo}"),
             runs: None,
+            quarantine: None,
         }
+    }
+
+    /// Do not fail a step on targets `history` has quarantined.
+    pub fn with_quarantine(mut self, history: TestHistory) -> Self {
+        self.quarantine = Some(history);
+        self
     }
 
     /// Give every step `env`, under its own environment. Workers start
@@ -189,15 +199,25 @@ impl PlanRunner {
                 extra,
             ));
         }
+        let quarantined: HashSet<String> = match &self.quarantine {
+            Some(history) => history
+                .quarantined()
+                .await?
+                .into_iter()
+                .map(|q| q.target)
+                .collect(),
+            None => HashSet::new(),
+        };
         let mut running = FuturesUnordered::new();
         while let Some(actions) = compiling.next().await {
             for action in actions? {
                 let index = progress.index();
-                let progress = &progress;
+                let (progress, quarantined) = (&progress, &quarantined);
                 running.push(async move {
-                    let (result, _) = self
+                    let (mut result, _) = self
                         .submit(action, target.priority, Some((progress, index)))
                         .await?;
+                    result.excuse(quarantined);
                     progress.write(index, &StepRecord::finished(&result)).await;
                     Ok::<_, crate::error::Error>(result)
                 });

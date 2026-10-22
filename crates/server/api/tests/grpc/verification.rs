@@ -399,3 +399,64 @@ async fn a_step_whose_rerun_differs_is_listed_as_nonhermetic() {
     );
     server.stop().await;
 }
+
+#[tokio::test]
+async fn an_owner_quarantines_a_target_and_lifts_it_again() {
+    use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
+    let server = TestServer::start(dev_config()).await;
+    let mut c = clients(&server, None).await;
+    c.repo
+        .create_repo(pb::CreateRepoRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            description: None,
+            windows_safe: false,
+        })
+        .await
+        .unwrap();
+    let mut checks = ChecksServiceClient::new(connect(&server.grpc).await);
+    let quarantine = |target: &str| pb::QuarantineRequest {
+        operation_id: Bytes::new(),
+        repo: "app".into(),
+        target: target.into(),
+        reason: "flips on unchanged inputs".into(),
+    };
+    let bad = checks.quarantine(quarantine("unit")).await.unwrap_err();
+    assert_eq!(bad.code(), tonic::Code::InvalidArgument);
+    for added in [true, false] {
+        let reply = checks
+            .quarantine(quarantine("test:core::racy"))
+            .await
+            .unwrap();
+        assert_eq!(reply.into_inner().added, added);
+    }
+    let listed = checks
+        .list_quarantined(pb::ListQuarantinedRequest { repo: "app".into() })
+        .await
+        .unwrap()
+        .into_inner()
+        .targets;
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].reason, "flips on unchanged inputs");
+    let release = || pb::ReleaseQuarantineRequest {
+        operation_id: Bytes::new(),
+        repo: "app".into(),
+        target: "test:core::racy".into(),
+    };
+    assert!(
+        checks
+            .release_quarantine(release())
+            .await
+            .unwrap()
+            .into_inner()
+            .released
+    );
+    assert!(
+        !checks
+            .release_quarantine(release())
+            .await
+            .unwrap()
+            .into_inner()
+            .released
+    );
+}

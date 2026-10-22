@@ -33,7 +33,7 @@ pub use postland::{PostLandVerifier, Sweep, VerificationRecord, VerificationStat
 pub use queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest};
 pub use revert::{auto_revert, build_revert, has_forward_fix, revert, RevertOutcome};
 pub use traits::{
-    AlwaysGreen, Approval, ConflictResolver, FnVerifier, NoRegenerator, NoopHooks,
+    AlwaysGreen, Approval, ConflictResolver, Failure, FnVerifier, NoRegenerator, NoopHooks,
     RegenerateRequest, Regenerated, Regenerator, Restacked, ReviewHooks, TargetGraph,
     VerificationOutcome, Verifier, VerifyRequest, VerifyStage,
 };

@@ -127,6 +127,9 @@ pub const VERIFY_RUN_COUNT: &str = "vrunc";
 /// `(tstat, ns, repo, target)` → a test's decayed run, failure and flip
 /// counts
 pub const TEST_STATS: &str = "tstat";
+/// `(tq, ns, repo, target)` → Quarantine: a test or step whose failures
+/// neither block landing nor trigger reverts
+pub const TEST_QUARANTINE: &str = "tq";
 /// `(xnh, ns, space, label)` → an action label whose re-run gave other
 /// outputs: its results are not cached for a while
 pub const EXEC_NONHERMETIC: &str = "xnh";

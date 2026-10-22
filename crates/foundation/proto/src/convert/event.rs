@@ -1,6 +1,6 @@
 //! Repository events.
 
-use rill_types::{Event, EventKind};
+use rill_types::{Event, EventKind, TrunkSeq};
 
 use crate::convert::land::{
     land_status_from_parts, land_status_parts, lane_from_proto, ticket_from_proto,
@@ -93,6 +93,34 @@ impl From<&EventKind> for pb::event::Kind {
             }),
             EventKind::PolicyChanged { name } => {
                 Kind::PolicyChanged(pb::PolicyChangedEvent { name: name.clone() })
+            }
+            EventKind::QuarantineChanged {
+                target,
+                quarantined,
+            } => Kind::QuarantineChanged(pb::QuarantineChangedEvent {
+                target: target.clone(),
+                quarantined: *quarantined,
+            }),
+            EventKind::IncidentChanged {
+                incident,
+                culprit,
+                state,
+            } => Kind::IncidentChanged(pb::IncidentChangedEvent {
+                incident: incident.clone(),
+                culprit: culprit.get(),
+                state: state.clone(),
+            }),
+            EventKind::TrunkHealthChanged { state, frozen } => {
+                Kind::TrunkHealthChanged(pb::TrunkHealthChangedEvent {
+                    state: state.clone(),
+                    frozen: *frozen,
+                })
+            }
+            EventKind::RevertsRequested { selector, count } => {
+                Kind::RevertsRequested(pb::RevertsRequestedEvent {
+                    selector: selector.clone(),
+                    count: *count,
+                })
             }
             EventKind::VersionStored { version, change } => {
                 Kind::VersionStored(pb::VersionStoredEvent {
@@ -197,6 +225,23 @@ impl TryFrom<pb::event::Kind> for EventKind {
                 added: e.added,
             },
             Kind::PolicyChanged(e) => EventKind::PolicyChanged { name: e.name },
+            Kind::QuarantineChanged(e) => EventKind::QuarantineChanged {
+                target: e.target,
+                quarantined: e.quarantined,
+            },
+            Kind::IncidentChanged(e) => EventKind::IncidentChanged {
+                incident: e.incident,
+                culprit: TrunkSeq(e.culprit),
+                state: e.state,
+            },
+            Kind::TrunkHealthChanged(e) => EventKind::TrunkHealthChanged {
+                state: e.state,
+                frozen: e.frozen,
+            },
+            Kind::RevertsRequested(e) => EventKind::RevertsRequested {
+                selector: e.selector,
+                count: e.count,
+            },
             Kind::VersionStored(e) => EventKind::VersionStored {
                 version: hash_from_proto("version_stored.version", &e.version)?,
                 change: id_from_proto("version_stored.change_id", &e.change_id)?,

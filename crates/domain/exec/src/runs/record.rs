@@ -39,6 +39,9 @@ impl From<&StepStatus> for StepEnd {
             StepStatus::Error(message) => StepEnd::Error(message.clone()),
             StepStatus::Unaffected => StepEnd::Unaffected,
             StepStatus::NotGating => StepEnd::NotGating,
+            StepStatus::Quarantined { exit_code } => StepEnd::Failed {
+                exit_code: *exit_code,
+            },
         }
     }
 }

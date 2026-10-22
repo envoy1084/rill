@@ -30,10 +30,7 @@ impl Verifier for Concurrent {
         self.most.fetch_max(now, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(100)).await;
         self.now.fetch_sub(1, Ordering::SeqCst);
-        Ok(VerificationOutcome {
-            green: true,
-            details: String::new(),
-        })
+        Ok(VerificationOutcome::green(""))
     }
 }
 

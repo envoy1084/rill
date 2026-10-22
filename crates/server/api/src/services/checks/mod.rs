@@ -4,6 +4,7 @@
 
 mod convert;
 mod history;
+mod quarantine;
 mod runs;
 mod service;
 

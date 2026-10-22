@@ -23,7 +23,7 @@ pub use exec::{ExecConfig, LocalWorkersConfig, SandboxKind};
 pub use identity::{IdentityConfig, LifetimesConfig, RotationConfig};
 pub use rate_limit::RateLimitConfig;
 pub use server::{
-    LogFormat, PostLandConfig, Roles, ServerConfig, ShutdownConfig, TelemetryConfig, TlsConfig,
-    VerifyConfig, DEFAULT_GRPC_ADDR, DEFAULT_HTTP_ADDR,
+    FlakeConfig, LogFormat, PostLandConfig, Roles, ServerConfig, ShutdownConfig, TelemetryConfig,
+    TlsConfig, VerifyConfig, DEFAULT_GRPC_ADDR, DEFAULT_HTTP_ADDR,
 };
 pub use storage::{MetadataConfig, StorageConfig};

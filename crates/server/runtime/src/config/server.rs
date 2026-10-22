@@ -231,6 +231,34 @@ pub struct VerifyConfig {
     /// Days a verification run, and so its logs and artifacts, stays
     /// readable.
     pub retention_days: u64,
+    /// What a failure of a flaky test counts for.
+    pub flakes: FlakeConfig,
+}
+
+/// How flaky failures are confirmed and chronic flakes quarantined.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FlakeConfig {
+    /// A failure whose every target scores above this (per mille) is run
+    /// again before it counts.
+    pub rerun_above_permille: u32,
+    /// Runs again at most.
+    pub reruns: u32,
+    /// A failing target scoring above this (per mille) with at least
+    /// `quarantine_flips` flips is quarantined.
+    pub quarantine_above_permille: u32,
+    pub quarantine_flips: u32,
+}
+
+impl Default for FlakeConfig {
+    fn default() -> Self {
+        FlakeConfig {
+            rerun_above_permille: 200,
+            reruns: 2,
+            quarantine_above_permille: 500,
+            quarantine_flips: 5,
+        }
+    }
 }
 
 /// The `PATH` steps get unless configured otherwise.
@@ -243,6 +271,7 @@ impl Default for VerifyConfig {
             platform: BTreeMap::new(),
             env: BTreeMap::from([("PATH".to_string(), DEFAULT_STEP_PATH.to_string())]),
             retention_days: 30,
+            flakes: FlakeConfig::default(),
         }
     }
 }
@@ -255,8 +284,12 @@ pub struct PostLandConfig {
     pub enabled: bool,
     /// Seconds between sweeps.
     pub interval_secs: u64,
-    /// Landings verified per sweep when the worker is behind.
+    /// Most landings verified together; batches grow toward it while
+    /// trunk stays green and shrink after red.
     pub batch_size: u64,
+    /// Seconds between runs of the whole plan on the head; between them
+    /// batches run only the steps their landings touched.
+    pub full_every_secs: u64,
 }
 
 impl Default for PostLandConfig {
@@ -265,6 +298,7 @@ impl Default for PostLandConfig {
             enabled: false,
             interval_secs: 30,
             batch_size: rill_lander::postland::DEFAULT_BATCH_SIZE,
+            full_every_secs: rill_lander::postland::DEFAULT_FULL_EVERY.as_secs(),
         }
     }
 }

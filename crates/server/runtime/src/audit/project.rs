@@ -178,6 +178,37 @@ pub fn repo(org: &str, repo: &str, event: &Event) -> Option<AuditRecord> {
             ],
         ),
         EventKind::PolicyChanged { name } => at("policy.set", &[("policy", name.clone())]),
+        EventKind::QuarantineChanged {
+            target,
+            quarantined,
+        } => at(
+            if *quarantined {
+                "test.quarantine"
+            } else {
+                "test.release"
+            },
+            &[("target", target.clone())],
+        ),
+        EventKind::IncidentChanged {
+            incident,
+            culprit,
+            state,
+        } => at(
+            "trunk.incident",
+            &[
+                ("incident", incident.clone()),
+                ("culprit", culprit.to_string()),
+                ("state", state.clone()),
+            ],
+        ),
+        EventKind::TrunkHealthChanged { state, frozen } => at(
+            "trunk.health",
+            &[("state", state.clone()), ("frozen", frozen.to_string())],
+        ),
+        EventKind::RevertsRequested { selector, count } => at(
+            "trunk.mass_revert",
+            &[("selector", selector.clone()), ("count", count.to_string())],
+        ),
         EventKind::RefMoved { name, old, new } => at(
             "ref.move",
             &[

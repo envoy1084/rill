@@ -216,3 +216,25 @@ impl ReviewHooks for StackHooks {
         Ok(Vec::new())
     }
 }
+
+/// Like [`bad_file_verifier`], but selecting like a verify plan: with a
+/// base, the check on `bad` runs only when `bad` changed since it.
+pub fn selecting_verifier(fx: &Fixture) -> Arc<dyn Verifier> {
+    let trees = fx.trees.clone();
+    Arc::new(FnVerifier(move |request: VerifyRequest| {
+        let trees = trees.clone();
+        async move {
+            let path = RepoPathBuf::new("bad").unwrap();
+            let now = trees.lookup(request.root, &path).await.unwrap();
+            let touched = match request.base {
+                Some(base) => trees.lookup(base, &path).await.unwrap() != now,
+                None => true,
+            };
+            Ok(if now.is_some() && touched {
+                VerificationOutcome::red("bad file present")
+            } else {
+                VerificationOutcome::green("ok")
+            })
+        }
+    }))
+}

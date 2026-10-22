@@ -65,11 +65,11 @@ async fn bisection_checks_many_positions_per_round() {
     let lander = fx.lander(Arc::new(NoopHooks), verifier.clone(), fast_policy());
     let worker = PostLandVerifier::new(lander, 64);
 
-    let sweep = worker.run_once().await.unwrap().unwrap();
-    assert_eq!(sweep.culprit, Some(TrunkSeq(37)));
+    let culprit = worker.bisect(TrunkSeq(0), TrunkSeq(64)).await.unwrap();
+    assert_eq!(culprit, TrunkSeq(37));
     assert!(
-        verifier.calls.load(Ordering::SeqCst) <= 15,
-        "the tip and at most two rounds of seven, not {}",
+        verifier.calls.load(Ordering::SeqCst) <= 14,
+        "at most two rounds of seven, not {}",
         verifier.calls.load(Ordering::SeqCst)
     );
     assert!(

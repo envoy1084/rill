@@ -261,6 +261,14 @@ impl RepoKeys {
     }
 
     /// The prefix of every target's stats.
+    pub fn test_quarantine(&self, target: &str) -> Bytes {
+        self.row(table::TEST_QUARANTINE, &target)
+    }
+
+    pub fn all_test_quarantine(&self) -> Bytes {
+        self.table(table::TEST_QUARANTINE)
+    }
+
     pub fn all_test_stats(&self) -> Bytes {
         self.table(table::TEST_STATS)
     }

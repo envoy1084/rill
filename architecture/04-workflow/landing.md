@@ -392,7 +392,7 @@ the queued requests.
 | `max_sponsor_in_flight` | 2,000 per sponsor |
 | `max_queued` | 10,000 in all |
 | `sponsor_weights` | empty (every sponsor 1) |
-| `auto_revert`, `revert_grace` | `false`, 15 min (see [post-land verification](post-land-verification.md)) |
+| `auto_revert`, `revert_grace` | `true`, 15 min (see [post-land verification](post-land-verification.md)) |
 
 The verifier is `ExecVerifier` (runs `.rill/verify.toml` through the
 execution scheduler, see [exec](../06-services/exec.md)) when

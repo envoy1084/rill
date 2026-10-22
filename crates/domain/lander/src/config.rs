@@ -54,7 +54,8 @@ pub struct LandPolicy {
     /// Longest pause between queue sweeps in `run_forever`; a new request
     /// starts a sweep at once.
     pub batch_window: Duration,
-    /// Revert a culprit automatically once post-land bisection finds it.
+    /// Revert a culprit automatically once post-land bisection finds it,
+    /// unless a forward fix lands within `revert_grace`. On by default.
     pub auto_revert: bool,
     /// How long to wait for a forward fix before an automatic revert.
     pub revert_grace: Duration,
@@ -79,7 +80,7 @@ impl Default for LandPolicy {
             modes: VerifyModes::default(),
             max_wait: Duration::from_secs(30 * 60),
             batch_window: Duration::from_secs(2),
-            auto_revert: false,
+            auto_revert: true,
             revert_grace: Duration::from_secs(15 * 60),
             max_retries: 8,
             max_in_flight: 50,

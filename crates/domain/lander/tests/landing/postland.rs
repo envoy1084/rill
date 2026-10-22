@@ -11,7 +11,7 @@ use rill_lander::{
 use rill_types::{Principal, RiskClass, TrunkSeq};
 
 use crate::common::{fast_policy, request, Fixture};
-use crate::doubles::{bad_file_verifier, CountingVerifier};
+use crate::doubles::{bad_file_verifier, selecting_verifier, CountingVerifier};
 
 async fn land_chain(fx: &Fixture, lander: &Arc<Lander>, files: &[&[(&str, &str)]]) {
     let mut parent = fx.repo.trunk_head().await.unwrap().map(|(_, h)| h);
@@ -45,10 +45,14 @@ async fn postland_marks_and_bisects() {
     let mut events = lander.subscribe();
     let worker = PostLandVerifier::new(lander.clone(), 8);
 
+    // Batches start small: the first covers four landings.
     let sweep = worker.run_once().await.unwrap().unwrap();
-    assert_eq!((sweep.from, sweep.to), (TrunkSeq(0), TrunkSeq(5)));
+    assert_eq!((sweep.from, sweep.to), (TrunkSeq(0), TrunkSeq(4)));
     assert!(!sweep.green);
     assert_eq!(sweep.culprit, Some(TrunkSeq(3)));
+    let sweep = worker.run_once().await.unwrap().unwrap();
+    assert_eq!((sweep.from, sweep.to), (TrunkSeq(4), TrunkSeq(5)));
+    assert_eq!(sweep.culprit, None, "still red from the same culprit");
     assert_eq!(worker.cursor().await.unwrap(), TrunkSeq(5));
 
     let records = worker.recent().await.unwrap();
@@ -205,4 +209,47 @@ async fn auto_revert_after_grace_without_forward_fix() {
     assert!(rill_lander::has_forward_fix(&lander, TrunkSeq(2))
         .await
         .unwrap());
+}
+
+#[tokio::test]
+async fn a_break_earlier_in_a_batch_is_caught_at_its_tip() {
+    let fx = Fixture::new().await;
+    let lander = fx.lander(Arc::new(NoopHooks), selecting_verifier(&fx), fast_policy());
+    let worker = PostLandVerifier::with_full_every(lander.clone(), 8, Duration::from_secs(3600));
+    land_chain(&fx, &lander, &[&[("one", "1")]]).await;
+    assert!(
+        worker.run_once().await.unwrap().unwrap().full,
+        "the first sweep runs everything"
+    );
+    // The tip does not touch `bad`: verified only against its own parent it
+    // would skip the check and pass.
+    land_chain(&fx, &lander, &[&[("bad", "!")], &[("three", "3")]]).await;
+    let sweep = worker.run_once().await.unwrap().unwrap();
+    assert!(!sweep.full);
+    assert!(!sweep.green);
+    assert_eq!(sweep.culprit, Some(TrunkSeq(2)));
+}
+
+#[tokio::test]
+async fn a_flaky_result_passes_and_finds_no_culprit() {
+    let fx = Fixture::new().await;
+    let verifier = Arc::new(rill_lander::FnVerifier(|_| async {
+        Ok(rill_lander::VerificationOutcome {
+            flaky: true,
+            ..rill_lander::VerificationOutcome::green("passed on a re-run")
+        })
+    }));
+    let lander = fx.lander(Arc::new(NoopHooks), verifier, fast_policy());
+    land_chain(&fx, &lander, &[&[("a", "1")], &[("b", "2")]]).await;
+    let worker = PostLandVerifier::new(lander.clone(), 8);
+    let sweep = worker.run_once().await.unwrap().unwrap();
+    assert!(sweep.green && sweep.culprit.is_none());
+    let tip = worker.record_at(TrunkSeq(2)).await.unwrap().unwrap();
+    assert_eq!(tip.status, VerificationStatus::Flaky);
+    let reverts = rill_jobs::Queue::new(fx.repo.clone(), rill_lander::postland::REVERT_QUEUE);
+    assert_eq!(
+        reverts.stats().await.unwrap().pending(),
+        0,
+        "nothing to revert"
+    );
 }

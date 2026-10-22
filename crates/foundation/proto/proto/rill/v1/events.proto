@@ -45,6 +45,10 @@ message Event {
     LandedEvent landed = 24;
     LandRequestedEvent land_requested = 25;
     LandStatusChangedEvent land_status_changed = 26;
+    QuarantineChangedEvent quarantine_changed = 27;
+    IncidentChangedEvent incident_changed = 28;
+    TrunkHealthChangedEvent trunk_health_changed = 29;
+    RevertsRequestedEvent reverts_requested = 30;
   }
 }
 
@@ -98,6 +102,23 @@ message RelationChangedEvent {
 }
 message PolicyChangedEvent {
   string name = 1;
+}
+message QuarantineChangedEvent {
+  string target = 1;
+  bool quarantined = 2;
+}
+message IncidentChangedEvent {
+  string incident = 1;
+  uint64 culprit = 2;
+  string state = 3;
+}
+message TrunkHealthChangedEvent {
+  string state = 1;
+  bool frozen = 2;
+}
+message RevertsRequestedEvent {
+  string selector = 1;
+  uint32 count = 2;
 }
 message VersionStoredEvent {
   bytes version = 1;

@@ -58,6 +58,23 @@ fn every_event_kind_roundtrips() {
         EventKind::PolicyChanged {
             name: "submit".into(),
         },
+        EventKind::QuarantineChanged {
+            target: "test:core::racy".into(),
+            quarantined: true,
+        },
+        EventKind::IncidentChanged {
+            incident: "inc_1".into(),
+            culprit: TrunkSeq(9),
+            state: "open".into(),
+        },
+        EventKind::TrunkHealthChanged {
+            state: "guarded".into(),
+            frozen: true,
+        },
+        EventKind::RevertsRequested {
+            selector: "session=s1".into(),
+            count: 3,
+        },
         EventKind::VersionStored {
             version: h("b"),
             change,

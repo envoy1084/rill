@@ -24,33 +24,35 @@ The worker is built by `RepoRegistry` when `[postland].enabled` and run by
 `spawn_repo_workers` with `run_forever(interval, shutdown)`. `run_once`
 holds `sweep_lock` (a process-local `tokio::sync::Mutex`) and:
 
-1. Loads the cursor (`TrunkSeq::ZERO` if never stored). Stops if trunk is
-   empty or the head is at or below the cursor.
-2. Sets `to = min(head, cursor + batch_size)`.
+1. Loads the cursor (`TrunkSeq::ZERO` if never stored) and the marks
+   (`Marks { green, full_green }`: the last positions that passed, and
+   passed the whole plan). Stops if trunk is empty or the head is at or
+   below the cursor.
+2. Sets `to = min(head, cursor + batch)`. The batch size adapts
+   (`BatchSize`): it starts at 4, doubles after a passing tip up to
+   `[postland].batch_size` (32) and halves after a red one, so verification
+   keeps pace with landing and a red batch is small.
 3. Finds the base culprit: if the record at `cursor` is `Red`, its
    `culprit` (or `cursor` itself).
-4. Verifies `to` directly with `verify_seq`.
-5. Tip green: fill `(cursor, to)` as `Green`. Tip not green with a red
-   base: fill as `Red` with the base culprit ("still red"). Tip not green
-   on a green base: `bisect(cursor, to)`, fill before the culprit `Green`
-   and after it `Red` with `culprit = found`.
-6. Moves the cursor from `cursor` to `to` with a compare-and-swap that is
-   also fenced on the `postland` lease, so neither a replaced verifier nor
-   a second sweep can move it twice.
+4. Verifies `to` directly. Normally only what changed since `marks.green`
+   runs: the verifier gets that position's root as the base, so steps
+   whose inputs nothing since touched are skipped (they passed then and
+   cannot have changed). Every `full_every_secs` (15 minutes), and on the
+   first sweep after a start, the whole plan runs instead.
+5. Tip passed (`Green`, or `Flaky`: it failed only in targets that passed
+   when run again): fill `(cursor, to)` as `Green` and move
+   `marks.green` (and `full_green` after a full run) to `to`. Tip red with
+   a red base: fill as `Red` with the base culprit ("still red"). Tip red
+   on a passing base: bisect, from the cursor, or from `full_green` after
+   a full run (a full run can find what selection missed before the
+   cursor); fill before the culprit `Green` and after it `Red` with
+   `culprit = found`, and set `marks.green` just before the culprit.
+6. Moves the cursor from `cursor` to `to` and the marks with
+   compare-and-swaps fenced on the `postland` lease, so neither a replaced
+   verifier nor a second sweep can move them twice.
 
-`verify_seq(seq)` runs the lander's `Verifier` on the root of
-`trunk_at(seq)` (stage `PostLand`, no risk class, the previous position's
-root as the base, so only steps the landing affected run), writes a direct record and publishes
-`LandEvent::Verification { seq, green }`. If an earlier direct record for
-that position disagrees, the new record is `Flaky`. `fill` writes an
-`inferred: true` record for each position strictly between the bounds
-that has no record yet. A verifier error aborts the sweep without moving
-the cursor; the next sweep retries.
-
-`batch_size` (default `DEFAULT_BATCH_SIZE` = 8) bounds one sweep. When the
-worker keeps up it verifies every position directly; when behind, it
-verifies only batch tips and pays for bisection only on a red tip over a
-green base.
+Inferred records are replaced when a position is verified directly or a
+later bisection decides it.
 
 ## Bisect
 
@@ -61,7 +63,8 @@ range between the last green and the first red of them, so 64 positions
 take two rounds instead of six. `Flaky` counts as not green. The culprit's
 own record gets `culprit = itself`, red records after it get `culprit =
 it`, `LandEvent::Culprit` is published, and if `LandPolicy.auto_revert` is
-set, `schedule_auto_revert` queues the revert.
+set (the default), `schedule_auto_revert` queues the revert. A `Flaky`
+probe counts as passing.
 
 ## Revert
 
