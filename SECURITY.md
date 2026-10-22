@@ -5,7 +5,7 @@
 Please do not open a public issue for a security problem. Report it
 privately through GitHub's
 [private vulnerability reporting](https://github.com/rill-vcs/rill/security/advisories/new)
-for this repository.
+for this repository, or by email to vedant@envoy1084.xyz.
 
 Include what you can of:
 
