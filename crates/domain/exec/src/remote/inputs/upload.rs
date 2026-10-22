@@ -146,13 +146,17 @@ impl ExecSpace {
         if files.is_empty() {
             return Ok(());
         }
-        let digests: Vec<_> = files.iter().map(|(d, _)| *d).collect();
+        let mut digests: Vec<_> = files.iter().map(|(d, _)| *d).collect();
+        digests.sort_unstable_by_key(|d| d.hash);
+        digests.dedup();
         let missing: std::collections::HashSet<_> =
             self.missing(&digests).await?.into_iter().collect();
         futures::stream::iter(
             files
                 .into_iter()
                 .filter(|(d, _)| missing.contains(d))
+                .collect::<std::collections::HashMap<_, _>>()
+                .into_iter()
                 .map(Ok::<_, Error>),
         )
         .try_for_each_concurrent(COPY_CONCURRENCY, |(digest, content)| async move {

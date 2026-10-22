@@ -144,7 +144,9 @@ async fn run(
         }
     }
     metadata.output_upload_completed_timestamp = Some(now());
-    tokio::task::spawn_blocking(move || drop(dir)).await?;
+    // Removing the inputs is not part of the result: it runs after the
+    // action is reported.
+    tokio::task::spawn_blocking(move || drop(dir));
     Ok((result, raw.timed_out))
 }
 
