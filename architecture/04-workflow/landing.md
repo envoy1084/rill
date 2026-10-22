@@ -95,10 +95,16 @@ starve another sponsor or a human.
 
 **Footprints.** A request's conflict domains are the paths its version
 changed (the `changed-paths` derivation), the groups `.rill/landing.toml`
-declares for them, and whether it changes `.rill/` (configuration). Two
-requests interact when one is configuration, they share a group, or a path
-of one is or is under a path of the other; a shared parent directory does
-not count.
+declares for them, whether it changes `.rill/` (configuration), and, when
+its verify plan declares a [build graph](../06-services/exec.md#build-graphs),
+the build targets it touches against its first parent (changed, added or
+removed; asked once per version through the `TargetGraph`, which the
+server answers with the plan's `[graph]` query, cached like any action).
+Two requests interact when one is configuration, they share a group or a
+target, or a path of one is or is under a path of the other; a shared
+parent directory does not count. So two changes to different files of one
+target are verified together, the second on top of the first. A graph
+that cannot be queried leaves path domains for that request.
 
 ```toml
 # .rill/landing.toml, on trunk (owner-only, like all of .rill/)
@@ -326,11 +332,10 @@ step.
 * A request keeps the risk class it was enqueued with.
 * A slow verification holds its wave, and so its window: the batch commits
   together.
-* Conflict domains are paths and declared groups. Verification computes
-  affected build targets ([exec](../06-services/exec.md#build-graphs)), but
-  the sequencer does not use them as domains yet.
-* A re-parented request is not verified again: under path domains its
-  verification still holds, under build-target domains it would not.
+* A re-parented request is not verified again. With build-target
+  domains that is sound for what the graph sees; with paths only, two
+  changes to different files that break each other land together (declare
+  a `[graph]` or a `[[serialize]]` group).
 * Requests queued in the same millisecond are served in ticket order,
   which is random.
 * ETAs and wait percentiles live in the lease holder's memory and start

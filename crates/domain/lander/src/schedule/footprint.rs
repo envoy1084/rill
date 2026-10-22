@@ -18,6 +18,8 @@ pub struct Footprint {
     pub groups: BTreeSet<String>,
     /// It changes repository configuration and lands alone.
     pub exclusive: bool,
+    /// Build targets it touches, when the repository declares a graph.
+    pub targets: BTreeSet<String>,
 }
 
 impl Footprint {
@@ -34,16 +36,25 @@ impl Footprint {
             paths,
             groups,
             exclusive,
+            targets: BTreeSet::new(),
         }
     }
 
+    /// The same footprint, also touching build `targets`.
+    pub fn with_targets(mut self, targets: BTreeSet<String>) -> Self {
+        self.targets = targets;
+        self
+    }
+
     /// Whether two requests interact: one is exclusive, they share a
-    /// declared group, or their paths overlap (the same path, or one under
-    /// the other). A shared parent directory alone does not count.
+    /// declared group or a build target, or their paths overlap (the same
+    /// path, or one under the other). A shared parent directory alone does
+    /// not count.
     pub fn overlaps(&self, other: &Footprint) -> bool {
         self.exclusive
             || other.exclusive
             || !self.groups.is_disjoint(&other.groups)
+            || !self.targets.is_disjoint(&other.targets)
             || self.paths.overlaps(&other.paths)
     }
 
@@ -100,6 +111,12 @@ mod tests {
         assert!(schema.overlaps(&fp(&["migrations/001.sql"], &rules)));
         assert!(!schema.overlaps(&fp(&["src/a.rs"], &rules)));
         assert!(schema.domains().contains("group:db"));
+
+        let lib = fp(&["src/lib.rs"], &none).with_targets(["//app".to_string()].into());
+        let main = fp(&["src/main.rs"], &none).with_targets(["//app".to_string()].into());
+        let docs = fp(&["docs/a.md"], &none).with_targets(["//docs".to_string()].into());
+        assert!(lib.overlaps(&main), "different files of one target");
+        assert!(!lib.overlaps(&docs));
     }
 
     #[test]

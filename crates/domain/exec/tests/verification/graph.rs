@@ -65,3 +65,26 @@ targets = "affected"
     );
     assert_eq!(outcome.excerpt.as_deref(), Some("no workspace\n"));
 }
+
+#[tokio::test]
+async fn touched_targets_are_the_lander_s_domains_and_absent_without_a_graph() {
+    let fx = Fixture::new().await;
+    let base = fx
+        .tree(None, &[("PLAN", PLAN), ("a/src", "1"), ("b/src", "1")])
+        .await;
+    let touches_b = fx.tree(Some(base), &[("b/src", "2")]).await;
+    let touched = fx
+        .runner
+        .touched_targets(touches_b, Some(base), rill_jobs::Priority::High)
+        .await
+        .unwrap();
+    assert_eq!(touched, Some(["//b:b".to_string()].into()));
+
+    let plain = fx.tree(None, &[("a/src", "1")]).await;
+    let none = fx
+        .runner
+        .touched_targets(plain, None, rill_jobs::Priority::High)
+        .await
+        .unwrap();
+    assert_eq!(none, None);
+}

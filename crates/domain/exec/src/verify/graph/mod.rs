@@ -6,7 +6,7 @@ mod hashes;
 mod query;
 mod spec;
 
-pub use affected::affected_targets;
+pub use affected::{affected_targets, touched_targets};
 pub use hashes::{parse_target_hashes, TargetHashes};
 pub(crate) use spec::GraphFile;
 pub use spec::{GraphSpec, DEFAULT_GRAPH_TIMEOUT, DEFAULT_OUTPUT, GRAPH_STEP};

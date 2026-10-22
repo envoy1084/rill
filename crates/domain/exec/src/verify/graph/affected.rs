@@ -1,5 +1,7 @@
 //! Targets a change affects: those whose hash it changed or that it added.
 
+use std::collections::BTreeSet;
+
 use super::hashes::TargetHashes;
 
 /// Labels in `after` whose hash differs from `before`, or every label
@@ -10,6 +12,16 @@ pub fn affected_targets(before: Option<&TargetHashes>, after: &TargetHashes) -> 
         .filter(|(label, hash)| before.is_none_or(|b| b.get(*label) != Some(*hash)))
         .map(|(label, _)| label.clone())
         .collect()
+}
+
+/// Targets whose hash differs between `before` and `after`, removed ones
+/// included: what two changes must not both touch unseen.
+pub fn touched_targets(before: Option<&TargetHashes>, after: &TargetHashes) -> BTreeSet<String> {
+    let mut touched: BTreeSet<String> = affected_targets(before, after).into_iter().collect();
+    if let Some(before) = before {
+        touched.extend(before.keys().filter(|l| !after.contains_key(*l)).cloned());
+    }
+    touched
 }
 
 #[cfg(test)]
@@ -30,5 +42,15 @@ mod tests {
         assert_eq!(affected_targets(Some(&before), &after), ["//b", "//new"]);
         assert_eq!(affected_targets(None, &after), ["//a", "//b", "//new"]);
         assert!(affected_targets(Some(&after), &after).is_empty());
+    }
+
+    #[test]
+    fn touched_targets_include_removed_ones() {
+        let before = hashes(&[("//a", "1"), ("//b", "1"), ("//gone", "1")]);
+        let after = hashes(&[("//a", "1"), ("//b", "2"), ("//new", "1")]);
+        assert_eq!(
+            touched_targets(Some(&before), &after),
+            BTreeSet::from(["//b".to_string(), "//gone".into(), "//new".into()])
+        );
     }
 }

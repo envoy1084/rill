@@ -121,7 +121,9 @@ impl RepoRegistry {
             self.config.lander.clone(),
         );
         if let Some(runner) = runner {
-            lander = lander.with_regenerator(Arc::new(workers::ExecRegenerator::new(runner)));
+            lander = lander
+                .with_regenerator(Arc::new(workers::ExecRegenerator::new(runner.clone())))
+                .with_targets(Arc::new(workers::ExecTargetGraph::new(runner)));
         }
         let lander = Arc::new(lander);
         let postland = self

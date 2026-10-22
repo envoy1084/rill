@@ -240,3 +240,16 @@ pub trait ConflictResolver: Send + Sync {
         paths: &[RepoPathBuf],
     ) -> Result<Option<String>>;
 }
+
+/// The build targets a change touches, for conflict domains finer than
+/// paths. The server adapts the verify plan's `[graph]` query to this.
+#[async_trait]
+pub trait TargetGraph: Send + Sync {
+    /// Targets whose hash differs between `base` and `root`; `None` when
+    /// the tree declares no build graph or it cannot be queried.
+    async fn touched(
+        &self,
+        root: TreeHash,
+        base: Option<TreeHash>,
+    ) -> Result<Option<std::collections::BTreeSet<String>>>;
+}

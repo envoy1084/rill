@@ -15,7 +15,9 @@ use crate::error::Result;
 use crate::events::LandEvent;
 use crate::queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest, SWEEP_LIMIT};
 use crate::schedule::{serve_order, share_key, Eta, Thrash, Timings};
-use crate::traits::{ConflictResolver, NoRegenerator, Regenerator, ReviewHooks, Verifier};
+use crate::traits::{
+    ConflictResolver, NoRegenerator, Regenerator, ReviewHooks, TargetGraph, Verifier,
+};
 
 /// Capacity of the event channel; slow subscribers lag rather than block
 /// landing.
@@ -34,6 +36,10 @@ pub struct Lander {
     pub(super) verifier: Arc<dyn Verifier>,
     pub(crate) regenerator: Arc<dyn Regenerator>,
     pub(super) resolver: Option<Arc<dyn ConflictResolver>>,
+    /// Build targets as conflict domains, when the server has a graph.
+    pub(super) targets: Option<Arc<dyn TargetGraph>>,
+    /// Targets each version touches, by version.
+    pub(super) touched: parking_lot::Mutex<super::domains::TouchedCache>,
     pub(super) policy: LandPolicy,
     queue: LandQueue,
     events: broadcast::Sender<LandEvent>,
@@ -72,6 +78,8 @@ impl Lander {
             verifier,
             regenerator: Arc::new(NoRegenerator),
             resolver: None,
+            targets: None,
+            touched: Default::default(),
             policy,
             events,
             rules: parking_lot::Mutex::new(None),
@@ -83,6 +91,12 @@ impl Lander {
     /// Run `regenerate` merge drivers with `regenerator`.
     pub fn with_regenerator(mut self, regenerator: Arc<dyn Regenerator>) -> Self {
         self.regenerator = regenerator;
+        self
+    }
+
+    /// Treat requests touching a common build target as interacting.
+    pub fn with_targets(mut self, targets: Arc<dyn TargetGraph>) -> Self {
+        self.targets = Some(targets);
         self
     }
 

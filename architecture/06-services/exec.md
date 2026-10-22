@@ -98,6 +98,10 @@ base, or when the base's query fails, every target. A step with
 `.rill-affected-targets` in its working directory (named by
 `RILL_AFFECTED_TARGETS`), which is part of its action, and is
 `Unaffected` when the list is empty. A failing query fails verification.
+The lander also uses the graph: `touched_targets` (changed, added and
+removed labels against a change's first parent) are its conflict domains
+([landing](../04-workflow/landing.md#sequencing)); there a failing query
+falls back to paths.
 bazel-diff and the build tool come from the worker image; the query
 usually needs a platform whose workers can fetch external dependencies.
 
@@ -247,8 +251,6 @@ Multi-tenant deployments run Buildbarn workers under gVisor instead
   memory or process count.
 * Steps of one plan run concurrently; a failure stops the wait, but the
   others' actions still run to completion on their workers.
-* Affected targets select what a step runs; the lander's conflict
-  domains are still paths and declared groups, not targets.
 * The base's and the change's queries each parse their whole hash file;
   nothing keeps parsed graphs in memory.
 * Secrets: output files are not masked, only standard output and error;

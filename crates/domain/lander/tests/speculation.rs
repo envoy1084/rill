@@ -367,3 +367,69 @@ async fn sponsors_and_the_queue_are_bounded_and_the_queue_reports_positions() {
     assert!(lander.position(tickets[1]).await.unwrap().is_none());
     assert!(lander.timings().interval < Duration::from_secs(5));
 }
+
+/// Files under a top-level directory make up target `//<dir>`.
+struct DirTargets(rill_core::TreeOps);
+
+#[async_trait]
+impl rill_lander::TargetGraph for DirTargets {
+    async fn touched(
+        &self,
+        root: rill_types::TreeHash,
+        base: Option<rill_types::TreeHash>,
+    ) -> rill_lander::Result<Option<std::collections::BTreeSet<String>>> {
+        let changed = rill_core::diff_trees(&self.0, base, Some(root))
+            .await
+            .unwrap();
+        Ok(Some(
+            changed
+                .iter()
+                .filter_map(|e| e.path.as_str().split_once('/'))
+                .map(|(dir, _)| format!("//{dir}"))
+                .collect(),
+        ))
+    }
+}
+
+/// Records which files each verified tree holds.
+struct SeenFiles(rill_core::TreeOps, tokio::sync::Mutex<Vec<Vec<String>>>);
+
+#[async_trait]
+impl Verifier for SeenFiles {
+    async fn verify(&self, request: VerifyRequest) -> rill_lander::Result<VerificationOutcome> {
+        let app = rill_types::RepoPathBuf::new("app").unwrap();
+        let names = self.0.list_dir(request.root, &app).await.unwrap();
+        self.1
+            .lock()
+            .await
+            .push(names.into_iter().map(|(n, _)| n).collect());
+        Ok(VerificationOutcome::green(""))
+    }
+}
+
+#[tokio::test]
+async fn requests_touching_one_build_target_are_verified_together() {
+    let fx = Fixture::new().await;
+    let seen = Arc::new(SeenFiles(fx.trees.clone(), Default::default()));
+    let lander = Arc::new(
+        fx.bare_lander(Arc::new(NoopHooks), seen.clone(), fast_policy())
+            .with_targets(Arc::new(DirTargets(fx.trees.clone()))),
+    );
+    let base = base(&fx, &[("app/main.rs", "0"), ("docs/a.md", "0")]).await;
+    for (name, file) in [("lib", "app/lib.rs"), ("util", "app/util.rs")] {
+        let (_, cv) = fx.commit(Some(base), &[(file, name)], name).await;
+        lander
+            .enqueue(request(&cv, RiskClass::Normal))
+            .await
+            .unwrap();
+    }
+    lander.run_once().await.unwrap();
+    assert_eq!(fx.head().await.0, TrunkSeq(3));
+    let seen = seen.1.lock().await;
+    assert!(
+        seen.iter()
+            .any(|files| files.contains(&"lib.rs".to_string())
+                && files.contains(&"util.rs".to_string())),
+        "the second request was verified on top of the first: {seen:?}"
+    );
+}

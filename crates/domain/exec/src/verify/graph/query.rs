@@ -3,12 +3,16 @@
 use rill_jobs::Priority;
 use rill_types::TreeHash;
 
+use std::collections::BTreeSet;
+
+use super::affected::touched_targets;
 use super::hashes::{parse_target_hashes, TargetHashes};
 use super::spec::GraphSpec;
 use crate::error::{Error, Result};
 use crate::remote::BlobDigest;
 use crate::verify::compile::compile;
 use crate::verify::outcome::StepResult;
+use crate::verify::plan::load_plan;
 use crate::verify::run::PlanRunner;
 
 impl PlanRunner {
@@ -50,5 +54,38 @@ impl PlanRunner {
             .await?
             .ok_or_else(|| Error::MissingBlob(digest.to_string()))?;
         Ok(Ok(parse_target_hashes(&bytes)?))
+    }
+
+    /// The targets a change from `base` to `root` touches, under the
+    /// build graph `root`'s plan declares: changed, added or removed.
+    /// `None` when the plan declares no graph or the query fails, so the
+    /// caller falls back to paths.
+    pub async fn touched_targets(
+        &self,
+        root: TreeHash,
+        base: Option<TreeHash>,
+        priority: Priority,
+    ) -> Result<Option<BTreeSet<String>>> {
+        let Some(spec) = load_plan(&self.trees, root).await?.and_then(|p| p.graph) else {
+            return Ok(None);
+        };
+        let after = match self.target_hashes(&spec, root, priority).await? {
+            Ok(hashes) => hashes,
+            Err(failed) => {
+                tracing::warn!(
+                    status = failed.status.describe(),
+                    "build graph query failed"
+                );
+                return Ok(None);
+            }
+        };
+        let before = match base {
+            Some(base) => match self.target_hashes(&spec, base, priority).await? {
+                Ok(hashes) => Some(hashes),
+                Err(_) => return Ok(None),
+            },
+            None => None,
+        };
+        Ok(Some(touched_targets(before.as_ref(), &after)))
     }
 }

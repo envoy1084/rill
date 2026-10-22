@@ -3,6 +3,7 @@
 //! the follower that keeps cached policy and relations current; per
 //! server, local execution workers.
 
+mod build_graph;
 mod deriver;
 mod discovery;
 mod follower;
@@ -17,6 +18,7 @@ mod reverter;
 pub(crate) mod rights;
 mod verifier;
 
+pub use build_graph::ExecTargetGraph;
 pub use discovery::discover_repos;
 pub use hooks::ReviewHooksAdapter;
 pub use idempotency::sweep_idempotency;
