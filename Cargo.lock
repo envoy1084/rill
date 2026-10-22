@@ -6043,6 +6043,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rill-reapi-proto"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "prost 0.14.4",
+ "prost-types 0.14.4",
+ "protox",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+]
+
+[[package]]
 name = "rill-review"
 version = "0.1.0"
 dependencies = [

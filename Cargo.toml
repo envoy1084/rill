@@ -21,6 +21,7 @@ rill-core = { path = "crates/engine/core" }
 rill-merge-syntax = { path = "crates/engine/merge-syntax" }
 rill-policy = { path = "crates/domain/policy" }
 rill-proto = { path = "crates/foundation/proto" }
+rill-reapi-proto = { path = "crates/foundation/reapi-proto" }
 rill-review = { path = "crates/domain/review" }
 rill-lander = { path = "crates/domain/lander" }
 rill-events = { path = "crates/foundation/events" }
