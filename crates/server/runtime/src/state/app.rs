@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use rill_policy::StaticTokenAuthenticator;
 use rill_store::Stores;
+use rill_types::{Principal, PrincipalKind};
 use tokio_util::sync::CancellationToken;
 
 use super::registry::RepoRegistry;
 use super::stores::open_stores;
-use crate::auth;
 use crate::config::ServerConfig;
 use crate::error::{Error, Result};
 
@@ -33,7 +33,7 @@ pub struct AppState {
     /// Each org's data keys, when objects are sealed at rest.
     pub data_keys: Option<Arc<rill_identity::keys::DataKeyManager>>,
     /// Per-principal request rate limits, when on.
-    pub rate_limits: Option<crate::auth::RateLimits>,
+    pub rate_limits: Option<crate::rate::RateLimits>,
     /// Every metric the server keeps.
     pub metrics: Arc<crate::telemetry::Metrics>,
     /// Process start time, for health reporting.
@@ -77,7 +77,7 @@ impl AppState {
             stores.meta.clone(),
             metrics.clone(),
         )));
-        let static_tokens = auth::static_tokens(&config)?;
+        let static_tokens = static_tokens(&config)?;
         let identity = crate::identity::IdentityView::open(&stores, &config.identity).await?;
         // Compiling the secret rules takes a moment; do it before the
         // first commit needs them.
@@ -103,7 +103,7 @@ impl AppState {
             identity.clone(),
             lifecycle.clone(),
         );
-        let rate_limits = auth::RateLimits::new(&config.rate_limit);
+        let rate_limits = crate::rate::RateLimits::new(&config.rate_limit);
         Ok(Arc::new(AppState {
             stores,
             config,
@@ -151,5 +151,48 @@ fn load_attestor(config: &ServerConfig) -> Result<rill_policy::Signer> {
             }
             Ok(rill_policy::Signer::generate())
         }
+    }
+}
+
+/// The static token table, when the configuration has one. Static tokens
+/// are refused outside dev mode.
+fn static_tokens(config: &ServerConfig) -> Result<Option<StaticTokenAuthenticator>> {
+    if config.auth.tokens.is_empty() {
+        return Ok(None);
+    }
+    if !config.dev_mode {
+        return Err(Error::Config(
+            "static tokens are only accepted in dev mode; issue tokens instead".into(),
+        ));
+    }
+    let mut table = StaticTokenAuthenticator::new();
+    for t in &config.auth.tokens {
+        let principal = match t.kind {
+            PrincipalKind::Human => Principal::human(&t.principal_name),
+            PrincipalKind::Agent => Principal::agent(&t.principal_name),
+            PrincipalKind::Service => Principal::service(&t.principal_name),
+        };
+        table.insert(t.token.clone(), principal, t.teams.clone());
+    }
+    Ok(Some(table))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::StaticToken;
+
+    #[test]
+    fn static_tokens_need_dev_mode() {
+        let mut config = ServerConfig::default();
+        config.auth.tokens.push(StaticToken {
+            token: "t".into(),
+            principal_name: "alice".into(),
+            kind: PrincipalKind::Human,
+            teams: vec![],
+        });
+        assert!(matches!(static_tokens(&config), Err(Error::Config(_))));
+        config.dev_mode = true;
+        assert!(static_tokens(&config).unwrap().is_some());
     }
 }

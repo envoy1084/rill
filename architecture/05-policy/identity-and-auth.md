@@ -62,7 +62,7 @@ empty token. Static tokens outside dev mode stop the server at startup
 
 ## The identity view
 
-Each server holds an [`IdentityView`](../../crates/server/api/src/identity/view.rs):
+Each server holds an [`IdentityView`](../../crates/server/runtime/src/identity/view.rs):
 the `KeySet` (every trusted public key and the issuer it signs with) and the
 revoked token ids and session ids still in force. `verify(token)` checks the
 signature against the key the token names, the expiry, then the revocation
@@ -70,13 +70,13 @@ sets. A token naming a key the view does not know forces one reload of the
 keys (at most once a second) before it is refused, so a key another server
 just added is never a reason to fail.
 
-[`follow`](../../crates/server/api/src/identity/follower.rs) keeps the view
+[`follow`](../../crates/server/runtime/src/identity/follower.rs) keeps the view
 current. It waits on the identity log counter (an FDB watch), applies new
 entries (`TokenRevoked`, `SessionRevoked`, `KeysChanged`), reloads
 everything every 60 s, and reloads when a pending key activates. A server
 that revokes something applies it to its own view at once. Every process
 runs a follower; processes with the workers role also run
-[`maintain_forever`](../../crates/server/api/src/identity/maintenance.rs)
+[`maintain_forever`](../../crates/server/runtime/src/identity/maintenance.rs)
 every 10 minutes: key rotation and pruning, and sweeping expired
 revocations and sessions (after a day) and log entries (after 7 days).
 
@@ -304,7 +304,7 @@ changes cannot land ([landing](../04-workflow/landing.md#sequencing)).
 
 A server outside dev mode accepts only tokens the instance signed. The first
 comes from `rill api mint-token <kind:name>`
-([mint.rs](../../crates/server/api/src/identity/mint.rs)): it opens the store
+([mint.rs](../../crates/server/runtime/src/identity/mint.rs)): it opens the store
 and key service from the server configuration, makes sure a key exists, and
 signs an unnarrowed token for the principal (by default as long as its kind
 allows). Whoever can reach the store and the key service can sign as the
@@ -377,18 +377,18 @@ path and repository. `resolved_by()` maps the caller's kind to the
 
 * [`rill-policy/src/identity.rs`](../../crates/domain/policy/src/identity.rs): `AuthHeaders`, `AuthContext`, `Authenticator`, `StaticTokenAuthenticator`, `TeamResolver`.
 * [`signin/`](../../crates/server/api/src/signin/mod.rs): the sign-in HTTP routes; [`rill-identity/src/signin/`](../../crates/domain/identity/src/signin/mod.rs), [`rill-identity/src/oidc/`](../../crates/domain/identity/src/oidc/mod.rs).
-* [`identity/callers.rs`](../../crates/server/api/src/identity/callers.rs): teams, agent standing and scope; [`rill-identity/src/agents/`](../../crates/domain/identity/src/agents/mod.rs): the workload exchange.
+* [`identity/callers.rs`](../../crates/server/runtime/src/identity/callers.rs): teams, agent standing and scope; [`rill-identity/src/agents/`](../../crates/domain/identity/src/agents/mod.rs): the workload exchange.
 * Tests: `rill-api/tests/grpc/scim.rs` (credentials, groups as teams, deactivation), `rill-identity/tests/scim.rs`, `rill-api/tests/grpc/killswitch.rs` (exact budgets, rate, kill switch ejection), `rill-api/tests/grpc/agents.rs` (exchange, scope, sponsor and model suspension), `rill-identity/tests/workload.rs`, `rill-api/tests/grpc/identity.rs` (revocation and rotation across servers), `rill-api/tests/grpc/signin.rs` (browser flow, exchange, refresh, suspension, org admins, against `rill_identity::testing::MockIdp`), `rill-identity/tests/{oidc,signin}.rs`, `rill-api/tests/grpc/keycloak_saml.rs` (SAML through Keycloak: a forged response, a replay), `rill-cli/tests/bootstrap.rs`.
 * [`rill-types/src/principal.rs`](../../crates/foundation/types/src/principal.rs): `Principal`, `PrincipalKind`.
 * [`auth/authenticator.rs`](../../crates/server/api/src/auth/authenticator.rs): `static_tokens`, `authenticate`.
 * [`auth/instance.rs`](../../crates/server/api/src/auth/instance.rs): `require_instance_admin`.
-* [`identity/`](../../crates/server/api/src/identity/mod.rs): `IdentityView`, `follow`, `maintain_forever`, `mint_token`.
+* [`identity/`](../../crates/server/runtime/src/identity/mod.rs): `IdentityView`, `follow`, `maintain_forever`, `mint_token`.
 * [`services/identity/`](../../crates/server/api/src/services/identity/mod.rs): the `IdentityService` RPCs.
 * [`auth/context.rs`](../../crates/server/api/src/auth/context.rs): `caller`, `bearer_token`, `dev_context`.
 * [`auth/layer.rs`](../../crates/server/api/src/auth/layer.rs), [`auth/http.rs`](../../crates/server/api/src/auth/http.rs): gRPC and HTTP middleware.
 * [`auth/permit.rs`](../../crates/server/api/src/auth/permit.rs): `Permit`.
 * [`services/common.rs`](../../crates/server/api/src/services/common.rs): `Opened`, `open`.
-* [`config/auth.rs`](../../crates/server/api/src/config/auth.rs), [`config/identity.rs`](../../crates/server/api/src/config/identity.rs), [`config/env.rs`](../../crates/server/api/src/config/env.rs): `AuthConfig`, `StaticToken`, `IdentityConfig`, env overrides.
+* [`config/auth.rs`](../../crates/server/runtime/src/config/auth.rs), [`config/identity.rs`](../../crates/server/runtime/src/config/identity.rs), [`config/env.rs`](../../crates/server/runtime/src/config/env.rs): `AuthConfig`, `StaticToken`, `IdentityConfig`, env overrides.
 
 ---
 ← Previous: [Intents](../04-workflow/intents.md) · [Index](../index.md) · Next: [Capability tokens](capability-tokens.md) →

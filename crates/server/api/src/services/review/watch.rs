@@ -7,10 +7,10 @@ use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeId, Event, EventKind, LabelVote, RepoPathBuf, ReviewStatus, Timestamp};
 
 use super::{change_id, ReviewEventStream, ReviewSvc};
-use crate::error::Result;
 use crate::services::common::{self, open};
 use crate::services::repo::forward;
-use crate::state::RepoContext;
+use rill_runtime::error::Result;
+use rill_runtime::state::RepoContext;
 
 impl ReviewSvc {
     pub(super) async fn watch_review_impl(

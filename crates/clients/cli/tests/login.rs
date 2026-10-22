@@ -3,10 +3,10 @@
 
 use std::net::SocketAddr;
 
-use rill_api::config::IdentityConfig;
 use rill_api::{Listeners, ServerConfig};
 use rill_identity::keys::KeyServiceConfig;
 use rill_identity::testing::{MockIdp, MockUser};
+use rill_runtime::config::IdentityConfig;
 use rill_types::{Principal, Timestamp};
 use tokio_util::sync::CancellationToken;
 

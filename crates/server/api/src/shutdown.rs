@@ -7,9 +7,9 @@ use std::time::Duration;
 
 use tokio_util::sync::CancellationToken;
 
-use crate::error::{Error, Result};
 use crate::serve::{serve_with_state, Listeners};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// How long aborted tasks get to give their jobs back.
 const ABORT_WAIT: Duration = Duration::from_secs(2);

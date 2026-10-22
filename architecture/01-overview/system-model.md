@@ -136,7 +136,7 @@ The rules these mechanisms must keep are listed in
 ## Code
 
 - [Server composition](../../crates/server/api/src/lib.rs)
-- [RepoContext and registry](../../crates/server/api/src/state/registry.rs)
+- [RepoContext and registry](../../crates/server/runtime/src/state/registry.rs)
 - [Request opening](../../crates/server/api/src/services/common.rs)
 - [Permission checks](../../crates/server/api/src/auth/permit.rs)
 - [Event log readers](../../crates/foundation/events/src/lib.rs)

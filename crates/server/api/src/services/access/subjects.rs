@@ -4,8 +4,8 @@
 use rill_policy::Subject;
 use rill_types::Principal;
 
-use crate::error::{Error, Result};
 use crate::services::common::Opened;
+use rill_runtime::error::{Error, Result};
 
 /// What a tuple stores for `text`. Users and agents must exist in the
 /// repository's org (except in dev mode, which has no directory).

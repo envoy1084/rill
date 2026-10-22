@@ -6,8 +6,8 @@ use rill_types::Timestamp;
 use tonic::Request;
 
 use crate::auth::{caller, require_instance_admin};
-use crate::error::Result;
-use crate::state::AppState;
+use rill_runtime::error::Result;
+use rill_runtime::state::AppState;
 
 pub async fn rotate(
     state: &AppState,

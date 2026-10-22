@@ -56,7 +56,7 @@ pub fn parse_size(text: &str) -> Result<u64> {
 
 /// Run the cache until interrupted.
 pub async fn run(args: CacheArgs) -> Result<()> {
-    let _telemetry = rill_api::telemetry::init(&Default::default())?;
+    let _telemetry = rill_runtime::telemetry::init(&Default::default())?;
     let mut config = CacheConfig::new(args.origin, args.dir, parse_size(&args.max_bytes)?);
     config.listen = args.listen;
     config.redaction_poll = std::time::Duration::from_secs(args.redaction_poll.max(1));

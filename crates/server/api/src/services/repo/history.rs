@@ -8,9 +8,9 @@ use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeId, ChangeVersionHash, FileChange, TrunkSeq};
 
 use super::{visible, RepoSvc};
-use crate::error::{Error, Result};
 use crate::grants::GrantBuilder;
 use crate::services::common::{self, hash, limit, open, path, resolve_version};
+use rill_runtime::error::{Error, Result};
 
 /// Default and maximum page sizes for history walks.
 const DEFAULT_LOG_LIMIT: usize = 100;
@@ -261,7 +261,7 @@ impl RepoSvc {
 }
 
 async fn first_parents(
-    ctx: &crate::state::RepoContext,
+    ctx: &rill_runtime::state::RepoContext,
     start: ChangeVersionHash,
     limit: usize,
 ) -> Result<Vec<ChangeVersionHash>> {

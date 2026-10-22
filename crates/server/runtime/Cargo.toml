@@ -1,0 +1,64 @@
+[package]
+name = "rill-runtime"
+description = "The state of a Rill server: configuration, stores, repository contexts, workers, telemetry"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+# Keep metadata in FoundationDB. Needs the FoundationDB client library.
+fdb = ["rill-store/fdb"]
+# AWS KMS and Google Cloud KMS as token key services.
+aws = ["rill-identity/aws"]
+gcp = ["rill-identity/gcp"]
+
+[dependencies]
+governor = { workspace = true }
+rill-types = { workspace = true }
+rill-store = { workspace = true, features = ["s3"] }
+rill-core = { workspace = true }
+rill-merge-syntax = { workspace = true }
+rill-policy = { workspace = true }
+rill-proto = { workspace = true }
+rill-review = { workspace = true }
+rill-lander = { workspace = true }
+rill-events = { workspace = true }
+rill-jobs = { workspace = true }
+rill-search = { workspace = true }
+rill-exec = { workspace = true }
+rill-identity = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+bytes = { workspace = true }
+hex = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+prometheus-client = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+dashmap = { workspace = true }
+arc-swap = { workspace = true }
+
+tonic = { workspace = true }
+tower = { workspace = true }
+http = { workspace = true }
+parking_lot = { workspace = true }
+reqwest = { workspace = true }
+
+[dev-dependencies]
+prost-types = { workspace = true }
+rill-identity = { workspace = true, features = ["testing"] }
+rill-store = { workspace = true, features = ["s3", "testing"] }
+tempfile = { workspace = true }

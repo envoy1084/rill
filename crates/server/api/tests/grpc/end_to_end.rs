@@ -12,7 +12,7 @@ async fn dev_mode_end_to_end() {
 async fn end_to_end_on_foundationdb() {
     let root = format!("rill-test-{}", hex::encode(rill_types::ids::random_id()));
     let config = ServerConfig {
-        metadata: rill_api::config::MetadataConfig::Fdb {
+        metadata: rill_runtime::config::MetadataConfig::Fdb {
             cluster_file: std::env::var("RILL_FDB_CLUSTER_FILE").ok().map(Into::into),
             root: root.clone(),
         },

@@ -1,8 +1,8 @@
 //! Revocation and key rotation across servers sharing one store.
 
-use rill_api::config::IdentityConfig;
 use rill_identity::keys::KeyServiceConfig;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_runtime::config::IdentityConfig;
 use rill_types::identity::{SessionKind, SessionRecord};
 use rill_types::{Principal, SessionId, Timestamp};
 

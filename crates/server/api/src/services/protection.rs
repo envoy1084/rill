@@ -13,8 +13,8 @@ use tonic::{Request, Response, Status};
 use super::common::{hash, open};
 use super::idem;
 use crate::auth::{caller, require_instance_admin, require_org_admin};
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 type GrpcResult<T> = std::result::Result<Response<T>, Status>;
 

@@ -7,9 +7,9 @@ use rill_types::RepoPathBuf;
 use tonic::Request;
 
 use super::subjects;
-use crate::error::{Error, Result};
 use crate::services::common::{open, Opened};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 pub(super) fn relation(text: &str) -> Result<Relation> {
     text.parse()

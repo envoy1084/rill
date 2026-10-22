@@ -180,7 +180,7 @@ impl ReviewHooks for ReviewHooksAdapter {
         };
         let refusal = match refusal {
             None => match &self.graph {
-                Some(graph) => crate::services::repo::held_back(service.repo(), graph, &version)
+                Some(graph) => crate::quarantine::held_back(service.repo(), graph, &version)
                     .await
                     .map_err(|e| rill_lander::Error::Hook(e.to_string()))?,
                 None => service.repo().quarantined(&version).await?,

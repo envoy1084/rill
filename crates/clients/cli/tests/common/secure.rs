@@ -4,9 +4,9 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use rill_api::config::IdentityConfig;
 use rill_api::{AppState, Listeners, ServerConfig, StorageConfig};
 use rill_identity::keys::KeyServiceConfig;
+use rill_runtime::config::IdentityConfig;
 use rill_sdk::{Client, ClientConfig};
 use rill_types::Principal;
 use tokio_util::sync::CancellationToken;

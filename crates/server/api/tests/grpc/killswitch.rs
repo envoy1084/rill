@@ -1,8 +1,8 @@
 //! Agent budgets and the kill switch.
 
-use rill_api::config::IdentityConfig;
 use rill_identity::keys::KeyServiceConfig;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_runtime::config::IdentityConfig;
 use rill_types::identity::{AccountStatus, AgentBudgets, AgentRecord, Sponsor, UserRecord};
 use rill_types::{Principal, Timestamp};
 

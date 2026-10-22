@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{scim_error, scim_for, scim_json};
-use crate::state::AppState;
+use rill_runtime::state::AppState;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

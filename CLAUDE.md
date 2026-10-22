@@ -103,11 +103,15 @@ do not introduce v2 names or compatibility shims. The roadmap's "v2" means
 
 `rill-types` ← `rill-store` ← `rill-events` / `rill-jobs` / `rill-core` ←
 `rill-policy` / `rill-review` / `rill-lander` / `rill-search` / `rill-exec` ←
-`rill-identity` ← `rill-api` ← `rill-sdk` ← `rill-cli` / `rill-mcp`, with
-`rill-cache` beside `rill-api` on `rill-policy` and `rill-merge-syntax`
-just above `rill-core`. Lower crates never depend on higher ones. Tooling
-crates (`tools/`: `rill-sim`, `rill-bench`, `rill-load`, `fuzz`) may depend on
-anything; nothing depends on them. Test-only hooks in library crates live
+`rill-identity` ← `rill-runtime` ← `rill-api` ← `rill-sdk` ← `rill-cli` /
+`rill-mcp`, with `rill-cache` beside the server crates on `rill-policy` and
+`rill-merge-syntax` just above `rill-core`. Lower crates never depend on
+higher ones. Tooling crates (`tools/`: `rill-sim`, `rill-bench`,
+`rill-load`, `fuzz`) may depend on anything; nothing depends on them.
+
+Crates live in `crates/<group>/<name>` (groups `foundation`, `engine`,
+`domain`, `server`, `clients`); the folder drops the `rill-` prefix the
+package name keeps. A new crate goes in the group matching its layer. Test-only hooks in library crates live
 behind a `testing` feature.
 
 ## Checks

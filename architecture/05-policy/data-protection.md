@@ -8,7 +8,7 @@ administrators, and per-org encryption at rest.
 ## Secret scanning
 
 Every version is scanned as it is committed
-([`services/repo/secrets.rs`](../../crates/server/api/src/services/repo/secrets.rs)),
+([`services/repo/secrets.rs`](../../crates/server/runtime/src/secrets.rs)),
 whatever the entry point: `ApplyEdits`, `CreateChangeVersion`, rebases and
 merges, workspace changes (`NewChange`) and imports all store versions
 through the same commit path, which checks the author's rights (including
@@ -145,7 +145,7 @@ Sealing is on by default outside dev mode (`[encryption] enabled`,
 ## Code
 
 * [`rill-policy/src/secrets/`](../../crates/domain/policy/src/secrets/): the rule catalog, repository rules, the scanner; [`rill-policy/rules/`](../../crates/domain/policy/rules/): the vendored gitleaks rules.
-* [`rill-api/src/services/repo/secrets.rs`](../../crates/server/api/src/services/repo/secrets.rs), [`commit.rs`](../../crates/server/api/src/services/repo/commit.rs): scanning at commit.
+* [`rill-api/src/services/repo/secrets.rs`](../../crates/server/runtime/src/secrets.rs), [`commit.rs`](../../crates/server/api/src/services/repo/commit.rs): scanning at commit.
 * [`rill-api/src/services/protection.rs`](../../crates/server/api/src/services/protection.rs): `ProtectionService`.
 * [`rill-store/src/repo/quarantine.rs`](../../crates/foundation/store/src/repo/quarantine.rs), [`redact.rs`](../../crates/foundation/store/src/redact.rs).
 * [`rill-cache/src/redactions.rs`](../../crates/server/cache/src/redactions.rs).

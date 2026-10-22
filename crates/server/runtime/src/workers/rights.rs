@@ -11,7 +11,7 @@ use rill_types::identity::OrgRole;
 use rill_types::{ChangeVersion, PrincipalKind, RepoPathBuf};
 
 use crate::identity::IdentityView;
-use crate::services::repo::authorize::{is_config, write_set};
+use crate::writes::{is_config, write_set};
 
 /// The author's write rights over a repository's versions.
 pub struct WriteRights {

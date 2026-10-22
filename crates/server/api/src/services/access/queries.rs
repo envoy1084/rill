@@ -7,9 +7,9 @@ use tonic::Request;
 
 use super::relations::{object, relation, to_proto};
 use super::subjects;
-use crate::error::Result;
 use crate::services::common::{open, Opened};
-use crate::state::AppState;
+use rill_runtime::error::Result;
+use rill_runtime::state::AppState;
 
 async fn snapshot(opened: &Opened) -> Result<std::sync::Arc<rill_policy::rebac::Snapshot>> {
     Ok(opened

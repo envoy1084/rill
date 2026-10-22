@@ -4,8 +4,8 @@ use rill_proto::rill::v1 as pb;
 use rill_search::SearchQuery;
 
 use super::RepoSvc;
-use crate::error::{Error, Result};
 use crate::services::common::{limit, open, resolve_root};
+use rill_runtime::error::{Error, Result};
 
 const DEFAULT_RESULTS: usize = 200;
 const MAX_RESULTS: usize = 5_000;

@@ -11,10 +11,10 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
 
 use super::{start_from, wait_for_events, EventStream, STREAM_BUFFER};
-use crate::error::Result;
 use crate::services::common::{self, open};
 use crate::services::repo::RepoSvc;
-use crate::state::RepoContext;
+use rill_runtime::error::Result;
+use rill_runtime::state::RepoContext;
 
 /// How many log entries a replay fetches per store read.
 const REPLAY_PAGE: usize = 512;

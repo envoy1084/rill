@@ -4,10 +4,10 @@
 //! `rill-test/builder` with audience `rill`, and a `token-other.jwt` with
 //! another audience (see `architecture/09-engineering/testing.md`).
 
-use rill_api::config::IdentityConfig;
 use rill_identity::keys::KeyServiceConfig;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
 use rill_proto::rill::v1::session_service_client::SessionServiceClient;
+use rill_runtime::config::IdentityConfig;
 use rill_types::identity::{AccountStatus, UserRecord};
 use rill_types::{Principal, Timestamp};
 

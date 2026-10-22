@@ -5,8 +5,8 @@
 use rill_policy::PathFilter;
 use rill_types::{ChangeInfo, ChangeVersion, ChangeVersionHash, SubtreeChange};
 
-use crate::error::Result;
-use crate::state::RepoContext;
+use rill_runtime::error::Result;
+use rill_runtime::state::RepoContext;
 
 /// `cv` with only the changes `filter` allows; copies from unreadable
 /// sources are dropped too.
@@ -69,10 +69,9 @@ pub async fn info_of(
     filter: &PathFilter,
     hash: &ChangeVersionHash,
 ) -> Result<Option<ChangeInfo>> {
-    let found = ctx
-        .repo
-        .get_change_info(hash)
-        .await?
-        .ok_or_else(|| crate::error::Error::not_found(format!("change version {hash}")))?;
+    let found =
+        ctx.repo.get_change_info(hash).await?.ok_or_else(|| {
+            rill_runtime::error::Error::not_found(format!("change version {hash}"))
+        })?;
     info(ctx, filter, found).await
 }

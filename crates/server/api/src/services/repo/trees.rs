@@ -12,10 +12,10 @@ use rill_types::{ContentRef, ObjectKind, RepoPathBuf};
 use tonic::{Status, Streaming};
 
 use super::RepoSvc;
-use crate::error::{Error, Result};
 use crate::grants::{self, GrantBuilder};
 use crate::services::common::{hash, open, path, resolve_root};
 use crate::services::diff::{file_diffs, DiffOptions};
+use rill_runtime::error::{Error, Result};
 
 /// Size of each `GetBlob` chunk.
 pub const BLOB_CHUNK: usize = 256 * 1024;

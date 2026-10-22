@@ -18,9 +18,9 @@ use rill_types::{
 };
 
 use super::trees::check_content_exists;
-use crate::error::{Error, Result};
 use crate::services::common::Opened;
 use crate::services::idem;
+use rill_runtime::error::{Error, Result};
 
 /// Attempts at the commit transaction when the review moves under it.
 const COMMIT_ATTEMPTS: usize = 8;
@@ -171,7 +171,7 @@ async fn secret_findings(
     if findings.is_empty() {
         return Ok(Vec::new());
     }
-    let mut described = super::secrets::describe(&findings);
+    let mut described = rill_runtime::secrets::describe(&findings);
     // Too many to review: an owner releasing a quarantine would see only
     // the first few, so the version is refused whatever the mode.
     let mode = if scan.truncated {
@@ -271,7 +271,7 @@ async fn validate(opened: &Opened, cv: &ChangeVersion) -> Result<()> {
 
 /// A copy source must name a file that exists in the version it cites.
 async fn check_copy_source(
-    ctx: &crate::state::RepoContext,
+    ctx: &rill_runtime::state::RepoContext,
     source: &rill_types::objects::change::CopySource,
 ) -> Result<()> {
     let missing = || {

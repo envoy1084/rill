@@ -4,8 +4,8 @@ use rill_policy::grants::GrantEntry;
 use rill_policy::PathFilter;
 use rill_types::{ChangeVersionHash, ContentRef, ObjectHash, ObjectKind, RepoPath, Timestamp};
 
-use crate::error::Result;
 use crate::services::common::Opened;
+use rill_runtime::error::Result;
 
 /// The objects one response lets its caller fetch.
 pub struct GrantBuilder {

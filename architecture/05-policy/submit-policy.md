@@ -93,7 +93,7 @@ server:
 
 ## Storage and hot swap
 
-[`state/policy.rs`](../../crates/server/api/src/state/policy.rs) stores two
+[`state/policy.rs`](../../crates/server/runtime/src/state/policy.rs) stores two
 documents per repository as JSON `StoredPolicy { text, updated_at,
 updated_by }` under `misc/<repo>/policy:<name>`:
 
@@ -146,7 +146,7 @@ sequenceDiagram
 * [`submit/policy.rs`](../../crates/domain/policy/src/submit/policy.rs): `SubmitPolicy`, `SubmitDecision`.
 * [`submit/tests.rs`](../../crates/domain/policy/src/submit/tests.rs): default-policy cases.
 * [`rill-review/src/evaluate.rs`](../../crates/domain/review/src/evaluate.rs): `evaluate_for`, `refresh_status`.
-* [`state/policy.rs`](../../crates/server/api/src/state/policy.rs), [`state/registry.rs`](../../crates/server/api/src/state/registry.rs): storage and `reload_policy`.
+* [`state/policy.rs`](../../crates/server/runtime/src/state/policy.rs), [`state/registry.rs`](../../crates/server/runtime/src/state/registry.rs): storage and `reload_policy`.
 * [`services/admin.rs`](../../crates/server/api/src/services/admin.rs): `GetPolicy`, `SetPolicy`.
 
 ---

@@ -9,15 +9,15 @@ repository.workspace = true
 
 [features]
 # Keep metadata in FoundationDB. Needs the FoundationDB client library.
-fdb = ["rill-store/fdb"]
+fdb = ["rill-runtime/fdb"]
 # AWS KMS and Google Cloud KMS as token key services.
-aws = ["rill-identity/aws"]
-gcp = ["rill-identity/gcp"]
+aws = ["rill-runtime/aws"]
+gcp = ["rill-runtime/gcp"]
 # SAML 2.0 sign-in. Needs libxml2 and xmlsec1.
 saml = ["rill-identity/saml"]
 
 [dependencies]
-governor = { workspace = true }
+rill-runtime = { workspace = true }
 rill-types = { workspace = true }
 rill-store = { workspace = true, features = ["s3"] }
 rill-core = { workspace = true }
@@ -29,30 +29,18 @@ rill-lander = { workspace = true }
 rill-events = { workspace = true }
 rill-jobs = { workspace = true }
 rill-search = { workspace = true }
-rill-exec = { workspace = true }
 rill-identity = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }
-toml = { workspace = true }
 bytes = { workspace = true }
 hex = { workspace = true }
 blake3 = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-tracing-opentelemetry = { workspace = true }
-opentelemetry = { workspace = true }
-opentelemetry_sdk = { workspace = true }
-opentelemetry-otlp = { workspace = true }
-prometheus-client = { workspace = true }
-async-trait = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 futures = { workspace = true }
-dashmap = { workspace = true }
-arc-swap = { workspace = true }
 
 tonic = { workspace = true }
 postcard = { workspace = true }

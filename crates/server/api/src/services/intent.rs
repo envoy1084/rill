@@ -14,8 +14,8 @@ use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult, Opened};
 use super::idem;
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// The intent service.
 #[derive(Clone)]
@@ -46,7 +46,7 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::CreateIntentRequest>,
     ) -> GrpcResult<pb::CreateIntentResponse> {
-        let result: crate::error::Result<Response<pb::CreateIntentResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::CreateIntentResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().write(&RepoPathBuf::root()).await?;
@@ -84,7 +84,7 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::GetIntentRequest>,
     ) -> GrpcResult<pb::GetIntentResponse> {
-        let result: crate::error::Result<Response<pb::GetIntentResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::GetIntentResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let intent = load(&opened, &request.get_ref().id).await?;
@@ -100,7 +100,7 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::UpdateIntentRequest>,
     ) -> GrpcResult<pb::UpdateIntentResponse> {
-        let result: crate::error::Result<Response<pb::UpdateIntentResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::UpdateIntentResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().write(&RepoPathBuf::root()).await?;
@@ -149,7 +149,7 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::ListIntentsRequest>,
     ) -> GrpcResult<pb::ListIntentsResponse> {
-        let result: crate::error::Result<Response<pb::ListIntentsResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::ListIntentsResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let req = request.get_ref();
@@ -191,7 +191,7 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::LinkChangeRequest>,
     ) -> GrpcResult<pb::LinkChangeResponse> {
-        let result: crate::error::Result<Response<pb::LinkChangeResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::LinkChangeResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().write(&RepoPathBuf::root()).await?;
@@ -246,7 +246,7 @@ impl IntentService for IntentSvc {
         &self,
         request: Request<pb::FindSimilarIntentsRequest>,
     ) -> GrpcResult<pb::FindSimilarIntentsResponse> {
-        let result: crate::error::Result<Response<pb::FindSimilarIntentsResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::FindSimilarIntentsResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let req = request.get_ref();

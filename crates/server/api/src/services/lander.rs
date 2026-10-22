@@ -18,8 +18,8 @@ use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult};
 use super::idem;
-use crate::error::{Error, Result};
-use crate::state::{AppState, RepoContext};
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::{AppState, RepoContext};
 
 /// Default number of recent landings in a status response.
 const DEFAULT_RECENT: usize = 20;
@@ -140,7 +140,7 @@ impl LanderService for LanderSvc {
         &self,
         request: Request<pb::GetTrunkStatusRequest>,
     ) -> GrpcResult<pb::GetTrunkStatusResponse> {
-        let result: crate::error::Result<Response<pb::GetTrunkStatusResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::GetTrunkStatusResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let ctx = &opened.repo;
@@ -188,7 +188,7 @@ impl LanderService for LanderSvc {
         &self,
         request: Request<pb::ListLandingsRequest>,
     ) -> GrpcResult<pb::ListLandingsResponse> {
-        let result: crate::error::Result<Response<pb::ListLandingsResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::ListLandingsResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let req = request.get_ref();
@@ -221,7 +221,7 @@ impl LanderService for LanderSvc {
         &self,
         request: Request<pb::GetVerificationRequest>,
     ) -> GrpcResult<pb::GetVerificationResponse> {
-        let result: crate::error::Result<Response<pb::GetVerificationResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::GetVerificationResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let seq = TrunkSeq(request.get_ref().seq);
@@ -240,7 +240,7 @@ impl LanderService for LanderSvc {
         &self,
         request: Request<pb::ReportVerificationRequest>,
     ) -> GrpcResult<pb::ReportVerificationResponse> {
-        let result: crate::error::Result<Response<pb::ReportVerificationResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::ReportVerificationResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().land().await?;
@@ -286,7 +286,7 @@ impl LanderService for LanderSvc {
         &self,
         request: Request<pb::RevertSeqRequest>,
     ) -> GrpcResult<pb::RevertSeqResponse> {
-        let result: crate::error::Result<Response<pb::RevertSeqResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::RevertSeqResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().land().await?;
@@ -315,7 +315,7 @@ impl LanderService for LanderSvc {
     }
 
     async fn bisect(&self, request: Request<pb::BisectRequest>) -> GrpcResult<pb::BisectResponse> {
-        let result: crate::error::Result<Response<pb::BisectResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::BisectResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().land().await?;

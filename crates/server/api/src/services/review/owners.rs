@@ -6,9 +6,9 @@ use rill_policy::owners::{OwnersFile, OWNERS_PATH};
 use rill_policy::{Relation, Verb};
 use rill_types::{ChangeId, EntryKind, RepoPathBuf};
 
-use crate::error::{Error, Result};
 use crate::services::common::Opened;
-use crate::services::repo::authorize::write_set;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::writes::write_set;
 
 /// The label whose approvals only owners may give.
 pub const OWNER_LABEL: &str = "Owner";

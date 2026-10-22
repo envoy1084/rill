@@ -1,11 +1,11 @@
 //! Agents: registration, the workload exchange, registered scope, and
 //! suspension of the agent or its sponsor.
 
-use rill_api::config::IdentityConfig;
 use rill_identity::keys::KeyServiceConfig;
 use rill_identity::testing::MockIdp;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
 use rill_proto::rill::v1::session_service_client::SessionServiceClient;
+use rill_runtime::config::IdentityConfig;
 use rill_types::identity::{AccountStatus, OrgIdentitySettings, UserRecord};
 use rill_types::{Principal, Timestamp};
 

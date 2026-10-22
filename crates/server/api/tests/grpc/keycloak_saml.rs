@@ -3,9 +3,9 @@
 //! issuer.
 
 use base64::Engine;
-use rill_api::config::IdentityConfig;
 use rill_identity::keys::KeyServiceConfig;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_runtime::config::IdentityConfig;
 use rill_types::Principal;
 
 use super::keycloak::{form_action, location, Jar};

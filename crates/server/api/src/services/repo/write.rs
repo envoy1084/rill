@@ -15,8 +15,8 @@ use rill_types::{
 use super::commit::commit_version;
 use super::trees::{check_content_exists, content_bytes};
 use super::RepoSvc;
-use crate::error::{Error, Result};
 use crate::services::common::{self, hash, open, path, provenance, resolve_root, Opened};
+use rill_runtime::error::{Error, Result};
 
 impl RepoSvc {
     pub(super) async fn create_change_version_impl(

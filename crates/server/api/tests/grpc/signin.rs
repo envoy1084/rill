@@ -3,10 +3,10 @@
 
 use std::collections::HashMap;
 
-use rill_api::config::IdentityConfig;
 use rill_identity::keys::KeyServiceConfig;
 use rill_identity::testing::{MockIdp, MockUser};
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
+use rill_runtime::config::IdentityConfig;
 use rill_types::Principal;
 
 use super::*;

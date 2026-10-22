@@ -12,8 +12,8 @@ use rill_store::repo::Claim;
 use tonic::{Request, Response};
 
 use crate::auth::caller;
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// How often a running request renews its claim, well inside
 /// [`rill_store::repo::CLAIM_TTL_MS`].

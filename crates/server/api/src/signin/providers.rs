@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::objects::error_response;
-use crate::state::AppState;
+use rill_runtime::state::AppState;
 
 #[derive(Deserialize)]
 pub struct ListQuery {

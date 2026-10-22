@@ -17,7 +17,7 @@ use rill_identity::scim::{Scim, ScimError};
 use serde_json::Value;
 
 use crate::services::identity::scim_credentials::{secret_hash, TOKEN_PREFIX};
-use crate::state::AppState;
+use rill_runtime::state::AppState;
 
 /// The SCIM routes.
 /// Largest SCIM request body.

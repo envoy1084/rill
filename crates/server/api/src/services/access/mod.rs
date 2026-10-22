@@ -11,7 +11,7 @@ use rill_proto::rill::v1::access_service_server::AccessService;
 use tonic::{Request, Response, Status};
 
 use super::idem;
-use crate::state::AppState;
+use rill_runtime::state::AppState;
 
 type GrpcResult<T> = std::result::Result<Response<T>, Status>;
 

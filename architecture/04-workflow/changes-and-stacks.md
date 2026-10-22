@@ -162,7 +162,7 @@ rebases those dependents automatically.
 * [rill-api/src/services/repo/commit.rs](../../crates/server/api/src/services/repo/commit.rs), [write.rs](../../crates/server/api/src/services/repo/write.rs)
 * [rill-core/src/rebase.rs](../../crates/engine/core/src/rebase.rs), [builder.rs](../../crates/engine/core/src/builder.rs)
 * [rill-review/src/stacks.rs](../../crates/domain/review/src/stacks.rs)
-* [rill-api/src/workers/hooks.rs](../../crates/server/api/src/workers/hooks.rs) (`dependents_of`)
+* [rill-runtime/src/workers/hooks.rs](../../crates/server/runtime/src/workers/hooks.rs) (`dependents_of`)
 * [rill-sdk/src/stack.rs](../../crates/clients/sdk/src/stack.rs)
 * [rill-cli/src/commands/change.rs](../../crates/clients/cli/src/commands/change.rs), [stack.rs](../../crates/clients/cli/src/commands/stack.rs)
 

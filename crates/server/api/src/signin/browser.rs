@@ -17,8 +17,8 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::{client_secret, page, provider, public_url, redirect_uri, session_ttl_ms};
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// The cookie holding the session's refresh token.
 const COOKIE: &str = "rill_session";

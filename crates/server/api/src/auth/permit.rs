@@ -25,8 +25,8 @@ use rill_policy::{AuthContext, PathFilter, Relation, Verb};
 use rill_types::{PrincipalKind, RepoPath, RepoPathBuf};
 use tokio::sync::OnceCell;
 
-use crate::error::{Error, Result};
-use crate::state::RepoContext;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::RepoContext;
 
 /// Permission checks for one caller on one repository.
 pub struct Permit<'a> {

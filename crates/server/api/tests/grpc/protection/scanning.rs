@@ -124,7 +124,7 @@ async fn a_planted_secret_is_blocked_at_every_write() {
     apply(&mut c, "app", vec![set_edit("README", b"hello\n")])
         .await
         .unwrap();
-    rill_api::audit::worker::catch_up(&server.state)
+    rill_runtime::audit::worker::catch_up(&server.state)
         .await
         .unwrap();
     let blocked = c

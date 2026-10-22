@@ -32,7 +32,7 @@ use super::authorize;
 use super::handlers::parse_ref;
 use super::{error_response, ObjectError};
 use crate::services::common::opened;
-use crate::state::AppState;
+use rill_runtime::state::AppState;
 
 /// Content type of the batch response.
 pub const BATCH_CONTENT_TYPE: &str = "application/vnd.rill.objects";

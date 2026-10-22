@@ -18,7 +18,7 @@ use tonic::Status;
 use tower::{Layer, Service};
 
 use super::authenticator::authenticate;
-use crate::state::AppState;
+use rill_runtime::state::AppState;
 
 /// Layer that adds [`AuthService`] around a service.
 #[derive(Clone)]

@@ -11,14 +11,14 @@ go in the `_instance` stream.
 Audit records are not written by each handler. Every state change already
 writes, in its own transaction, either an identity log entry or a
 repository event; the audit worker projects those
-([`audit/project.rs`](../../crates/server/api/src/audit/project.rs)). An
+([`audit/project.rs`](../../crates/server/runtime/src/audit/project.rs)). An
 action is therefore audited exactly when it happens.
 
 | Source | Actions |
 | --- | --- |
 | Identity log | `keys.change`, `token.revoke`, `session.revoke`, `session.open` (sign-in and workload exchange), `token.issue` (`IssueToken` and `mint-token`), `user.change`, `idp.change`, `agent.change`, `trust.change`, `team.change`, `org.settings`, `org.create`, `scim.credential.create`/`revoke` |
 | Repository events | `repo.create`, `relation.add`/`remove`, `policy.set`, `ref.move`, `review.submit`, `review.vote`, `land.request`, `land.refuse`, `land` |
-| Refusals | `repo.<verb>` with outcome `Denied`, from every `Permit` refusal, sampled to one per principal and repository a minute and written best effort ([`audit/denials.rs`](../../crates/server/api/src/audit/denials.rs)) |
+| Refusals | `repo.<verb>` with outcome `Denied`, from every `Permit` refusal, sampled to one per principal and repository a minute and written best effort ([`audit/denials.rs`](../../crates/server/runtime/src/audit/denials.rs)) |
 
 Stored versions, workspace operations, comments and intents are routine
 work, not audited. The kill switch is audited through the changes it makes
@@ -37,7 +37,7 @@ An `AuditRecord` ([types](../../crates/foundation/types/src/audit/entry.rs)) hol
 ## The chain
 
 Records are first queued in `(audq, org, stamp)`. The worker
-([`audit/worker.rs`](../../crates/server/api/src/audit/worker.rs)) then
+([`audit/worker.rs`](../../crates/server/runtime/src/audit/worker.rs)) then
 places them ([`rill-store/src/audit/`](../../crates/foundation/store/src/audit/mod.rs)):
 
 * `AuditEntry { seq, prev, record }` at `(aud, org, seq)`, where `prev` is
@@ -121,7 +121,7 @@ The CLI is `rill admin audit list/watch/seal/verify/export`. `export
 
 * [`rill-types/src/audit/`](../../crates/foundation/types/src/audit/mod.rs): records, entries, roots.
 * [`rill-store/src/audit/`](../../crates/foundation/store/src/audit/mod.rs): queue, chain, cursors, roots.
-* [`rill-api/src/audit/`](../../crates/server/api/src/audit/mod.rs): projection, worker, seals, refusals.
+* [`rill-runtime/src/audit/`](../../crates/server/runtime/src/audit/mod.rs): projection, worker, seals, refusals.
 * [`rill-policy/src/audit.rs`](../../crates/domain/policy/src/audit.rs): the audit key and `verify_chain`.
 * Tests: `rill-store/tests/conformance/audit.rs` (racing chainers and projectors), `rill-api/tests/grpc/audit.rs` (end to end, tampering, refusals).
 

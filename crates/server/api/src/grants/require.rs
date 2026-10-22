@@ -4,8 +4,8 @@ use rill_policy::grants::ReadGrant;
 use rill_store::ObjectStoreExt;
 use rill_types::{BlobManifest, ObjectHash, ObjectKind, RepoPathBuf, Timestamp};
 
-use crate::error::{Error, Result};
 use crate::services::common::Opened;
+use rill_runtime::error::{Error, Result};
 
 fn verified(opened: &Opened, grant: Option<&str>) -> Result<ReadGrant> {
     let text = grant

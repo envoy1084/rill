@@ -7,8 +7,8 @@ use rill_proto::convert::{file_state_to_proto, merge_terms_to_proto};
 use rill_proto::rill::v1 as pb;
 use rill_types::{ChangeVersion, FileChange, RepoPathBuf, TreeHash};
 
-use crate::error::Result;
-use crate::state::RepoContext;
+use rill_runtime::error::Result;
+use rill_runtime::state::RepoContext;
 
 /// Largest file content compared line by line; bigger files are reported
 /// as changed without hunks.

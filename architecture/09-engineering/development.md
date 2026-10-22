@@ -1,7 +1,7 @@
 # Development
 
-Rill is one Cargo workspace of fourteen crates under `crates/`. It uses Rust
-2021 with resolver 2. This page covers how the repository is laid out, how
+Rill is one Cargo workspace: twenty product crates under `crates/<group>/`
+and tooling under `tools/`. It uses Rust 2021 with resolver 2. This page covers how the repository is laid out, how
 it builds, and what CI checks. The crate dependency rules are on
 [crates and layering](../01-overview/crates-and-layering.md).
 

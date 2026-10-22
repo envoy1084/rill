@@ -163,7 +163,7 @@ async fn a_redacted_object_needs_two_admins_and_is_never_served() {
     let published: serde_json::Value = redactions(Some(cache)).await.json().await.unwrap();
     assert_eq!(published["hashes"][0], hash.to_hex());
 
-    rill_api::audit::worker::catch_up(&server.state)
+    rill_runtime::audit::worker::catch_up(&server.state)
         .await
         .unwrap();
     let actions: Vec<String> = root

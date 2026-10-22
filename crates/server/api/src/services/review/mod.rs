@@ -19,8 +19,8 @@ use tonic::{Request, Response, Status};
 
 use super::common::{self, open, GrpcResult, Opened};
 use super::idem;
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// Server stream of review events.
 pub type ReviewEventStream = super::repo::EventStream<pb::ReviewEvent>;
@@ -62,7 +62,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::GetReviewRequest>,
     ) -> GrpcResult<pb::GetReviewResponse> {
-        let result: crate::error::Result<Response<pb::GetReviewResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::GetReviewResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let id = change_id(&request.get_ref().change_id)?;
@@ -80,7 +80,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::ListReviewsRequest>,
     ) -> GrpcResult<pb::ListReviewsResponse> {
-        let result: crate::error::Result<Response<pb::ListReviewsResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::ListReviewsResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let req = request.get_ref();
@@ -115,7 +115,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::SubmitForReviewRequest>,
     ) -> GrpcResult<pb::SubmitForReviewResponse> {
-        let result: crate::error::Result<Response<pb::SubmitForReviewResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::SubmitForReviewResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().write_any().await?;
@@ -130,7 +130,7 @@ impl ReviewService for ReviewSvc {
     }
 
     async fn vote(&self, request: Request<pb::VoteRequest>) -> GrpcResult<pb::VoteResponse> {
-        let result: crate::error::Result<Response<pb::VoteResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::VoteResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().review().await?;
@@ -173,7 +173,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::CommentRequest>,
     ) -> GrpcResult<pb::CommentResponse> {
-        let result: crate::error::Result<Response<pb::CommentResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::CommentResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().review().await?;
@@ -219,7 +219,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::ReplyThreadRequest>,
     ) -> GrpcResult<pb::ReplyThreadResponse> {
-        let result: crate::error::Result<Response<pb::ReplyThreadResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::ReplyThreadResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().review().await?;
@@ -253,7 +253,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::ResolveThreadRequest>,
     ) -> GrpcResult<pb::ResolveThreadResponse> {
-        let result: crate::error::Result<Response<pb::ResolveThreadResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::ResolveThreadResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().review().await?;
@@ -280,7 +280,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::SetStackRequest>,
     ) -> GrpcResult<pb::SetStackResponse> {
-        let result: crate::error::Result<Response<pb::SetStackResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::SetStackResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().write_any().await?;
@@ -299,7 +299,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::EvaluateSubmitRequest>,
     ) -> GrpcResult<pb::EvaluateSubmitResponse> {
-        let result: crate::error::Result<Response<pb::EvaluateSubmitResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::EvaluateSubmitResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let id = change_id(&request.get_ref().change_id)?;
@@ -324,7 +324,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::AbandonRequest>,
     ) -> GrpcResult<pb::AbandonResponse> {
-        let result: crate::error::Result<Response<pb::AbandonResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::AbandonResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().write_any().await?;
@@ -361,7 +361,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::RequestLandRequest>,
     ) -> GrpcResult<pb::RequestLandResponse> {
-        let result: crate::error::Result<Response<pb::RequestLandResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::RequestLandResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 opened.permit().land().await?;
@@ -416,7 +416,7 @@ impl ReviewService for ReviewSvc {
         &self,
         request: Request<pb::GetLandStatusRequest>,
     ) -> GrpcResult<pb::GetLandStatusResponse> {
-        let result: crate::error::Result<Response<pb::GetLandStatusResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::GetLandStatusResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let ticket = common::parse_ticket(&request.get_ref().ticket)?;

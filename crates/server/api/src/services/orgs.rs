@@ -6,8 +6,8 @@ use rill_store::OrgConfig;
 use tonic::Request;
 
 use crate::auth::caller;
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 fn org_proto(org: OrgConfig) -> pb::Org {
     pb::Org {

@@ -10,8 +10,8 @@ use axum::response::{IntoResponse, Response};
 use rill_policy::AuthContext;
 
 use super::authenticator::authenticate;
-use crate::error::Error;
-use crate::state::AppState;
+use rill_runtime::error::Error;
+use rill_runtime::state::AppState;
 
 /// Resolve the caller and attach it to the request, or reply 401 (or
 /// 429 past its rate limit).

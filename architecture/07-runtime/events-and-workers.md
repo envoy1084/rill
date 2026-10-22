@@ -161,7 +161,7 @@ time, not tasks.
 * [rill-events](../../crates/foundation/events/src/lib.rs), [rill-jobs](../../crates/foundation/jobs/src/lib.rs)
 * [rill-store repo/events.rs](../../crates/foundation/store/src/repo/events.rs), [repo/leases.rs](../../crates/foundation/store/src/repo/leases.rs), [repo/reviews.rs](../../crates/foundation/store/src/repo/reviews.rs)
 * [rill-lander land/followups.rs](../../crates/domain/lander/src/land/followups.rs)
-* [workers/mod.rs](../../crates/server/api/src/workers/mod.rs), [workers/deriver.rs](../../crates/server/api/src/workers/deriver.rs), [workers/indexer.rs](../../crates/server/api/src/workers/indexer.rs), [workers/leader.rs](../../crates/server/api/src/workers/leader.rs), [workers/follower.rs](../../crates/server/api/src/workers/follower.rs)
+* [workers/mod.rs](../../crates/server/runtime/src/workers/mod.rs), [workers/deriver.rs](../../crates/server/runtime/src/workers/deriver.rs), [workers/indexer.rs](../../crates/server/runtime/src/workers/indexer.rs), [workers/leader.rs](../../crates/server/runtime/src/workers/leader.rs), [workers/follower.rs](../../crates/server/runtime/src/workers/follower.rs)
 * [services/repo/watch/](../../crates/server/api/src/services/repo/watch/mod.rs), [services/review/watch.rs](../../crates/server/api/src/services/review/watch.rs)
 
 ---

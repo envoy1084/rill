@@ -13,8 +13,8 @@ use rill_types::audit::{AuditEntry, AuditOutcome, AuditRoot, INSTANCE_AUDIT};
 use tonic::{Request, Response, Status};
 
 use crate::auth::{caller, require_instance_admin, require_org_admin};
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 type GrpcResult<T> = std::result::Result<Response<T>, Status>;
 
@@ -150,8 +150,8 @@ impl AuditService for AuditSvc {
     ) -> GrpcResult<pb::SealAuditResponse> {
         let result: Result<_> = async {
             let org = authorized(&self.state, &request, &request.get_ref().org).await?;
-            crate::audit::worker::catch_up(&self.state).await?;
-            let root = crate::audit::seal::seal(&self.state, &org).await?;
+            rill_runtime::audit::worker::catch_up(&self.state).await?;
+            let root = rill_runtime::audit::seal::seal(&self.state, &org).await?;
             Ok(pb::SealAuditResponse {
                 root: root.as_ref().map(root_proto).transpose()?,
             })

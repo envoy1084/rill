@@ -3,9 +3,9 @@
 
 use std::path::Path;
 
-use rill_api::config::IdentityConfig;
 use rill_api::StorageConfig;
 use rill_identity::keys::{DataKeyManager, KeyServiceConfig, LocalKeyService};
+use rill_runtime::config::IdentityConfig;
 use rill_store::{LocalStores, ObjectStore, ObjectStoreBackend, OrgSealer};
 use rill_types::Principal;
 

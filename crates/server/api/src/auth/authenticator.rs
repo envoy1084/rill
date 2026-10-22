@@ -5,36 +5,11 @@
 //! dev-mode server may additionally accept static tokens from its
 //! configuration.
 
-use rill_policy::{AuthContext, AuthHeaders, Authenticator, StaticTokenAuthenticator};
-use rill_types::{Principal, PrincipalKind};
+use rill_policy::{AuthContext, AuthHeaders, Authenticator};
 
 use super::context::{bearer_token, dev_context};
-use crate::config::ServerConfig;
-use crate::error::{Error, Result};
-use crate::state::AppState;
-
-/// The static token table, when the configuration has one. Static tokens
-/// are refused outside dev mode.
-pub fn static_tokens(config: &ServerConfig) -> Result<Option<StaticTokenAuthenticator>> {
-    if config.auth.tokens.is_empty() {
-        return Ok(None);
-    }
-    if !config.dev_mode {
-        return Err(Error::Config(
-            "static tokens are only accepted in dev mode; issue tokens instead".into(),
-        ));
-    }
-    let mut table = StaticTokenAuthenticator::new();
-    for t in &config.auth.tokens {
-        let principal = match t.kind {
-            PrincipalKind::Human => Principal::human(&t.principal_name),
-            PrincipalKind::Agent => Principal::agent(&t.principal_name),
-            PrincipalKind::Service => Principal::service(&t.principal_name),
-        };
-        table.insert(t.token.clone(), principal, t.teams.clone());
-    }
-    Ok(Some(table))
-}
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// Resolve the caller for a request from its `Authorization` header.
 ///
@@ -58,24 +33,4 @@ pub async fn authenticate(state: &AppState, authorization: Option<&str>) -> Resu
     }
     let verified = state.identity.verify(token).await?;
     state.identity.context(verified).await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::StaticToken;
-
-    #[test]
-    fn static_tokens_need_dev_mode() {
-        let mut config = ServerConfig::default();
-        config.auth.tokens.push(StaticToken {
-            token: "t".into(),
-            principal_name: "alice".into(),
-            kind: PrincipalKind::Human,
-            teams: vec![],
-        });
-        assert!(matches!(static_tokens(&config), Err(Error::Config(_))));
-        config.dev_mode = true;
-        assert!(static_tokens(&config).unwrap().is_some());
-    }
 }

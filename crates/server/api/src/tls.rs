@@ -10,8 +10,8 @@ use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use tonic::transport::{Certificate, Identity, ServerTlsConfig};
 
-use crate::config::TlsConfig;
-use crate::error::{Error, Result};
+use rill_runtime::config::TlsConfig;
+use rill_runtime::error::{Error, Result};
 
 /// The gRPC listener's TLS.
 pub fn grpc(config: &TlsConfig) -> Result<ServerTlsConfig> {

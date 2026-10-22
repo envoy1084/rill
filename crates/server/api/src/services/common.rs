@@ -17,8 +17,8 @@ use rill_types::{
 use tonic::{Request, Response, Status};
 
 use crate::auth::{caller, Permit};
-use crate::error::{Error, Result};
-use crate::state::{AppState, RepoContext};
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::{AppState, RepoContext};
 
 /// What a handler returns.
 pub type GrpcResult<T> = std::result::Result<Response<T>, Status>;

@@ -27,6 +27,7 @@ rill-events = { path = "crates/foundation/events" }
 rill-jobs = { path = "crates/foundation/jobs" }
 rill-search = { path = "crates/domain/search" }
 rill-exec = { path = "crates/domain/exec" }
+rill-runtime = { path = "crates/server/runtime" }
 rill-api = { path = "crates/server/api" }
 rill-cache = { path = "crates/server/cache" }
 rill-sdk = { path = "crates/clients/sdk" }

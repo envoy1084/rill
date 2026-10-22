@@ -63,7 +63,7 @@ pub struct RepoContext {
     /// Where refused requests are noted.
     pub denials: Arc<crate::audit::denials::Denials>,
     /// Secret scanning rules and what was found clean.
-    pub secrets: Arc<crate::services::repo::secrets::Scanner>,
+    pub secrets: Arc<crate::secrets::Scanner>,
     /// Vote labels.
     pub labels: Arc<LabelSet>,
     /// Cancelled when the server shuts down; long-lived streams and

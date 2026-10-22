@@ -4,9 +4,9 @@
 
 use rill_policy::AuthContext;
 
-use crate::error::{Error, Result};
-use crate::identity::IdentityView;
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::identity::IdentityView;
+use rill_runtime::state::AppState;
 
 /// Allow `ctx` to administer the instance: anyone in dev mode, otherwise a
 /// configured administrator presenting an unnarrowed token.

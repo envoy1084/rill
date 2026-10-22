@@ -4,7 +4,7 @@ use rill_policy::AuthContext;
 use rill_types::Principal;
 use tonic::Request;
 
-use crate::error::{Error, Result};
+use rill_runtime::error::{Error, Result};
 
 /// Name of the principal anonymous requests act as in dev mode.
 pub const DEV_PRINCIPAL: &str = "dev";

@@ -8,8 +8,8 @@ use rill_types::Timestamp;
 use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// The prefix of SCIM bearer tokens: `scim_<id>.<secret>`.
 pub const TOKEN_PREFIX: &str = "scim_";

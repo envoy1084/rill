@@ -8,8 +8,8 @@ use rill_types::{Principal, RepoPathBuf, Timestamp};
 use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 fn parse_sponsor(text: &str) -> Result<Sponsor> {
     match text.split_once(':') {

@@ -146,8 +146,8 @@ history and blame RPCs, the MCP blame tool and review agent context use
 * [derive/root_tree.rs](../../crates/engine/core/src/derive/root_tree.rs), [derive/ancestry.rs](../../crates/engine/core/src/derive/ancestry.rs), [derive/changed_paths.rs](../../crates/engine/core/src/derive/changed_paths.rs), [derive/registry.rs](../../crates/engine/core/src/derive/registry.rs), [derive/summary.rs](../../crates/engine/core/src/derive/summary.rs), [derive/history.rs](../../crates/engine/core/src/derive/history.rs), [derive/blame.rs](../../crates/engine/core/src/derive/blame.rs)
 * [tree/materialize.rs](../../crates/engine/core/src/tree/materialize.rs)
 * [rill-api services/repo/refs.rs](../../crates/server/api/src/services/repo/refs.rs): `GetDerived` compute dispatch
-* [rill-api services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/server/api/src/workers/deriver.rs): derive jobs
-* [rill-api state/registry.rs](../../crates/server/api/src/state/registry.rs): manager construction
+* [rill-api services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs): land-critical values on `PutChange`; [workers/deriver.rs](../../crates/server/runtime/src/workers/deriver.rs): derive jobs
+* [rill-runtime state/registry.rs](../../crates/server/runtime/src/state/registry.rs): manager construction
 
 ---
 ← Previous: [Content and chunking](content-and-chunking.md) · [Index](../index.md) · Next: [Diff](../03-core-algorithms/diff.md) →

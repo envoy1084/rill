@@ -8,10 +8,10 @@ use rill_proto::rill::v1 as pb;
 use rill_types::{EventKind, RefName, TrunkSeq};
 
 use super::{forward, EventStream};
-use crate::error::Result;
 use crate::services::common::open;
 use crate::services::repo::RepoSvc;
-use crate::state::RepoContext;
+use rill_runtime::error::Result;
+use rill_runtime::state::RepoContext;
 
 impl RepoSvc {
     pub(in crate::services::repo) async fn watch_refs_impl(

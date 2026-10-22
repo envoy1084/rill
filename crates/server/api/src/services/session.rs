@@ -9,9 +9,9 @@ use rill_proto::rill::v1 as pb;
 use rill_proto::rill::v1::session_service_server::SessionService;
 use tonic::{Request, Response, Status};
 
-use crate::error::Error;
 use crate::signin::flows;
-use crate::state::AppState;
+use rill_runtime::error::Error;
+use rill_runtime::state::AppState;
 
 const TOKEN_TYPE_ID: &str = "urn:ietf:params:oauth:token-type:id_token";
 const TOKEN_TYPE_JWT: &str = "urn:ietf:params:oauth:token-type:jwt";

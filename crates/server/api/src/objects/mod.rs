@@ -30,8 +30,8 @@ use axum::Router;
 use tonic::Code;
 
 use crate::auth::http::require_auth;
-use crate::error::Error;
-use crate::state::AppState;
+use rill_runtime::error::Error;
+use rill_runtime::state::AppState;
 
 /// An HTTP-level error.
 #[derive(Debug)]

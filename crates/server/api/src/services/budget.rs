@@ -4,8 +4,8 @@ use rill_store::meta::Transaction;
 use rill_store::repo::day_of;
 use rill_types::Timestamp;
 
-use crate::error::{Error, Result};
 use crate::services::common::Opened;
+use rill_runtime::error::{Error, Result};
 
 /// Versions stored per day.
 pub const VERSIONS: &str = "versions";

@@ -6,8 +6,8 @@ use rill_types::{SessionId, Timestamp, TokenId};
 use tonic::Request;
 
 use crate::auth::{caller, require_instance_admin};
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// Revoke the presented token (anyone holding it may), or a token id
 /// (administrators).

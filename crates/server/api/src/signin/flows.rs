@@ -9,8 +9,8 @@ use rill_types::identity::SessionKind;
 use rill_types::Timestamp;
 
 use super::session_ttl_ms;
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// A provider a client can sign in through.
 #[derive(Debug, Clone)]

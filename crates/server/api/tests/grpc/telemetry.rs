@@ -45,7 +45,7 @@ async fn requests_carry_ids_and_show_up_in_metrics() {
 
 #[test]
 fn dashboards_query_only_metrics_the_server_exports() {
-    let exported: std::collections::BTreeSet<String> = rill_api::telemetry::Metrics::new()
+    let exported: std::collections::BTreeSet<String> = rill_runtime::telemetry::Metrics::new()
         .names()
         .iter()
         .cloned()
@@ -105,7 +105,7 @@ fn shipped_configurations_parse() {
     assert!(!config.dev_mode);
     assert!(matches!(
         config.metadata,
-        rill_api::config::MetadataConfig::Fdb { .. }
+        rill_runtime::config::MetadataConfig::Fdb { .. }
     ));
     assert!(matches!(config.storage, rill_api::StorageConfig::S3 { .. }));
 }

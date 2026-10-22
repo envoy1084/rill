@@ -21,13 +21,13 @@ use tonic::transport::server::TcpIncoming;
 use tower::Layer;
 
 use crate::auth::{AuthLayer, AuthService};
-use crate::error::{Error, Result};
 use crate::objects;
 use crate::services::{
     AccessSvc, AdminSvc, AuditSvc, IdentitySvc, IntentSvc, LanderSvc, ProtectionSvc, RepoSvc,
     ReviewSvc, SessionSvc, WorkspaceSvc,
 };
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// Largest gRPC request message: a change version (8 MiB) with room for
 /// its envelope; blobs stream in smaller pieces.
@@ -85,25 +85,28 @@ pub async fn serve_with_state(
     tracing::info!(%grpc_addr, %http_addr, dev_mode = state.dev_mode(), "rill server listening");
 
     let roles = state.config.roles;
-    tokio::spawn(crate::telemetry::sample_forever(
+    tokio::spawn(rill_runtime::telemetry::sample_forever(
         state.clone(),
         shutdown.clone(),
     ));
-    tokio::spawn(crate::identity::follow(
+    tokio::spawn(rill_runtime::identity::follow(
         state.identity.clone(),
         shutdown.clone(),
     ));
     if roles.workers {
-        tokio::spawn(crate::audit::worker::run(state.clone(), shutdown.clone()));
-        tokio::spawn(crate::identity::maintain_forever(
+        tokio::spawn(rill_runtime::audit::worker::run(
+            state.clone(),
+            shutdown.clone(),
+        ));
+        tokio::spawn(rill_runtime::identity::maintain_forever(
             state.identity.clone(),
             shutdown.clone(),
         ));
-        tokio::spawn(crate::workers::sweep_idempotency(
+        tokio::spawn(rill_runtime::workers::sweep_idempotency(
             state.stores.clone(),
             shutdown.clone(),
         ));
-        tokio::spawn(crate::workers::discover_repos(
+        tokio::spawn(rill_runtime::workers::discover_repos(
             state.clone(),
             shutdown.clone(),
         ));
@@ -134,7 +137,7 @@ async fn sweep_rate_limits(state: Arc<AppState>, shutdown: CancellationToken) {
     let Some(limits) = &state.rate_limits else {
         return;
     };
-    let mut tick = tokio::time::interval(crate::auth::SWEEP_EVERY);
+    let mut tick = tokio::time::interval(rill_runtime::rate::SWEEP_EVERY);
     loop {
         tokio::select! {
             _ = shutdown.cancelled() => return,
@@ -164,7 +167,9 @@ async fn serve_grpc(
 
     let mut builder = tonic::transport::Server::builder()
         .concurrency_limit_per_connection(MAX_CONCURRENT_PER_CONNECTION)
-        .layer(crate::telemetry::TelemetryLayer::new(state.metrics.clone()));
+        .layer(rill_runtime::telemetry::TelemetryLayer::new(
+            state.metrics.clone(),
+        ));
     if let Some(tls) = &state.config.tls {
         builder = builder
             .tls_config(crate::tls::grpc(tls)?)

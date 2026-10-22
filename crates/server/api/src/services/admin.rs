@@ -18,9 +18,9 @@ use tonic::{Request, Response, Status};
 use super::common::{self, open, GrpcResult, Opened};
 use super::idem;
 use crate::auth::caller;
-use crate::error::{Error, Result};
-use crate::state::policy::{self, StoredPolicy};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::policy::{self, StoredPolicy};
+use rill_runtime::state::AppState;
 
 /// The admin service.
 #[derive(Clone)]
@@ -105,7 +105,7 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::WhoAmIRequest>,
     ) -> GrpcResult<pb::WhoAmIResponse> {
-        let result: crate::error::Result<Response<pb::WhoAmIResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::WhoAmIResponse>> = async {
             let ctx = caller(&request)?;
             let (capabilities, token_expires_at) = match &ctx.capability {
                 Some(cap) => {
@@ -146,7 +146,7 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::IssueTokenRequest>,
     ) -> GrpcResult<pb::IssueTokenResponse> {
-        let result: crate::error::Result<Response<pb::IssueTokenResponse>> = idem::once(&self.state, request, |request| async move {
+        let result: rill_runtime::error::Result<Response<pb::IssueTokenResponse>> = idem::once(&self.state, request, |request| async move {
             let ctx = caller(&request)?;
             let req = request.get_ref();
             if req.capabilities.is_empty() {
@@ -243,7 +243,7 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::GetPolicyRequest>,
     ) -> GrpcResult<pb::GetPolicyResponse> {
-        let result: crate::error::Result<Response<pb::GetPolicyResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::GetPolicyResponse>> = async {
             let (repo, name) = parse_policy_name(&request.get_ref().name)?;
             let opened = self.open_named(&request, &repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
@@ -273,7 +273,7 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::AppendTrunkRequest>,
     ) -> GrpcResult<pb::AppendTrunkResponse> {
-        let result: crate::error::Result<Response<pb::AppendTrunkResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::AppendTrunkResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = self.open_named(&request, &request.get_ref().repo).await?;
                 opened.permit().admin().await?;
@@ -282,7 +282,7 @@ impl AdminService for AdminSvc {
                     rill_proto::convert::opt_hash_from_proto("expected", req.expected.as_ref())?;
                 let version = rill_proto::convert::hash_from_proto("version", &req.version)?;
                 if let Some(why) =
-                    super::repo::held_back(&opened.repo.repo, &opened.repo.graph, &version)
+                    rill_runtime::quarantine::held_back(&opened.repo.repo, &opened.repo.graph, &version)
                         .await?
                 {
                     return Err(Error::FailedPrecondition(format!(
@@ -312,7 +312,7 @@ impl AdminService for AdminSvc {
         &self,
         request: Request<pb::SetPolicyRequest>,
     ) -> GrpcResult<pb::SetPolicyResponse> {
-        let result: crate::error::Result<Response<pb::SetPolicyResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::SetPolicyResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let (repo, name) = parse_policy_name(&request.get_ref().name)?;
                 let opened = self.open_named(&request, &repo).await?;
@@ -354,7 +354,7 @@ impl AdminService for AdminSvc {
     }
 
     async fn health(&self, _request: Request<pb::HealthRequest>) -> GrpcResult<pb::HealthResponse> {
-        let result: crate::error::Result<Response<pb::HealthResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::HealthResponse>> = async {
             let components = health_components(&self.state).await;
             Ok(Response::new(pb::HealthResponse {
                 ok: components.iter().all(|c| c.ok),
@@ -417,7 +417,7 @@ async fn may_issue_for(
     state: &AppState,
     ctx: &rill_policy::AuthContext,
     principal: &Principal,
-) -> crate::error::Result<()> {
+) -> rill_runtime::error::Result<()> {
     if crate::auth::require_instance_admin(state, ctx).is_ok() {
         return Ok(());
     }

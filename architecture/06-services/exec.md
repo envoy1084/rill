@@ -168,7 +168,7 @@ The lander picks a `VerifyMode` per risk class: `None` skips verification;
 * [action.rs](../../crates/domain/exec/src/action.rs), [cache.rs](../../crates/domain/exec/src/cache.rs), [runner.rs](../../crates/domain/exec/src/runner.rs), [materialize.rs](../../crates/domain/exec/src/materialize.rs)
 * [sandbox/mod.rs](../../crates/domain/exec/src/sandbox/mod.rs), [sandbox/local.rs](../../crates/domain/exec/src/sandbox/local.rs), [sandbox/confine.rs](../../crates/domain/exec/src/sandbox/confine.rs)
 * [verify.rs](../../crates/domain/exec/src/verify.rs)
-* Server: [workers/verifier.rs](../../crates/server/api/src/workers/verifier.rs), [state/registry.rs](../../crates/server/api/src/state/registry.rs), [config/server.rs](../../crates/server/api/src/config/server.rs)
+* Server: [workers/verifier.rs](../../crates/server/runtime/src/workers/verifier.rs), [state/registry.rs](../../crates/server/runtime/src/state/registry.rs), [config/server.rs](../../crates/server/runtime/src/config/server.rs)
 * Lander: [config.rs](../../crates/domain/lander/src/config.rs), [land/sequence.rs](../../crates/domain/lander/src/land/sequence.rs)
 
 ---

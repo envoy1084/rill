@@ -200,7 +200,7 @@ async fn refusals_are_audited_but_sampled() {
     }
     let mut denied = Vec::new();
     for _ in 0..50 {
-        rill_api::audit::worker::catch_up(&server.state)
+        rill_runtime::audit::worker::catch_up(&server.state)
             .await
             .unwrap();
         denied = chain(&mut root, "default")

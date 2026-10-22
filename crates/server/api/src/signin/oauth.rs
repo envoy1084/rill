@@ -13,8 +13,8 @@ use rill_types::Timestamp;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 pub const GRANT_REFRESH: &str = "refresh_token";
 pub const GRANT_EXCHANGE: &str = "urn:ietf:params:oauth:grant-type:token-exchange";

@@ -12,7 +12,7 @@ use rill_types::{ObjectHash, ObjectKind};
 use super::authorize::{self, grant_of, FetchQuery};
 use super::{error_response, ObjectError};
 use crate::services::common::opened;
-use crate::state::AppState;
+use rill_runtime::state::AppState;
 
 /// Objects never change, so a client may keep them for a year; shared
 /// caches must not, since each fetch needs a read grant (the Rill cache

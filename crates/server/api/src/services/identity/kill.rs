@@ -7,8 +7,8 @@ use rill_types::{Principal, SessionId, Timestamp};
 use tonic::Request;
 
 use crate::auth::{caller, require_org_admin};
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// Sessions a sweep revokes at most.
 const SESSION_SCAN: usize = 100_000;

@@ -7,9 +7,9 @@ use rill_proto::rill::v1 as pb;
 use rill_types::RepoPathBuf;
 
 use super::{forward, start_from, EventStream};
-use crate::error::Result;
 use crate::services::common::open;
 use crate::services::repo::RepoSvc;
+use rill_runtime::error::Result;
 
 impl RepoSvc {
     pub(in crate::services::repo) async fn watch_events_impl(

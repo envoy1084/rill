@@ -120,7 +120,7 @@ pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
         let key = dir.join("master.key");
         (StorageConfig::Local { dir }, Some(key))
     };
-    let identity = rill_api::config::IdentityConfig {
+    let identity = rill_runtime::config::IdentityConfig {
         keys: rill_identity::keys::KeyServiceConfig::Local {
             master_key_hex: None,
             master_key_file,
@@ -221,7 +221,7 @@ pub async fn api(ctx: &mut crate::context::Ctx<'_>, args: ApiArgs) -> Result<()>
         }) => {
             let config = api_config(&args)?;
             let principal = parse_principal(principal)?;
-            let token = rill_api::identity::mint_token(&config, &principal, org, *ttl).await?;
+            let token = rill_runtime::identity::mint_token(&config, &principal, org, *ttl).await?;
             ctx.emit(serde_json::json!({ "token": token }), |out| {
                 out.line(&token)
             })
@@ -231,7 +231,7 @@ pub async fn api(ctx: &mut crate::context::Ctx<'_>, args: ApiArgs) -> Result<()>
 }
 
 async fn serve(config: ServerConfig) -> Result<()> {
-    let _telemetry = rill_api::telemetry::init(&config.telemetry)?;
+    let _telemetry = rill_runtime::telemetry::init(&config.telemetry)?;
     if config.dev_mode {
         tracing::warn!(storage = ?config.storage, "dev mode: no authentication, every request is permitted");
     }

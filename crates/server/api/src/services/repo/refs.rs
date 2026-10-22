@@ -7,8 +7,8 @@ use rill_types::{ObjectHash, RefUpdate, RepoPathBuf, TrunkSeq};
 
 use super::RepoSvc;
 use crate::auth::caller;
-use crate::error::{Error, Result};
 use crate::services::common::{self, hash, open};
+use rill_runtime::error::{Error, Result};
 
 /// Longest a `WaitDerived` call blocks.
 const MAX_WAIT_MS: u64 = 60_000;
@@ -287,7 +287,7 @@ impl RepoSvc {
 /// Fetch a derived record's raw bytes. Known framework kinds are computed
 /// on demand when `compute` is set; other kinds are read as stored.
 async fn derived(
-    ctx: &crate::state::RepoContext,
+    ctx: &rill_runtime::state::RepoContext,
     kind: &str,
     hash: &ObjectHash,
     compute: bool,

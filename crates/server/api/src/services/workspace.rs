@@ -24,8 +24,8 @@ use super::common::{self, open, operation_id, provenance, resolve_version, GrpcR
 use super::diff::{file_diffs, DiffOptions};
 use super::idem;
 use super::repo::{commit_version_with, version_from_diff, CommitExtras};
-use crate::error::{Error, Result};
-use crate::state::AppState;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::AppState;
 
 /// Default page size for operation listings.
 const DEFAULT_OPS_LIMIT: usize = 50;
@@ -162,7 +162,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::CreateWorkspaceRequest>,
     ) -> GrpcResult<pb::CreateWorkspaceResponse> {
-        let result: crate::error::Result<Response<pb::CreateWorkspaceResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::CreateWorkspaceResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let req = request.into_inner();
@@ -211,7 +211,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::GetWorkspaceRequest>,
     ) -> GrpcResult<pb::GetWorkspaceResponse> {
-        let result: crate::error::Result<Response<pb::GetWorkspaceResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::GetWorkspaceResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let ws = self.load(&opened, &request.get_ref().workspace).await?;
             Ok(Response::new(pb::GetWorkspaceResponse {
@@ -226,7 +226,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::ListWorkspacesRequest>,
     ) -> GrpcResult<pb::ListWorkspacesResponse> {
-        let result: crate::error::Result<Response<pb::ListWorkspacesResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::ListWorkspacesResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             opened.permit().read(&RepoPathBuf::root()).await?;
             let req = request.get_ref();
@@ -256,7 +256,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::SetSparseProfileRequest>,
     ) -> GrpcResult<pb::SetSparseProfileResponse> {
-        let result: crate::error::Result<Response<pb::SetSparseProfileResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::SetSparseProfileResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let req = request.into_inner();
@@ -290,7 +290,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::SnapshotRequest>,
     ) -> GrpcResult<pb::SnapshotResponse> {
-        let result: crate::error::Result<Response<pb::SnapshotResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::SnapshotResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let req = request.into_inner();
@@ -325,7 +325,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::NewChangeRequest>,
     ) -> GrpcResult<pb::NewChangeResponse> {
-        let result: crate::error::Result<Response<pb::NewChangeResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::NewChangeResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let req = request.into_inner();
@@ -390,7 +390,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::UpdateBaseRequest>,
     ) -> GrpcResult<pb::UpdateBaseResponse> {
-        let result: crate::error::Result<Response<pb::UpdateBaseResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::UpdateBaseResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let req = request.into_inner();
@@ -451,7 +451,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::HandoffRequest>,
     ) -> GrpcResult<pb::HandoffResponse> {
-        let result: crate::error::Result<Response<pb::HandoffResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::HandoffResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let req = request.into_inner();
@@ -482,7 +482,7 @@ impl WorkspaceService for WorkspaceSvc {
     /// Restore the workspace to the state before `target` (default: the
     /// head operation), recorded as a new `Undo` operation.
     async fn undo(&self, request: Request<pb::UndoRequest>) -> GrpcResult<pb::UndoResponse> {
-        let result: crate::error::Result<Response<pb::UndoResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::UndoResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let req = request.into_inner();
@@ -542,7 +542,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::ListOperationsRequest>,
     ) -> GrpcResult<pb::ListOperationsResponse> {
-        let result: crate::error::Result<Response<pb::ListOperationsResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::ListOperationsResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let req = request.get_ref();
             let ws = self.load(&opened, &req.workspace).await?;
@@ -570,7 +570,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::DeleteWorkspaceRequest>,
     ) -> GrpcResult<pb::DeleteWorkspaceResponse> {
-        let result: crate::error::Result<Response<pb::DeleteWorkspaceResponse>> =
+        let result: rill_runtime::error::Result<Response<pb::DeleteWorkspaceResponse>> =
             idem::once(&self.state, request, |request| async move {
                 let opened = open(&self.state, &request, &request.get_ref().repo).await?;
                 let ws = self.load_mut(&opened, &request.get_ref().workspace).await?;
@@ -589,7 +589,7 @@ impl WorkspaceService for WorkspaceSvc {
         &self,
         request: Request<pb::WorkspaceDiffRequest>,
     ) -> GrpcResult<pb::WorkspaceDiffResponse> {
-        let result: crate::error::Result<Response<pb::WorkspaceDiffResponse>> = async {
+        let result: rill_runtime::error::Result<Response<pb::WorkspaceDiffResponse>> = async {
             let opened = open(&self.state, &request, &request.get_ref().repo).await?;
             let req = request.get_ref();
             let ws = self.load(&opened, &req.workspace).await?;

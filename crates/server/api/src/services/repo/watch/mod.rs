@@ -22,8 +22,8 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
 
-use crate::error::{Error, Result};
-use crate::state::RepoContext;
+use rill_runtime::error::{Error, Result};
+use rill_runtime::state::RepoContext;
 
 /// A boxed server stream.
 pub type EventStream<T> = Pin<Box<dyn Stream<Item = std::result::Result<T, Status>> + Send>>;
