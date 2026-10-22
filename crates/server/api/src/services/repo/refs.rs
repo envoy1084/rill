@@ -3,7 +3,7 @@
 use rill_policy::{Relation, Subject};
 use rill_proto::convert::{hash_to_proto, ref_name_from_proto};
 use rill_proto::rill::v1 as pb;
-use rill_types::{ObjectHash, RefUpdate, RepoPathBuf, TrunkSeq};
+use rill_types::{ObjectHash, RefName, RefUpdate, RepoPathBuf, TrunkSeq};
 
 use super::RepoSvc;
 use crate::auth::caller;
@@ -147,8 +147,47 @@ impl RepoSvc {
         Ok(pb::ListRefsResponse { refs })
     }
 
-    /// Compare-and-swap a ref. Trunk is owned by the lander: it only moves
-    /// through landings, so requests to move it are refused.
+    /// Cut `release/<name>` at a trunk position: repository owners only.
+    pub(super) async fn cut_release_impl(
+        &self,
+        request: tonic::Request<pb::CutReleaseRequest>,
+    ) -> Result<pb::CutReleaseResponse> {
+        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        opened.permit().admin().await?;
+        let name = request.get_ref().name.clone();
+        let ref_name = RefName::release(&name)
+            .map_err(|e| Error::invalid(format!("release name {name:?}: {e}")))?;
+        let repo = &opened.repo.repo;
+        let (seq, hash) = match request.get_ref().at {
+            Some(at) => {
+                let seq = TrunkSeq(at);
+                let hash = repo
+                    .trunk_at(seq)
+                    .await?
+                    .ok_or_else(|| Error::not_found(format!("trunk@{at}")))?;
+                (seq, hash)
+            }
+            None => repo
+                .trunk_head()
+                .await?
+                .ok_or_else(|| Error::precondition("trunk is empty; nothing to cut"))?,
+        };
+        repo.cut_release(&name, hash, opened.principal())
+            .await
+            .map_err(|e| match e.is_conflict() {
+                true => Error::FailedPrecondition(format!("{ref_name} already exists")),
+                false => e.into(),
+            })?;
+        Ok(pb::CutReleaseResponse {
+            r#ref: ref_name.to_string(),
+            hash: hash_to_proto(&hash),
+            trunk_seq: seq.get(),
+        })
+    }
+
+    /// Compare-and-swap a ref. Trunk and releases are owned by their
+    /// landers: they only move through landings, so requests to move them
+    /// are refused.
     pub(super) async fn move_ref_impl(
         &self,
         request: tonic::Request<pb::MoveRefRequest>,
@@ -165,6 +204,12 @@ impl RepoSvc {
         if update.name.is_trunk() {
             return Err(Error::denied(
                 "trunk only moves through landings; use RequestLand",
+            ));
+        }
+        if update.name.is_release() {
+            return Err(Error::denied(
+                "a release only moves through its lander; cut it with CutRelease \
+                 and land on it with RequestLand onto it",
             ));
         }
         if let Some(target) = &update.target {

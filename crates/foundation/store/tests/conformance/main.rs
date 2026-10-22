@@ -14,6 +14,7 @@ mod layer;
 mod meta;
 mod objects;
 mod race;
+mod releases;
 mod repo;
 
 use std::sync::Arc;
@@ -145,6 +146,7 @@ async fn repo_stores_conform() {
     for f in fixtures().await {
         repo::scenario(f.name, &f.stores).await;
         repo::landing(f.name, &f.stores).await;
+        releases::scenario(f.name, &f.stores).await;
         events::scenario(f.name, &f.stores).await;
         land_queue::scenario(f.name, &f.stores).await;
         identity::scenario(f.name, &f.stores).await;

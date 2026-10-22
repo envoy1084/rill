@@ -323,22 +323,32 @@ impl ReviewClient {
         Ok(required("abandon.review", resp.review)?.try_into()?)
     }
 
-    /// Ask the lander to land a change. Returns the ticket to poll.
+    /// Ask the lander to land a change on trunk. Returns the ticket to poll.
     pub async fn request_land(&self, change_id: ChangeId) -> Result<LandTicket> {
-        self.request_land_with_op(OperationId::new(), change_id)
+        self.request_land_with_op(OperationId::new(), change_id, None)
             .await
     }
 
-    /// [`ReviewClient::request_land`] with a caller-chosen idempotency key.
+    /// Ask the lander of `onto` (`trunk`, or `release/<name>`) to land a
+    /// change. Returns the ticket to poll.
+    pub async fn request_land_onto(&self, change_id: ChangeId, onto: &str) -> Result<LandTicket> {
+        self.request_land_with_op(OperationId::new(), change_id, Some(onto))
+            .await
+    }
+
+    /// [`ReviewClient::request_land_onto`] with a caller-chosen idempotency
+    /// key; `None` lands on trunk.
     pub async fn request_land_with_op(
         &self,
         op: OperationId,
         change_id: ChangeId,
+        onto: Option<&str>,
     ) -> Result<LandTicket> {
         let request = pb::RequestLandRequest {
             operation_id: id_to_proto(&op),
             repo: self.repo.clone(),
             change_id: id_to_proto(&change_id),
+            onto: onto.map(str::to_string),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (mut svc, request) = (self.svc(), request.clone());
@@ -349,19 +359,22 @@ impl ReviewClient {
         required("request_land.ticket", resp.ticket)?.try_into()
     }
 
-    /// Ask the lander to land `change_id`'s stack, from its lowest
-    /// unlanded change up to it, as one ordered group: all or nothing, or
-    /// with `prefix` as far as it can. Returns the tickets, bottom first.
+    /// Ask the lander of `onto` (trunk when `None`) to land `change_id`'s
+    /// stack, from its lowest unlanded change up to it, as one ordered
+    /// group: all or nothing, or with `prefix` as far as it can. Returns the
+    /// tickets, bottom first.
     pub async fn request_land_stack(
         &self,
         change_id: ChangeId,
         prefix: bool,
+        onto: Option<&str>,
     ) -> Result<Vec<LandTicket>> {
         let request = pb::RequestLandStackRequest {
             operation_id: id_to_proto(&OperationId::new()),
             repo: self.repo.clone(),
             change_id: id_to_proto(&change_id),
             prefix,
+            onto: onto.map(str::to_string),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (mut svc, request) = (self.svc(), request.clone());

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rill_core::{CommitGraph, DeriveManager};
 use rill_store::repo::{Lease, LeaseHolder};
 use rill_store::RepoStore;
-use rill_types::{ChangeId, GroupMode};
+use rill_types::{ChangeId, GroupMode, Line};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
@@ -42,6 +42,8 @@ pub struct Lander {
     /// Targets each version touches, by version.
     pub(super) touched: parking_lot::Mutex<super::domains::TouchedCache>,
     pub(super) policy: LandPolicy,
+    /// What it lands on.
+    pub(super) line: Line,
     queue: LandQueue,
     events: broadcast::Sender<LandEvent>,
     /// The lander lease.
@@ -57,6 +59,14 @@ pub struct Lander {
 
 /// The lease role landers fence their trunk writes with.
 pub const LANDER_LEASE: &str = "lander";
+
+/// The lease role of the lander of `line`: one lease per line.
+pub fn lander_lease(line: &Line) -> String {
+    match line {
+        Line::Trunk => LANDER_LEASE.to_string(),
+        Line::Release(name) => format!("{LANDER_LEASE}:release/{name}"),
+    }
+}
 
 impl Lander {
     /// A lander over `repo`, without regenerate drivers or a resolver.
@@ -77,6 +87,7 @@ impl Lander {
             graph,
             hooks,
             verifier,
+            line: Line::Trunk,
             regenerator: Arc::new(NoRegenerator),
             resolver: None,
             targets: None,
@@ -87,6 +98,19 @@ impl Lander {
             thrash: Thrash::new(),
             timings: Timings::new(),
         }
+    }
+
+    /// Land on `line` rather than trunk, under that line's own lease.
+    pub fn on_line(mut self, line: Line) -> Self {
+        self.lease = LeaseHolder::new(self.repo.clone(), &lander_lease(&line));
+        self.queue = LandQueue::new(self.repo.clone()).on_line(line.clone());
+        self.line = line;
+        self
+    }
+
+    /// What this lander lands on.
+    pub fn line(&self) -> &Line {
+        &self.line
     }
 
     /// Run `regenerate` merge drivers with `regenerator`.
@@ -177,6 +201,7 @@ impl Lander {
     /// Queue a request and return its ticket; a change with an
     /// unfinished request gets that request's ticket.
     pub async fn enqueue(&self, request: LandRequest) -> Result<LandTicket> {
+        self.check_line(std::slice::from_ref(&request))?;
         let change_id = request.change_id;
         if let Some(ticket) = self.repo.active_land_request(&change_id).await? {
             return Ok(ticket);
@@ -197,6 +222,7 @@ impl Lander {
         requests: Vec<LandRequest>,
         mode: GroupMode,
     ) -> Result<Vec<LandTicket>> {
+        self.check_line(&requests)?;
         if requests.is_empty() || requests.len() > MAX_BATCH {
             return Err(crate::error::Error::GroupSize {
                 size: requests.len(),
@@ -220,6 +246,16 @@ impl Lander {
             });
         }
         Ok(tickets)
+    }
+
+    fn check_line(&self, requests: &[LandRequest]) -> Result<()> {
+        match requests.iter().find(|r| r.line != self.line) {
+            Some(r) => Err(crate::error::Error::Config(format!(
+                "the lander of {} cannot land a request for {}",
+                self.line, r.line
+            ))),
+            None => Ok(()),
+        }
     }
 
     /// Refuse `requests` when the queue, their requester or their sponsor
@@ -341,7 +377,7 @@ impl Lander {
     pub async fn run_forever(self: Arc<Self>, shutdown: CancellationToken) {
         let mut last_retention = tokio::time::Instant::now();
         loop {
-            let seen = self.repo.land_wake_count().await.unwrap_or(0);
+            let seen = self.repo.land_wake_count(&self.line).await.unwrap_or(0);
             if let Err(e) = self.run_once().await {
                 tracing::error!(error = %e, "landing sweep failed");
             }
@@ -351,7 +387,7 @@ impl Lander {
             }
             tokio::select! {
                 _ = shutdown.cancelled() => break,
-                _ = self.repo.wait_for_land_requests(seen, self.policy.batch_window) => {}
+                _ = self.repo.wait_for_land_requests(&self.line, seen, self.policy.batch_window) => {}
             }
         }
         self.release().await;

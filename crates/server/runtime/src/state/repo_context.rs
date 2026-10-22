@@ -39,6 +39,8 @@ pub struct RepoContext {
     pub graph: Arc<CommitGraph>,
     /// The landing pipeline.
     pub lander: Arc<Lander>,
+    /// The landers of the repository's releases.
+    pub releases: Arc<super::ReleaseLanders>,
     /// Post-land verifier, when enabled.
     pub postland: Option<Arc<PostLandVerifier>>,
     /// Trigram search index, updated as changes land.

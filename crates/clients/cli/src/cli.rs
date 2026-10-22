@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    access, admin, change, checkout, history, import, intent, land, org, refs, repo, review, stack,
-    status, watch, ws,
+    access, admin, change, checkout, history, import, intent, land, org, refs, release, repo,
+    review, stack, status, watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -166,6 +166,10 @@ pub enum Command {
     /// Refs: list, show, set, delete.
     #[command(subcommand)]
     Ref(refs::RefCmd),
+
+    /// Releases: cut and list.
+    #[command(subcommand)]
+    Release(release::ReleaseCmd),
 
     /// Sign in through the organization's identity provider.
     Login(crate::commands::session::LoginArgs),

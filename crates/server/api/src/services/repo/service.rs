@@ -211,6 +211,17 @@ impl RepoService for RepoSvc {
             .await?,
         )
     }
+    async fn cut_release(
+        &self,
+        request: Request<pb::CutReleaseRequest>,
+    ) -> GrpcResult<pb::CutReleaseResponse> {
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(self.cut_release_impl(r).await?))
+            })
+            .await?,
+        )
+    }
     async fn trunk_head(
         &self,
         request: Request<pb::TrunkHeadRequest>,

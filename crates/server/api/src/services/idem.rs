@@ -57,6 +57,7 @@ idempotent!(
     MergeRequest,
     ResolveRequest,
     MoveRefRequest,
+    CutReleaseRequest,
     CreateWorkspaceRequest,
     SetSparseProfileRequest,
     SnapshotRequest,

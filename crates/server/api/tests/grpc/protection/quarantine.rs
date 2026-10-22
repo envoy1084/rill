@@ -60,6 +60,7 @@ async fn quarantined_versions_wait_for_an_owner() {
             operation_id: Bytes::new(),
             repo: "app".into(),
             change_id: change.clone(),
+            onto: None,
         })
         .await
         .unwrap()

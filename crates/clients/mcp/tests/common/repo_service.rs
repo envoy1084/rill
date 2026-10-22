@@ -150,6 +150,7 @@ impl RepoService for MockRepo {
         resolve_ref(pb::ResolveRefRequest) -> pb::ResolveRefResponse;
         list_refs(pb::ListRefsRequest) -> pb::ListRefsResponse;
         move_ref(pb::MoveRefRequest) -> pb::MoveRefResponse;
+        cut_release(pb::CutReleaseRequest) -> pb::CutReleaseResponse;
         trunk_head(pb::TrunkHeadRequest) -> pb::TrunkHeadResponse;
         trunk_range(pb::TrunkRangeRequest) -> pb::TrunkRangeResponse;
         watch_trunk(pb::WatchTrunkRequest) -> Self::WatchTrunkStream;

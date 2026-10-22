@@ -22,6 +22,7 @@ mod kubernetes;
 mod limits;
 mod orgs;
 mod protection;
+mod releases;
 mod replicas;
 mod retries;
 mod scim;

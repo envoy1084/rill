@@ -125,6 +125,7 @@ const MATRIX: &[(&str, Class)] = &[
     ("RepoService/ResolveRef", ReadAny),
     ("RepoService/ListRefs", ReadAny),
     ("RepoService/MoveRef", WriteRoot),
+    ("RepoService/CutRelease", Owner),
     ("RepoService/TrunkHead", ReadAny),
     ("RepoService/TrunkRange", ReadAny),
     ("RepoService/WatchRefs", ReadAny),

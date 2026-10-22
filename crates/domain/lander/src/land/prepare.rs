@@ -47,7 +47,7 @@ impl Lander {
             .get_change_version(&requested)
             .await?
             .ok_or(Error::ChangeNotFound(requested))?;
-        if let Some(seq) = self.repo.trunk_seq_of(&requested).await? {
+        if let Some(seq) = self.repo.line_seq_of(&self.line, &requested).await? {
             self.fail(queued, format!("already landed at {seq}")).await;
             return Ok(Prepared::Dropped);
         }
@@ -159,7 +159,11 @@ impl Lander {
             },
         )
         .await;
-        let mut reason = format!("rebase onto trunk conflicts at {} path(s)", paths.len());
+        let mut reason = format!(
+            "rebase onto {} conflicts at {} path(s)",
+            self.line,
+            paths.len()
+        );
         if let Some(why) = &unresolved.reason {
             reason.push_str(&format!(": {why}"));
         }

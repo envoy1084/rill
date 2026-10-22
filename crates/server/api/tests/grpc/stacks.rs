@@ -147,6 +147,7 @@ async fn a_declared_stack_lands_as_one_group() {
             repo: "app".into(),
             change_id: ids[2].clone(),
             prefix: false,
+            onto: None,
         })
         .await
         .unwrap()

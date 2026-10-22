@@ -76,7 +76,7 @@ async fn land_stack_declares_the_stack_and_requests_it_as_one_group() {
     let stack = h.client.repo("main").stack().with_backoff(fast());
     let ids = [ChangeId::new(), ChangeId::new()];
     let landing = stack
-        .land_stack(&ids, false, Duration::from_secs(5))
+        .land_stack(&ids, false, None, Duration::from_secs(5))
         .await
         .unwrap();
     assert!(landing.unlanded.is_empty());

@@ -162,6 +162,8 @@ message RequestLandRequest {
   bytes operation_id = 1;
   string repo = 2;
   bytes change_id = 3;
+  // The line to land on: "trunk" (the default) or "release/<name>".
+  optional string onto = 4;
 }
 message RequestLandResponse {
   LandTicket ticket = 1;
@@ -176,6 +178,8 @@ message RequestLandStackRequest {
   bytes change_id = 3;
   // Land the longest landable run from the bottom instead of all or none.
   bool prefix = 4;
+  // The line to land on: "trunk" (the default) or "release/<name>".
+  optional string onto = 5;
 }
 message RequestLandStackResponse {
   // Bottom first.

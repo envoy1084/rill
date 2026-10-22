@@ -4,7 +4,7 @@
 
 use rill_jobs::{JobSpec, Priority, Queue};
 use rill_store::{RepoStore, Transaction};
-use rill_types::ChangeVersionHash;
+use rill_types::{ChangeVersionHash, Line};
 
 use crate::error::Result;
 
@@ -34,15 +34,19 @@ pub fn index_root_job(root: &rill_types::TreeHash) -> JobSpec {
     JobSpec::new(INDEX_ROOT_JOB, root.to_hex(), root.as_bytes().to_vec()).priority(Priority::High)
 }
 
-/// The jobs for landing `versions`, in order: each is derived, and the
-/// last, the new trunk head, is indexed.
-pub fn landing_jobs(repo: &RepoStore, versions: &[ChangeVersionHash]) -> Result<Transaction> {
+/// The jobs for landing `versions` on `line`, in order: each is derived,
+/// and on trunk the last, the new head, is indexed.
+pub fn landing_jobs(
+    repo: &RepoStore,
+    versions: &[ChangeVersionHash],
+    line: &Line,
+) -> Result<Transaction> {
     let derive = Queue::new(repo.clone(), DERIVE_QUEUE);
     let mut tx = Transaction::new();
     for version in versions {
         tx.mutations.extend(derive.enqueue(derive_job(version))?);
     }
-    if let Some(head) = versions.last() {
+    if let Some(head) = versions.last().filter(|_| line.is_trunk()) {
         let index = Queue::new(repo.clone(), INDEX_QUEUE);
         tx.mutations.extend(index.enqueue(index_job(head))?);
     }

@@ -101,6 +101,12 @@ through the global `repoid` index.
 | `trunk` | `seq` | version hash landed at that sequence |
 | `trunkh` | `hash` | be64 trunk sequence (reverse index) |
 | `ref` | `name` | version hash |
+| `rhd` | `release` | a release's head: be64 seq ++ version hash (seq 0 is where it was cut) |
+| `rel` | `release, seq` | version hash landed on the release at that position |
+| `relh` | `release, hash` | be64 release position (reverse index) |
+| `rland` | `release, seq` | `Landing` record on the release |
+| `rlq` | `release, lane, requested_at, ticket` | empty; release requests not yet finished |
+| `rln` | (none) | counter moved by every new release request |
 | `ws` | `workspace` | `Workspace` record |
 | `op` | `workspace, stamp` | `Operation`, with the whole resulting workspace |
 | `opi` | `operation` | empty; idempotency marker |

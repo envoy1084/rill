@@ -46,7 +46,7 @@ pub use objects::land_request::{
     GroupMode, LandGroup, LandRequest, LandRequestRecord, LandStatus, LandTicket, Lane, VerifyMode,
 };
 pub use objects::landing::Landing;
-pub use objects::refs::{RefName, RefUpdate, TrunkSeq};
+pub use objects::refs::{Line, RefName, RefUpdate, TrunkSeq};
 pub use objects::review::{
     ChangeRecord, Comment, Label, LabelRange, LabelVote, ReviewState, ReviewStatus, Thread,
     ThreadAnchor, ThreadHeader,

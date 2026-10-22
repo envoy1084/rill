@@ -49,6 +49,7 @@ service RepoService {
   rpc ResolveRef(ResolveRefRequest) returns (ResolveRefResponse);
   rpc ListRefs(ListRefsRequest) returns (ListRefsResponse);
   rpc MoveRef(MoveRefRequest) returns (MoveRefResponse);
+  rpc CutRelease(CutReleaseRequest) returns (CutReleaseResponse);
   rpc TrunkHead(TrunkHeadRequest) returns (TrunkHeadResponse);
   rpc TrunkRange(TrunkRangeRequest) returns (TrunkRangeResponse);
 
@@ -436,6 +437,21 @@ message ListRefsRequest {
 }
 message ListRefsResponse {
   repeated Ref refs = 1;
+}
+
+// Create release/<name> at a trunk position. A release then moves only
+// through its own lander: RequestLand with onto = "release/<name>".
+message CutReleaseRequest {
+  bytes operation_id = 1;
+  string repo = 2;
+  string name = 3;
+  // The trunk position to cut at; the head when absent.
+  optional uint64 at = 4;
+}
+message CutReleaseResponse {
+  string ref = 1;
+  bytes hash = 2;
+  uint64 trunk_seq = 3;
 }
 
 message MoveRefRequest {

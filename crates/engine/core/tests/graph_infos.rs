@@ -25,6 +25,7 @@ async fn a_version_read_before_landing_reports_its_trunk_position_after() {
 
     f.repo
         .land(LandBatch {
+            line: Default::default(),
             expected: None,
             entries: vec![LandEntry {
                 version,

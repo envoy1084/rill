@@ -169,7 +169,11 @@ pub async fn scenario(name: &str, stores: &Stores) {
     );
 }
 
-fn review_of(change: ChangeId, version: ChangeVersionHash, status: ReviewStatus) -> ReviewState {
+pub fn review_of(
+    change: ChangeId,
+    version: ChangeVersionHash,
+    status: ReviewStatus,
+) -> ReviewState {
     ReviewState {
         change_id: change,
         versions: vec![version],
@@ -218,6 +222,7 @@ pub async fn landing(name: &str, stores: &Stores) {
     }
     let lease = repo.try_acquire("lander", "a").await.unwrap().unwrap();
     let batch = LandBatch {
+        line: Default::default(),
         expected: Some(root),
         entries: entries.clone(),
         fence: Some(lease.clone()),
@@ -261,6 +266,7 @@ pub async fn landing(name: &str, stores: &Stores) {
     repo.release(&lease).await.unwrap();
     repo.try_acquire("lander", "b").await.unwrap().unwrap();
     let stale = LandBatch {
+        line: Default::default(),
         expected: Some(entries[2].version),
         entries: vec![LandEntry {
             version: next_hash,
@@ -288,6 +294,7 @@ pub async fn landing(name: &str, stores: &Stores) {
     .await
     .unwrap();
     let abandoned = LandBatch {
+        line: Default::default(),
         expected: Some(entries[2].version),
         entries: vec![LandEntry {
             version: next_hash,

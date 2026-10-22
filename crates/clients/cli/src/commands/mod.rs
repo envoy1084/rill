@@ -17,6 +17,7 @@ pub mod land;
 pub mod org;
 pub mod protection;
 pub mod refs;
+pub mod release;
 pub mod repo;
 pub mod review;
 pub mod secrets;

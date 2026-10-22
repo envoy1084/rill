@@ -145,6 +145,7 @@ mod tests {
         let repo = fx.service.repo();
         let head = repo.trunk_head().await.unwrap().map(|(_, h)| h);
         repo.land(rill_store::repo::LandBatch {
+            line: Default::default(),
             expected: head,
             entries: vec![rill_store::repo::LandEntry {
                 version,

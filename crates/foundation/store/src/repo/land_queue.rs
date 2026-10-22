@@ -13,14 +13,13 @@ use std::time::Duration;
 use bytes::Bytes;
 use rill_types::{
     ids::random_id, ChangeId, EventKind, GroupMode, LandGroup, LandRequest, LandRequestRecord,
-    LandStatus, LandTicket, Principal, Timestamp,
+    LandStatus, LandTicket, Line, Principal, Timestamp,
 };
 
 use super::codec::{decode_record, encode_record, parse_seq};
 use super::leases::Lease;
 use super::store::RepoStore;
 use crate::error::{Error, Result};
-use crate::keys::table;
 use crate::meta::{KeyRange, Mutation, Transaction};
 
 impl RepoStore {
@@ -33,7 +32,7 @@ impl RepoStore {
         let ticket = new_ticket();
         let tx = self
             .queue_tx(ticket, request.clone())?
-            .merge(self.wake_tx());
+            .merge(self.wake_tx(&request.line));
         match self.meta().transact(tx).await {
             Ok(_) => Ok((ticket, true)),
             Err(Error::Conflict(_)) => match self.active_land_request(&request.change_id).await? {
@@ -53,7 +52,13 @@ impl RepoStore {
         mode: GroupMode,
     ) -> Result<Vec<LandTicket>> {
         let tickets: Vec<LandTicket> = requests.iter().map(|_| new_ticket()).collect();
-        let mut tx = self.wake_tx();
+        let Some(line) = requests.first().map(|r| r.line.clone()) else {
+            return Ok(Vec::new());
+        };
+        if requests.iter().any(|r| r.line != line) {
+            return Err(Error::Invalid("a group lands on one line".into()));
+        }
+        let mut tx = self.wake_tx(&line);
         for (index, request) in requests.iter().enumerate() {
             let mut request = request.clone();
             request.group = Some(LandGroup {
@@ -100,10 +105,10 @@ impl RepoStore {
         Ok(tx)
     }
 
-    fn wake_tx(&self) -> Transaction {
+    fn wake_tx(&self, line: &Line) -> Transaction {
         let mut tx = Transaction::new();
         tx.mutations.push(Mutation::Add {
-            key: self.keys().table(table::LAND_WAKE),
+            key: self.keys().line(line).wake(),
             delta: 1,
         });
         tx
@@ -128,7 +133,18 @@ impl RepoStore {
     /// Up to `limit` unfinished requests, most urgent lane first, oldest
     /// first within a lane.
     pub async fn pending_land_requests(&self, limit: usize) -> Result<Vec<LandRequestRecord>> {
-        let prefix = self.keys().land_pending_all();
+        self.pending_land_requests_on(&Line::Trunk, limit).await
+    }
+
+    /// [`RepoStore::pending_land_requests`] for the requests landing on
+    /// `line`.
+    pub async fn pending_land_requests_on(
+        &self,
+        line: &Line,
+        limit: usize,
+    ) -> Result<Vec<LandRequestRecord>> {
+        let keys = self.keys();
+        let prefix = keys.line(line).pending_all();
         let rows = self
             .meta()
             .scan(KeyRange::prefix(prefix.clone()).limit(limit))
@@ -208,17 +224,20 @@ impl RepoStore {
     }
 
     /// Requests queued so far, to pass to [`RepoStore::wait_for_land_requests`].
-    pub async fn land_wake_count(&self) -> Result<i64> {
-        self.meta()
-            .counter(&self.keys().table(table::LAND_WAKE))
-            .await
+    pub async fn land_wake_count(&self, line: &Line) -> Result<i64> {
+        self.meta().counter(&self.keys().line(line).wake()).await
     }
 
-    /// Wait until a request is queued after the count was `seen`, or
-    /// `timeout` passes.
-    pub async fn wait_for_land_requests(&self, seen: i64, timeout: Duration) -> Result<()> {
+    /// Wait until a request for `line` is queued after the count was
+    /// `seen`, or `timeout` passes. Every release shares one counter.
+    pub async fn wait_for_land_requests(
+        &self,
+        line: &Line,
+        seen: i64,
+        timeout: Duration,
+    ) -> Result<()> {
         self.meta()
-            .wait_counter(&self.keys().table(table::LAND_WAKE), seen, timeout)
+            .wait_counter(&self.keys().line(line).wake(), seen, timeout)
             .await?;
         Ok(())
     }
@@ -249,7 +268,7 @@ impl RepoStore {
     }
 
     fn pending_key(&self, record: &LandRequestRecord) -> Bytes {
-        self.keys().land_pending(
+        self.keys().line(&record.request.line).pending(
             record.request.lane.rank(),
             record.request.requested_at.millis(),
             record.ticket.0,

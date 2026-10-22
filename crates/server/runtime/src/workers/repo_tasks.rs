@@ -23,6 +23,11 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>, roles: crate::config::Roles) {
     ctx.lifecycle
         .tasks
         .spawn(ctx.lander.clone().run_forever(shutdown.clone()));
+    ctx.lifecycle.tasks.spawn(
+        ctx.releases
+            .clone()
+            .run_forever(ctx.lander.policy().batch_window, shutdown.clone()),
+    );
     if let Some(postland) = &ctx.postland {
         ctx.lifecycle.tasks.spawn(
             postland

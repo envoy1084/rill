@@ -3,8 +3,8 @@
 use clap::CommandFactory;
 
 use super::{
-    access, admin, change, checkout, export, history, import, intent, land, org, refs, repo,
-    review, session, stack, status, watch, ws,
+    access, admin, change, checkout, export, history, import, intent, land, org, refs, release,
+    repo, review, session, stack, status, watch, ws,
 };
 use crate::cli::{Cli, Command};
 use crate::context::Ctx;
@@ -55,6 +55,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Intent(cmd) => intent::run(ctx, cmd).await,
         Command::Ws(cmd) => ws::run(ctx, cmd).await,
         Command::Ref(cmd) => refs::run(ctx, cmd).await,
+        Command::Release(cmd) => release::run(ctx, cmd).await,
         Command::Admin(cmd) => admin::run(ctx, cmd).await,
         Command::Access(cmd) => access::run(ctx, cmd).await,
         Command::Login(args) => session::login(ctx, args).await,

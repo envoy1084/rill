@@ -64,6 +64,9 @@ pub struct StackLandArgs {
     /// or none.
     #[arg(long)]
     pub prefix: bool,
+    /// Land on this release (`release/<name>`) instead of trunk.
+    #[arg(long, value_name = "REF")]
+    pub onto: Option<String>,
 }
 
 /// Run a stack subcommand.
@@ -201,7 +204,12 @@ async fn land(ctx: &mut Ctx<'_>, args: StackLandArgs) -> Result<()> {
     }
     let landing = repo
         .stack()
-        .land_stack(&ids(&chain), args.prefix, Duration::from_secs(args.timeout))
+        .land_stack(
+            &ids(&chain),
+            args.prefix,
+            args.onto.as_deref(),
+            Duration::from_secs(args.timeout),
+        )
         .await?;
     ctx.emit(
         j!({

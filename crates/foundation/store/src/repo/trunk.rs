@@ -1,7 +1,7 @@
 //! Refs and the trunk sequence.
 
 use bytes::Bytes;
-use rill_types::{ChangeVersionHash, EventKind, Principal, RefName, TrunkSeq};
+use rill_types::{ChangeVersionHash, EventKind, Line, Principal, RefName, TrunkSeq};
 
 use super::codec::{hash_value, parse_hash, parse_seq};
 use super::store::RepoStore;
@@ -71,24 +71,83 @@ impl RepoStore {
 
     /// The newest trunk position and the version there.
     pub async fn trunk_head(&self) -> Result<Option<(TrunkSeq, ChangeVersionHash)>> {
-        match self.meta().get(&self.keys().trunk_head()).await? {
+        self.line_head(&Line::Trunk).await
+    }
+
+    pub async fn trunk_at(&self, seq: TrunkSeq) -> Result<Option<ChangeVersionHash>> {
+        self.line_at(&Line::Trunk, seq).await
+    }
+
+    pub async fn trunk_seq_of(&self, hash: &ChangeVersionHash) -> Result<Option<TrunkSeq>> {
+        self.line_seq_of(&Line::Trunk, hash).await
+    }
+
+    /// The newest position of `line` and the version there. A release
+    /// starts at position 0, the version it was cut at.
+    pub async fn line_head(&self, line: &Line) -> Result<Option<(TrunkSeq, ChangeVersionHash)>> {
+        match self.meta().get(&self.keys().line(line).head()).await? {
             Some(row) => Ok(Some(parse_head(&row)?)),
             None => Ok(None),
         }
     }
 
-    pub async fn trunk_at(&self, seq: TrunkSeq) -> Result<Option<ChangeVersionHash>> {
-        match self.meta().get(&self.keys().trunk(seq.get())).await? {
+    /// The version at position `seq` of `line`.
+    pub async fn line_at(&self, line: &Line, seq: TrunkSeq) -> Result<Option<ChangeVersionHash>> {
+        match self
+            .meta()
+            .get(&self.keys().line(line).position(seq.get()))
+            .await?
+        {
             Some(bytes) => Ok(Some(parse_hash(&bytes)?)),
             None => Ok(None),
         }
     }
 
-    pub async fn trunk_seq_of(&self, hash: &ChangeVersionHash) -> Result<Option<TrunkSeq>> {
-        match self.meta().get(&self.keys().trunk_by_hash(hash)).await? {
+    /// The position `hash` landed at on `line`, if it did.
+    pub async fn line_seq_of(
+        &self,
+        line: &Line,
+        hash: &ChangeVersionHash,
+    ) -> Result<Option<TrunkSeq>> {
+        match self
+            .meta()
+            .get(&self.keys().line(line).by_hash(hash))
+            .await?
+        {
             Some(bytes) => Ok(Some(TrunkSeq(parse_seq(&bytes)?))),
             None => Ok(None),
         }
+    }
+
+    /// Cut `release/<name>` at `at`: the ref and the release's head row
+    /// (position 0), written together. Fails with a conflict when the
+    /// release exists.
+    pub async fn cut_release(
+        &self,
+        name: &str,
+        at: ChangeVersionHash,
+        actor: &Principal,
+    ) -> Result<()> {
+        let ref_name = RefName::release(name)?;
+        let line = Line::Release(name.to_string());
+        let keys = self.keys();
+        let head = keys.line(&line).head();
+        let reference = keys.reference(&ref_name);
+        let mut tx = Transaction::new()
+            .expect_absent(reference.clone())
+            .expect_absent(head.clone())
+            .set(reference, hash_value(&at))
+            .set(head, head_row(0, &at));
+        tx.mutations.extend(self.event_by(
+            actor,
+            EventKind::RefMoved {
+                name: ref_name.to_string(),
+                old: None,
+                new: Some(at),
+            },
+        )?);
+        self.meta().transact(tx).await?;
+        Ok(())
     }
 
     /// Trunk entries in `(from, to]`, oldest first.

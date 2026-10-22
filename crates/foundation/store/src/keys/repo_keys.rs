@@ -30,7 +30,7 @@ impl RepoKeys {
         key(&(table, self.ns.as_str(), self.repo.as_bytes().as_slice()))
     }
 
-    fn row<T: TuplePack>(&self, table: &str, rest: &T) -> Bytes {
+    pub(super) fn row<T: TuplePack>(&self, table: &str, rest: &T) -> Bytes {
         let mut out = self.table(table).to_vec();
         foundationdb_tuple::pack_into(rest, &mut out);
         Bytes::from(out)

@@ -40,7 +40,8 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Changes | `new`, `describe`, `amend`, `sync`, `resolve`, `undo` |
 | Stacks | `stack show`, `stack sync`, `stack submit`, `stack land [--prefix]` (one ordered group: all or nothing, or the longest landable prefix) |
 | Review | `submit`, `review show/list/vote/comment/threads/resolve-thread/evaluate/abandon` |
-| Landing | `land [--wait] [--timeout 300] [--no-sync]`, `trunk`, `landings`, `verify`, `revert`, `bisect` |
+| Landing | `land [--wait] [--timeout 300] [--no-sync] [--onto release/<name>]`, `trunk`, `landings`, `verify`, `revert`, `bisect` |
+| Releases | `release cut <name> [--at SEQ]` (repository owners), `release list`; land on one with `land --onto release/<name>` or `stack land --onto` |
 | Checks | `checks runs [--of-version]`, `checks run <id> [--watch]`, `checks log <run> <step> [--stderr] [--tail]`, `checks artifact <run> <step> <path> [-o]`, `checks nonhermetic`, `checks flaky [--min-score] [--limit]`, `checks history <target>` ([checks](../06-services/checks.md)) |
 | Intents | `intent create/list/show/update/link/similar` |
 | Workspaces, refs | `ws create/list/show/handoff/ops/delete`, `ref list/show/set/delete` |

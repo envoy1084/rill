@@ -9,6 +9,8 @@ use rill_exec::history::TestHistory;
 use rill_exec::runs::RunStore;
 use rill_exec::PlanRunner;
 use rill_lander::{AlwaysGreen, Lander, PostLandVerifier, Verifier};
+
+use super::ReleaseLanders;
 use rill_policy::Authorizer;
 use rill_review::service::{ReviewEvent, ReviewService};
 use rill_review::votes::LabelSet;
@@ -112,20 +114,29 @@ impl RepoRegistry {
             });
         }
         let hooks = Arc::new(hooks);
-        let mut lander = Lander::new(
-            repo.clone(),
-            derive.clone(),
-            graph.clone(),
-            hooks,
-            verifier,
-            self.config.lander.clone(),
-        );
-        if let Some(runner) = runner {
-            lander = lander
-                .with_regenerator(Arc::new(workers::ExecRegenerator::new(runner.clone())))
-                .with_targets(Arc::new(workers::ExecTargetGraph::new(runner)));
-        }
-        let lander = Arc::new(lander);
+        let build = {
+            let (repo, derive, graph) = (repo.clone(), derive.clone(), graph.clone());
+            let policy = self.config.lander.clone();
+            move |line: rill_types::Line| {
+                let mut lander = Lander::new(
+                    repo.clone(),
+                    derive.clone(),
+                    graph.clone(),
+                    hooks.clone(),
+                    verifier.clone(),
+                    policy.clone(),
+                )
+                .on_line(line);
+                if let Some(runner) = &runner {
+                    lander = lander
+                        .with_regenerator(Arc::new(workers::ExecRegenerator::new(runner.clone())))
+                        .with_targets(Arc::new(workers::ExecTargetGraph::new(runner.clone())));
+                }
+                lander
+            }
+        };
+        let lander = Arc::new(build(rill_types::Line::Trunk));
+        let releases = Arc::new(ReleaseLanders::new(repo.clone(), build));
         let postland = self
             .config
             .postland
@@ -141,6 +152,7 @@ impl RepoRegistry {
             derive,
             graph,
             lander,
+            releases,
             postland,
             search,
             authorizer,

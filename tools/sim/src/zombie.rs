@@ -32,6 +32,7 @@ impl Ctx<'_> {
             return Outcome::Failed;
         };
         let batch = LandBatch {
+            line: Default::default(),
             expected: head.map(|(_, h)| h),
             entries: vec![LandEntry {
                 version,

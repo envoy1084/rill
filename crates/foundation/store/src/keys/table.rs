@@ -54,6 +54,19 @@ pub const LOG: &str = "log";
 pub const TRUNK: &str = "trunk";
 /// `(trunkh, ns, repo, hash)` → be64 seq
 pub const TRUNK_BY_HASH: &str = "trunkh";
+/// `(rhd, ns, repo, release)` → be64 seq ++ version hash of a release head
+pub const RELEASE_HEAD: &str = "rhd";
+/// `(rel, ns, repo, release, seq)` → version hash
+pub const RELEASE: &str = "rel";
+/// `(relh, ns, repo, release, hash)` → be64 seq
+pub const RELEASE_BY_HASH: &str = "relh";
+/// `(rland, ns, repo, release, seq)` → Landing
+pub const RELEASE_LANDING: &str = "rland";
+/// `(rlq, ns, repo, release, lane, requested_at, ticket)` → empty; release
+/// requests not yet finished, in the order they are served
+pub const RELEASE_PENDING: &str = "rlq";
+/// `(rln, ns, repo)` → counter moved by every new release request
+pub const RELEASE_WAKE: &str = "rln";
 /// `(ref, ns, repo, name)` → version hash
 pub const REF: &str = "ref";
 /// `(ws, ns, repo, workspace)` → Workspace

@@ -32,6 +32,9 @@ pub struct LandArgs {
     /// syncing it to trunk.
     #[arg(long)]
     pub no_sync: bool,
+    /// Land on this release (`release/<name>`) instead of trunk.
+    #[arg(long, value_name = "REF")]
+    pub onto: Option<String>,
 }
 
 /// `rill landings`.
@@ -78,7 +81,10 @@ pub struct BisectArgs {
 pub async fn land(ctx: &mut Ctx<'_>, args: LandArgs) -> Result<()> {
     let repo = ctx.repo()?;
     let id = change_or_working(ctx, args.change.as_deref(), &repo).await?;
-    let ticket = repo.reviews().request_land(id).await?;
+    let ticket = match args.onto.as_deref() {
+        Some(onto) => repo.reviews().request_land_onto(id, onto).await?,
+        None => repo.reviews().request_land(id).await?,
+    };
     if !args.wait {
         let progress = repo.reviews().land_status(&ticket.id).await?;
         return ctx.emit(json::land_progress(&progress), |out| {
@@ -102,7 +108,7 @@ pub async fn land(ctx: &mut Ctx<'_>, args: LandArgs) -> Result<()> {
         .await;
     match progress {
         Ok(progress) => {
-            let sync = if args.no_sync {
+            let sync = if args.no_sync || args.onto.is_some() {
                 AfterLand::Skipped
             } else {
                 sync_after_land(ctx, id).await?

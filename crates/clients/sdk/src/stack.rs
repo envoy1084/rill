@@ -146,14 +146,15 @@ impl StackClient {
         Ok(result)
     }
 
-    /// Declare `change_ids` (bottom first) a stack and land it as one
-    /// ordered group: every change in one landing or none, or with
-    /// `prefix` the longest run from the bottom that can land. Waits up to
-    /// `timeout` for each landing to finish.
+    /// Declare `change_ids` (bottom first) a stack and land it on `onto`
+    /// (trunk when `None`) as one ordered group: every change in one
+    /// landing or none, or with `prefix` the longest run from the bottom
+    /// that can land. Waits up to `timeout` for each landing to finish.
     pub async fn land_stack(
         &self,
         change_ids: &[ChangeId],
         prefix: bool,
+        onto: Option<&str>,
         timeout: Duration,
     ) -> Result<StackLanding> {
         let Some(top) = change_ids.last() else {
@@ -162,7 +163,7 @@ impl StackClient {
         if change_ids.len() > 1 {
             self.reviews.set_stack(change_ids).await?;
         }
-        let tickets = self.reviews.request_land_stack(*top, prefix).await?;
+        let tickets = self.reviews.request_land_stack(*top, prefix, onto).await?;
         let mut out = StackLanding::default();
         for ticket in tickets {
             match self.await_land(&ticket.id, timeout).await {

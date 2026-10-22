@@ -34,9 +34,9 @@ in, without it. It also registers `tonic-reflection` and
 
 | Service | Proto | Handler | Covers |
 | --- | --- | --- | --- |
-| `RepoService` | `repo.proto` | `services/repo/` | repositories, history, blame, grep, trees and blobs, diff, merge base, writes (`CreateChangeVersion`, `ApplyEdits`, `Rebase`, `Merge`, `Resolve`), refs and trunk, `Watch*` streams including `WatchEvents`, derived data |
+| `RepoService` | `repo.proto` | `services/repo/` | repositories, history, blame, grep, trees and blobs, diff, merge base, writes (`CreateChangeVersion`, `ApplyEdits`, `Rebase`, `Merge`, `Resolve`), refs and trunk, `CutRelease`, `Watch*` streams including `WatchEvents`, derived data |
 | `WorkspaceService` | `workspace.proto` | `services/workspace/mod.rs` | server-side workspaces, snapshots, operation log, `Undo`, `WorkspaceDiff` |
-| `ReviewService` | `review.proto` | `services/review/` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand`, `RequestLandStack`, `GetLandStatus`, `WatchReview` |
+| `ReviewService` | `review.proto` | `services/review/` | votes, threads, stacks, `EvaluateSubmit`, `RequestLand` and `RequestLandStack` (`onto` trunk or a release), `GetLandStatus`, `WatchReview` |
 | `IntentService` | `intent.proto` | `services/intent.rs` | intents, change links, `FindSimilarIntents` |
 | `LanderService` | `lander.proto` | `services/lander.rs` | trunk status, landings, verification records and reports, `RevertSeq`, `Bisect` |
 | `AdminService` | `admin.proto` | `services/admin/mod.rs`, `services/orgs.rs` | `WhoAmI`, `IssueToken`, `GetPolicy`/`SetPolicy`, `Health`, `CreateOrg`, `ListOrgs`, `AppendTrunk` (importers) |

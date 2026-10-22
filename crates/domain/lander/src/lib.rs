@@ -26,7 +26,9 @@ pub use config::{LandPolicy, VerifyMode, VerifyModes};
 pub use error::{Error, Result};
 pub use events::LandEvent;
 pub use ladder::{MergeRules, MERGE_DRIVERS_EXTRA, MERGE_RULES_PATH};
-pub use land::{landing_of, list_landings, HeadRules, Lander, Landing, MAX_BATCH};
+pub use land::{
+    lander_lease, landing_of, list_landings, HeadRules, Lander, Landing, LANDER_LEASE, MAX_BATCH,
+};
 pub use postland::{PostLandVerifier, Sweep, VerificationRecord, VerificationStatus};
 pub use queue::{LandQueue, LandRequest, LandStatus, LandTicket, QueuedRequest};
 pub use revert::{auto_revert, build_revert, has_forward_fix, revert, RevertOutcome};

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use rill_types::{ChangeId, ChangeVersion, ChangeVersionHash, LandStatus, Timestamp, TrunkSeq};
 
-use super::lander::{Lander, LANDER_LEASE};
+use super::lander::{lander_lease, Lander};
 use super::prepare::Candidate;
 use crate::error::{Error, Result};
 use crate::events::LandEvent;
@@ -23,7 +23,7 @@ impl Lander {
         let first = head.map(|(s, _)| s.get()).unwrap_or(0) + 1;
         let actor = crate::revert::lander_principal();
         let versions: Vec<ChangeVersionHash> = chain.iter().map(|c| c.version).collect();
-        let mut also = super::followups::landing_jobs(&self.repo, &versions)?;
+        let mut also = super::followups::landing_jobs(&self.repo, &versions, &self.line)?;
         for (i, candidate) in chain.iter().enumerate() {
             let seq = TrunkSeq(first + i as u64);
             also = also.merge(self.repo.land_status_tx(
@@ -46,6 +46,7 @@ impl Lander {
             })
             .collect();
         let batch = LandBatch {
+            line: self.line.clone(),
             expected: head.map(|(_, h)| h),
             entries,
             fence: Some(lease.clone()),
@@ -55,7 +56,7 @@ impl Lander {
         let landings = match self.repo.land(batch).await {
             Ok(landings) => landings,
             Err(e) if e.is_conflict() => {
-                if self.repo.lease_epoch(LANDER_LEASE).await? != lease.epoch {
+                if self.repo.lease_epoch(&lander_lease(&self.line)).await? != lease.epoch {
                     self.lost_lease().await;
                     return Err(Error::Fenced);
                 }
@@ -64,11 +65,12 @@ impl Lander {
             Err(e) => {
                 // The land may have committed with its reply lost: trunk is
                 // the record of what happened.
-                match self.repo.landing_of(&chain[0].version).await {
+                match self.repo.landing_of_on(&self.line, &chain[0].version).await {
                     Ok(Some(landing)) if landing.change_id == chain[0].cv.change_id => {
                         let mut landings = Vec::with_capacity(chain.len());
                         for c in &chain {
-                            if let Some(l) = self.repo.landing_of(&c.version).await? {
+                            if let Some(l) = self.repo.landing_of_on(&self.line, &c.version).await?
+                            {
                                 landings.push(l);
                             }
                         }

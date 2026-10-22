@@ -316,6 +316,45 @@ digest of the submit policy that approved the landing and `approvals` the
 votes it saw (both empty for changes without review). `landing_of(version)` goes through the
 reverse index; `list_landings(limit)` scans the newest records.
 
+## Release lines
+
+A release is a second line of landings beside trunk. `CutRelease(name,
+at)` (repository owners; audited as `ref.move` with no old target) writes,
+in one transaction, the ref `release/<name>` and the release's head row at
+position 0, the trunk version it was cut at (`RepoStore::cut_release`;
+refused if the release exists). After that the release moves only through
+its lander: `MoveRef` refuses `release/*` like `trunk`.
+
+Everything a line needs is keyed by `Line` (`Trunk` or `Release(name)`):
+`RepoKeys::line(&line)` gives trunk's own keys, or the release's rows in
+the release tables (`rhd`, `rel`, `relh`, `rland`, `rlq`, `rln`;
+[keyspace](../02-data/storage-and-keyspace.md)). `RepoStore::land` lands a
+`LandBatch` on `batch.line`: the same checks and writes, against that
+line's head row and ref. A release landing writes a `RefMoved` event, not
+`Landed`, and does not set the review's `landed_seq` (a trunk position);
+it enqueues derive jobs but no search index job, so search stays on
+trunk.
+
+A land request carries its line (`LandRequest::onto`): `RequestLand` and
+`RequestLandStack` take `onto = "release/<name>"`, refused with
+`NOT_FOUND` for a release never cut. Each release has its own lander
+(`Lander::on_line`): its own queue (`rlq`), its own lease
+(`lander:release/<name>`, so it never contends with trunk's), and the same
+review hooks, verifier, merge drivers and build graph as trunk. A lander
+refuses a request for another line. Its rules are the release's own:
+`.rill/landing.toml`, `.rill/merge.toml` and `.rill/verify.toml` are read
+at the release head (or in the tree verified), so a release keeps the
+rules it was cut with. Submit policy and write grants are repository-wide
+records, so they are the same on every line.
+
+A cherry-pick is a change whose base is the release, or any change landed
+onto it: the rebase replays the change's own edit (its diff from its
+first parent) onto the release head. `ReleaseLanders` (in the runtime)
+builds release landers on demand; one task per repository serves every
+release's queue concurrently after each new release request (one shared
+`rln` counter) or `batch_window`. Post-land verification, reverts and
+bisection follow trunk only.
+
 ## Formal model
 
 [`spec/sequencer/Sequencer.tla`](../../spec/sequencer/Sequencer.tla) is a
@@ -374,6 +413,10 @@ step.
 * After a failed landing the rebased version stays stored but is not the
   review's current version.
 * Only the root `.gitattributes` is read, and only its `merge` attribute.
+* Releases: all of a repository's releases are served by one task, so a
+  slow verification on one release delays the others' next sweep. A
+  release cannot be deleted, and nothing helps make a cherry-pick (create
+  the change on the release, or land a trunk change's copy onto it).
 * `regenerate` runs without network, so lockfile commands must work
   offline (vendored or cached dependencies in the image). A conflicted
   chain of lockfile changes regenerates once per request, in order.
@@ -382,6 +425,7 @@ step.
 
 * [rill-lander/src/land/lander.rs](../../crates/domain/lander/src/land/lander.rs), [sequence.rs](../../crates/domain/lander/src/land/sequence.rs), [prepare.rs](../../crates/domain/lander/src/land/prepare.rs), [commit.rs](../../crates/domain/lander/src/land/commit.rs), [speculate.rs](../../crates/domain/lander/src/land/speculate.rs), [domains.rs](../../crates/domain/lander/src/land/domains.rs), [record.rs](../../crates/domain/lander/src/land/record.rs)
 * [rill-lander/src/schedule/](../../crates/domain/lander/src/schedule/) (footprints, landing rules, fair order, ordered groups, plan, thrash, ETAs), [land/groups.rs](../../crates/domain/lander/src/land/groups.rs)
+* [rill-store/src/keys/line_keys.rs](../../crates/foundation/store/src/keys/line_keys.rs), [rill-runtime/src/state/releases.rs](../../crates/server/runtime/src/state/releases.rs), [rill-api/src/services/repo/refs.rs](../../crates/server/api/src/services/repo/refs.rs) (`CutRelease`)
 * [rill-lander/src/ladder/](../../crates/domain/lander/src/ladder/) (merge rules, `.gitattributes`, union, the ladder), [land/head_config.rs](../../crates/domain/lander/src/land/head_config.rs) (rules read once per head)
 * [rill-exec/src/verify/regenerate.rs](../../crates/domain/exec/src/verify/regenerate.rs), [rill-runtime/src/workers/regenerator.rs](../../crates/server/runtime/src/workers/regenerator.rs)
 * [rill-lander/src/queue.rs](../../crates/domain/lander/src/queue.rs), [config.rs](../../crates/domain/lander/src/config.rs), [events.rs](../../crates/domain/lander/src/events.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)

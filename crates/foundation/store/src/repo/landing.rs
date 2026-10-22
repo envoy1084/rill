@@ -9,7 +9,7 @@
 
 use bytes::Bytes;
 use rill_types::{
-    ChangeId, ChangeVersionHash, Event, EventKind, Landing, Principal, RefName, ReviewStatus,
+    ChangeId, ChangeVersionHash, Event, EventKind, Landing, Line, Principal, ReviewStatus,
     RiskClass, Timestamp, TrunkSeq,
 };
 
@@ -42,6 +42,8 @@ pub struct LandEntry {
 /// Versions to land together, in order.
 #[derive(Debug, Clone, Default)]
 pub struct LandBatch {
+    /// The line they land on.
+    pub line: Line,
     /// The trunk head the batch lands on; `None` for an empty trunk.
     pub expected: Option<ChangeVersionHash>,
     pub entries: Vec<LandEntry>,
@@ -60,7 +62,8 @@ impl RepoStore {
     /// review changed since it was read.
     pub async fn land(&self, batch: LandBatch) -> Result<Vec<Landing>> {
         let keys = self.keys();
-        let head_key = keys.trunk_head();
+        let lines = keys.line(&batch.line);
+        let head_key = lines.head();
         let head = self.meta().get(&head_key).await?;
         let (head_seq, head_hash) = match &head {
             Some(row) => {
@@ -69,14 +72,17 @@ impl RepoStore {
             }
             None => (0, None),
         };
+        if head.is_none() && !batch.line.is_trunk() {
+            return Err(Error::NotFound(format!("{} was never cut", batch.line)));
+        }
         if head_hash != batch.expected {
-            return Err(Error::Conflict("trunk moved".into()));
+            return Err(Error::Conflict(format!("{} moved", batch.line)));
         }
         let Some(last) = batch.entries.last() else {
             return Ok(Vec::new());
         };
         let now = Timestamp::now();
-        let ref_key = keys.reference(&RefName::trunk());
+        let ref_key = keys.reference(&batch.line.ref_name());
         let mut tx = Transaction::new()
             .expect(head_key.clone(), head)
             .expect(ref_key.clone(), batch.expected.as_ref().map(hash_value))
@@ -91,6 +97,9 @@ impl RepoStore {
         tx = tx.merge(batch.also);
         let stores = self.stores();
         let mut landings = Vec::with_capacity(batch.entries.len());
+        // A release head always exists (it was cut), so only trunk starts
+        // from nothing.
+        let mut previous = head_hash.unwrap_or(ChangeVersionHash::ZERO);
         for (i, entry) in batch.entries.into_iter().enumerate() {
             let seq = TrunkSeq(head_seq + 1 + i as u64);
             let landing = Landing {
@@ -114,18 +123,27 @@ impl RepoStore {
                 at: now,
             };
             tx = tx
-                .expect_absent(keys.trunk(seq.get()))
-                .set(keys.trunk(seq.get()), hash_value(&entry.version))
+                .expect_absent(lines.position(seq.get()))
+                .set(lines.position(seq.get()), hash_value(&entry.version))
                 .set(
-                    keys.trunk_by_hash(&entry.version),
+                    lines.by_hash(&entry.version),
                     Bytes::copy_from_slice(&seq.get().to_be_bytes()),
                 )
-                .set(keys.landing(seq.get()), encode_record(&landing)?);
-            tx.mutations.extend(self.event(&event(EventKind::Landed {
-                seq,
-                version: entry.version,
-                change: entry.change_id,
-            }))?);
+                .set(lines.landing(seq.get()), encode_record(&landing)?);
+            let landed = match &batch.line {
+                Line::Trunk => EventKind::Landed {
+                    seq,
+                    version: entry.version,
+                    change: entry.change_id,
+                },
+                Line::Release(_) => EventKind::RefMoved {
+                    name: batch.line.ref_name().to_string(),
+                    old: Some(previous),
+                    new: Some(entry.version),
+                },
+            };
+            previous = entry.version;
+            tx.mutations.extend(self.event(&event(landed))?);
             tx.mutations
                 .push(stores.charge(&entry.requester, metric::LANDINGS, 1));
             if let Some(snapshot) = &entry.review {
@@ -138,7 +156,7 @@ impl RepoStore {
                 }
                 let mut next = snapshot.state.clone();
                 next.status = ReviewStatus::Landed;
-                next.landed_seq = Some(seq);
+                next.landed_seq = batch.line.is_trunk().then_some(seq);
                 next.updated_at = now.max(snapshot.state.updated_at);
                 tx = tx.merge(self.review_writes(snapshot, &next, &actor)?);
             }
@@ -177,7 +195,16 @@ impl RepoStore {
 
     /// The landing record at `seq`.
     pub async fn landing(&self, seq: TrunkSeq) -> Result<Option<Landing>> {
-        match self.meta().get(&self.keys().landing(seq.get())).await? {
+        self.landing_on(&Line::Trunk, seq).await
+    }
+
+    /// The landing record at `seq` of `line`.
+    pub async fn landing_on(&self, line: &Line, seq: TrunkSeq) -> Result<Option<Landing>> {
+        match self
+            .meta()
+            .get(&self.keys().line(line).landing(seq.get()))
+            .await?
+        {
             Some(bytes) => Ok(Some(decode_record(&bytes)?)),
             None => Ok(None),
         }
@@ -185,15 +212,29 @@ impl RepoStore {
 
     /// The landing record of `version`, if it is on trunk.
     pub async fn landing_of(&self, version: &ChangeVersionHash) -> Result<Option<Landing>> {
-        match self.trunk_seq_of(version).await? {
-            Some(seq) => self.landing(seq).await,
+        self.landing_of_on(&Line::Trunk, version).await
+    }
+
+    /// The landing record of `version`, if it is on `line`.
+    pub async fn landing_of_on(
+        &self,
+        line: &Line,
+        version: &ChangeVersionHash,
+    ) -> Result<Option<Landing>> {
+        match self.line_seq_of(line, version).await? {
+            Some(seq) => self.landing_on(line, seq).await,
             None => Ok(None),
         }
     }
 
     /// The newest `limit` landing records, oldest first.
     pub async fn list_landings(&self, limit: usize) -> Result<Vec<Landing>> {
-        let prefix = self.keys().landings();
+        self.list_landings_on(&Line::Trunk, limit).await
+    }
+
+    /// The newest `limit` landing records of `line`, oldest first.
+    pub async fn list_landings_on(&self, line: &Line, limit: usize) -> Result<Vec<Landing>> {
+        let prefix = self.keys().line(line).landings();
         let mut rows = self
             .meta()
             .scan(KeyRange::prefix(prefix.clone()).reverse().limit(limit))

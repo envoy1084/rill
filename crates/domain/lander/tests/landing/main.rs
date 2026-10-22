@@ -6,5 +6,6 @@ mod doubles;
 mod ladder;
 mod pipeline;
 mod postland;
+mod releases;
 mod service;
 mod stacks;

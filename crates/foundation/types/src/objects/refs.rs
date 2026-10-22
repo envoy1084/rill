@@ -117,6 +117,55 @@ impl FromStr for RefName {
     }
 }
 
+/// A line of landings, moved only by its lander: trunk, or a release
+/// ref cut from it.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Default)]
+pub enum Line {
+    #[default]
+    Trunk,
+    /// `release/<name>`, by name.
+    Release(String),
+}
+
+impl Line {
+    /// The line a ref name moves, if it is one: `trunk` or `release/<name>`.
+    pub fn of_ref(name: &RefName) -> Option<Line> {
+        if name.is_trunk() {
+            return Some(Line::Trunk);
+        }
+        name.as_str()
+            .strip_prefix("release/")
+            .map(|n| Line::Release(n.to_string()))
+    }
+
+    /// The ref the line moves.
+    pub fn ref_name(&self) -> RefName {
+        match self {
+            Line::Trunk => RefName::trunk(),
+            // Built from a validated release name.
+            Line::Release(name) => RefName(format!("release/{name}")),
+        }
+    }
+
+    pub fn is_trunk(&self) -> bool {
+        *self == Line::Trunk
+    }
+
+    /// The release name, for a release line.
+    pub fn release(&self) -> Option<&str> {
+        match self {
+            Line::Trunk => None,
+            Line::Release(name) => Some(name),
+        }
+    }
+}
+
+impl fmt::Display for Line {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.ref_name())
+    }
+}
+
 /// A compare-and-swap request on a ref.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RefUpdate {
@@ -130,6 +179,15 @@ pub struct RefUpdate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lines_are_trunk_and_release_refs_only() {
+        let release = RefName::release("1.0").unwrap();
+        assert_eq!(Line::of_ref(&release), Some(Line::Release("1.0".into())));
+        assert_eq!(Line::of_ref(&RefName::trunk()), Some(Line::Trunk));
+        assert_eq!(Line::of_ref(&RefName::new("ann/wip").unwrap()), None);
+        assert_eq!(Line::Release("1.0".into()).ref_name(), release);
+    }
 
     #[test]
     fn ref_validation() {

@@ -5,6 +5,7 @@
 use std::time::Duration;
 
 use rill_store::RepoStore;
+use rill_types::Line;
 pub use rill_types::{LandRequest, LandRequestRecord, LandStatus, LandTicket};
 
 use crate::error::Result;
@@ -39,15 +40,26 @@ impl From<LandRequestRecord> for QueuedRequest {
     }
 }
 
-/// A handle on one repository's land requests.
+/// A handle on one repository's land requests for one line.
 #[derive(Clone)]
 pub struct LandQueue {
     repo: RepoStore,
+    line: Line,
 }
 
 impl LandQueue {
+    /// The queue of trunk requests.
     pub fn new(repo: RepoStore) -> Self {
-        LandQueue { repo }
+        LandQueue {
+            repo,
+            line: Line::Trunk,
+        }
+    }
+
+    /// The queue of `line`'s requests.
+    pub fn on_line(mut self, line: Line) -> Self {
+        self.line = line;
+        self
     }
 
     /// Queue a request and return its ticket; a change with an unfinished
@@ -70,7 +82,7 @@ impl LandQueue {
     pub async fn pending(&self, limit: usize) -> Result<Vec<QueuedRequest>> {
         Ok(self
             .repo
-            .pending_land_requests(limit)
+            .pending_land_requests_on(&self.line, limit)
             .await?
             .into_iter()
             .map(QueuedRequest::from)
@@ -79,6 +91,10 @@ impl LandQueue {
 
     /// True when no request is unfinished.
     pub async fn is_empty(&self) -> Result<bool> {
-        Ok(self.repo.pending_land_requests(1).await?.is_empty())
+        Ok(self
+            .repo
+            .pending_land_requests_on(&self.line, 1)
+            .await?
+            .is_empty())
     }
 }

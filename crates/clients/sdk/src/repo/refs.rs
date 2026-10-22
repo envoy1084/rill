@@ -68,6 +68,32 @@ impl RepoClient {
         resp.refs.into_iter().map(RefInfo::try_from).collect()
     }
 
+    /// Cut `release/<name>` at trunk position `at` (the head when `None`).
+    /// Returns the ref, the version it points at and that trunk position.
+    pub async fn cut_release(
+        &self,
+        name: &str,
+        at: Option<TrunkSeq>,
+    ) -> Result<(RefName, ChangeVersionHash, TrunkSeq)> {
+        let request = pb::CutReleaseRequest {
+            operation_id: id_to_proto(&OperationId::new()),
+            repo: self.repo.clone(),
+            name: name.to_string(),
+            at: at.map(|s| s.get()),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (mut svc, request) = (self.svc(), request.clone());
+            async move { svc.cut_release(request).await }
+        })
+        .await?
+        .into_inner();
+        Ok((
+            RefName::new(resp.r#ref)?,
+            hash_from_proto("cut_release.hash", &resp.hash)?,
+            TrunkSeq(resp.trunk_seq),
+        ))
+    }
+
     /// Compare-and-swap a ref: `expected` is the required current target
     /// (`None` means the ref must not exist), `target` the new one (`None`
     /// deletes). Returns the target after the move.

@@ -58,7 +58,7 @@ impl Lander {
     ) -> Window {
         let (mut live, mut held) = self.gate_groups(window).await;
         for attempt in 0..=self.policy.max_retries {
-            let head = match self.repo.trunk_head().await {
+            let head = match self.repo.line_head(&self.line).await {
                 Ok(head) => head,
                 Err(e) => {
                     tracing::warn!(error = %e, "reading the trunk head failed");

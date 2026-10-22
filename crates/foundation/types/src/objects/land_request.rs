@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::ids::ChangeId;
 use crate::objects::change::ChangeVersionHash;
 use crate::objects::intent::RiskClass;
-use crate::objects::refs::TrunkSeq;
+use crate::objects::refs::{Line, TrunkSeq};
 use crate::path::RepoPathBuf;
 use crate::principal::{Principal, PrincipalKind};
 use crate::time::Timestamp;
@@ -84,6 +84,8 @@ pub struct LandRequest {
     pub sponsor: Option<String>,
     /// The ordered group (a stack) it lands with, if any.
     pub group: Option<LandGroup>,
+    /// What it lands on.
+    pub line: Line,
 }
 
 /// Whether an ordered group lands whole or as far as it can.
@@ -135,7 +137,14 @@ impl LandRequest {
             verify_override: None,
             sponsor: None,
             group: None,
+            line: Line::Trunk,
         }
+    }
+
+    /// The same request, landing on `line`.
+    pub fn onto(mut self, line: Line) -> Self {
+        self.line = line;
+        self
     }
 
     /// The same request charged to `sponsor`.

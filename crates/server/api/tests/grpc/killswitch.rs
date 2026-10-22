@@ -172,6 +172,7 @@ async fn killing_an_agent_ejects_its_queued_landing() {
             operation_id: Bytes::new(),
             repo: "r".into(),
             change_id: change_id.clone(),
+            onto: None,
         })
         .await
         .unwrap()
