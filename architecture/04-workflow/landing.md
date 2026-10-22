@@ -121,7 +121,8 @@ window_secs = 300
 
 Each window of up to `MAX_BATCH` (64):
 
-1. **Accept.** The first time a request is taken up, `hooks.mark_landing`
+1. **Accept.** Requests are taken up and their footprints read
+   concurrently. The first time a request is taken up, `hooks.mark_landing`
    moves its review to `Landing` (or accepts it already `Landing`, when a
    lander that took over resumes it). A refusal fails the request.
 2. **Admit.** A configuration change ends the batch before it or is all of
@@ -151,10 +152,15 @@ Each window of up to `MAX_BATCH` (64):
    An approval carries the review snapshot, the policy digest and the
    votes it saw.
 5. **Line up.** In commit order each candidate is re-parented onto the one
-   before it (`rebase` onto the batch tip). Everything it overlaps is
-   already in its base, so this adds only disjoint changes: it cannot
-   conflict and is not verified again. Requests placed on the lined-up
-   batch are prepared now.
+   before it. Everything it overlaps is already in its base, so everything
+   between its base and the tip is disjoint from it: the new version is
+   the same edits on a new parent, keeping what its rebase recorded
+   (`merge_drivers`, `structural_merge`). It cannot conflict and is not
+   verified again. The re-parented versions are stored together: the
+   versions concurrently, root trees in chain order, the other
+   land-critical values concurrently; a storage failure fails that request
+   and returns what was lined up after it to the queue. Requests placed on
+   the lined-up batch are prepared on the stored tip.
 6. **Commit** the chain in one `RepoStore::land` batch on the head read at
    the start. A conflict (trunk moved, or a review changed after it was
    approved) rebuilds the window, up to `max_retries` times; a conflict
