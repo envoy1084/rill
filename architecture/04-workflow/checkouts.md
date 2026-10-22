@@ -30,7 +30,10 @@ updates still read the old base content from the pinned version.
 
 ## Create
 
-`Checkout::create` refuses a directory that already has `.rill/`.
+`Checkout::create` refuses a directory that already has
+`.rill/checkout.toml`, and `Checkout::find` walks up to the nearest such
+directory, so a repository's own `.rill/` (policy files) is not mistaken
+for a checkout.
 `remote::list_tree` lists the root one `ListDir` RPC per directory. It does
 not enter a directory that is excluded, or that is neither under an
 include nor an ancestor of one (`dir_may_contain`). Each file is fetched
@@ -54,8 +57,12 @@ runs under `spawn_blocking`. For each manifest entry:
 4. Otherwise read the file. It is `Modified` only if the kind or BLAKE3 hash differs from `local_hash`.
 
 Every file on disk that is not in the manifest is `Added`. The walk skips
-`.rill/` and paths matched by `.rillignore` (gitignore syntax, any level,
-[walk.rs](../../crates/clients/sdk/src/local/walk.rs)). Ignore rules hide
+the checkout's own files (the reserved `.rill/checkout.toml` and
+`.rill/manifest.toml`, and `.rill/.rill-tmp-*` while they are written) and
+paths matched by `.rillignore` (gitignore syntax, any level,
+[walk.rs](../../crates/clients/sdk/src/local/walk.rs)). The repository's
+own files in `.rill/` (`verify.toml`, `owners.toml`, `secrets.toml`) are
+tracked like any other. Ignore rules hide
 untracked files only. A tracked file that matches an ignore rule is still
 reported.
 

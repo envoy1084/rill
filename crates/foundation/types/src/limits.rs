@@ -178,7 +178,8 @@ pub fn case_key(name: &str) -> String {
         .into_owned()
 }
 
-fn is_reserved(path: &RepoPath) -> bool {
+/// Whether `path` is a checkout's own file, which no version may hold.
+pub fn is_reserved(path: &RepoPath) -> bool {
     RESERVED_PATHS.contains(&path.as_str())
 }
 

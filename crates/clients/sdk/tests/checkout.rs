@@ -325,3 +325,38 @@ async fn update_merges_adjacent_additions_in_source_files() {
         "{text}"
     );
 }
+
+#[tokio::test]
+async fn repository_files_under_dot_rill_are_tracked_but_checkout_metadata_is_not() {
+    let h = Harness::with_repo(mock_with_base()).await;
+    let dir = tempfile::tempdir().unwrap();
+    let co = Checkout::create(
+        dir.path(),
+        h.client.repo("main"),
+        Root::trunk(),
+        SparseProfile::full(),
+    )
+    .await
+    .unwrap();
+    // Policy files live beside the checkout's own files in `.rill/`.
+    std::fs::write(dir.path().join(".rill/verify.toml"), "[[step]]\n").unwrap();
+    std::fs::write(dir.path().join(".rill/owners.toml"), "").unwrap();
+    std::fs::write(dir.path().join(".rill/.rill-tmp-x1"), "half written").unwrap();
+
+    let status = co.status().await.unwrap();
+    let got: Vec<_> = status.iter().map(|c| (c.path.as_str(), c.kind)).collect();
+    assert_eq!(
+        got,
+        vec![
+            (".rill/owners.toml", LocalChangeKind::Added),
+            (".rill/verify.toml", LocalChangeKind::Added),
+        ]
+    );
+
+    // A repository's own `.rill/` below the checkout root is not a checkout.
+    std::fs::create_dir_all(dir.path().join("vendor/.rill")).unwrap();
+    assert_eq!(
+        Checkout::find(dir.path().join("vendor")),
+        Some(dir.path().to_path_buf())
+    );
+}

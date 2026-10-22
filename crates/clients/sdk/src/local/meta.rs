@@ -153,6 +153,11 @@ pub fn meta_dir(root: &Path) -> PathBuf {
     root.join(META_DIR)
 }
 
+/// The file that marks `root` as a checkout.
+pub(crate) fn checkout_file(root: &Path) -> PathBuf {
+    meta_dir(root).join(CHECKOUT_FILE)
+}
+
 /// Write both metadata files. The manifest is written atomically via a
 /// temporary file so an interrupted write never leaves a half manifest.
 pub fn save(root: &Path, meta: &CheckoutMeta, manifest: &Manifest) -> Result<()> {

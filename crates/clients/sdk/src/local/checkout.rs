@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use rill_types::{ChangeVersionHash, RepoPath, RepoPathBuf, SparseProfile, WorkspaceId};
 
 use super::fs::{local_hash, read_entry, stat, write_entry};
-use super::meta::{self, CheckoutMeta, Manifest, ManifestEntry, META_DIR};
+use super::meta::{self, CheckoutMeta, Manifest, ManifestEntry};
 use super::remote::{self, RemoteFile};
 use super::status::{compute_status, LocalChange, LocalChangeKind};
 use super::walk::to_fs_path;
@@ -33,7 +33,7 @@ impl Checkout {
         sparse: SparseProfile,
     ) -> Result<Self> {
         let dir = dir.as_ref().to_path_buf();
-        if meta::meta_dir(&dir).exists() {
+        if meta::checkout_file(&dir).exists() {
             return Err(Error::checkout(format!(
                 "{} is already a checkout",
                 dir.display()
@@ -92,11 +92,12 @@ impl Checkout {
         Ok(meta::load(dir.as_ref())?.0)
     }
 
-    /// Walk up from `start` to the nearest directory containing `.rill/`.
+    /// Walk up from `start` to the nearest checkout: a directory with
+    /// `.rill/checkout.toml` (a repository's own `.rill/` has none).
     pub fn find(start: impl AsRef<Path>) -> Option<PathBuf> {
         let mut dir = Some(start.as_ref().to_path_buf());
         while let Some(d) = dir {
-            if d.join(META_DIR).is_dir() {
+            if meta::checkout_file(&d).is_file() {
                 return Some(d);
             }
             dir = d.parent().map(Path::to_path_buf);
