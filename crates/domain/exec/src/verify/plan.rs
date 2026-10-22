@@ -14,6 +14,7 @@
 //! risk = ["normal", "sensitive", "critical"]
 //! targets = "affected"               # needs [graph]; see graph/
 //! secrets = ["NPM_TOKEN"]             # org secrets, as environment variables
+//! junit = "target/nextest/ci/junit.xml" # test report, relative to working_dir
 //! ```
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -62,6 +63,9 @@ pub struct Step {
     /// Org secrets the command gets as environment variables. Their values
     /// never enter the action, and the step is never cached.
     pub secrets: Vec<String>,
+    /// A JUnit XML report the step writes, relative to the working
+    /// directory; its test cases enter the test history.
+    pub junit: Option<String>,
 }
 
 /// The steps that verify a tree.
@@ -100,7 +104,13 @@ impl Plan {
                 Some(dir) => RepoPathBuf::new(dir)
                     .map_err(|e| invalid(format!("step {name:?} working_dir: {e}")))?,
             };
-            for output in &step.outputs {
+            let mut outputs = step.outputs;
+            if let Some(report) = &step.junit {
+                if !outputs.contains(report) {
+                    outputs.push(report.clone());
+                }
+            }
+            for output in &outputs {
                 RepoPathBuf::new(output)
                     .map_err(|e| invalid(format!("step {name:?} output {output:?}: {e}")))?;
             }
@@ -145,7 +155,7 @@ impl Plan {
                 command: step.command,
                 env: step.env,
                 working_dir,
-                outputs: step.outputs,
+                outputs,
                 timeout: step
                     .timeout_secs
                     .map(Duration::from_secs)
@@ -155,6 +165,7 @@ impl Plan {
                 risk,
                 affected_targets,
                 secrets,
+                junit: step.junit,
                 name,
             });
         }
@@ -198,6 +209,7 @@ struct StepFile {
     targets: Option<String>,
     #[serde(default)]
     secrets: Vec<String>,
+    junit: Option<String>,
 }
 
 /// The plan at [`PLAN_PATH`] in `root`, or `None` when the tree has none.

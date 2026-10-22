@@ -1,0 +1,68 @@
+// Checks service: what verification ran, test by test.
+syntax = "proto3";
+
+package rill.v1;
+
+service ChecksService {
+  // Recent runs of a step or test, newest first.
+  rpc GetTestHistory(GetTestHistoryRequest) returns (GetTestHistoryResponse);
+  // Targets whose outcome changes on unchanged inputs, flakiest first.
+  rpc ListFlakyTests(ListFlakyTestsRequest) returns (ListFlakyTestsResponse);
+}
+
+enum TestOutcome {
+  TEST_OUTCOME_UNSPECIFIED = 0;
+  TEST_OUTCOME_PASSED = 1;
+  TEST_OUTCOME_FAILED = 2;
+  TEST_OUTCOME_SKIPPED = 3;
+  // It could not run; says nothing about the test.
+  TEST_OUTCOME_ERROR = 4;
+}
+
+message TestRun {
+  // `step:<name>[#i/n]` or `test:<class>::<name>`.
+  string target = 1;
+  TestOutcome outcome = 2;
+  // The test runner retried it before it passed.
+  bool retried = 3;
+  optional uint64 duration_ms = 4;
+  // The action it ran in; the same action means the same inputs.
+  bytes action = 5;
+  string worker = 6;
+  bytes version = 7;
+  // Verified after landing.
+  bool trunk = 8;
+  int64 at = 9;
+}
+
+message GetTestHistoryRequest {
+  string repo = 1;
+  string target = 2;
+  // Default 50, at most 100.
+  uint32 limit = 3;
+}
+message GetTestHistoryResponse {
+  repeated TestRun runs = 1;
+  FlakyTest stats = 2;
+}
+
+message FlakyTest {
+  string target = 1;
+  // 0 to 1: the decayed rate of changed outcomes on unchanged inputs.
+  double score = 2;
+  double runs = 3;
+  double failures = 4;
+  double flips = 5;
+  TestOutcome last = 6;
+}
+
+message ListFlakyTestsRequest {
+  string repo = 1;
+  // Default 0.1.
+  optional double min_score = 2;
+  // Default 50.
+  uint32 limit = 3;
+}
+message ListFlakyTestsResponse {
+  repeated FlakyTest tests = 1;
+}

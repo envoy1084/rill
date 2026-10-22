@@ -6,6 +6,7 @@ use std::sync::Arc;
 use rill_proto::rill::v1::access_service_server::AccessServiceServer;
 use rill_proto::rill::v1::admin_service_server::AdminServiceServer;
 use rill_proto::rill::v1::audit_service_server::AuditServiceServer;
+use rill_proto::rill::v1::checks_service_server::ChecksServiceServer;
 use rill_proto::rill::v1::identity_service_server::IdentityServiceServer;
 use rill_proto::rill::v1::intent_service_server::IntentServiceServer;
 use rill_proto::rill::v1::lander_service_server::LanderServiceServer;
@@ -31,8 +32,8 @@ use rill_reapi_proto::reapi::execution_server::ExecutionServer;
 use rill_reapi_proto::remoteworker::operation_queue_server::OperationQueueServer;
 
 use crate::services::{
-    AccessSvc, AdminSvc, AuditSvc, ExecSvc, IdentitySvc, IntentSvc, LanderSvc, ProtectionSvc,
-    RepoSvc, ReviewSvc, SecretSvc, SessionSvc, WorkspaceSvc,
+    AccessSvc, AdminSvc, AuditSvc, ChecksSvc, ExecSvc, IdentitySvc, IntentSvc, LanderSvc,
+    ProtectionSvc, RepoSvc, ReviewSvc, SecretSvc, SessionSvc, WorkspaceSvc,
 };
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
@@ -247,6 +248,9 @@ async fn serve_grpc(
         .add_service(auth.layer(limits!(SecretServiceServer::new(SecretSvc::new(
             state.clone()
         )))))
+        .add_service(auth.layer(limits!(ChecksServiceServer::new(ChecksSvc::new(
+            state.clone()
+        )))))
         .add_service(auth.layer(limits!(ExecutionServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(ActionCacheServer::new(exec.clone()))))
         .add_service(auth.layer(limits!(ContentAddressableStorageServer::new(exec.clone()))))
@@ -321,6 +325,7 @@ async fn set_health(reporter: &tonic_health::server::HealthReporter, serving: bo
         <AuditServiceServer<AuditSvc> as tonic::server::NamedService>::NAME,
         <ProtectionServiceServer<ProtectionSvc> as tonic::server::NamedService>::NAME,
         <SecretServiceServer<SecretSvc> as tonic::server::NamedService>::NAME,
+        <ChecksServiceServer<ChecksSvc> as tonic::server::NamedService>::NAME,
         <IdentityServiceServer<IdentitySvc> as tonic::server::NamedService>::NAME,
         <SessionServiceServer<SessionSvc> as tonic::server::NamedService>::NAME,
     ] {

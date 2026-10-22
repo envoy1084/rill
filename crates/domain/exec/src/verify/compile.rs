@@ -23,6 +23,8 @@ pub struct CompiledAction {
     pub platform: Platform,
     /// Org secrets the action gets when it runs.
     pub secrets: Vec<String>,
+    /// The JUnit report among its outputs.
+    pub junit: Option<String>,
 }
 
 /// A file Rill adds to a step's input root, relative to its working
@@ -100,6 +102,7 @@ pub async fn compile(
             action: space.put(Bytes::from(action.encode_to_vec())).await?,
             platform: platform.clone(),
             secrets: step.secrets.clone(),
+            junit: step.junit.clone(),
         });
     }
     Ok(actions)

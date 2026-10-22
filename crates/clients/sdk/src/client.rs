@@ -7,6 +7,7 @@ use std::time::Duration;
 use rill_proto::rill::v1::access_service_client::AccessServiceClient;
 use rill_proto::rill::v1::admin_service_client::AdminServiceClient;
 use rill_proto::rill::v1::audit_service_client::AuditServiceClient;
+use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
 use rill_proto::rill::v1::intent_service_client::IntentServiceClient;
 use rill_proto::rill::v1::lander_service_client::LanderServiceClient;
@@ -144,6 +145,8 @@ pub type AuditSvc = AuditServiceClient<Svc>;
 pub type ProtectionSvc = ProtectionServiceClient<Svc>;
 /// Generated secret client over the SDK transport.
 pub type SecretSvc = SecretServiceClient<Svc>;
+/// Generated checks client over the SDK transport.
+pub type ChecksSvc = ChecksServiceClient<Svc>;
 /// Generated access client over the SDK transport.
 pub type AccessSvc = AccessServiceClient<Svc>;
 /// Generated identity client over the SDK transport.
@@ -342,6 +345,11 @@ impl Client {
     /// A fresh generated protection client.
     pub fn protection_svc(&self) -> ProtectionSvc {
         ProtectionServiceClient::new(self.svc())
+    }
+
+    /// A fresh generated checks client.
+    pub fn checks_svc(&self) -> ChecksSvc {
+        ChecksServiceClient::new(self.svc())
     }
 
     /// A fresh generated secret client.

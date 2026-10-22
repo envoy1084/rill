@@ -7,6 +7,7 @@ pub mod admin;
 pub mod audit;
 pub mod change;
 pub mod checkout;
+pub mod checks;
 pub mod export;
 pub mod history;
 pub mod identity;

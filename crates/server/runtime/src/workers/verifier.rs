@@ -1,6 +1,7 @@
 //! Pre-land and post-land verification through remote execution.
 
 use async_trait::async_trait;
+use rill_exec::history::TestHistory;
 use rill_exec::{PlanRunner, Target};
 use rill_jobs::Priority;
 use rill_lander::{VerificationOutcome, Verifier, VerifyRequest, VerifyStage};
@@ -9,12 +10,14 @@ use rill_lander::{VerificationOutcome, Verifier, VerifyRequest, VerifyStage};
 /// the outcome to the lander.
 pub struct ExecVerifier {
     runner: PlanRunner,
+    history: TestHistory,
 }
 
 impl ExecVerifier {
-    /// A verifier running plans with `runner`.
-    pub fn new(runner: PlanRunner) -> Self {
-        ExecVerifier { runner }
+    /// A verifier running plans with `runner` and recording what ran in
+    /// `history`.
+    pub fn new(runner: PlanRunner, history: TestHistory) -> Self {
+        ExecVerifier { runner, history }
     }
 }
 
@@ -42,6 +45,12 @@ impl Verifier for ExecVerifier {
             }
             Err(e) => return Err(rill_lander::Error::Verifier(e.to_string())),
         };
+        let runs = outcome.test_runs(request.version, target.trunk, rill_types::Timestamp::now());
+        for run in &runs {
+            if let Err(e) = self.history.record(run).await {
+                tracing::warn!(target = %run.target, error = %e, "recording a test run");
+            }
+        }
         let mut details = outcome.summary();
         if let Some(excerpt) = &outcome.excerpt {
             details.push('\n');

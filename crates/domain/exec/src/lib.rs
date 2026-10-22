@@ -8,6 +8,7 @@
 //! single-host setups; production uses Buildbarn workers.
 
 pub mod error;
+pub mod history;
 pub mod remote;
 pub mod sandbox;
 pub mod verify;

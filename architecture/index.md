@@ -73,33 +73,34 @@ Read in this order the first time; each page ends with Previous / Next links.
 36. [Search](06-services/search.md)
 37. [Exec](06-services/exec.md)
 38. [Remote execution](06-services/remote-execution.md)
-39. [Git import and export](06-services/git-import.md)
+39. [Checks](06-services/checks.md)
+40. [Git import and export](06-services/git-import.md)
 
 **07 Runtime**
 
-40. [Server](07-runtime/server.md)
-41. [API surface](07-runtime/api-surface.md)
-42. [Events and workers](07-runtime/events-and-workers.md)
-43. [Configuration](07-runtime/configuration.md)
-44. [Observability](07-runtime/observability.md)
-45. [Cache tier](07-runtime/cache.md)
+41. [Server](07-runtime/server.md)
+42. [API surface](07-runtime/api-surface.md)
+43. [Events and workers](07-runtime/events-and-workers.md)
+44. [Configuration](07-runtime/configuration.md)
+45. [Observability](07-runtime/observability.md)
+46. [Cache tier](07-runtime/cache.md)
 
 **08 Clients**
 
-46. [SDK](08-clients/sdk.md)
-47. [CLI](08-clients/cli.md)
-48. [MCP server](08-clients/mcp.md)
+47. [SDK](08-clients/sdk.md)
+48. [CLI](08-clients/cli.md)
+49. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-49. [Development](09-engineering/development.md)
-50. [Testing](09-engineering/testing.md)
-51. [Simulation](09-engineering/simulation.md)
-52. [Performance](09-engineering/performance.md)
+50. [Development](09-engineering/development.md)
+51. [Testing](09-engineering/testing.md)
+52. [Simulation](09-engineering/simulation.md)
+53. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-53. [Architecture decisions](10-decisions/README.md): the sixteen ADRs that
+54. [Architecture decisions](10-decisions/README.md): the sixteen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -131,6 +132,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Code search and symbols | [Search](06-services/search.md) |
 | Pre-land checks and the action cache | [Exec](06-services/exec.md) |
 | REAPI, Bazel builds, workers and sandboxes | [Remote execution](06-services/remote-execution.md) |
+| Test history, flaky tests | [Checks](06-services/checks.md) |
 | How the server is assembled and a request is handled | [Server](07-runtime/server.md) |
 | Which RPCs exist | [API surface](07-runtime/api-surface.md) |
 | Events, background workers | [Events and workers](07-runtime/events-and-workers.md) |

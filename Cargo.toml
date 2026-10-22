@@ -135,6 +135,7 @@ tempfile = "3.27.0"
 icu_casemap = "2.3.0"
 backon = "1.6.0"
 moka = { version = "0.12.16", features = ["sync"] }
+quick-junit = "=0.8.0"
 roaring = "0.11"
 governor = "0.10.4"
 # Pinned with weave-core, which depends on the same release.

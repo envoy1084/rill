@@ -5,6 +5,7 @@ use std::sync::Arc;
 use arc_swap::ArcSwap;
 use rill_core::tree::DEFAULT_TREE_CACHE;
 use rill_core::{CommitGraph, DeriveManager, TreeOps};
+use rill_exec::history::TestHistory;
 use rill_exec::PlanRunner;
 use rill_lander::{AlwaysGreen, Lander, PostLandVerifier, Verifier};
 use rill_policy::Authorizer;
@@ -74,13 +75,16 @@ impl RepoRegistry {
         ));
 
         let verifier: Arc<dyn Verifier> = match self.config.verify.enabled {
-            true => Arc::new(workers::ExecVerifier::new(PlanRunner::new(
-                self.exec.clone(),
-                &config.org,
-                &config.name,
-                trees.clone(),
-                self.config.verify.platform.clone(),
-            ))),
+            true => Arc::new(workers::ExecVerifier::new(
+                PlanRunner::new(
+                    self.exec.clone(),
+                    &config.org,
+                    &config.name,
+                    trees.clone(),
+                    self.config.verify.platform.clone(),
+                ),
+                TestHistory::new(repo.clone()),
+            )),
             false => Arc::new(AlwaysGreen),
         };
         let authorizer = Arc::new(Authorizer::new(repo.clone()));

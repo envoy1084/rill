@@ -212,6 +212,25 @@ impl RepoKeys {
         self.row(table::EXEC_SECRET_COMMAND, &digest.as_bytes().as_slice())
     }
 
+    /// A run of `target` at `at_millis`; later runs sort first.
+    pub fn test_run(&self, target: &str, at_millis: i64, id: &[u8]) -> Bytes {
+        self.row(table::TEST_RUN, &(target, i64::MAX - at_millis, id))
+    }
+
+    /// The prefix of `target`'s runs, newest first.
+    pub fn test_runs(&self, target: &str) -> Bytes {
+        self.row(table::TEST_RUN, &(target,))
+    }
+
+    pub fn test_stats(&self, target: &str) -> Bytes {
+        self.row(table::TEST_STATS, &target)
+    }
+
+    /// The prefix of every target's stats.
+    pub fn all_test_stats(&self) -> Bytes {
+        self.table(table::TEST_STATS)
+    }
+
     pub fn exec_secret_commands(&self) -> Bytes {
         self.table(table::EXEC_SECRET_COMMAND)
     }

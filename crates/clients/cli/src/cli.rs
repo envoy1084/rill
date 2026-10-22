@@ -151,6 +151,10 @@ pub enum Command {
     /// Bisect a verification target between two sequences.
     Bisect(land::BisectArgs),
 
+    /// Test history and flaky tests from verification.
+    #[command(subcommand)]
+    Checks(crate::commands::checks::ChecksCmd),
+
     /// Intents: tasks, bugs and plans that changes link to.
     #[command(subcommand)]
     Intent(intent::IntentCmd),

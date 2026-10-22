@@ -51,6 +51,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Verify(args) => land::verify(ctx, args).await,
         Command::Revert(args) => land::revert(ctx, args).await,
         Command::Bisect(args) => land::bisect(ctx, args).await,
+        Command::Checks(cmd) => super::checks::run(ctx, cmd).await,
         Command::Intent(cmd) => intent::run(ctx, cmd).await,
         Command::Ws(cmd) => ws::run(ctx, cmd).await,
         Command::Ref(cmd) => refs::run(ctx, cmd).await,

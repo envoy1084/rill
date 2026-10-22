@@ -11,6 +11,7 @@ use super::compile::CompiledAction;
 use super::outcome::{StepResult, StepStatus};
 use super::run::PlanRunner;
 use crate::error::{Error, Result};
+use crate::history::{parse_junit, TestCaseResult};
 use crate::remote::{BlobDigest, Stage, Submission};
 
 /// How long one wait for an operation lasts before it is read again.
@@ -35,9 +36,11 @@ impl PlanRunner {
             true => self.space.result(&compiled.action).await?,
             false => None,
         };
+        let junit = compiled.junit.clone();
         if let Some(cached) = cached {
             fill(&mut result, &cached);
             result.cached = true;
+            result.tests = self.report(junit.as_deref(), &cached).await?;
             return Ok((result, Some(cached)));
         }
         let submitted = self
@@ -58,6 +61,7 @@ impl PlanRunner {
         result.cached = response.cached_result;
         if let Some(action_result) = &response.result {
             fill(&mut result, action_result);
+            result.tests = self.report(junit.as_deref(), action_result).await?;
         }
         match response.status.filter(|s| s.code != 0) {
             Some(status) if status.code == tonic::Code::DeadlineExceeded as i32 => {
@@ -89,6 +93,36 @@ impl PlanRunner {
             self.scheduler
                 .wait_operation(&self.space, id, seen, WAIT)
                 .await?;
+        }
+    }
+
+    /// The test cases of the JUnit report at `path` among `action`'s
+    /// outputs; none when there is no such report or it does not parse.
+    async fn report(
+        &self,
+        path: Option<&str>,
+        action: &ActionResult,
+    ) -> Result<Vec<TestCaseResult>> {
+        let Some(path) = path else {
+            return Ok(Vec::new());
+        };
+        let Some(digest) = action
+            .output_files
+            .iter()
+            .find(|f| f.path == path)
+            .and_then(|f| f.digest.as_ref())
+        else {
+            return Ok(Vec::new());
+        };
+        let Some(bytes) = self.space.read(&BlobDigest::parse(digest)?).await? else {
+            return Ok(Vec::new());
+        };
+        match parse_junit(&String::from_utf8_lossy(&bytes)) {
+            Some(cases) => Ok(cases),
+            None => {
+                tracing::warn!(path, "a step's JUnit report did not parse");
+                Ok(Vec::new())
+            }
         }
     }
 

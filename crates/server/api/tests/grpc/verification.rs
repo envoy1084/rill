@@ -155,3 +155,76 @@ secrets = ["DEPLOY_KEY"]
     );
     server.stop().await;
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_step_that_fails_then_passes_on_the_same_tree_is_listed_as_flaky() {
+    use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
+
+    let mut config = dev_config();
+    config.verify.enabled = true;
+    config.exec.local.workers = 1;
+    let server = TestServer::start(config).await;
+    let mut c = clients(&server, None).await;
+    c.repo
+        .create_repo(pb::CreateRepoRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            description: None,
+            windows_safe: false,
+        })
+        .await
+        .unwrap();
+    // Fails the first time it runs, passes after: a flake on one tree.
+    let marker = std::env::temp_dir().join(format!(
+        "rill-flaky-{}",
+        hex::encode(rill_types::ids::random_id())
+    ));
+    let plan = format!(
+        "[[step]]\nname = \"racy\"\ncommand = [\"sh\", \"-c\", \"test -e {0} || {{ touch {0}; exit 1; }}\"]\n",
+        marker.display()
+    );
+    let change = apply(
+        &mut c,
+        false,
+        vec![set_edit(".rill/verify.toml", plan.as_bytes())],
+    )
+    .await;
+    let first = try_land_with(&mut c, "app", change.clone(), &[("Owner", 1)]).await;
+    assert!(first.unwrap_err().contains("\"racy\" failed"));
+    assert_eq!(common::request_land(&mut c, "app", change).await, Ok(1));
+    let _ = std::fs::remove_file(&marker);
+
+    let channel = connect(&server.grpc).await;
+    let mut checks = ChecksServiceClient::new(channel);
+    let flaky = checks
+        .list_flaky_tests(pb::ListFlakyTestsRequest {
+            repo: "app".into(),
+            min_score: None,
+            limit: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .tests;
+    assert_eq!(flaky.len(), 1, "{flaky:?}");
+    assert_eq!(flaky[0].target, "step:racy");
+    let history = checks
+        .get_test_history(pb::GetTestHistoryRequest {
+            repo: "app".into(),
+            target: "step:racy".into(),
+            limit: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let outcomes: Vec<_> = history.runs.iter().map(|r| r.outcome).collect();
+    assert_eq!(
+        outcomes,
+        [
+            pb::TestOutcome::Passed as i32,
+            pb::TestOutcome::Failed as i32
+        ]
+    );
+    server.stop().await;
+}

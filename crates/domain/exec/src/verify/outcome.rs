@@ -2,6 +2,9 @@
 
 use std::time::Duration;
 
+use rill_types::{ObjectHash, Timestamp};
+
+use crate::history::{TestCaseResult, TestOutcome, TestRun};
 use crate::remote::BlobDigest;
 
 /// How one step (or shard) ended.
@@ -44,6 +47,8 @@ pub struct StepResult {
     pub stderr: Option<BlobDigest>,
     pub worker: Option<String>,
     pub duration: Option<Duration>,
+    /// Test cases from the step's JUnit report.
+    pub tests: Vec<TestCaseResult>,
 }
 
 impl StepResult {
@@ -59,6 +64,7 @@ impl StepResult {
             stderr: None,
             worker: None,
             duration: None,
+            tests: Vec::new(),
         }
     }
 
@@ -116,5 +122,52 @@ impl VerificationOutcome {
                 format!("step {} {what}; {tally}", failed.label())
             }
         }
+    }
+}
+
+impl VerificationOutcome {
+    /// The runs to record in the test history for verifying `version`:
+    /// every step or shard that ran (not ones served from the cache, which
+    /// were recorded when they ran) and each of its test cases.
+    pub fn test_runs(&self, version: ObjectHash, trunk: bool, at: Timestamp) -> Vec<TestRun> {
+        let mut runs = Vec::new();
+        for step in self.steps.iter().filter(|s| !s.cached) {
+            let outcome = match &step.status {
+                StepStatus::Passed => TestOutcome::Passed,
+                StepStatus::Failed { .. } | StepStatus::TimedOut => TestOutcome::Failed,
+                StepStatus::Error(_) => TestOutcome::Error,
+                StepStatus::Unaffected | StepStatus::NotGating => continue,
+            };
+            let target = match step.shard {
+                Some((index, total)) => format!("step:{}#{}/{total}", step.step, index + 1),
+                None => format!("step:{}", step.step),
+            };
+            let action = step.action.map(|a| a.hash);
+            runs.push(TestRun {
+                target,
+                outcome,
+                retried: false,
+                duration_ms: step.duration.map(|d| d.as_millis() as u64),
+                action,
+                worker: step.worker.clone(),
+                version,
+                trunk,
+                at,
+            });
+            for case in &step.tests {
+                runs.push(TestRun {
+                    target: format!("test:{}", case.id),
+                    outcome: case.outcome,
+                    retried: case.retried,
+                    duration_ms: case.duration_ms,
+                    action,
+                    worker: step.worker.clone(),
+                    version,
+                    trunk,
+                    at,
+                });
+            }
+        }
+        runs
     }
 }

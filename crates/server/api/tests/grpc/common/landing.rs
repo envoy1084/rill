@@ -56,6 +56,15 @@ pub(crate) async fn try_land_with(
             .await
             .unwrap();
     }
+    request_land(clients, repo, change_id).await
+}
+
+/// Ask to land `change_id`, already reviewed, and wait for the outcome.
+pub(crate) async fn request_land(
+    clients: &mut Clients,
+    repo: &str,
+    change_id: Bytes,
+) -> Result<u64, String> {
     let ticket = clients
         .review
         .request_land(pb::RequestLandRequest {

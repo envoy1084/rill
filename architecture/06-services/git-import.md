@@ -176,4 +176,4 @@ storage directory instead. See [CLI](../08-clients/cli.md).
 * Store: [repo/](../../crates/foundation/store/src/repo/mod.rs) (`put_change_version`, `land_on_trunk`, `set_misc`)
 
 ---
-← Previous: [Remote execution](remote-execution.md) · [Index](../index.md) · Next: [Server](../07-runtime/server.md) →
+← Previous: [Checks](checks.md) · [Index](../index.md) · Next: [Server](../07-runtime/server.md) →

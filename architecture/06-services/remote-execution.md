@@ -152,4 +152,4 @@ Both are on the queues dashboard. Queue depths appear with every other
 * Tests: [tests/grpc/exec/](../../crates/server/api/tests/grpc/exec/mod.rs)
 
 ---
-← Previous: [Exec](exec.md) · [Index](../index.md) · Next: [Git import](git-import.md) →
+← Previous: [Exec](exec.md) · [Index](../index.md) · Next: [Checks](checks.md) →

@@ -40,6 +40,7 @@ timeout_secs = 900                        # default 600
 platform = { OSFamily = "linux" }         # added to [verify] platform
 shards = 4                                # 1 to 256
 risk = ["normal", "sensitive", "critical"] # default: every class
+junit = "report.xml"                      # test report for the history
 ```
 
 `Plan::parse` (`verify/plan.rs`) refuses unknown keys, empty commands,

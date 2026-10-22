@@ -99,6 +99,12 @@ pub const EXEC_PLATFORM: &str = "xpl";
 pub const EXEC_WAKE: &str = "xwake";
 /// `(xsec, ns, space, name)` → an org secret, its value sealed
 pub const EXEC_SECRET: &str = "xsec";
+/// `(trun, ns, repo, target, newest first, id)` → one run of a test or
+/// verification step
+pub const TEST_RUN: &str = "trun";
+/// `(tstat, ns, repo, target)` → a test's decayed run, failure and flip
+/// counts
+pub const TEST_STATS: &str = "tstat";
 /// `(xscmd, ns, space, digest)` → a command with secret values, sealed,
 /// readable only by workers while its action runs
 pub const EXEC_SECRET_COMMAND: &str = "xscmd";

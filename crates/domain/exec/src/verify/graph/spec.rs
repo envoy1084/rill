@@ -101,6 +101,7 @@ impl GraphFile {
                 risk: None,
                 affected_targets: false,
                 secrets: Vec::new(),
+                junit: None,
             },
             output,
         })
