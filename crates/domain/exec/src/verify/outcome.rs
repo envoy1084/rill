@@ -51,6 +51,8 @@ pub struct StepResult {
     pub tests: Vec<TestCaseResult>,
     /// Output files it produced (artifacts), by path.
     pub outputs: Vec<(String, BlobDigest)>,
+    /// A probe found the step non-hermetic: it ran uncached.
+    pub nonhermetic: bool,
 }
 
 impl StepResult {
@@ -68,6 +70,7 @@ impl StepResult {
             duration: None,
             tests: Vec::new(),
             outputs: Vec::new(),
+            nonhermetic: false,
         }
     }
 

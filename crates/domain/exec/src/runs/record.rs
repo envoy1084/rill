@@ -82,6 +82,8 @@ pub struct StepRecord {
     pub outputs: Vec<(String, StoredDigest)>,
     pub worker: Option<String>,
     pub duration_ms: Option<u64>,
+    /// It ran uncached because a probe found it non-hermetic.
+    pub nonhermetic: bool,
     pub updated_at: Timestamp,
 }
 
@@ -108,6 +110,7 @@ impl StepRecord {
             outputs: Vec::new(),
             worker: None,
             duration_ms: None,
+            nonhermetic: false,
             updated_at: Timestamp::now(),
         }
     }
@@ -129,6 +132,7 @@ impl StepRecord {
                 .collect(),
             worker: result.worker.clone(),
             duration_ms: result.duration.map(|d| d.as_millis() as u64),
+            nonhermetic: result.nonhermetic,
             updated_at: Timestamp::now(),
         }
     }

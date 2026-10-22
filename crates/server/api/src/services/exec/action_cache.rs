@@ -1,5 +1,6 @@
 //! The action cache: results of actions already run. Only workers write
-//! it, so a client cannot plant a result for an action it never ran.
+//! it, so a client cannot plant a result for an action it never ran; a
+//! result naming content that is not stored is refused.
 
 use rill_exec::remote::BlobDigest;
 use rill_reapi_proto::reapi::action_cache_server::ActionCache;
@@ -23,7 +24,13 @@ impl ActionCache for ExecSvc {
             .as_ref()
             .ok_or_else(|| Status::invalid_argument("action_digest is required"))?;
         let digest = BlobDigest::parse(digest).map_err(Error::from)?;
-        match caller.space.result(&digest).await.map_err(Error::from)? {
+        let cached = self
+            .state
+            .exec
+            .cached_result(&caller.space, &digest)
+            .await
+            .map_err(Error::from)?;
+        match cached {
             Some(result) => Ok(Response::new(result)),
             None => Err(Status::not_found(format!("no result for action {digest}"))),
         }
@@ -48,11 +55,17 @@ impl ActionCache for ExecSvc {
         let result = request
             .action_result
             .ok_or_else(|| Status::invalid_argument("action_result is required"))?;
-        caller
-            .space
-            .put_result(&digest, &result)
+        let cached = self
+            .state
+            .exec
+            .cache_result(&caller.space, &digest, &result)
             .await
             .map_err(Error::from)?;
+        if !cached {
+            return Err(Status::failed_precondition(
+                "the result refers to content that is not stored",
+            ));
+        }
         Ok(Response::new(result))
     }
 }

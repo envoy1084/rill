@@ -265,6 +265,14 @@ impl RepoKeys {
         self.table(table::TEST_STATS)
     }
 
+    pub fn exec_nonhermetic(&self, label: &str) -> Bytes {
+        self.row(table::EXEC_NONHERMETIC, &label)
+    }
+
+    pub fn exec_nonhermetics(&self) -> Bytes {
+        self.table(table::EXEC_NONHERMETIC)
+    }
+
     pub fn exec_secret_commands(&self) -> Bytes {
         self.table(table::EXEC_SECRET_COMMAND)
     }

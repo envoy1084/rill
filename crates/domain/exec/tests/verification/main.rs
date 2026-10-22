@@ -5,6 +5,7 @@
 
 mod fixture;
 mod graph;
+mod hermetic;
 mod history;
 mod running;
 mod runs;

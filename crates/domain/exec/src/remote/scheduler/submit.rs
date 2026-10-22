@@ -33,6 +33,8 @@ pub struct Submission {
     /// Org secrets to give the command. Only Rill's own submissions (verify
     /// plans) carry them, never a client's `Execute`.
     pub secrets: Vec<String>,
+    /// What the action belongs to; see [`OperationRecord::label`].
+    pub label: Option<String>,
 }
 
 /// What submitting did.
@@ -91,6 +93,8 @@ impl Scheduler {
                 response: None,
                 secrets: submission.secrets.clone(),
                 secret_command: None,
+                label: submission.label.clone(),
+                probe: false,
             };
             let job = JobSpec::new(
                 EXECUTE_JOB,

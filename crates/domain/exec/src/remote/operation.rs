@@ -34,6 +34,11 @@ pub struct OperationRecord {
     pub secrets: Vec<String>,
     /// The sealed command carrying their values while a worker runs it.
     pub secret_command: Option<ObjectHash>,
+    /// What the action belongs to, for hermeticity flags:
+    /// `verify:<repo>/<step>` or a build tool's target and mnemonic.
+    pub label: Option<String>,
+    /// A re-run of a cached result, to check it is hermetic.
+    pub probe: bool,
 }
 
 impl Record for OperationRecord {

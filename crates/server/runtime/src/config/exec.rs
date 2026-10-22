@@ -27,6 +27,9 @@ pub struct ExecConfig {
     pub default_timeout_secs: u64,
     /// The longest timeout, in seconds, an action may ask for.
     pub max_timeout_secs: u64,
+    /// Results entering the action cache run again, per thousand, to check
+    /// they are hermetic.
+    pub probe_per_mille: u32,
     /// Workers inside this server.
     pub local: LocalWorkersConfig,
 }
@@ -42,6 +45,7 @@ impl Default for ExecConfig {
             max_attempts: 3,
             default_timeout_secs: 30 * 60,
             max_timeout_secs: 2 * 60 * 60,
+            probe_per_mille: 20,
             local: LocalWorkersConfig::default(),
         }
     }

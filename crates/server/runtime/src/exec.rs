@@ -21,6 +21,7 @@ pub fn scheduler_config(config: &ExecConfig) -> SchedulerConfig {
         max_attempts: config.max_attempts,
         default_timeout: Duration::from_secs(config.default_timeout_secs),
         max_timeout: Duration::from_secs(config.max_timeout_secs),
+        probe_rate: f64::from(config.probe_per_mille.min(1000)) / 1000.0,
     }
 }
 

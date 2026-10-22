@@ -114,6 +114,9 @@ pub const VERIFY_RUN_COUNT: &str = "vrunc";
 /// `(tstat, ns, repo, target)` → a test's decayed run, failure and flip
 /// counts
 pub const TEST_STATS: &str = "tstat";
+/// `(xnh, ns, space, label)` → an action label whose re-run gave other
+/// outputs: its results are not cached for a while
+pub const EXEC_NONHERMETIC: &str = "xnh";
 /// `(xscmd, ns, space, digest)` → a command with secret values, sealed,
 /// readable only by workers while its action runs
 pub const EXEC_SECRET_COMMAND: &str = "xscmd";

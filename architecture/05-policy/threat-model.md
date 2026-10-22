@@ -66,6 +66,7 @@ flowchart LR
 | T18 | Stale snapshot overwrites concurrent landings | Fixed: checkouts snapshot against the pinned `base_version` | Workspace-authoritative clients | — |
 | T19 | Stolen disk, bucket or backup | Fixed for objects: sealed with AES-256-GCM under per-org data keys wrapped by the key service, bound to their org and hash ([data protection](data-protection.md#encryption-at-rest)). Metadata other than secrets relies on disk encryption | Re-encryption under rotated keys | 12 (done), 28 |
 | T20 | CI secret leaks | Partly fixed: org secrets are sealed under org data keys, write-only through the API, scoped to repositories and to post-land verification, never in an action, its cache key or the cache, given only to the worker running the action, and masked in its logs ([exec](../06-services/exec.md#secrets)). A command given a secret can still leak it on purpose | Output-file masking; per-step network policy | 16 |
+| T21 | Poisoned or non-reproducible build cache | Fixed: only workers write the action cache; entries are sealed under org data keys and bound to their action; a result naming content that is not stored is neither cached nor served; a sample of cached results is re-run and a mismatch evicts the entry and stops caching that step or target ([remote execution](../06-services/remote-execution.md#action-cache)) | A worker itself compromised can still report a false result; reproducibility across machines | 16 |
 
 ## Assumptions
 

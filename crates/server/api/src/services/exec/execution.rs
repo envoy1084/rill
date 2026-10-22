@@ -38,6 +38,7 @@ impl Execution for ExecSvc {
         request: Request<ExecuteRequest>,
     ) -> Result<Response<OperationStream>, Status> {
         let caller = admit(&self.state, &request, &request.get_ref().instance_name).await?;
+        let label = action_label(request.metadata());
         let request = request.into_inner();
         let digest = request
             .action_digest
@@ -45,9 +46,25 @@ impl Execution for ExecSvc {
             .ok_or_else(|| Status::invalid_argument("action_digest is required"))?;
         let digest = BlobDigest::parse(digest).map_err(Error::from)?;
         let action = load_action(&caller.space, &digest).await?;
-        let lookup = !request.skip_cache_lookup && !action.do_not_cache;
+        let nonhermetic = match &label {
+            Some(label) => self
+                .state
+                .exec
+                .nonhermetic(&caller.space, label)
+                .await
+                .map_err(Error::from)?
+                .is_some(),
+            None => false,
+        };
+        let lookup = !request.skip_cache_lookup && !action.do_not_cache && !nonhermetic;
         if lookup {
-            if let Some(result) = caller.space.result(&digest).await.map_err(Error::from)? {
+            let hit = self
+                .state
+                .exec
+                .cached_result(&caller.space, &digest)
+                .await
+                .map_err(Error::from)?;
+            if let Some(result) = hit {
                 let response = ExecuteResponse {
                     result: Some(result),
                     cached_result: true,
@@ -77,6 +94,7 @@ impl Execution for ExecSvc {
                     requester: caller.ctx.principal.to_string(),
                     do_not_cache: action.do_not_cache,
                     secrets: Vec::new(),
+                    label,
                 },
             )
             .await
@@ -238,4 +256,24 @@ fn follow(state: Arc<AppState>, space: ExecSpace, id: String) -> OperationStream
         }
     });
     Box::pin(ReceiverStream::new(rx))
+}
+
+/// Bazel's `RequestMetadata` header, as a hermeticity label:
+/// `<tool>:<target>#<mnemonic>`, when it names a target.
+fn action_label(metadata: &tonic::metadata::MetadataMap) -> Option<String> {
+    let header = metadata.get_bin("build.bazel.remote.execution.v2.requestmetadata-bin")?;
+    let bytes = header.to_bytes().ok()?;
+    let meta = rill_reapi_proto::reapi::RequestMetadata::decode(bytes).ok()?;
+    if meta.target_id.is_empty() {
+        return None;
+    }
+    let tool = meta
+        .tool_details
+        .map(|t| t.tool_name)
+        .filter(|t| !t.is_empty())
+        .unwrap_or_else(|| "build".into());
+    Some(format!(
+        "{tool}:{}#{}",
+        meta.target_id, meta.action_mnemonic
+    ))
 }

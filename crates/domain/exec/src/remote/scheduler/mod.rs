@@ -1,5 +1,6 @@
 //! Queueing actions and serving workers.
 
+mod complete;
 mod handle;
 mod reap;
 mod session;

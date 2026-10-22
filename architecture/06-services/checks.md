@@ -98,6 +98,16 @@ prior on the flip rate, `(flips + 0.1) / (repeats + 5.1)`: a new test
 scores 0.02, one flip in one repeat 0.18, and a test that stops flipping
 drifts back down.
 
+## Non-hermetic steps
+
+A step whose re-run gives other outputs reads something besides its
+inputs. The scheduler's hermeticity probes ([remote
+execution](remote-execution.md#action-cache)) catch it and flag the
+step's label, `verify:<repo>/<step>`, for a week. A flagged step runs
+uncached: `PlanRunner` skips the cache lookup, the step's result is not
+stored, and its run record and result say `nonhermetic`.
+`ListNonhermetic` lists a repository's flagged steps with what differed.
+
 ## API and CLI
 
 `ChecksService` (repository read access):
@@ -107,6 +117,8 @@ drifts back down.
   ends (a stopping server ends the stream);
 * `ReadLog(repo, run, step, stdout|stderr, offset, limit)` and
   `ReadArtifact(repo, run, step, path, offset, limit)`;
+* `ListNonhermetic(repo)`: steps flagged non-hermetic, with what
+  differed and until when;
 * `GetTestHistory(repo, target, limit)`: recent runs, newest first, and
   the target's score;
 * `ListFlakyTests(repo, min_score = 0.1, limit = 50)`: targets at or above
@@ -114,8 +126,9 @@ drifts back down.
 
 `rill checks runs [--version]`, `rill checks run <id> [--watch]`, `rill
 checks log <run> <step> [--stderr] [--tail BYTES]`, `rill checks artifact
-<run> <step> <path> [-o FILE]`, `rill checks flaky [--min-score]
-[--limit]` and `rill checks history <target> [--limit]` use them.
+<run> <step> <path> [-o FILE]`, `rill checks nonhermetic`, `rill checks
+flaky [--min-score] [--limit]` and `rill checks history <target>
+[--limit]` use them.
 
 ## Limitations
 

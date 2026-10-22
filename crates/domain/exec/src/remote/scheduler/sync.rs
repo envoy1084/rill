@@ -1,7 +1,6 @@
 //! Buildbarn's worker protocol: a worker reports its state with every
 //! `Synchronize` and is told what to do next.
 
-use bytes::Bytes;
 use prost::Message;
 use rill_reapi_proto::reapi::{digest_function, Action, ExecuteResponse};
 use rill_reapi_proto::remoteworker::{
@@ -16,7 +15,7 @@ use super::handle::Scheduler;
 use super::session::{worker_key, WorkerSession};
 use crate::error::{Error, Result};
 use crate::remote::digest::BlobDigest;
-use crate::remote::operation::{OperationRecord, Stage};
+use crate::remote::operation::Stage;
 use crate::remote::platform::platform_key;
 use crate::remote::timestamps::proto_timestamp as timestamp;
 
@@ -192,7 +191,7 @@ impl Scheduler {
     }
 
     /// The worker dropped its action: hand it to another.
-    async fn abandon(&self, worker: &str, session: &WorkerSession) -> Result<()> {
+    pub(super) async fn abandon(&self, worker: &str, session: &WorkerSession) -> Result<()> {
         let space = self.space(&session.org);
         let queue = self.queue(&space, &session.queue);
         match queue.release(&session.claim).await {
@@ -204,85 +203,6 @@ impl Scheduler {
             .transact(Transaction::new().delete(self.instance.keys().exec_worker(worker)))
             .await?;
         Ok(())
-    }
-
-    /// Record a finished action: its operation, the cache, the queue.
-    async fn complete(
-        &self,
-        worker: &str,
-        session: &WorkerSession,
-        response: ExecuteResponse,
-    ) -> Result<()> {
-        let space = self.space(&session.org);
-        let queue = self.queue(&space, &session.queue);
-        let Some(mut op) = self.operation(&space, &session.operation).await? else {
-            return self.abandon(worker, session).await;
-        };
-        let digest = op.action_digest();
-        let mut response = response;
-        if !op.secrets.is_empty() {
-            self.redact_response(&space, &op, &mut response).await?;
-        }
-        let cacheable = op.secrets.is_empty()
-            && !op.do_not_cache
-            && response.status.as_ref().is_none_or(|s| s.code == 0)
-            && response.result.as_ref().is_some_and(|r| r.exit_code == 0)
-            && !Action::decode(session.action_bytes.clone()).is_ok_and(|a| a.do_not_cache);
-        if cacheable {
-            if let Some(result) = &response.result {
-                space.put_result(&digest, result).await?;
-            }
-        }
-        match self
-            .finish(
-                &space,
-                &queue,
-                &session.claim,
-                &mut op,
-                response,
-                Some(worker),
-            )
-            .await
-        {
-            Ok(()) | Err(Error::Jobs(rill_jobs::Error::Lost(_))) => Ok(()),
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Complete `op` with `response` and finish its job, in one commit.
-    pub(super) async fn finish(
-        &self,
-        space: &crate::remote::space::ExecSpace,
-        queue: &rill_jobs::Queue,
-        claim: &rill_jobs::Claim,
-        op: &mut OperationRecord,
-        response: ExecuteResponse,
-        worker: Option<&str>,
-    ) -> Result<()> {
-        op.stage = Stage::Completed;
-        op.response = Some(Bytes::from(response.encode_to_vec()));
-        let secret_command = op.secret_command.take();
-        let keys = space.records.keys();
-        let in_flight = keys.exec_in_flight(&op.action);
-        let current = space.records.meta().get(&in_flight).await?;
-        let mut tx = queue
-            .complete_tx(claim)
-            .set(keys.exec_operation(&op.id), encode_record(op)?)
-            .add(keys.exec_operation_count(&op.id), 1);
-        if current.as_deref() == Some(op.id.as_bytes()) {
-            tx = tx.expect(in_flight.clone(), current).delete(in_flight);
-        }
-        if let Some(worker) = worker {
-            tx = tx.delete(self.instance.keys().exec_worker(worker));
-        }
-        if let Some(command) = secret_command {
-            tx = tx.delete(keys.exec_secret_command(&command));
-        }
-        match space.records.meta().transact(tx).await {
-            Ok(_) => Ok(()),
-            Err(StoreError::Conflict(_)) => Err(Error::Jobs(rill_jobs::Error::Lost(claim.job.id))),
-            Err(e) => Err(e.into()),
-        }
     }
 
     fn executing(&self, session: &WorkerSession) -> SynchronizeResponse {

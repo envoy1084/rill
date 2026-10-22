@@ -33,6 +33,9 @@ pub struct SchedulerConfig {
     pub default_timeout: Duration,
     /// The longest timeout an action may ask for.
     pub max_timeout: Duration,
+    /// The share of results entering the cache that are run again to check
+    /// they are hermetic.
+    pub probe_rate: f64,
 }
 
 impl Default for SchedulerConfig {
@@ -44,6 +47,7 @@ impl Default for SchedulerConfig {
             max_attempts: 3,
             default_timeout: Duration::from_secs(30 * 60),
             max_timeout: Duration::from_secs(2 * 60 * 60),
+            probe_rate: 0.02,
         }
     }
 }

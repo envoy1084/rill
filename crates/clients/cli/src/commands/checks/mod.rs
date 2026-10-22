@@ -23,6 +23,9 @@ pub enum ChecksCmd {
     Log(runs::LogArgs),
     /// A file a step produced.
     Artifact(runs::ArtifactArgs),
+    /// Steps a hermeticity probe caught giving different outputs, which
+    /// run uncached for now.
+    Nonhermetic,
 }
 
 /// Run a checks subcommand.
@@ -34,5 +37,6 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ChecksCmd) -> Result<()> {
         ChecksCmd::Run(a) => runs::show(ctx, a).await,
         ChecksCmd::Log(a) => runs::log(ctx, a).await,
         ChecksCmd::Artifact(a) => runs::artifact(ctx, a).await,
+        ChecksCmd::Nonhermetic => tests::nonhermetic(ctx).await,
     }
 }

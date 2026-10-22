@@ -5,7 +5,7 @@ use rill_reapi_proto::reapi::{ActionResult, GetActionResultRequest, UpdateAction
 use rill_types::{Principal, RepoId, RepoPathBuf, Timestamp};
 use tonic::Code;
 
-use super::fixtures::{exec_clients, upload_action};
+use super::fixtures::{digest, exec_clients, upload_action};
 use crate::common::TestServer;
 
 fn config(secrets: &std::path::Path) -> rill_api::ServerConfig {
@@ -47,6 +47,24 @@ async fn only_workers_write_the_action_cache_and_narrow_tokens_need_execute() {
     );
 
     let mut worker = exec_clients(&server, Some("rwk_s3cret")).await;
+    let phantom = UpdateActionResultRequest {
+        action_digest: Some(action.clone()),
+        action_result: Some(ActionResult {
+            stdout_digest: Some(digest(b"output nobody uploaded")),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_eq!(
+        worker
+            .cache
+            .update_action_result(phantom)
+            .await
+            .unwrap_err()
+            .code(),
+        Code::FailedPrecondition,
+        "not even a worker caches a result naming content that is not stored"
+    );
     worker.cache.update_action_result(forged).await.unwrap();
     let mut wrong = exec_clients(&server, Some("rwk_guess")).await;
     assert_eq!(

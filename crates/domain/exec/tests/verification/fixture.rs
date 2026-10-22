@@ -29,11 +29,20 @@ impl Drop for Fixture {
 
 impl Fixture {
     pub async fn new() -> Self {
-        Self::sealed_by(Arc::new(rill_store::Plaintext)).await
+        Self::build(Arc::new(rill_store::Plaintext), 0.0).await
     }
 
-    /// A fixture whose scheduler seals secrets with `sealer`.
+    /// A fixture whose scheduler seals secrets and results with `sealer`.
     pub async fn sealed_by(sealer: Arc<dyn rill_store::Sealer>) -> Self {
+        Self::build(sealer, 0.0).await
+    }
+
+    /// A fixture that probes `probe_rate` of the results it caches.
+    pub async fn probing(probe_rate: f64) -> Self {
+        Self::build(Arc::new(rill_store::Plaintext), probe_rate).await
+    }
+
+    async fn build(sealer: Arc<dyn rill_store::Sealer>, probe_rate: f64) -> Self {
         let stores = Stores::memory();
         let repo = stores.repo(stores.create_repo("app", "").await.unwrap().id);
         let trees = TreeOps::new(repo.objects().clone(), 256);
@@ -43,6 +52,7 @@ impl Fixture {
                 SchedulerConfig {
                     idle_wait: Duration::from_millis(200),
                     report_every: Duration::from_millis(500),
+                    probe_rate,
                     ..SchedulerConfig::default()
                 },
             )

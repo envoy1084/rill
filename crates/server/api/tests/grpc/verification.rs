@@ -348,3 +348,54 @@ command = ["sh", "-c", "sleep 1; echo 'expected 2, got 3' >&2; exit 1"]
     assert_eq!(watched.len(), 1, "a finished run is sent once");
     server.stop().await;
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_step_whose_rerun_differs_is_listed_as_nonhermetic() {
+    use rill_proto::rill::v1::checks_service_client::ChecksServiceClient;
+
+    let mut config = dev_config();
+    config.verify.enabled = true;
+    config.exec.local.workers = 1;
+    config.exec.probe_per_mille = 1000;
+    let server = TestServer::start(config).await;
+    let mut c = clients(&server, None).await;
+    c.repo
+        .create_repo(pb::CreateRepoRequest {
+            operation_id: Bytes::new(),
+            repo: "app".into(),
+            description: None,
+            windows_safe: false,
+        })
+        .await
+        .unwrap();
+    let plan = "[[step]]\nname = \"stamp\"\ncommand = [\"sh\", \"-c\", \"od -An -N8 -tx8 /dev/urandom > stamp\"]\noutputs = [\"stamp\"]\n";
+    let change = apply(
+        &mut c,
+        false,
+        vec![set_edit(".rill/verify.toml", plan.as_bytes())],
+    )
+    .await;
+    assert_eq!(land_with(&mut c, "app", change, &[("Owner", 1)]).await, 1);
+
+    let mut checks = ChecksServiceClient::new(connect(&server.grpc).await);
+    let mut steps = Vec::new();
+    for _ in 0..100 {
+        steps = checks
+            .list_nonhermetic(pb::ListNonhermeticRequest { repo: "app".into() })
+            .await
+            .unwrap()
+            .into_inner()
+            .steps;
+        if !steps.is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert_eq!(steps.len(), 1, "the probe never flagged the step");
+    assert_eq!(
+        (steps[0].step.as_str(), steps[0].differences.as_slice()),
+        ("stamp", ["stamp differs".to_string()].as_slice())
+    );
+    server.stop().await;
+}

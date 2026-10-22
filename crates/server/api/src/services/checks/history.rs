@@ -71,3 +71,29 @@ impl ChecksSvc {
         })
     }
 }
+
+impl ChecksSvc {
+    pub(super) async fn nonhermetic(
+        &self,
+        request: Request<pb::ListNonhermeticRequest>,
+    ) -> Result<pb::ListNonhermeticResponse> {
+        let opened = open(&self.state, &request, &request.get_ref().repo).await?;
+        opened.permit().read_any().await?;
+        let config = &opened.repo.config;
+        let space = self.state.exec.space(&config.org);
+        let prefix = format!("verify:{}/", config.name);
+        let flags = self.state.exec.nonhermetics(&space, &prefix).await?;
+        Ok(pb::ListNonhermeticResponse {
+            steps: flags
+                .into_iter()
+                .map(|f| pb::NonhermeticStep {
+                    step: f.label[prefix.len()..].to_string(),
+                    action: bytes::Bytes::copy_from_slice(f.action.as_bytes()),
+                    differences: f.differences,
+                    found_at: rill_proto::convert::timestamp_to_proto(f.found_at),
+                    until: rill_proto::convert::timestamp_to_proto(f.until),
+                })
+                .collect(),
+        })
+    }
+}

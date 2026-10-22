@@ -35,8 +35,18 @@ impl PlanRunner {
             shard: compiled.shard,
             ..StepResult::skipped(&compiled.step, StepStatus::Passed)
         };
-        let cached = match compiled.secrets.is_empty() {
-            true => self.space.result(&compiled.action).await?,
+        let label = format!("verify:{}/{}", self.repo, compiled.step);
+        result.nonhermetic = self
+            .scheduler
+            .nonhermetic(&self.space, &label)
+            .await?
+            .is_some();
+        let cached = match compiled.secrets.is_empty() && !result.nonhermetic {
+            true => {
+                self.scheduler
+                    .cached_result(&self.space, &compiled.action)
+                    .await?
+            }
             false => None,
         };
         let junit = compiled.junit.clone();
@@ -64,6 +74,7 @@ impl PlanRunner {
                     requester: self.requester.clone(),
                     do_not_cache: !compiled.secrets.is_empty(),
                     secrets: compiled.secrets,
+                    label: Some(label),
                 },
             )
             .await?;

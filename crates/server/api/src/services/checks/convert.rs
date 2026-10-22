@@ -102,5 +102,6 @@ fn step(indexed: &IndexedStep) -> pb::RunStep {
             .collect(),
         worker: s.worker.clone().unwrap_or_default(),
         duration_ms: s.duration_ms,
+        nonhermetic: s.nonhermetic,
     }
 }

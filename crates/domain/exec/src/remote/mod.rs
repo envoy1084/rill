@@ -2,12 +2,12 @@
 //! org's execution space, operations, and the scheduler that hands
 //! actions to Buildbarn workers.
 
+pub mod cache;
 pub mod cas;
 pub mod digest;
 pub mod inputs;
 pub mod operation;
 pub mod platform;
-pub mod results;
 pub mod scheduler;
 pub mod secrets;
 pub mod space;

@@ -170,8 +170,8 @@ impl DataKeySource for Fixed {
     }
 }
 
-#[tokio::test]
-async fn secret_values_are_stored_sealed_under_the_org_keys() {
+/// A fixture sealing with real org data keys.
+pub async fn sealed_fixture() -> Fixture {
     let sealer = Arc::new(OrgSealer::new());
     sealer.set_source(Arc::new(Fixed(HashMap::from([(
         DEFAULT_ORG.to_string(),
@@ -181,7 +181,12 @@ async fn secret_values_are_stored_sealed_under_the_org_keys() {
             active_from: Timestamp::from_millis(0),
         }],
     )]))));
-    let fx = Fixture::sealed_by(sealer.clone() as Arc<dyn Sealer>).await;
+    Fixture::sealed_by(sealer as Arc<dyn Sealer>).await
+}
+
+#[tokio::test]
+async fn secret_values_are_stored_sealed_under_the_org_keys() {
+    let fx = sealed_fixture().await;
     fx.scheduler
         .put_secret(
             DEFAULT_ORG,

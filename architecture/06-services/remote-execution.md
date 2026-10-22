@@ -32,9 +32,10 @@ Every org has an execution space (`remote/space.rs`):
   rehashing: raw content is plain BLAKE3, the digest REAPI clients compute
   ([ADR 016](../10-decisions/016-plain-blake3-for-content.md)). The sealer
   encrypts it with the org's data keys, bound to the `.exec` namespace.
-* **Records** (action results, operations, queues, org secrets) live
-  under a `RepoStore` whose id no repository uses, in the `xop`, `xopn`,
-  `xif`, `xpl`, `xsec` and `xscmd` tables; worker sessions and the idle
+* **Records** (action results, operations, queues, org secrets,
+  non-hermetic labels) live under a `RepoStore` whose id no repository
+  uses, in the `xop`, `xopn`, `xif`, `xpl`, `xsec`, `xscmd` and `xnh`
+  tables; worker sessions and the idle
   wake counter are instance-wide (`xwk`, `xwake`).
 
 The REAPI instance name is the org: `""` is the default org, `acme` is
@@ -53,11 +54,32 @@ its digest. `SplitBlob` and `SpliceBlob` are unimplemented.
 
 ## Action cache
 
-`GetActionResult` reads `reapi:ac` records. **Only workers write**
-(`UpdateActionResult` from anyone else is `PERMISSION_DENIED`), so a client
-cannot plant a result for an action it never ran. The scheduler also
-records a result when a worker completes an action with exit code 0,
-unless the action or the request says `do_not_cache`.
+`GetActionResult` reads `reapi:ac` records (`remote/cache/`). **Only
+workers write** (`UpdateActionResult` from anyone else is
+`PERMISSION_DENIED`), so a client cannot plant a result for an action it
+never ran. The scheduler also records a result when a worker completes an
+action with exit code 0, unless the action or the request says
+`do_not_cache`, it carries secrets, or its label is flagged non-hermetic.
+Guards on the cache:
+
+* **Sealed entries.** An entry is sealed under the org's data keys
+  (namespace `<org>.ac`, bound to the action digest) where objects are
+  sealed, so an entry written into the metadata store around the
+  scheduler, or copied to another action, does not open and is a miss.
+* **Referenced content.** A result is cached only if every blob it names
+  (output files, output directory trees, standard output and error) is
+  stored, and served only while they still are; `UpdateActionResult`
+  with a missing blob is `FAILED_PRECONDITION`.
+* **Hermeticity probes.** A share of the results entering the cache
+  (`[exec] probe_per_mille`, 20 by default) is queued again at low
+  priority as a probe operation, which neither merges nor caches. When
+  the probe completes, its exit code and output digests are compared with
+  the cached result; logs are not compared. A difference evicts the entry
+  and flags the action's label non-hermetic for a week (`xnh`): actions
+  with that label are neither looked up nor cached until then. Labels are
+  `verify:<repo>/<step>` for verify plans and `<tool>:<target>#<mnemonic>`
+  from Bazel's `RequestMetadata` header; an action without one is only
+  evicted.
 
 ## Execute
 
@@ -138,6 +160,10 @@ Both are on the queues dashboard. Queue depths appear with every other
   orgs with pending work.
 * Completed operation records are kept; nothing expires them yet.
 * `GetTree` returns the whole tree in one page.
+* A probe may run on the worker that produced the result; differences
+  that only another machine would show (a host path, a CPU feature) are
+  not caught.
+* Probe outcomes are logged, not counted in metrics.
 * Large content read over ByteStream is read per 1 MiB range, but a
   `BatchReadBlobs` or `Action` read loads the blob whole.
 * In Kubernetes the worker and runner share a pod network; actions are

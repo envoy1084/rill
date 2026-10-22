@@ -73,4 +73,11 @@ impl ChecksService for ChecksSvc {
     ) -> GrpcResult<pb::ReadBytesResponse> {
         reply(self.read_artifact(request).await)
     }
+
+    async fn list_nonhermetic(
+        &self,
+        request: Request<pb::ListNonhermeticRequest>,
+    ) -> GrpcResult<pb::ListNonhermeticResponse> {
+        reply(self.nonhermetic(request).await)
+    }
 }

@@ -132,3 +132,36 @@ pub async fn history(ctx: &mut Ctx<'_>, a: HistoryArgs) -> Result<()> {
         },
     )
 }
+
+/// `rill checks nonhermetic`.
+pub async fn nonhermetic(ctx: &mut Ctx<'_>) -> Result<()> {
+    let repo = ctx.repo_name()?;
+    let steps = ctx
+        .client()?
+        .checks_svc()
+        .list_nonhermetic(pb::ListNonhermeticRequest { repo })
+        .await?
+        .into_inner()
+        .steps;
+    ctx.emit(
+        j!({ "steps": steps.iter().map(|s| j!({
+            "step": s.step,
+            "action": hex::encode(&s.action),
+            "differences": s.differences,
+            "found_at": s.found_at,
+            "until": s.until,
+        })).collect::<Vec<_>>() }),
+        |out| {
+            let mut table = Table::new(&["STEP", "FOUND", "UNCACHED UNTIL", "DIFFERENCES"]);
+            for s in &steps {
+                table.row(vec![
+                    s.step.clone(),
+                    when(&Timestamp::from_millis(s.found_at)),
+                    when(&Timestamp::from_millis(s.until)),
+                    s.differences.join("; "),
+                ]);
+            }
+            out.table(table)
+        },
+    )
+}

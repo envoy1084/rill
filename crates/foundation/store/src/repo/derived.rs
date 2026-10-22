@@ -29,6 +29,15 @@ impl RepoStore {
         self.meta().set(self.keys().derived(kind, hash), row).await
     }
 
+    /// Remove a derived value; an offloaded object stays for the
+    /// collector.
+    pub async fn delete_derived(&self, kind: &str, hash: &ObjectHash) -> Result<()> {
+        self.meta()
+            .transact(crate::meta::Transaction::new().delete(self.keys().derived(kind, hash)))
+            .await?;
+        Ok(())
+    }
+
     /// [`RepoStore::put_derived`] that fails once `fence` is lost.
     pub async fn put_derived_fenced(
         &self,
