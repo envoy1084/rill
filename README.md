@@ -2,135 +2,130 @@
 
 **Source control for codebases written by humans and AI agents together.**
 
-One server owns the repository. Every person and every agent works in a private
-server-side workspace, submits changes for review, and the lander puts them on a
-single numbered trunk. Review, landing, verification, search and permissions are
-part of the system, not products bolted on.
+One server owns each repository. Every person and every agent works in a
+private server-side workspace, submits changes for review, and the lander puts
+them on a single numbered trunk (`trunk@18422931`). Review, landing,
+verification, search and permissions are part of the system, not products
+bolted on around it.
 
-Rill is written from scratch in Rust and is not git-compatible. A one-way
-importer exists for migrating a git history; that is the whole bridge.
+Rill is written in Rust and is not git-compatible. A one-way importer brings a
+git history in, and a one-way mirror publishes trunk to a git branch.
 
-## What it does
+> **Status: pre-release.** Rill is under active development. Stored formats,
+> the wire protocol and the CLI change without migration between commits. Do
+> not use it for anything you cannot recreate.
 
-- Stores every blob, tree and change version content-addressed (BLAKE3) and
-  makes every write O(size of the change), not of the repository.
-- Gives each change a stable id across amend and rebase, so review state follows
-  the work and never the hash.
-- Records conflicts as data inside a change instead of aborting; a rebase never
-  fails, and conflicted files can be reviewed, handed off, or resolved later.
-- Runs review as labels and votes evaluated by Cedar policy against a computed
-  risk class, with per-directory ownership and unresolved-thread blocking.
-- Lands optimistically: rebase onto trunk head, compare-and-swap, gap-free
-  sequence numbers (`trunk@18422931`), then verifies continuously after landing
-  with batching, bisect and automatic revert.
-- Treats agents as principals: attested identity, narrow-only capability tokens,
-  sponsor, and signed provenance (model, session) on every change. 27 MCP tools
-  let an agent read, edit, submit, review and land without a checkout.
-- Serves trigram code search and symbol lookup from the same object store,
-  filtered by what the caller may read.
+## Why Rill
 
-See the [system model](architecture/01-overview/system-model.md) before extending landing,
-policy or storage.
+- **Changes, not commits.** Every change keeps a stable id across amend and
+  rebase, so review state follows the work instead of a hash.
+- **Conflicts are data.** A rebase never fails: conflicts are recorded inside
+  the change and can be reviewed, handed off or resolved later. Adjacent edits
+  to imports, functions and other entities merge structurally
+  ([weave](https://crates.io/crates/weave-core)).
+- **One trunk, landed in order.** The sequencer lands non-overlapping changes
+  in parallel, speculates on the queue, compare-and-swaps trunk and numbers
+  every landing without gaps. Verification continues after landing, with
+  batching, bisect and automatic revert.
+- **Agents are principals.** Agents have registered identities, sponsors,
+  budgets, narrow expiring capability tokens and a kill switch. Every change
+  records which model and session wrote it. An MCP server gives an agent 27
+  tools to read, edit, submit, review and land without a checkout.
+- **Policy is part of the server.** Per-directory ownership (relationship
+  tuples), Cedar submit rules over a computed risk class, secret scanning on
+  every stored version, a hash-chained audit log, and objects sealed at rest
+  under per-organization keys.
+- **Built for scale.** Content-addressed storage (BLAKE3, FastCDC chunking) on
+  S3, metadata in FoundationDB, writes that cost the size of the change rather
+  than the repository, trigram code search and a regional read cache.
 
 ## Quick start
 
+Requires stable Rust (1.85 or newer). No `protoc` is needed.
+
 ```sh
-cargo build --release --workspace
+cargo build --release -p rill-cli -p rill-mcp
 export PATH="$PWD/target/release:$PATH"
 
-rill dev                                       # every role, no auth, :7470 / :7471
+rill dev                                  # every role in one process, no auth, :7470
 
 rill repo create app
 rill checkout app ~/app && cd ~/app
 echo 'fn main() {}' > main.rs
-rill new -m "initial"                          # snapshot → change ch_…
+rill new -m "initial"                     # snapshot into a new change ch_…
 rill submit
-rill review vote <ch> Review 2 && rill review vote <ch> Verified 1
-rill land --wait                               # Landed trunk@1
+rill review vote <change> Review 2
+rill review vote <change> Verified 1
+rill land --wait                          # Landed trunk@1
 rill log
 ```
 
-The [user guide](docs/USER_GUIDE.md) walks through the daily loop, syncing,
-conflicts, stacks, agents and team setup. [Getting started](docs/GETTING_STARTED.md)
-covers server configuration.
+`rill --help` lists every command; `rill <command> --help` explains one.
 
-## Repository
-
-Rust 2021 workspace; `cargo build --workspace` needs Rust 1.85+ and no `protoc`
-(protobufs compile with `protox`).
-
-| Crate | Purpose |
-| --- | --- |
-| [rill-types](crates/foundation/types) | Object model, ids, hashing, `Merge<T>` conflict algebra |
-| [rill-store](crates/foundation/store) | Object and metadata store traits; memory, local (redb + files), S3, FoundationDB |
-| [rill-core](crates/engine/core) | Diff, three-way merge, trees, rebase, ancestry graph, derived data, blob chunking |
-| [rill-policy](crates/domain/policy) | Risk classification, Cedar submit rules, ReBAC, Biscuit capability tokens, signing |
-| [rill-review](crates/domain/review) | Labels, votes, threads, interdiff, stacks, submit evaluation, review agents |
-| [rill-lander](crates/domain/lander) | Landing pipeline, sequence numbers, post-land verification, bisect, revert |
-| [rill-search](crates/domain/search) | Trigram index and symbol extraction |
-| [rill-exec](crates/domain/exec) | Verification runner with a content-addressed action cache |
-| [rill-proto](crates/foundation/proto) | `rill.v1` protobufs and generated tonic services |
-| [rill-events](crates/foundation/events) | Reading the event log: resumable, filtered tails and retention |
-| [rill-jobs](crates/foundation/jobs) | Durable job queues with leased claims and a worker runtime |
-| [rill-api](crates/server/api) | gRPC API, object HTTP protocol, authentication, watch streams, workers |
-| [rill-sdk](crates/clients/sdk) | Typed client and the local checkout |
-| [rill-cli](crates/clients/cli) | The `rill` binary: client commands, `rill dev` and `rill api` |
-| [rill-mcp](crates/clients/mcp) | MCP server exposing the SDK to agents |
-| [rill-git-import](crates/domain/git-import) | One-way importer from git |
-
-The [architecture knowledge base](architecture/index.md) documents each
-boundary: data model, algorithms, workflow, policy, runtime and integrations.
-The fixed design decisions for v2 are in
-[architecture/10-decisions](architecture/10-decisions/README.md).
-
-## Running a server
+### Running a server
 
 ```sh
-rill api init-config > rill.toml         # annotated defaults
-rill api --config rill.toml              # --roles api,workers by default
+rill api init-config > rill.toml          # annotated defaults
+rill api --config rill.toml               # gRPC :7420, HTTP :7421
 ```
 
 Storage is `memory`, `local:<dir>` (objects as files, metadata in redb) or
-`s3://bucket/prefix` (objects on S3, metadata in redb). Every token is a
-Biscuit signed by the instance's P-256 keys, which a key service (a local
-master key, Vault, AWS KMS or Google Cloud KMS) wraps; the first comes from
-`rill api mint-token`, narrower ones from `rill admin token issue`. Per-directory permissions are relationship tuples
-(`rill access grant user:ann owner billing`). Submit rules are
-Cedar policies (`rill admin policy set <repo>/submit`). `RILL_*` environment
-variables override individual keys.
+S3 with metadata in FoundationDB. The first token comes from
+`rill api mint-token`; people then sign in through OpenID Connect or SAML
+(`rill login`). `RILL_*` environment variables override individual keys. The
+[deploy](deploy/README.md) folder has a Docker image, a Helm chart and a
+staging cluster for Docker Compose.
 
-## For agents
+### Connecting an agent
 
 ```sh
-rill-mcp --endpoint http://host:7470 --token <agent-token> --repo app
+rill-mcp --endpoint http://host:7420 --token <agent-token> --repo app
 ```
 
 Register that command as an MCP server. `rill_apply_edits` edits files against
 a base and creates a change in one call; `rill_submit`, `rill_request_land` and
-`rill_land_status` run the same review loop a human runs. Issue agents narrow,
-expiring tokens: `rill admin token issue --for agent:fixer --repo app --verbs
-read,write,review --paths src/ --expires 4h`.
+`rill_land_status` run the same review loop a person runs.
 
-## Development
+## Repository layout
 
-```sh
-cargo test --workspace
-cargo clippy --workspace --all-targets
-cargo fmt --check
+```
+crates/
+  foundation/   types, proto, store, events, jobs     object model, wire format, storage
+  engine/       core, merge-syntax                    diff, merge, trees, rebase, history
+  domain/       policy, review, lander, search,       the subsystems with their own rules
+                exec, identity, git-import
+  server/       runtime, api, cache                   a server process and its API
+  clients/      sdk, cli, mcp                         what people and agents run
+tools/          sim, bench, load, fuzz                simulation, benchmarks, load, fuzzing
+architecture/   how Rill works, page by page, with the design decisions
+deploy/         Docker image, Helm chart, compose cluster, dashboards
+spec/           TLA+ specifications checked with TLC
 ```
 
-Dev and test profiles use `debug = "line-tables-only"` to keep `target/` near
-9 GB. [CLAUDE.md](CLAUDE.md) states the code conventions and layering rule;
-[development](architecture/09-engineering/development.md) and
-[testing](architecture/09-engineering/testing.md) describe the workspace.
+Each crate folder drops the `rill-` prefix of its package name
+(`crates/domain/lander` is `rill-lander`). Dependencies point only down this
+list; [crates and layering](architecture/01-overview/crates-and-layering.md)
+has the full map.
 
-## Status
+## Documentation
 
-Version 1. Every crate above is implemented and tested in-process (357 tests).
-Not production-ready: S3 and FoundationDB backends are untested against real
-services, there is no identity provider sign-in yet, execution is unsandboxed, there is no web UI, no virtual
-filesystem client, and structural merge is a hook. Rill is being rebuilt as v2
-for large monorepos shared by many agents and humans; the decisions behind it
-are in [architecture/10-decisions](architecture/10-decisions/README.md).
+The [architecture knowledge base](architecture/index.md) describes the code as
+it is: the data model, the algorithms, the review and landing workflow, policy,
+the runtime and the clients, with a reading order. Start with the
+[system model](architecture/01-overview/system-model.md) and the
+[principles and invariants](architecture/01-overview/principles-and-invariants.md).
+Fixed design decisions are recorded as [ADRs](architecture/10-decisions/README.md).
 
-License: Apache-2.0.
+User documentation will be written once the design settles.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build, test and submit
+changes, and [SECURITY.md](SECURITY.md) to report a vulnerability. Everyone
+taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+Rill is licensed under the [Apache License, Version 2.0](LICENSE). Unless you
+state otherwise, any contribution you submit for inclusion in Rill is licensed
+under the same terms, without any additional terms or conditions.

@@ -9,17 +9,19 @@ it builds, and what CI checks. The crate dependency rules are on
 
 | Path | Contents |
 | --- | --- |
-| `Cargo.toml` | members, `[workspace.package]`, `[workspace.dependencies]`, build profiles |
-| `rust-toolchain.toml` | toolchain channel and components |
-| `rustfmt.toml` | `edition = "2021"`, `max_width = 100` |
-| `CLAUDE.md` | contributor rules: code style, errors, async, layering |
-| `docs/` | `ARCHITECTURE.md` (pointer to this knowledge base), `GETTING_STARTED.md`, `USER_GUIDE.md` |
+| `Cargo.toml`, `Cargo.lock` | members (`crates/*/*`, `tools/*`), `[workspace.package]`, `[workspace.dependencies]`, build profiles |
+| `rust-toolchain.toml`, `rustfmt.toml` | stable toolchain with rustfmt and clippy; `max_width = 100` |
+| `deny.toml` | `cargo deny` policy: licences, advisories, sources |
+| `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `LICENSE` | project front matter |
+| `CLAUDE.md` | contributor rules for coding agents: structure, style, tests, checks |
 | `architecture/` | this knowledge base, start at [index](../index.md) |
-| `crates/<name>/src` | one crate; `lib.rs` declares modules, `error.rs` holds the error enum |
-| `crates/<name>/tests` | cross-module tests ([testing](testing.md)) |
+| `crates/<group>/<name>/src` | one crate ([crates and layering](../01-overview/crates-and-layering.md)); `lib.rs` declares modules, `error.rs` holds the error enum |
+| `crates/<group>/<name>/tests` | cross-module tests ([testing](testing.md)) |
 | `crates/foundation/proto/proto/rill/v1` | the `.proto` sources |
+| `tools/` | `sim`, `bench`, `load`; `fuzz/` is a separate `cargo-fuzz` workspace |
+| `deploy/` | the Docker image, Helm chart, staging compose cluster, dashboards, test identity providers |
+| `spec/` | TLA+ specifications checked with TLC |
 | `.github/workflows/ci.yml` | the CI pipeline |
-| `tools/fuzz/` | `cargo-fuzz` targets, a separate workspace excluded from the main one |
 
 `.gitignore` excludes `/target`, `.rill/` checkouts, `*.redb` files and the
 local `research/` notes.
@@ -163,7 +165,7 @@ logging in all three binaries.
   to clippy after `--` instead: changing `RUSTFLAGS` rebuilds the whole
   workspace into a second copy of `target/`.
 - Some files are over the 400-line guideline: the `review`, `workspace` and
-  `admin` gRPC service files and `rill-cli/src/commands/review.rs`.
+  `admin` gRPC service files and `rill-cli/src/commands/review/mod.rs`.
 
 ## Code
 
