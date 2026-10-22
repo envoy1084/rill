@@ -11,7 +11,10 @@ use crate::common::{connect, dev_config, TestServer};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn an_action_runs_once_then_comes_from_the_cache() {
-    let server = TestServer::start(dev_config()).await;
+    // A hermeticity probe would run a cached action again now and then.
+    let mut config = dev_config();
+    config.exec.probe_per_mille = 0;
+    let server = TestServer::start(config).await;
     let worker = FakeWorker::start(&server, None, "w1");
     let mut exec = exec_clients(&server, None).await;
     let action = upload_action(&mut exec, &["sh", "-c", "echo hi > out.txt"]).await;
