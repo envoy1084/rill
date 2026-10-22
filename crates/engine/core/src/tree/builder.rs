@@ -68,6 +68,11 @@ impl TreeBuilder {
                 None => ops.put_tree(&Tree::empty()).await,
             };
         }
+        // Operations already deferring belong to a caller that stores
+        // several builds' nodes together.
+        if ops.is_deferring() {
+            return Ok(build_dir(ops, base, self.root).await?.0);
+        }
         let ops = ops.deferring();
         let (hash, _) = build_dir(&ops, base, self.root).await?;
         ops.flush().await?;

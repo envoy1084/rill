@@ -234,12 +234,14 @@ async fn what_a_driver_resolved_stays_recorded_when_its_landing_is_lined_up() {
     let (_, resolved) = fx
         .commit(Some(base), &[("registry.txt", "a\ny\n")], "y")
         .await;
-    for cv in [&first, &resolved] {
-        lander
-            .enqueue(request(cv, RiskClass::Normal))
-            .await
-            .unwrap();
-    }
+    // Queued a second apart, so the disjoint one is served first.
+    let mut earlier = request(&first, RiskClass::Normal);
+    earlier.requested_at = rill_types::Timestamp::from_millis(earlier.requested_at.millis() - 1000);
+    lander.enqueue(earlier).await.unwrap();
+    lander
+        .enqueue(request(&resolved, RiskClass::Normal))
+        .await
+        .unwrap();
     lander.run_once().await.unwrap();
     let (seq, head) = fx.head().await;
     assert_eq!(seq, TrunkSeq(4), "both landed in one batch");

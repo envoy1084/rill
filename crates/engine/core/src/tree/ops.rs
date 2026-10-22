@@ -87,6 +87,11 @@ impl TreeOps {
         }
     }
 
+    /// Whether new nodes are held back for a later [`TreeOps::flush`].
+    pub(crate) fn is_deferring(&self) -> bool {
+        self.pending.is_some()
+    }
+
     /// Store the nodes held back since [`TreeOps::deferring`].
     pub(crate) async fn flush(&self) -> Result<()> {
         let Some(pending) = &self.pending else {

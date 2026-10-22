@@ -134,9 +134,9 @@ impl Lander {
         (chain, held)
     }
 
-    /// Store the re-parented versions at `unstored` places of `chain`,
-    /// each with its land-critical values in one transaction. A failure
-    /// fails that request and takes everything lined up after it off the
+    /// Store the re-parented versions at `unstored` places of `chain` with
+    /// their land-critical values, all in one transaction. A failure fails
+    /// the first of them and takes everything lined up after it off the
     /// chain, to be served again.
     async fn store_lined(
         &self,
@@ -148,14 +148,11 @@ impl Lander {
         if places.is_empty() {
             return;
         }
-        // In chain order: each version's values build on its parent's.
-        let mut failed = None;
-        for &at in &places {
-            if let Err(e) = self.derive.store_version(&chain[at].cv).await {
-                failed = Some((at, e.to_string()));
-                break;
-            }
-        }
+        let versions: Vec<_> = places.iter().map(|&at| chain[at].cv.clone()).collect();
+        let failed = match self.derive.store_chain(&versions).await {
+            Ok(_) => None,
+            Err(e) => Some((places[0], e.to_string())),
+        };
         let Some((at, reason)) = failed else {
             return;
         };
