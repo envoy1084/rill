@@ -18,6 +18,8 @@ fn descriptor_set_is_embedded_and_parses() {
         "rill/v1/audit.proto",
         "rill/v1/protection.proto",
         "rill/v1/identity.proto",
+        "rill/v1/secrets.proto",
+        "rill/v1/checks.proto",
     ] {
         assert!(names.contains(&expected.to_string()), "missing {expected}");
     }
@@ -26,5 +28,5 @@ fn descriptor_set_is_embedded_and_parses() {
         .iter()
         .flat_map(|f| f.service.iter().map(|s| s.name().to_string()))
         .collect();
-    assert_eq!(services.len(), 11);
+    assert_eq!(services.len(), 13);
 }
