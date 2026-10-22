@@ -30,6 +30,15 @@ async fn an_action_runs_once_then_comes_from_the_cache() {
     assert!(again.cached_result, "the second run is a cache hit");
     assert_eq!(again.result, Some(result));
     assert_eq!(worker.runs.load(Ordering::SeqCst), 1);
+    let requests = |outcome| {
+        server
+            .state
+            .metrics
+            .exec_requests
+            .get_or_create(&rill_runtime::telemetry::OutcomeLabels { outcome })
+            .get()
+    };
+    assert_eq!((requests("queued"), requests("cache_hit")), (1, 1));
     worker.stop();
     server.stop().await;
 }

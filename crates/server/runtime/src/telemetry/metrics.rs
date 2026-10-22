@@ -95,6 +95,12 @@ pub struct Metrics {
     /// Text conflicts structural merge resolved, declined or skipped, by
     /// file extension and outcome.
     pub structural_merges: Family<OutcomeKeyLabels, Gauge>,
+    /// Remote execution requests by outcome: served from the cache,
+    /// queued, or merged into an identical running action.
+    pub exec_requests: Family<OutcomeLabels, Counter>,
+    /// Actions workers finished, by outcome (`ok`, `failed` for a non-zero
+    /// exit, `error` when the action could not run).
+    pub exec_completions: Family<OutcomeLabels, Counter>,
 }
 
 impl Default for Metrics {
@@ -228,6 +234,22 @@ impl Metrics {
             "text conflicts structural merge resolved, declined or skipped",
             structural_merges.clone(),
         );
+        let exec_requests = Family::<OutcomeLabels, Counter>::default();
+        register(
+            &mut registry,
+            &mut names,
+            "exec_requests",
+            "remote execution requests served from the cache, queued or merged",
+            exec_requests.clone(),
+        );
+        let exec_completions = Family::<OutcomeLabels, Counter>::default();
+        register(
+            &mut registry,
+            &mut names,
+            "exec_completions",
+            "actions workers finished, by outcome",
+            exec_completions.clone(),
+        );
         let lease_epoch = Family::<RoleLabels, Gauge>::default();
         register(
             &mut registry,
@@ -256,6 +278,8 @@ impl Metrics {
             land_conflict_permille,
             land_queued_by_share,
             structural_merges,
+            exec_requests,
+            exec_completions,
         }
     }
 

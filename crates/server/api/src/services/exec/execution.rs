@@ -55,6 +55,7 @@ impl Execution for ExecSvc {
                 };
                 let name = format!("{}/operations/cached-{}", caller.space.org, digest.hash);
                 let op = cached(name, digest, response);
+                self.count("cache_hit");
                 return Ok(Response::new(Box::pin(futures::stream::iter([Ok(op)]))));
             }
         }
@@ -79,6 +80,7 @@ impl Execution for ExecSvc {
             )
             .await
             .map_err(Error::from)?;
+        self.count(if submitted.merged { "merged" } else { "queued" });
         Ok(Response::new(follow(
             self.state.clone(),
             caller.space,

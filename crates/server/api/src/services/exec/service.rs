@@ -14,4 +14,13 @@ impl ExecSvc {
     pub fn new(state: Arc<AppState>) -> Self {
         ExecSvc { state }
     }
+
+    /// Count an `Execute` by how it was served.
+    pub(super) fn count(&self, outcome: &'static str) {
+        self.state
+            .metrics
+            .exec_requests
+            .get_or_create(&rill_runtime::telemetry::OutcomeLabels { outcome })
+            .inc();
+    }
 }
