@@ -19,7 +19,7 @@ flowchart LR
 
 ## Review facts
 
-[`SubmitFacts::from_review`](../../crates/rill-policy/src/submit/facts.rs)
+[`SubmitFacts::from_review`](../../crates/domain/policy/src/submit/facts.rs)
 reads the `ReviewState`:
 
 * `risk`: the stored class (see [risk classification](risk-classification.md)).
@@ -36,7 +36,7 @@ votes count toward `max` and `min` only.
 
 ## Cedar schema
 
-[`SCHEMA_SRC`](../../crates/rill-policy/src/submit/schema.rs) is parsed once
+[`SCHEMA_SRC`](../../crates/domain/policy/src/submit/schema.rs) is parsed once
 per process. Labels are entity tags on `Rill::Change`, so a policy can address
 any label by name without the schema listing them.
 
@@ -46,13 +46,13 @@ any label by name without the schema listing them.
 | `Rill::Change` | `risk`, `author_kind`, `intent_kind` (or `none`), `unresolved_threads`, `unresolved_blocking_threads`, `touches_sensitive`, `has_agent_resolution`, `label_names: Set<String>`; tags of type `VoteSummary` |
 | `Rill::VoteSummary` | the eight `VoteSummary` counters, as `Long` |
 
-[`entities.rs`](../../crates/rill-policy/src/submit/entities.rs) builds
+[`entities.rs`](../../crates/domain/policy/src/submit/entities.rs) builds
 `Rill::Principal::"<id>"` and `Rill::Change::"current"`, validates both
 against the schema, and uses an empty context.
 
 ## Default policy
 
-[`DEFAULT_POLICY`](../../crates/rill-policy/src/submit/default_policy.rs)
+[`DEFAULT_POLICY`](../../crates/domain/policy/src/submit/default_policy.rs)
 applies when a repository has no stored submit policy. Each rule has an
 `@id`:
 
@@ -67,7 +67,7 @@ applies when a repository has no stored submit policy. Each rule has an
 
 ## Loading and evaluation
 
-[`SubmitPolicy::from_source`](../../crates/rill-policy/src/submit/policy.rs)
+[`SubmitPolicy::from_source`](../../crates/domain/policy/src/submit/policy.rs)
 parses the text (`Error::PolicyParse`) and renames each policy to its
 `@id("...")` annotation; duplicate ids are `PolicyParse`. It then validates in
 `ValidationMode::Strict` against the schema (`Error::PolicyValidation`), so a
@@ -82,7 +82,7 @@ reference to an unknown attribute fails at load, not at land time.
   policy has a `@description`), `no permit rule matched` when none matched,
   and `evaluation error: ...` for each Cedar error (also logged at `warn`).
 
-Callers in [`rill-review`](../../crates/rill-review/src/evaluate.rs) and the
+Callers in [`rill-review`](../../crates/domain/review/src/evaluate.rs) and the
 server:
 
 * `refresh_status` evaluates as the review's owner and flips `Open` to
@@ -93,7 +93,7 @@ server:
 
 ## Storage and hot swap
 
-[`state/policy.rs`](../../crates/rill-api/src/state/policy.rs) stores two
+[`state/policy.rs`](../../crates/server/api/src/state/policy.rs) stores two
 documents per repository as JSON `StoredPolicy { text, updated_at,
 updated_by }` under `misc/<repo>/policy:<name>`:
 
@@ -139,15 +139,15 @@ sequenceDiagram
 
 ## Code
 
-* [`submit/schema.rs`](../../crates/rill-policy/src/submit/schema.rs): `SCHEMA_SRC`, `schema`.
-* [`submit/facts.rs`](../../crates/rill-policy/src/submit/facts.rs): `SubmitFacts`, `VoteSummary`.
-* [`submit/entities.rs`](../../crates/rill-policy/src/submit/entities.rs): `build_request`.
-* [`submit/default_policy.rs`](../../crates/rill-policy/src/submit/default_policy.rs): `DEFAULT_POLICY`.
-* [`submit/policy.rs`](../../crates/rill-policy/src/submit/policy.rs): `SubmitPolicy`, `SubmitDecision`.
-* [`submit/tests.rs`](../../crates/rill-policy/src/submit/tests.rs): default-policy cases.
-* [`rill-review/src/evaluate.rs`](../../crates/rill-review/src/evaluate.rs): `evaluate_for`, `refresh_status`.
-* [`state/policy.rs`](../../crates/rill-api/src/state/policy.rs), [`state/registry.rs`](../../crates/rill-api/src/state/registry.rs): storage and `reload_policy`.
-* [`services/admin.rs`](../../crates/rill-api/src/services/admin.rs): `GetPolicy`, `SetPolicy`.
+* [`submit/schema.rs`](../../crates/domain/policy/src/submit/schema.rs): `SCHEMA_SRC`, `schema`.
+* [`submit/facts.rs`](../../crates/domain/policy/src/submit/facts.rs): `SubmitFacts`, `VoteSummary`.
+* [`submit/entities.rs`](../../crates/domain/policy/src/submit/entities.rs): `build_request`.
+* [`submit/default_policy.rs`](../../crates/domain/policy/src/submit/default_policy.rs): `DEFAULT_POLICY`.
+* [`submit/policy.rs`](../../crates/domain/policy/src/submit/policy.rs): `SubmitPolicy`, `SubmitDecision`.
+* [`submit/tests.rs`](../../crates/domain/policy/src/submit/tests.rs): default-policy cases.
+* [`rill-review/src/evaluate.rs`](../../crates/domain/review/src/evaluate.rs): `evaluate_for`, `refresh_status`.
+* [`state/policy.rs`](../../crates/server/api/src/state/policy.rs), [`state/registry.rs`](../../crates/server/api/src/state/registry.rs): storage and `reload_policy`.
+* [`services/admin.rs`](../../crates/server/api/src/services/admin.rs): `GetPolicy`, `SetPolicy`.
 
 ---
 ← Previous: [Risk classification](risk-classification.md) · [Index](../index.md) · Next: [Signing](signing.md) →

@@ -12,7 +12,7 @@ authority block.
 
 ## Claims
 
-[`TokenClaims`](../../crates/rill-policy/src/tokens/claims.rs) are what the
+[`TokenClaims`](../../crates/domain/policy/src/tokens/claims.rs) are what the
 server trusts about a token and stamps on the writes it makes:
 
 | Claim | Meaning |
@@ -34,7 +34,7 @@ the authority block or an attenuation, narrows it.
 
 ## Capability
 
-[`Capability`](../../crates/rill-policy/src/tokens/capability.rs) is the scope
+[`Capability`](../../crates/domain/policy/src/tokens/capability.rs) is the scope
 of one token:
 
 | Field | Semantics |
@@ -58,7 +58,7 @@ hold:
 
 ## Datalog
 
-[`datalog.rs`](../../crates/rill-policy/src/tokens/datalog.rs) turns a
+[`datalog.rs`](../../crates/domain/policy/src/tokens/datalog.rs) turns a
 capability into one block. Every attenuation block carries its checks plus
 the capability's JSON as the block context, so a token's grant can be read
 back without re-deriving it. The authority block holds the identity and
@@ -93,11 +93,11 @@ flowchart LR
     V -->|authenticate / verify_full| P["Verified {principal, claims, capability}"]
 ```
 
-* [`KeyRing`](../../crates/rill-policy/src/tokens/keyring.rs) holds P-256
+* [`KeyRing`](../../crates/domain/policy/src/tokens/keyring.rs) holds P-256
   public keys by id, each with an optional `not_after`. A token naming no
   key, an unknown key or a retired one is `Error::Token`; so is a key that
   reuses a trusted id with different material (the signature fails).
-* [`Issuer`](../../crates/rill-policy/src/tokens/issuer.rs) holds one
+* [`Issuer`](../../crates/domain/policy/src/tokens/issuer.rs) holds one
   `SigningKey` and `TokenLifetimes`. `issue(principal, claims, capability)`
   returns a base64 token with the key's id.
 * `attenuate(token, keys, narrower)` parses the parent, enforces
@@ -111,7 +111,7 @@ flowchart LR
   contexts in order, checking each narrows the previous one. A block without
   context is `Error::Token`; a widening block is `Error::Widening`.
 
-[`Verifier`](../../crates/rill-policy/src/tokens/verifier.rs):
+[`Verifier`](../../crates/domain/policy/src/tokens/verifier.rs):
 
 1. Parse with the key the token names; a bad signature chain is
    `Error::Token`.
@@ -137,7 +137,7 @@ Rust rather than through Datalog, and before the relation check, even in dev
 mode. The effective right is the capability AND the stored relations.
 
 `AdminService.IssueToken`
-([admin.rs](../../crates/rill-api/src/services/admin.rs)) mints tokens:
+([admin.rs](../../crates/server/api/src/services/admin.rs)) mints tokens:
 
 * Each `pb::Capability.scope` is `repo:<name>[/<dir>][/*]`. All scopes must
   name one repository.
@@ -165,14 +165,14 @@ verb and path, with action `repo.<verb>` and scope `repo:<name>/<path>/*`.
 
 ## Code
 
-* [`tokens/capability.rs`](../../crates/rill-policy/src/tokens/capability.rs): `Capability`, `Verb`, `check_narrower_than`.
-* [`tokens/claims.rs`](../../crates/rill-policy/src/tokens/claims.rs): `TokenClaims`, `TokenLifetimes`.
-* [`tokens/keyring.rs`](../../crates/rill-policy/src/tokens/keyring.rs): `SigningKey`, `KeyRing`.
-* [`tokens/datalog.rs`](../../crates/rill-policy/src/tokens/datalog.rs): `capability_block`, `authority_block`, `effective_scope`.
-* [`tokens/issuer.rs`](../../crates/rill-policy/src/tokens/issuer.rs): `Issuer`, `attenuate`, `inspect`.
-* [`tokens/verifier.rs`](../../crates/rill-policy/src/tokens/verifier.rs): `TokenRequest`, `Verified`, `Verifier`.
-* [`tokens/tests.rs`](../../crates/rill-policy/src/tokens/tests.rs): issue, attenuate and reject cases.
-* [`services/admin.rs`](../../crates/rill-api/src/services/admin.rs): `IssueToken`, `WhoAmI`, `parse_scope`, `parse_action`.
+* [`tokens/capability.rs`](../../crates/domain/policy/src/tokens/capability.rs): `Capability`, `Verb`, `check_narrower_than`.
+* [`tokens/claims.rs`](../../crates/domain/policy/src/tokens/claims.rs): `TokenClaims`, `TokenLifetimes`.
+* [`tokens/keyring.rs`](../../crates/domain/policy/src/tokens/keyring.rs): `SigningKey`, `KeyRing`.
+* [`tokens/datalog.rs`](../../crates/domain/policy/src/tokens/datalog.rs): `capability_block`, `authority_block`, `effective_scope`.
+* [`tokens/issuer.rs`](../../crates/domain/policy/src/tokens/issuer.rs): `Issuer`, `attenuate`, `inspect`.
+* [`tokens/verifier.rs`](../../crates/domain/policy/src/tokens/verifier.rs): `TokenRequest`, `Verified`, `Verifier`.
+* [`tokens/tests.rs`](../../crates/domain/policy/src/tokens/tests.rs): issue, attenuate and reject cases.
+* [`services/admin.rs`](../../crates/server/api/src/services/admin.rs): `IssueToken`, `WhoAmI`, `parse_scope`, `parse_action`.
 
 ---
 ← Previous: [Identity and authentication](identity-and-auth.md) · [Index](../index.md) · Next: [Token keys](token-keys.md) →

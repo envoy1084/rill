@@ -7,7 +7,7 @@ checkout. The protocol is the official Rust SDK,
 framing, `initialize` and protocol-version negotiation, `ping`,
 notifications, cancellation and errors, and its transports would serve
 streamable HTTP as well as stdio. Rill implements only `ServerHandler`
-([`server.rs`](../../crates/rill-mcp/src/server.rs)): `get_info` (server
+([`server.rs`](../../crates/clients/mcp/src/server.rs)): `get_info` (server
 name and version, the tools capability, and `instructions` covering `repo`,
 root syntax and provenance), `list_tools` and `call_tool`.
 
@@ -128,10 +128,10 @@ name (`transport`, `conflict`, `land_failed`). The crate-level `Error`
 
 ## Code
 
-- [lib.rs](../../crates/rill-mcp/src/lib.rs), [bin/rill_mcp.rs](../../crates/rill-mcp/src/bin/rill_mcp.rs), [config.rs](../../crates/rill-mcp/src/config.rs), [error.rs](../../crates/rill-mcp/src/error.rs), [server.rs](../../crates/rill-mcp/src/server.rs)
-- [tools/mod.rs](../../crates/rill-mcp/src/tools/mod.rs), [tools/schema.rs](../../crates/rill-mcp/src/tools/schema.rs), [tools/args.rs](../../crates/rill-mcp/src/tools/args.rs), [tools/write.rs](../../crates/rill-mcp/src/tools/write.rs), [tools/repo.rs](../../crates/rill-mcp/src/tools/repo.rs), [tools/review.rs](../../crates/rill-mcp/src/tools/review.rs)
-- [grep.rs](../../crates/rill-mcp/src/grep.rs)
-- [json/mod.rs](../../crates/rill-mcp/src/json/mod.rs), [json/primitives.rs](../../crates/rill-mcp/src/json/primitives.rs), [json/history.rs](../../crates/rill-mcp/src/json/history.rs)
+- [lib.rs](../../crates/clients/mcp/src/lib.rs), [bin/rill_mcp.rs](../../crates/clients/mcp/src/bin/rill_mcp.rs), [config.rs](../../crates/clients/mcp/src/config.rs), [error.rs](../../crates/clients/mcp/src/error.rs), [server.rs](../../crates/clients/mcp/src/server.rs)
+- [tools/mod.rs](../../crates/clients/mcp/src/tools/mod.rs), [tools/schema.rs](../../crates/clients/mcp/src/tools/schema.rs), [tools/args.rs](../../crates/clients/mcp/src/tools/args.rs), [tools/write.rs](../../crates/clients/mcp/src/tools/write.rs), [tools/repo.rs](../../crates/clients/mcp/src/tools/repo.rs), [tools/review.rs](../../crates/clients/mcp/src/tools/review.rs)
+- [grep.rs](../../crates/clients/mcp/src/grep.rs)
+- [json/mod.rs](../../crates/clients/mcp/src/json/mod.rs), [json/primitives.rs](../../crates/clients/mcp/src/json/primitives.rs), [json/history.rs](../../crates/clients/mcp/src/json/history.rs)
 
 ---
 ← Previous: [CLI](cli.md) · [Index](../index.md) · Next: [Development](../09-engineering/development.md) →

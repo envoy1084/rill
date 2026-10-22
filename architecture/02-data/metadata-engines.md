@@ -110,9 +110,9 @@ costs about a microsecond more per write. On disk, redb's fsync dominates.
 
 ## Code
 
-* [keyspace/](../../crates/rill-store/src/keyspace/mod.rs): [engine.rs](../../crates/rill-store/src/keyspace/engine.rs), [store.rs](../../crates/rill-store/src/keyspace/store.rs), [layout.rs](../../crates/rill-store/src/keyspace/layout.rs), [buffered.rs](../../crates/rill-store/src/keyspace/buffered.rs)
-* [memory.rs](../../crates/rill-store/src/memory.rs), [local/meta.rs](../../crates/rill-store/src/local/meta.rs), [fdb/](../../crates/rill-store/src/fdb/mod.rs)
-* [tests/conformance/](../../crates/rill-store/tests/conformance/main.rs), [rill-bench benches/meta.rs](../../crates/rill-bench/benches/meta.rs)
+* [keyspace/](../../crates/foundation/store/src/keyspace/mod.rs): [engine.rs](../../crates/foundation/store/src/keyspace/engine.rs), [store.rs](../../crates/foundation/store/src/keyspace/store.rs), [layout.rs](../../crates/foundation/store/src/keyspace/layout.rs), [buffered.rs](../../crates/foundation/store/src/keyspace/buffered.rs)
+* [memory.rs](../../crates/foundation/store/src/memory.rs), [local/meta.rs](../../crates/foundation/store/src/local/meta.rs), [fdb/](../../crates/foundation/store/src/fdb/mod.rs)
+* [tests/conformance/](../../crates/foundation/store/tests/conformance/main.rs), [rill-bench benches/meta.rs](../../tools/bench/benches/meta.rs)
 
 ---
 ← Previous: [Storage and keyspace](storage-and-keyspace.md) · [Index](../index.md) · Next: [Merge algebra](merge-algebra.md) →

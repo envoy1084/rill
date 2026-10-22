@@ -162,10 +162,10 @@ Linux. Shutdown follows `[shutdown]`
 
 ## Code
 
-* [lib.rs](../../crates/rill-api/src/lib.rs), [serve.rs](../../crates/rill-api/src/serve.rs), [error.rs](../../crates/rill-api/src/error.rs)
-* [state/app.rs](../../crates/rill-api/src/state/app.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [state/policy.rs](../../crates/rill-api/src/state/policy.rs)
-* [auth/layer.rs](../../crates/rill-api/src/auth/layer.rs), [auth/authenticator.rs](../../crates/rill-api/src/auth/authenticator.rs), [auth/permit.rs](../../crates/rill-api/src/auth/permit.rs), [auth/context.rs](../../crates/rill-api/src/auth/context.rs)
-* [services/common.rs](../../crates/rill-api/src/services/common.rs), [services/repo/write.rs](../../crates/rill-api/src/services/repo/write.rs)
+* [lib.rs](../../crates/server/api/src/lib.rs), [serve.rs](../../crates/server/api/src/serve.rs), [error.rs](../../crates/server/api/src/error.rs)
+* [state/app.rs](../../crates/server/api/src/state/app.rs), [state/registry.rs](../../crates/server/api/src/state/registry.rs), [state/policy.rs](../../crates/server/api/src/state/policy.rs)
+* [auth/layer.rs](../../crates/server/api/src/auth/layer.rs), [auth/authenticator.rs](../../crates/server/api/src/auth/authenticator.rs), [auth/permit.rs](../../crates/server/api/src/auth/permit.rs), [auth/context.rs](../../crates/server/api/src/auth/context.rs)
+* [services/common.rs](../../crates/server/api/src/services/common.rs), [services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs)
 
 ---
 ← Previous: [Git import](../06-services/git-import.md) · [Index](../index.md) · Next: [API surface](api-surface.md) →

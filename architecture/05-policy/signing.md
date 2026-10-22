@@ -14,7 +14,7 @@ A signature covers an `ObjectHash`, the BLAKE3 digest of a kind-prefixed
 encoding. In practice the signed object is a change version. The version hash
 covers its author, provenance, parents and file changes, so a signature over
 it attests to the whole version, including
-[`Provenance`](../../crates/rill-types/src/objects/change.rs).
+[`Provenance`](../../crates/foundation/types/src/objects/change.rs).
 
 ```mermaid
 flowchart LR
@@ -34,7 +34,7 @@ flowchart LR
 
 ## Keys and API
 
-[`Signer`](../../crates/rill-policy/src/signing.rs):
+[`Signer`](../../crates/domain/policy/src/signing.rs):
 
 * `generate()` draws a random 32-byte scalar. `from_bytes` rejects anything
   that is not a valid P-256 secret scalar with `Error::InvalidKey`.
@@ -61,7 +61,7 @@ file I/O.
 agent's work), `resolved_by` and the free-form `extra` map. The server sets
 `resolved_by` from `Permit::resolved_by()` in `ApplyEdits`. Every commit
 path stamps the rest from the caller's signed token before hashing
-([stamp.rs](../../crates/rill-api/src/services/repo/stamp.rs)): `session`
+([stamp.rs](../../crates/server/api/src/services/repo/stamp.rs)): `session`
 and `model` are the token's claims, `sponsor` is the token's user sponsor
 (a team sponsor goes to `extra["sponsor_team"]`), and a client value that
 differs is kept as `extra["claimed_session"]` / `extra["claimed_model"]`.
@@ -98,12 +98,12 @@ versions.
 
 ## Code
 
-* [`signing.rs`](../../crates/rill-policy/src/signing.rs): `Signer`, `verify`, `KeyFile`.
-* [`objects/change.rs`](../../crates/rill-types/src/objects/change.rs): `Signature`, `Provenance`.
-* [`rill-store/src/repo/versions.rs`](../../crates/rill-store/src/repo/versions.rs): `signatures_mutation`, `get_signatures`.
-* [`services/repo/write.rs`](../../crates/rill-api/src/services/repo/write.rs): `create_change_version_impl`, provenance handling.
-* [`services/repo/history.rs`](../../crates/rill-api/src/services/repo/history.rs): signatures on read.
-* [`rill-sdk/src/repo/write.rs`](../../crates/rill-sdk/src/repo/write.rs), [`rill-sdk/src/repo/history.rs`](../../crates/rill-sdk/src/repo/history.rs): client surface.
+* [`signing.rs`](../../crates/domain/policy/src/signing.rs): `Signer`, `verify`, `KeyFile`.
+* [`objects/change.rs`](../../crates/foundation/types/src/objects/change.rs): `Signature`, `Provenance`.
+* [`rill-store/src/repo/versions.rs`](../../crates/foundation/store/src/repo/versions.rs): `signatures_mutation`, `get_signatures`.
+* [`services/repo/write.rs`](../../crates/server/api/src/services/repo/write.rs): `create_change_version_impl`, provenance handling.
+* [`services/repo/history.rs`](../../crates/server/api/src/services/repo/history.rs): signatures on read.
+* [`rill-sdk/src/repo/write.rs`](../../crates/clients/sdk/src/repo/write.rs), [`rill-sdk/src/repo/history.rs`](../../crates/clients/sdk/src/repo/history.rs): client surface.
 
 ---
 ← Previous: [Submit policy](submit-policy.md) · [Index](../index.md) · Next: [Audit log](audit.md) →

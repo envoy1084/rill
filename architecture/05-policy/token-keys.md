@@ -9,7 +9,7 @@ signs anything.
 
 ## Records
 
-[`TokenKeyRecord`](../../crates/rill-types/src/identity/keys.rs), one per
+[`TokenKeyRecord`](../../crates/foundation/types/src/identity/keys.rs), one per
 key, in the instance-wide `idk` table:
 
 | Field | Meaning |
@@ -24,12 +24,12 @@ key, in the instance-wide `idk` table:
 
 Every change to the table appends `IdentityChange::KeysChanged` to the
 identity log in the same transaction
-([identity store](../../crates/rill-store/src/identity/)), so other
+([identity store](../../crates/foundation/store/src/identity/)), so other
 servers learn of it from the log.
 
 ## Key services
 
-[`KeyWrapper`](../../crates/rill-identity/src/keys/wrapper.rs) wraps and
+[`KeyWrapper`](../../crates/domain/identity/src/keys/wrapper.rs) wraps and
 unwraps a secret; `can_unwrap` matches the stored backend and `key_ref`.
 
 | Backend | `key_ref` | Notes |
@@ -44,7 +44,7 @@ it.
 
 ## Lifecycle
 
-[`KeyManager`](../../crates/rill-identity/src/keys/manager.rs), with
+[`KeyManager`](../../crates/domain/identity/src/keys/manager.rs), with
 `RotationPolicy` defaults: rotate after 30 days, activate 60 s after
 storing, verify 5 min past the last token, delete retired keys after a day.
 
@@ -79,9 +79,9 @@ sequenceDiagram
 
 ## Code
 
-* [`rill-identity/src/keys/`](../../crates/rill-identity/src/keys/mod.rs): services, `KeyManager`.
-* [`rill-store/src/identity/`](../../crates/rill-store/src/identity/mod.rs): key, session and revocation tables, identity log.
-* [`rill-types/src/identity/`](../../crates/rill-types/src/identity/mod.rs): records.
+* [`rill-identity/src/keys/`](../../crates/domain/identity/src/keys/mod.rs): services, `KeyManager`.
+* [`rill-store/src/identity/`](../../crates/foundation/store/src/identity/mod.rs): key, session and revocation tables, identity log.
+* [`rill-types/src/identity/`](../../crates/foundation/types/src/identity/mod.rs): records.
 * Tests: `rill-identity/tests/keys.rs` (lifecycle), `tests/key_services.rs` (Vault, AWS KMS on LocalStack; run when configured), `tests/gcp_kms.rs` (REST contract); `rill-store/tests/conformance/identity.rs`.
 
 ---

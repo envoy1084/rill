@@ -75,8 +75,8 @@ server exports.
 
 ## Code
 
-* [telemetry/](../../crates/rill-api/src/telemetry/mod.rs): `init.rs`, `metrics.rs`, `rpc.rs`, `meta.rs`, `sampler.rs`
-* [objects/mod.rs](../../crates/rill-api/src/objects/mod.rs) (`/livez`, `/readyz`, `/metrics`), [serve.rs](../../crates/rill-api/src/serve.rs) (gRPC health)
+* [telemetry/](../../crates/server/api/src/telemetry/mod.rs): `init.rs`, `metrics.rs`, `rpc.rs`, `meta.rs`, `sampler.rs`
+* [objects/mod.rs](../../crates/server/api/src/objects/mod.rs) (`/livez`, `/readyz`, `/metrics`), [serve.rs](../../crates/server/api/src/serve.rs) (gRPC health)
 * [deploy/grafana](../../deploy/grafana/README.md)
 
 ---

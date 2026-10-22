@@ -8,7 +8,7 @@ version. It fails only when an input is missing or content cannot be read.
 ## Algorithm
 
 `rebase(derive, version, new_parent, created_at) -> ChangeVersion`
-([rebase.rs](../../crates/rill-core/src/rebase.rs)):
+([rebase.rs](../../crates/engine/core/src/rebase.rs)):
 
 1. Load the version, the root of its old first parent (`None` for a root
    change), its own root and the new parent's root, all through `RootTree`.
@@ -68,9 +68,9 @@ The algebra settles most paths before any content is read:
 
 | Caller | What happens to a conflicted result |
 | --- | --- |
-| `Rebase` RPC ([repo/write.rs](../../crates/rill-api/src/services/repo/write.rs)) | Stored through `commit_version`; `has_conflicts` is true |
-| Workspace rebase ([services/workspace.rs](../../crates/rill-api/src/services/workspace.rs)) | Stored through `commit_version`; the workspace snapshot moves to its root |
-| Lander ([land/sequence.rs](../../crates/rill-lander/src/land/sequence.rs)) | Not stored. The request gets `LandStatus::Conflict` and the change goes back to its owner |
+| `Rebase` RPC ([repo/write.rs](../../crates/server/api/src/services/repo/write.rs)) | Stored through `commit_version`; `has_conflicts` is true |
+| Workspace rebase ([services/workspace.rs](../../crates/server/api/src/services/workspace.rs)) | Stored through `commit_version`; the workspace snapshot moves to its root |
+| Lander ([land/sequence.rs](../../crates/domain/lander/src/land/sequence.rs)) | Not stored. The request gets `LandStatus::Conflict` and the change goes back to its owner |
 
 The lander first checks `is_ancestor(tip, head)` and skips the rebase when
 the tip is already on trunk. See [landing](../04-workflow/landing.md).
@@ -95,10 +95,10 @@ the tip is already on trunk. See [landing](../04-workflow/landing.md).
 
 ## Code
 
-- [rebase.rs](../../crates/rill-core/src/rebase.rs)
-- [merge/change.rs](../../crates/rill-core/src/merge/change.rs) (`merge_path`, `tip_terms`, `is_same_as`, `root_of`)
-- [merge/state.rs](../../crates/rill-core/src/merge/state.rs)
-- [rill-lander land/sequence.rs](../../crates/rill-lander/src/land/sequence.rs)
+- [rebase.rs](../../crates/engine/core/src/rebase.rs)
+- [merge/change.rs](../../crates/engine/core/src/merge/change.rs) (`merge_path`, `tip_terms`, `is_same_as`, `root_of`)
+- [merge/state.rs](../../crates/engine/core/src/merge/state.rs)
+- [rill-lander land/sequence.rs](../../crates/domain/lander/src/land/sequence.rs)
 
 ---
 ← Previous: [Merge](merge.md) · [Index](../index.md) · Next: [Trees](trees.md) →

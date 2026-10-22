@@ -1,30 +1,7 @@
 [workspace]
 resolver = "2"
-exclude = ["fuzz"]
-members = [
-    "crates/rill-types",
-    "crates/rill-store",
-    "crates/rill-core",
-    "crates/rill-merge-syntax",
-    "crates/rill-policy",
-    "crates/rill-proto",
-    "crates/rill-review",
-    "crates/rill-lander",
-    "crates/rill-events",
-    "crates/rill-jobs",
-    "crates/rill-search",
-    "crates/rill-exec",
-    "crates/rill-api",
-    "crates/rill-cache",
-    "crates/rill-sdk",
-    "crates/rill-cli",
-    "crates/rill-mcp",
-    "crates/rill-identity",
-    "crates/rill-git-import",
-    "crates/rill-sim",
-    "crates/rill-bench",
-    "crates/rill-load",
-]
+exclude = ["tools/fuzz"]
+members = ["crates/*/*", "tools/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -38,24 +15,24 @@ authors = ["Rill contributors"]
 # Structural merge engine; pinned exactly, upgraded deliberately.
 weave-core = "=0.6.1"
 # Internal crates
-rill-types = { path = "crates/rill-types" }
-rill-store = { path = "crates/rill-store" }
-rill-core = { path = "crates/rill-core" }
-rill-merge-syntax = { path = "crates/rill-merge-syntax" }
-rill-policy = { path = "crates/rill-policy" }
-rill-proto = { path = "crates/rill-proto" }
-rill-review = { path = "crates/rill-review" }
-rill-lander = { path = "crates/rill-lander" }
-rill-events = { path = "crates/rill-events" }
-rill-jobs = { path = "crates/rill-jobs" }
-rill-search = { path = "crates/rill-search" }
-rill-exec = { path = "crates/rill-exec" }
-rill-api = { path = "crates/rill-api" }
-rill-cache = { path = "crates/rill-cache" }
-rill-sdk = { path = "crates/rill-sdk" }
-rill-git-import = { path = "crates/rill-git-import" }
-rill-mcp = { path = "crates/rill-mcp" }
-rill-identity = { path = "crates/rill-identity" }
+rill-types = { path = "crates/foundation/types" }
+rill-store = { path = "crates/foundation/store" }
+rill-core = { path = "crates/engine/core" }
+rill-merge-syntax = { path = "crates/engine/merge-syntax" }
+rill-policy = { path = "crates/domain/policy" }
+rill-proto = { path = "crates/foundation/proto" }
+rill-review = { path = "crates/domain/review" }
+rill-lander = { path = "crates/domain/lander" }
+rill-events = { path = "crates/foundation/events" }
+rill-jobs = { path = "crates/foundation/jobs" }
+rill-search = { path = "crates/domain/search" }
+rill-exec = { path = "crates/domain/exec" }
+rill-api = { path = "crates/server/api" }
+rill-cache = { path = "crates/server/cache" }
+rill-sdk = { path = "crates/clients/sdk" }
+rill-git-import = { path = "crates/domain/git-import" }
+rill-mcp = { path = "crates/clients/mcp" }
+rill-identity = { path = "crates/domain/identity" }
 
 # Serialization and hashing
 serde = { version = "1.0.229", features = ["derive"] }

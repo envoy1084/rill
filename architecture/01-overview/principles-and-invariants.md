@@ -122,17 +122,17 @@ flowchart LR
 
 ## Code
 
-- [Merge::simplify](../../crates/rill-types/src/merge.rs)
-- [ChangeVersion](../../crates/rill-types/src/objects/change.rs)
-- [Object verification](../../crates/rill-store/src/object.rs)
-- [land_on_trunk](../../crates/rill-store/src/repo/trunk.rs)
-- [Land transaction](../../crates/rill-store/src/repo/landing.rs)
-- [Lander traits](../../crates/rill-lander/src/traits.rs)
-- [ReviewHooksAdapter](../../crates/rill-api/src/workers/hooks.rs)
-- [Policy hot-swap](../../crates/rill-api/src/state/registry.rs)
-- [SetPolicy handler](../../crates/rill-api/src/services/admin.rs)
-- [Rebase](../../crates/rill-core/src/rebase.rs)
-- [Search index](../../crates/rill-search/src/index/search_index.rs)
+- [Merge::simplify](../../crates/foundation/types/src/merge.rs)
+- [ChangeVersion](../../crates/foundation/types/src/objects/change.rs)
+- [Object verification](../../crates/foundation/store/src/object.rs)
+- [land_on_trunk](../../crates/foundation/store/src/repo/trunk.rs)
+- [Land transaction](../../crates/foundation/store/src/repo/landing.rs)
+- [Lander traits](../../crates/domain/lander/src/traits.rs)
+- [ReviewHooksAdapter](../../crates/server/api/src/workers/hooks.rs)
+- [Policy hot-swap](../../crates/server/api/src/state/registry.rs)
+- [SetPolicy handler](../../crates/server/api/src/services/admin.rs)
+- [Rebase](../../crates/engine/core/src/rebase.rs)
+- [Search index](../../crates/domain/search/src/index/search_index.rs)
 
 ---
 ← Previous: [System model](system-model.md) · [Index](../index.md) · Next: [Crates and layering](crates-and-layering.md) →

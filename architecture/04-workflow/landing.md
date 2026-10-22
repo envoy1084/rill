@@ -279,12 +279,12 @@ The verifier is `ExecVerifier` (runs `.rill/verify.toml` through
 
 ## Code
 
-* [rill-lander/src/land/lander.rs](../../crates/rill-lander/src/land/lander.rs), [sequence.rs](../../crates/rill-lander/src/land/sequence.rs), [speculate.rs](../../crates/rill-lander/src/land/speculate.rs), [domains.rs](../../crates/rill-lander/src/land/domains.rs), [record.rs](../../crates/rill-lander/src/land/record.rs)
-* [rill-lander/src/schedule/](../../crates/rill-lander/src/schedule/) (footprints, landing rules, fair order, plan, thrash, ETAs)
-* [rill-lander/src/queue.rs](../../crates/rill-lander/src/queue.rs), [config.rs](../../crates/rill-lander/src/config.rs), [events.rs](../../crates/rill-lander/src/events.rs), [traits.rs](../../crates/rill-lander/src/traits.rs)
-* [rill-lander/src/land/followups.rs](../../crates/rill-lander/src/land/followups.rs) (jobs a landing enqueues)
-* [rill-store/src/repo/landing.rs](../../crates/rill-store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records), [repo/leases.rs](../../crates/rill-store/src/repo/leases.rs), [repo/trunk.rs](../../crates/rill-store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)
-* [rill-api/src/services/review/mod.rs](../../crates/rill-api/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/rill-api/src/services/common.rs) (`ticket_status`), [repo/land_queue.rs](../../crates/rill-store/src/repo/land_queue.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [workers/mod.rs](../../crates/rill-api/src/workers/mod.rs)
+* [rill-lander/src/land/lander.rs](../../crates/domain/lander/src/land/lander.rs), [sequence.rs](../../crates/domain/lander/src/land/sequence.rs), [speculate.rs](../../crates/domain/lander/src/land/speculate.rs), [domains.rs](../../crates/domain/lander/src/land/domains.rs), [record.rs](../../crates/domain/lander/src/land/record.rs)
+* [rill-lander/src/schedule/](../../crates/domain/lander/src/schedule/) (footprints, landing rules, fair order, plan, thrash, ETAs)
+* [rill-lander/src/queue.rs](../../crates/domain/lander/src/queue.rs), [config.rs](../../crates/domain/lander/src/config.rs), [events.rs](../../crates/domain/lander/src/events.rs), [traits.rs](../../crates/domain/lander/src/traits.rs)
+* [rill-lander/src/land/followups.rs](../../crates/domain/lander/src/land/followups.rs) (jobs a landing enqueues)
+* [rill-store/src/repo/landing.rs](../../crates/foundation/store/src/repo/landing.rs) (`land`, `land_on_trunk`, landing records), [repo/leases.rs](../../crates/foundation/store/src/repo/leases.rs), [repo/trunk.rs](../../crates/foundation/store/src/repo/trunk.rs) (`trunk_head`, `trunk_seq_of`)
+* [rill-api/src/services/review/mod.rs](../../crates/server/api/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/server/api/src/services/common.rs) (`ticket_status`), [repo/land_queue.rs](../../crates/foundation/store/src/repo/land_queue.rs), [state/registry.rs](../../crates/server/api/src/state/registry.rs), [workers/mod.rs](../../crates/server/api/src/workers/mod.rs)
 
 ---
 ← Previous: [Review agents](review-agents.md) · [Index](../index.md) · Next: [Post-land verification](post-land-verification.md) →

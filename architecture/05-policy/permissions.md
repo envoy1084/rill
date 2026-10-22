@@ -18,7 +18,7 @@ flowchart LR
 ```
 
 Each relation implies the ones after it:
-[`Relation::satisfied_by`](../../crates/rill-policy/src/rebac/model.rs)
+[`Relation::satisfied_by`](../../crates/domain/policy/src/rebac/model.rs)
 accepts a tuple holding the relation itself or any stronger one. There are no
 deny tuples, so checks are monotonic and snapshots cache safely.
 
@@ -41,9 +41,9 @@ then `repo`.
 ## Storage
 
 Tuples are keys with empty values in the repository's metadata
-([`keys.rs`](../../crates/rill-store/src/keys.rs)), written in one
+([`keys.rs`](../../crates/foundation/store/src/keys.rs)), written in one
 transaction by
-[`add_relation` and `remove_relation`](../../crates/rill-store/src/repo/relations.rs):
+[`add_relation` and `remove_relation`](../../crates/foundation/store/src/repo/relations.rs):
 
 | Key | Purpose |
 | --- | --- |
@@ -56,7 +56,7 @@ relation version after the change.
 
 ## Snapshot and authorizer
 
-[`Snapshot::load`](../../crates/rill-policy/src/rebac/snapshot.rs) reads the
+[`Snapshot::load`](../../crates/domain/policy/src/rebac/snapshot.rs) reads the
 version, then every tuple, so the tuples reflect at least that version. Tuples
 that do not parse are logged and skipped. The snapshot indexes tuples by
 object:
@@ -67,9 +67,9 @@ object:
 * `granted_dirs` lists the directories where a principal directly holds a
   relation.
 
-[`Authorizer`](../../crates/rill-policy/src/rebac/authorizer.rs) is one per
+[`Authorizer`](../../crates/domain/policy/src/rebac/authorizer.rs) is one per
 `RepoContext` and holds one snapshot in a
-[`SnapshotCache`](../../crates/rill-policy/src/rebac/cache.rs). The held
+[`SnapshotCache`](../../crates/domain/policy/src/rebac/cache.rs). The held
 snapshot is served while it is at least the requested version and younger
 than `DEFAULT_SNAPSHOT_TTL` (30 s, a backstop). It is replaced when:
 
@@ -90,7 +90,7 @@ version the store has not reached is refused with `INVALID_ARGUMENT`.
 
 ## Read filtering
 
-[`PathFilter`](../../crates/rill-policy/src/rebac/path_filter.rs) is a set of
+[`PathFilter`](../../crates/domain/policy/src/rebac/path_filter.rs) is a set of
 path prefixes, built once per request. Relations, token paths and agent
 scopes are all prefix sets, so `and` intersects them exactly.
 
@@ -120,7 +120,7 @@ directory:
 
 ## Read grants
 
-[Grants](../../crates/rill-policy/src/grants/mod.rs) close the gap that
+[Grants](../../crates/domain/policy/src/grants/mod.rs) close the gap that
 content addressing opens: an object is named by its hash, and a hash says
 nothing about the path it was reached through.
 
@@ -135,13 +135,13 @@ objects under paths the caller may read:
 
 A grant (`ReadGrant`) lists `(kind, hash, path)` entries for one principal
 and repository, and expires within ten minutes (sooner if the token does).
-[`GrantBuilder`](../../crates/rill-api/src/grants/issue.rs) adds a
+[`GrantBuilder`](../../crates/server/api/src/grants/issue.rs) adds a
 directory's tree only when the caller may read the whole directory, because
 a tree object names every child. A version object is added only for readers
 of the whole repository.
 
 Every fetch by hash requires a grant naming the object, for the caller and
-repository ([`grants::require`](../../crates/rill-api/src/grants/require.rs)):
+repository ([`grants::require`](../../crates/server/api/src/grants/require.rs)):
 
 * `GetBlob` and `GetTree` take it as `grant`;
 * the object protocol takes `x-rill-grant` or `?grant=`;
@@ -163,7 +163,7 @@ shared ([ADR 014](../10-decisions/014-objects-per-organization.md)).
 
 ## Enforcement
 
-[`Permit`](../../crates/rill-api/src/auth/permit.rs) maps each operation to
+[`Permit`](../../crates/server/api/src/auth/permit.rs) maps each operation to
 a verb, a relation and a path:
 
 | Method | Verb | Relation | Typical callers |
@@ -179,7 +179,7 @@ a verb, a relation and a path:
 ### Writes
 
 Every stored version passes one check inside its commit
-([`services/repo/authorize.rs`](../../crates/rill-api/src/services/repo/authorize.rs)),
+([`services/repo/authorize.rs`](../../crates/server/api/src/services/repo/authorize.rs)),
 whichever RPC made it. `write_set` lists what the version writes:
 
 * every file and subtree change;
@@ -200,7 +200,7 @@ agent scope and org-admin role count here; their token does not.
 A check passes the token's capability, then the agent's scope, then either
 the tuples or org administration. Instance administrators, and users with the
 org's `admin` role presenting an unnarrowed token for it
-([`administers_org`](../../crates/rill-api/src/auth/instance.rs)), are owners
+([`administers_org`](../../crates/server/api/src/auth/instance.rs)), are owners
 of every repository in the org. Dev mode skips the third layer.
 
 A repository with no tuples is closed to everyone but org administrators.
@@ -212,7 +212,7 @@ otherwise requires `admin()`.
 
 ## AccessService
 
-[`AccessService`](../../crates/rill-api/src/services/access/mod.rs) names the
+[`AccessService`](../../crates/server/api/src/services/access/mod.rs) names the
 repository (`org/name` or a bare name) and a directory path in each tuple.
 
 | RPC | Needs | Does |
@@ -243,14 +243,14 @@ The CLI is `rill access grant/revoke/list/check/who/where`
 
 ## Code
 
-* [`rebac/model.rs`](../../crates/rill-policy/src/rebac/model.rs): `Relation`, `Subject`, `dir_object`, `inheritance_chain`.
-* [`rebac/snapshot.rs`](../../crates/rill-policy/src/rebac/snapshot.rs): `Tuple`, `Snapshot`.
-* [`rebac/cache.rs`](../../crates/rill-policy/src/rebac/cache.rs): `SnapshotCache`, `DEFAULT_SNAPSHOT_TTL`.
-* [`rebac/authorizer.rs`](../../crates/rill-policy/src/rebac/authorizer.rs): `Authorizer`; [`rebac/path_filter.rs`](../../crates/rill-policy/src/rebac/path_filter.rs): `PathFilter`.
-* [`rill-store/src/repo/relations.rs`](../../crates/rill-store/src/repo/relations.rs): tuples, the subject index and the relation version.
-* [`auth/permit.rs`](../../crates/rill-api/src/auth/permit.rs): `Permit`; [`auth/instance.rs`](../../crates/rill-api/src/auth/instance.rs): org administration.
-* [`services/access/`](../../crates/rill-api/src/services/access/mod.rs): `AccessService`.
-* Tests: [`rebac/tests.rs`](../../crates/rill-policy/src/rebac/tests.rs), `rill-api/tests/grpc/access/` (the permission matrix, holes, grants, relations, writes).
+* [`rebac/model.rs`](../../crates/domain/policy/src/rebac/model.rs): `Relation`, `Subject`, `dir_object`, `inheritance_chain`.
+* [`rebac/snapshot.rs`](../../crates/domain/policy/src/rebac/snapshot.rs): `Tuple`, `Snapshot`.
+* [`rebac/cache.rs`](../../crates/domain/policy/src/rebac/cache.rs): `SnapshotCache`, `DEFAULT_SNAPSHOT_TTL`.
+* [`rebac/authorizer.rs`](../../crates/domain/policy/src/rebac/authorizer.rs): `Authorizer`; [`rebac/path_filter.rs`](../../crates/domain/policy/src/rebac/path_filter.rs): `PathFilter`.
+* [`rill-store/src/repo/relations.rs`](../../crates/foundation/store/src/repo/relations.rs): tuples, the subject index and the relation version.
+* [`auth/permit.rs`](../../crates/server/api/src/auth/permit.rs): `Permit`; [`auth/instance.rs`](../../crates/server/api/src/auth/instance.rs): org administration.
+* [`services/access/`](../../crates/server/api/src/services/access/mod.rs): `AccessService`.
+* Tests: [`rebac/tests.rs`](../../crates/domain/policy/src/rebac/tests.rs), `rill-api/tests/grpc/access/` (the permission matrix, holes, grants, relations, writes).
 
 ---
 ← Previous: [Token keys](token-keys.md) · [Index](../index.md) · Next: [Risk classification](risk-classification.md) →

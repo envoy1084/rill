@@ -113,7 +113,7 @@ client sync (`rill-sdk` `local/update.rs`) uses it too unless
 `merge_changes(derive, graph, left, right, MergeChangeOptions)` returns a
 version with `parents = [left, right]`:
 
-1. `MergeBase::of` ([base.rs](../../crates/rill-core/src/merge/base.rs))
+1. `MergeBase::of` ([base.rs](../../crates/engine/core/src/merge/base.rs))
    takes `graph.merge_bases(left, right)`. One base is used as is. Several
    (a criss-cross history) form a virtual base: per path, the bases are
    merged pairwise and recursively against their own bases, like git's
@@ -185,16 +185,16 @@ re-materialises to identical bytes.
 
 ## Code
 
-- [merge/mod.rs](../../crates/rill-core/src/merge/mod.rs)
-- [merge/file.rs](../../crates/rill-core/src/merge/file.rs)
-- [merge/state.rs](../../crates/rill-core/src/merge/state.rs)
-- [merge/content.rs](../../crates/rill-core/src/merge/content.rs)
-- [rill-merge-syntax](../../crates/rill-merge-syntax/src/)
-- [merge/change.rs](../../crates/rill-core/src/merge/change.rs)
-- [merge/materialize.rs](../../crates/rill-core/src/merge/materialize.rs)
-- [merge/parse.rs](../../crates/rill-core/src/merge/parse.rs)
-- [rill-types merge.rs](../../crates/rill-types/src/merge.rs)
-- [rill-sdk local/update.rs](../../crates/rill-sdk/src/local/update.rs)
+- [merge/mod.rs](../../crates/engine/core/src/merge/mod.rs)
+- [merge/file.rs](../../crates/engine/core/src/merge/file.rs)
+- [merge/state.rs](../../crates/engine/core/src/merge/state.rs)
+- [merge/content.rs](../../crates/engine/core/src/merge/content.rs)
+- [rill-merge-syntax](../../crates/engine/merge-syntax/src/)
+- [merge/change.rs](../../crates/engine/core/src/merge/change.rs)
+- [merge/materialize.rs](../../crates/engine/core/src/merge/materialize.rs)
+- [merge/parse.rs](../../crates/engine/core/src/merge/parse.rs)
+- [rill-types merge.rs](../../crates/foundation/types/src/merge.rs)
+- [rill-sdk local/update.rs](../../crates/clients/sdk/src/local/update.rs)
 
 ---
 ← Previous: [Diff](diff.md) · [Index](../index.md) · Next: [Rebase](rebase.md) →

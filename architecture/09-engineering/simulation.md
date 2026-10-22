@@ -158,9 +158,9 @@ A release build runs about 200 faulty seeds a second.
 
 ## Code
 
-- [rill-sim/src/run.rs](../../crates/rill-sim/src/run.rs), [world.rs](../../crates/rill-sim/src/world.rs), [actors.rs](../../crates/rill-sim/src/actors.rs), [oracle.rs](../../crates/rill-sim/src/oracle.rs), [known.rs](../../crates/rill-sim/src/known.rs), [processes.rs](../../crates/rill-sim/src/processes.rs), [kill.rs](../../crates/rill-sim/src/kill.rs)
-- [rill-sim/src/faults/](../../crates/rill-sim/src/faults/mod.rs), [rill-sim/tests/seeds.rs](../../crates/rill-sim/tests/seeds.rs)
-- [rill-types/src/testing/](../../crates/rill-types/src/testing/mod.rs)
+- [rill-sim/src/run.rs](../../tools/sim/src/run.rs), [world.rs](../../tools/sim/src/world.rs), [actors.rs](../../tools/sim/src/actors.rs), [oracle.rs](../../tools/sim/src/oracle.rs), [known.rs](../../tools/sim/src/known.rs), [processes.rs](../../tools/sim/src/processes.rs), [kill.rs](../../tools/sim/src/kill.rs)
+- [rill-sim/src/faults/](../../tools/sim/src/faults/mod.rs), [rill-sim/tests/seeds.rs](../../tools/sim/tests/seeds.rs)
+- [rill-types/src/testing/](../../crates/foundation/types/src/testing/mod.rs)
 
 ---
 ← Previous: [Testing](testing.md) · [Index](../index.md) · Next: [Performance](performance.md) →

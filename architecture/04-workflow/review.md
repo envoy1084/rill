@@ -56,7 +56,7 @@ the range (`VoteOutOfRange`), and the maximum value from a non-human on a
 
 A positive `Owner` vote must come from an owner of every path the change's
 current version writes
-([`services/review/owners.rs`](../../crates/rill-api/src/services/review/owners.rs)).
+([`services/review/owners.rs`](../../crates/server/api/src/services/review/owners.rs)).
 Ownership comes from `.rill/owners.toml` on trunk, where each `[[rule]]`
 names a `path` and its `owners` (`user:`, `agent:` or `team:`). The rule with
 the longest covering path decides; rules do not add up. A path no rule
@@ -182,10 +182,10 @@ service also still broadcasts a `ReviewEvent` per mutation in process.
 
 ## Code
 
-* [rill-review/src/service.rs](../../crates/rill-review/src/service.rs), [evaluate.rs](../../crates/rill-review/src/evaluate.rs), [facts.rs](../../crates/rill-review/src/facts.rs), [stacks.rs](../../crates/rill-review/src/stacks.rs)
-* [rill-review/src/lifecycle/](../../crates/rill-review/src/lifecycle/mod.rs): [submit.rs](../../crates/rill-review/src/lifecycle/submit.rs), [versions.rs](../../crates/rill-review/src/lifecycle/versions.rs), [interdiff.rs](../../crates/rill-review/src/lifecycle/interdiff.rs), [status.rs](../../crates/rill-review/src/lifecycle/status.rs), [retry.rs](../../crates/rill-review/src/lifecycle/retry.rs)
-* [rill-review/src/votes/labels.rs](../../crates/rill-review/src/votes/labels.rs), [cast.rs](../../crates/rill-review/src/votes/cast.rs), [threads/comment.rs](../../crates/rill-review/src/threads/comment.rs), [threads/anchor.rs](../../crates/rill-review/src/threads/anchor.rs)
-* [rill-types/src/objects/review.rs](../../crates/rill-types/src/objects/review.rs), [rill-api/src/services/review/](../../crates/rill-api/src/services/review/mod.rs)
+* [rill-review/src/service.rs](../../crates/domain/review/src/service.rs), [evaluate.rs](../../crates/domain/review/src/evaluate.rs), [facts.rs](../../crates/domain/review/src/facts.rs), [stacks.rs](../../crates/domain/review/src/stacks.rs)
+* [rill-review/src/lifecycle/](../../crates/domain/review/src/lifecycle/mod.rs): [submit.rs](../../crates/domain/review/src/lifecycle/submit.rs), [versions.rs](../../crates/domain/review/src/lifecycle/versions.rs), [interdiff.rs](../../crates/domain/review/src/lifecycle/interdiff.rs), [status.rs](../../crates/domain/review/src/lifecycle/status.rs), [retry.rs](../../crates/domain/review/src/lifecycle/retry.rs)
+* [rill-review/src/votes/labels.rs](../../crates/domain/review/src/votes/labels.rs), [cast.rs](../../crates/domain/review/src/votes/cast.rs), [threads/comment.rs](../../crates/domain/review/src/threads/comment.rs), [threads/anchor.rs](../../crates/domain/review/src/threads/anchor.rs)
+* [rill-types/src/objects/review.rs](../../crates/foundation/types/src/objects/review.rs), [rill-api/src/services/review/](../../crates/server/api/src/services/review/mod.rs)
 
 ---
 ← Previous: [Changes and stacks](changes-and-stacks.md) · [Index](../index.md) · Next: [Review agents](review-agents.md) →

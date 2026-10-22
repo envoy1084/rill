@@ -123,11 +123,11 @@ conflicts; the conflict lives only in the change.
 
 ## Code
 
-* [rill-types merge.rs](../../crates/rill-types/src/merge.rs): the algebra and its tests
-* [rill-types objects/change.rs](../../crates/rill-types/src/objects/change.rs): `FileChange::Conflict`, `FileState`
-* [rill-core merge/state.rs](../../crates/rill-core/src/merge/state.rs): `merge_file_state`
-* [rill-core merge/change.rs](../../crates/rill-core/src/merge/change.rs): `tip_terms`, `merge_path`
-* [rill-core tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs): first add wins when building a tree
+* [rill-types merge.rs](../../crates/foundation/types/src/merge.rs): the algebra and its tests
+* [rill-types objects/change.rs](../../crates/foundation/types/src/objects/change.rs): `FileChange::Conflict`, `FileState`
+* [rill-core merge/state.rs](../../crates/engine/core/src/merge/state.rs): `merge_file_state`
+* [rill-core merge/change.rs](../../crates/engine/core/src/merge/change.rs): `tip_terms`, `merge_path`
+* [rill-core tree/materialize.rs](../../crates/engine/core/src/tree/materialize.rs): first add wins when building a tree
 
 ---
 ← Previous: [Metadata engines](metadata-engines.md) · [Index](../index.md) · Next: [Content and chunking](content-and-chunking.md) →

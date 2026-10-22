@@ -17,9 +17,9 @@ it builds, and what CI checks. The crate dependency rules are on
 | `architecture/` | this knowledge base, start at [index](../index.md) |
 | `crates/<name>/src` | one crate; `lib.rs` declares modules, `error.rs` holds the error enum |
 | `crates/<name>/tests` | cross-module tests ([testing](testing.md)) |
-| `crates/rill-proto/proto/rill/v1` | the `.proto` sources |
+| `crates/foundation/proto/proto/rill/v1` | the `.proto` sources |
 | `.github/workflows/ci.yml` | the CI pipeline |
-| `fuzz/` | `cargo-fuzz` targets, a separate workspace excluded from the main one |
+| `tools/fuzz/` | `cargo-fuzz` targets, a separate workspace excluded from the main one |
 
 `.gitignore` excludes `/target`, `.rill/` checkouts, `*.redb` files and the
 local `research/` notes.
@@ -34,9 +34,9 @@ No `protoc` is needed. `rill-proto/build.rs` compiles the protobufs with
 `protox` and writes a descriptor set that the server serves for reflection
 ([api surface](../07-runtime/api-surface.md)).
 
-`crates/rill-proto/buf.yaml` holds the lint and breaking-change rules for
+`crates/foundation/proto/buf.yaml` holds the lint and breaking-change rules for
 `rill.v2` (buf's `STANDARD` lint set and `FILE` breaking rules); `rill.v1`
-is exempt. Run `buf lint` from `crates/rill-proto` (`npx @bufbuild/buf lint`
+is exempt. Run `buf lint` from `crates/foundation/proto` (`npx @bufbuild/buf lint`
 works without installing buf). It is not part of CI.
 
 ## Build profiles
@@ -169,8 +169,8 @@ logging in all three binaries.
 
 - [Cargo.toml](../../Cargo.toml), [rust-toolchain.toml](../../rust-toolchain.toml), [rustfmt.toml](../../rustfmt.toml), [CLAUDE.md](../../CLAUDE.md)
 - [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
-- [rill-proto/build.rs](../../crates/rill-proto/build.rs), [rill-store/Cargo.toml](../../crates/rill-store/Cargo.toml), [rill-cli/Cargo.toml](../../crates/rill-cli/Cargo.toml)
-- [rill-cli/src/server/mod.rs](../../crates/rill-cli/src/server/mod.rs)
+- [rill-proto/build.rs](../../crates/foundation/proto/build.rs), [rill-store/Cargo.toml](../../crates/foundation/store/Cargo.toml), [rill-cli/Cargo.toml](../../crates/clients/cli/Cargo.toml)
+- [rill-cli/src/server/mod.rs](../../crates/clients/cli/src/server/mod.rs)
 
 ---
 ← Previous: [MCP server](../08-clients/mcp.md) · [Index](../index.md) · Next: [Testing](testing.md) →

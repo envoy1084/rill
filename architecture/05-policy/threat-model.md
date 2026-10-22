@@ -84,9 +84,9 @@ flowchart LR
 
 ## Code
 
-- [rill-api/src/auth/](../../crates/rill-api/src/auth/mod.rs), [rill-api/src/services/repo/write.rs](../../crates/rill-api/src/services/repo/write.rs)
-- [rill-api/src/objects/](../../crates/rill-api/src/objects/mod.rs), [rill-exec/src/sandbox/](../../crates/rill-exec/src/sandbox/mod.rs)
-- [rill-sdk/src/local/](../../crates/rill-sdk/src/local/mod.rs), [rill-policy/src/tokens/](../../crates/rill-policy/src/tokens/mod.rs)
+- [rill-api/src/auth/](../../crates/server/api/src/auth/mod.rs), [rill-api/src/services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs)
+- [rill-api/src/objects/](../../crates/server/api/src/objects/mod.rs), [rill-exec/src/sandbox/](../../crates/domain/exec/src/sandbox/mod.rs)
+- [rill-sdk/src/local/](../../crates/clients/sdk/src/local/mod.rs), [rill-policy/src/tokens/](../../crates/domain/policy/src/tokens/mod.rs)
 
 ---
 ← Previous: [Data protection](data-protection.md) · [Index](../index.md) · Next: [Security review packet](security-review.md) →

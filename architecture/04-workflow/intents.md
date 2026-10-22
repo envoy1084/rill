@@ -22,7 +22,7 @@ flowchart LR
 
 ## Record
 
-`Intent` ([intent.rs](../../crates/rill-types/src/objects/intent.rs)):
+`Intent` ([intent.rs](../../crates/foundation/types/src/objects/intent.rs)):
 
 | Field | Notes |
 | --- | --- |
@@ -42,7 +42,7 @@ The only automatic status move is `Open` to `InProgress` on the first
 
 ## RPCs
 
-`IntentSvc` ([intent.rs](../../crates/rill-api/src/services/intent.rs)):
+`IntentSvc` ([intent.rs](../../crates/server/api/src/services/intent.rs)):
 
 | RPC | Permit | Effect | Errors |
 | --- | --- | --- | --- |
@@ -85,7 +85,7 @@ next version that does not carry the intent; `rill amend` sends none.
 ## Policy and post-land
 
 `ReviewService::version_facts`
-([facts.rs](../../crates/rill-review/src/facts.rs)) loads the version's
+([facts.rs](../../crates/domain/review/src/facts.rs)) loads the version's
 intent if the record still exists, and calls
 `ChangeFacts::with_intent(kind, risk_override)`. In
 `rill_policy::classify`, `risk_override` replaces the computed class as the
@@ -94,7 +94,7 @@ attribute `resource.intent_kind`, with `"none"` when no intent is set. See
 [submit policy](../05-policy/submit-policy.md). An intent's `status`
 has no effect on review or landing.
 
-`has_forward_fix` ([revert.rs](../../crates/rill-lander/src/revert.rs))
+`has_forward_fix` ([revert.rs](../../crates/domain/lander/src/revert.rs))
 counts a later trunk version as a fix for `trunk@N` when its message
 contains `trunk@N`, or when its intent's title or body does. See
 [post-land verification](post-land-verification.md).
@@ -116,13 +116,13 @@ contains `trunk@N`, or when its intent's title or body does. See
 
 ## Code
 
-* [rill-types/src/objects/intent.rs](../../crates/rill-types/src/objects/intent.rs)
-* [rill-api/src/services/intent.rs](../../crates/rill-api/src/services/intent.rs)
-* [rill-review/src/facts.rs](../../crates/rill-review/src/facts.rs) (`version_facts`)
-* [rill-policy/src/submit/entities.rs](../../crates/rill-policy/src/submit/entities.rs) (`intent_kind` attribute)
-* [rill-lander/src/revert.rs](../../crates/rill-lander/src/revert.rs) (`has_forward_fix`)
-* [rill-sdk/src/intent.rs](../../crates/rill-sdk/src/intent.rs)
-* [rill-cli/src/commands/intent.rs](../../crates/rill-cli/src/commands/intent.rs)
+* [rill-types/src/objects/intent.rs](../../crates/foundation/types/src/objects/intent.rs)
+* [rill-api/src/services/intent.rs](../../crates/server/api/src/services/intent.rs)
+* [rill-review/src/facts.rs](../../crates/domain/review/src/facts.rs) (`version_facts`)
+* [rill-policy/src/submit/entities.rs](../../crates/domain/policy/src/submit/entities.rs) (`intent_kind` attribute)
+* [rill-lander/src/revert.rs](../../crates/domain/lander/src/revert.rs) (`has_forward_fix`)
+* [rill-sdk/src/intent.rs](../../crates/clients/sdk/src/intent.rs)
+* [rill-cli/src/commands/intent.rs](../../crates/clients/cli/src/commands/intent.rs)
 
 ---
 ← Previous: [Post-land verification](post-land-verification.md) · [Index](../index.md) · Next: [Identity and authentication](../05-policy/identity-and-auth.md) →

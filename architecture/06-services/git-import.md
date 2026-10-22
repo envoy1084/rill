@@ -168,12 +168,12 @@ storage directory instead. See [CLI](../08-clients/cli.md).
 
 ## Code
 
-* [lib.rs](../../crates/rill-git-import/src/lib.rs), [error.rs](../../crates/rill-git-import/src/error.rs)
-* [reader/source.rs](../../crates/rill-git-import/src/reader/source.rs), [reader/gix_source.rs](../../crates/rill-git-import/src/reader/gix_source.rs), [reader/history.rs](../../crates/rill-git-import/src/reader/history.rs), [reader/memory.rs](../../crates/rill-git-import/src/reader/memory.rs)
-* [import/importer.rs](../../crates/rill-git-import/src/import/importer.rs), [import/land.rs](../../crates/rill-git-import/src/import/land.rs), [import/map.rs](../../crates/rill-git-import/src/import/map.rs), [import/options.rs](../../crates/rill-git-import/src/import/options.rs)
-* [import/target.rs](../../crates/rill-git-import/src/import/target.rs)
-* CLI: [commands/import/](../../crates/rill-cli/src/commands/import/mod.rs) (`git.rs`, `remote.rs`), [commands/export.rs](../../crates/rill-cli/src/commands/export.rs)
-* Store: [repo/](../../crates/rill-store/src/repo/mod.rs) (`put_change_version`, `land_on_trunk`, `set_misc`)
+* [lib.rs](../../crates/domain/git-import/src/lib.rs), [error.rs](../../crates/domain/git-import/src/error.rs)
+* [reader/source.rs](../../crates/domain/git-import/src/reader/source.rs), [reader/gix_source.rs](../../crates/domain/git-import/src/reader/gix_source.rs), [reader/history.rs](../../crates/domain/git-import/src/reader/history.rs), [reader/memory.rs](../../crates/domain/git-import/src/reader/memory.rs)
+* [import/importer.rs](../../crates/domain/git-import/src/import/importer.rs), [import/land.rs](../../crates/domain/git-import/src/import/land.rs), [import/map.rs](../../crates/domain/git-import/src/import/map.rs), [import/options.rs](../../crates/domain/git-import/src/import/options.rs)
+* [import/target.rs](../../crates/domain/git-import/src/import/target.rs)
+* CLI: [commands/import/](../../crates/clients/cli/src/commands/import/mod.rs) (`git.rs`, `remote.rs`), [commands/export.rs](../../crates/clients/cli/src/commands/export.rs)
+* Store: [repo/](../../crates/foundation/store/src/repo/mod.rs) (`put_change_version`, `land_on_trunk`, `set_misc`)
 
 ---
 ← Previous: [Exec](exec.md) · [Index](../index.md) · Next: [Server](../07-runtime/server.md) →

@@ -1,5 +1,5 @@
 target
-fuzz/target
+tools/fuzz/target
 research
 .git
 .DS_Store

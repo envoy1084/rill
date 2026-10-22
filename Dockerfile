@@ -38,7 +38,7 @@ COPY . .
 # time while dependencies stay cached.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
-    find crates -name '*.rs' -exec touch {} + \
+    find crates tools -name '*.rs' -exec touch {} + \
     && cargo build --release --locked -p rill-cli --features "$FEATURES" \
     && cp target/release/rill /usr/local/bin/rill
 

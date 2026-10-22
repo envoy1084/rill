@@ -176,9 +176,9 @@ startup. In dev mode:
 
 ## Code
 
-* [rill-api/src/config/](../../crates/rill-api/src/config/mod.rs), [state/stores.rs](../../crates/rill-api/src/state/stores.rs), [auth/authenticator.rs](../../crates/rill-api/src/auth/authenticator.rs)
-* [rill-cli/src/server/mod.rs](../../crates/rill-cli/src/server/mod.rs), [rill-cli/src/server/template.rs](../../crates/rill-cli/src/server/template.rs)
-* [rill-lander/src/config.rs](../../crates/rill-lander/src/config.rs)
+* [rill-api/src/config/](../../crates/server/api/src/config/mod.rs), [state/stores.rs](../../crates/server/api/src/state/stores.rs), [auth/authenticator.rs](../../crates/server/api/src/auth/authenticator.rs)
+* [rill-cli/src/server/mod.rs](../../crates/clients/cli/src/server/mod.rs), [rill-cli/src/server/template.rs](../../crates/clients/cli/src/server/template.rs)
+* [rill-lander/src/config.rs](../../crates/domain/lander/src/config.rs)
 
 ---
 ← Previous: [Events and workers](events-and-workers.md) · [Index](../index.md) · Next: [Observability](observability.md) →

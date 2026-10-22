@@ -17,8 +17,8 @@ flowchart LR
 
 ## Facts
 
-[`ChangeFacts`](../../crates/rill-policy/src/risk/facts.rs) is built by
-[`ReviewService::version_facts`](../../crates/rill-review/src/facts.rs) from
+[`ChangeFacts`](../../crates/domain/policy/src/risk/facts.rs) is built by
+[`ReviewService::version_facts`](../../crates/domain/review/src/facts.rs) from
 the version, its tree diff against the first parent, and its linked intent.
 
 | Field | Source |
@@ -37,7 +37,7 @@ after removing whitespace, empty lines, and lines starting with `//` or `#`.
 
 ## Configuration
 
-[`RiskConfig`](../../crates/rill-policy/src/risk/config.rs) is declarative.
+[`RiskConfig`](../../crates/domain/policy/src/risk/config.rs) is declarative.
 `compile()` turns it into `CompiledRiskConfig` once. Globs use
 `literal_separator`, so `*` stops at `/` and `**` spans directories. An invalid
 pattern is `Error::InvalidGlob`.
@@ -55,7 +55,7 @@ stored with `SetPolicy` as described in [submit policy](submit-policy.md).
 
 ## Algorithm
 
-[`classify(facts, config)`](../../crates/rill-policy/src/risk/classify.rs)
+[`classify(facts, config)`](../../crates/domain/policy/src/risk/classify.rs)
 runs a fixed, ordered list of features. Later steps see the result of earlier
 ones. Every feature that fires appends a reason, and the review stores the
 list as `risk_reasons`.
@@ -105,11 +105,11 @@ the submit policy against the stored class without reclassifying.
 
 ## Code
 
-* [`risk/facts.rs`](../../crates/rill-policy/src/risk/facts.rs): `ChangeFacts`, `PathFacts`.
-* [`risk/config.rs`](../../crates/rill-policy/src/risk/config.rs): `RiskConfig`, `SensitiveGlob`, `CompiledRiskConfig`.
-* [`risk/classify.rs`](../../crates/rill-policy/src/risk/classify.rs): `classify`, `RiskAssessment`, `SENSITIVE_REASON_PREFIX`, `touches_sensitive`.
-* [`rill-review/src/facts.rs`](../../crates/rill-review/src/facts.rs): fact assembly, `MAX_DIFF_BYTES`, `cosmetic_only`.
-* [`rill-types/src/objects/intent.rs`](../../crates/rill-types/src/objects/intent.rs): `RiskClass`, `bump`.
+* [`risk/facts.rs`](../../crates/domain/policy/src/risk/facts.rs): `ChangeFacts`, `PathFacts`.
+* [`risk/config.rs`](../../crates/domain/policy/src/risk/config.rs): `RiskConfig`, `SensitiveGlob`, `CompiledRiskConfig`.
+* [`risk/classify.rs`](../../crates/domain/policy/src/risk/classify.rs): `classify`, `RiskAssessment`, `SENSITIVE_REASON_PREFIX`, `touches_sensitive`.
+* [`rill-review/src/facts.rs`](../../crates/domain/review/src/facts.rs): fact assembly, `MAX_DIFF_BYTES`, `cosmetic_only`.
+* [`rill-types/src/objects/intent.rs`](../../crates/foundation/types/src/objects/intent.rs): `RiskClass`, `bump`.
 
 ---
 ← Previous: [Permissions](permissions.md) · [Index](../index.md) · Next: [Submit policy](submit-policy.md) →

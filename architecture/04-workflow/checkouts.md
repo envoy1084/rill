@@ -18,7 +18,7 @@ flowchart LR
 ## Metadata
 
 Both files are TOML written atomically by rename
-([meta.rs](../../crates/rill-sdk/src/local/meta.rs)).
+([meta.rs](../../crates/clients/sdk/src/local/meta.rs)).
 
 | File | Contents |
 | --- | --- |
@@ -45,7 +45,7 @@ prefixes only.
 
 ## Status
 
-`compute_status` ([status.rs](../../crates/rill-sdk/src/local/status.rs))
+`compute_status` ([status.rs](../../crates/clients/sdk/src/local/status.rs))
 runs under `spawn_blocking`. For each manifest entry:
 
 1. `conflict` flag set: `Conflict`.
@@ -55,7 +55,7 @@ runs under `spawn_blocking`. For each manifest entry:
 
 Every file on disk that is not in the manifest is `Added`. The walk skips
 `.rill/` and paths matched by `.rillignore` (gitignore syntax, any level,
-[walk.rs](../../crates/rill-sdk/src/local/walk.rs)). Ignore rules hide
+[walk.rs](../../crates/clients/sdk/src/local/walk.rs)). Ignore rules hide
 untracked files only. A tracked file that matches an ignore rule is still
 reported.
 
@@ -71,7 +71,7 @@ the server and silently overwrite anything landed since the files were
 materialized. Bytes at or under
 `INLINE_THRESHOLD` (256) travel inline. Larger files are first uploaded
 with the streamed `PutBlob` RPC in `PUT_BLOB_CHUNK_SIZE` (256 KiB)
-messages ([blobs.rs](../../crates/rill-sdk/src/repo/blobs.rs)). The
+messages ([blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs)). The
 returned change id is saved as `working_change`.
 
 A snapshot changes neither `base` nor the manifest. Each snapshot
@@ -81,7 +81,7 @@ this are in [changes and stacks](changes-and-stacks.md).
 
 ## Update (`rill sync`, `rill undo`)
 
-`Checkout::update(new_root)` ([update.rs](../../crates/rill-sdk/src/local/update.rs))
+`Checkout::update(new_root)` ([update.rs](../../crates/clients/sdk/src/local/update.rs))
 lists the new root under the checkout's sparse profile. It compares each
 path's old manifest `content_hash` and kind against the new listing
 (upstream) and against status (local):
@@ -153,11 +153,11 @@ call `UpdateBase`.
 
 ## Code
 
-* [rill-sdk/src/local/checkout.rs](../../crates/rill-sdk/src/local/checkout.rs), [meta.rs](../../crates/rill-sdk/src/local/meta.rs)
-* [rill-sdk/src/local/status.rs](../../crates/rill-sdk/src/local/status.rs), [walk.rs](../../crates/rill-sdk/src/local/walk.rs), [fs.rs](../../crates/rill-sdk/src/local/fs.rs)
-* [rill-sdk/src/local/update.rs](../../crates/rill-sdk/src/local/update.rs), [remote.rs](../../crates/rill-sdk/src/local/remote.rs)
-* [rill-sdk/src/repo/blobs.rs](../../crates/rill-sdk/src/repo/blobs.rs), [write.rs](../../crates/rill-sdk/src/repo/write.rs)
-* [rill-cli/src/commands/checkout.rs](../../crates/rill-cli/src/commands/checkout.rs), [change.rs](../../crates/rill-cli/src/commands/change.rs), [status.rs](../../crates/rill-cli/src/commands/status.rs), [checkout_meta.rs](../../crates/rill-cli/src/checkout_meta.rs)
+* [rill-sdk/src/local/checkout.rs](../../crates/clients/sdk/src/local/checkout.rs), [meta.rs](../../crates/clients/sdk/src/local/meta.rs)
+* [rill-sdk/src/local/status.rs](../../crates/clients/sdk/src/local/status.rs), [walk.rs](../../crates/clients/sdk/src/local/walk.rs), [fs.rs](../../crates/clients/sdk/src/local/fs.rs)
+* [rill-sdk/src/local/update.rs](../../crates/clients/sdk/src/local/update.rs), [remote.rs](../../crates/clients/sdk/src/local/remote.rs)
+* [rill-sdk/src/repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs), [write.rs](../../crates/clients/sdk/src/repo/write.rs)
+* [rill-cli/src/commands/checkout.rs](../../crates/clients/cli/src/commands/checkout.rs), [change.rs](../../crates/clients/cli/src/commands/change.rs), [status.rs](../../crates/clients/cli/src/commands/status.rs), [checkout_meta.rs](../../crates/clients/cli/src/checkout_meta.rs)
 
 ---
 ← Previous: [Workspaces](workspaces.md) · [Index](../index.md) · Next: [Changes and stacks](changes-and-stacks.md) →

@@ -152,11 +152,11 @@ the root `CancellationToken`. See
 
 ## Code
 
-- [lib.rs](../../crates/rill-cli/src/lib.rs), [cli.rs](../../crates/rill-cli/src/cli.rs), [context.rs](../../crates/rill-cli/src/context.rs), [error.rs](../../crates/rill-cli/src/error.rs), [exit.rs](../../crates/rill-cli/src/exit.rs), [checkout_meta.rs](../../crates/rill-cli/src/checkout_meta.rs)
-- [commands/mod.rs](../../crates/rill-cli/src/commands/mod.rs), [commands/parse.rs](../../crates/rill-cli/src/commands/parse.rs), [commands/change.rs](../../crates/rill-cli/src/commands/change.rs), [commands/import/](../../crates/rill-cli/src/commands/import/mod.rs), [commands/export.rs](../../crates/rill-cli/src/commands/export.rs)
-- [output/mod.rs](../../crates/rill-cli/src/output/mod.rs), [output/table.rs](../../crates/rill-cli/src/output/table.rs), [output/format.rs](../../crates/rill-cli/src/output/format.rs)
-- [server/mod.rs](../../crates/rill-cli/src/server/mod.rs), [server/template.rs](../../crates/rill-cli/src/server/template.rs)
-- [bin/rill.rs](../../crates/rill-cli/src/bin/rill.rs)
+- [lib.rs](../../crates/clients/cli/src/lib.rs), [cli.rs](../../crates/clients/cli/src/cli.rs), [context.rs](../../crates/clients/cli/src/context.rs), [error.rs](../../crates/clients/cli/src/error.rs), [exit.rs](../../crates/clients/cli/src/exit.rs), [checkout_meta.rs](../../crates/clients/cli/src/checkout_meta.rs)
+- [commands/mod.rs](../../crates/clients/cli/src/commands/mod.rs), [commands/parse.rs](../../crates/clients/cli/src/commands/parse.rs), [commands/change.rs](../../crates/clients/cli/src/commands/change.rs), [commands/import/](../../crates/clients/cli/src/commands/import/mod.rs), [commands/export.rs](../../crates/clients/cli/src/commands/export.rs)
+- [output/mod.rs](../../crates/clients/cli/src/output/mod.rs), [output/table.rs](../../crates/clients/cli/src/output/table.rs), [output/format.rs](../../crates/clients/cli/src/output/format.rs)
+- [server/mod.rs](../../crates/clients/cli/src/server/mod.rs), [server/template.rs](../../crates/clients/cli/src/server/template.rs)
+- [bin/rill.rs](../../crates/clients/cli/src/bin/rill.rs)
 
 ---
 ← Previous: [SDK](sdk.md) · [Index](../index.md) · Next: [MCP server](mcp.md) →

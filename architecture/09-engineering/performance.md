@@ -115,8 +115,8 @@ p99.
 
 ## Code
 
-- [rill-bench/src/lib.rs](../../crates/rill-bench/src/lib.rs), [rill-bench/benches/core.rs](../../crates/rill-bench/benches/core.rs), [rill-bench/benches/meta.rs](../../crates/rill-bench/benches/meta.rs)
-- [rill-load/src/run.rs](../../crates/rill-load/src/run.rs), [workload.rs](../../crates/rill-load/src/workload.rs), [profile.rs](../../crates/rill-load/src/profile.rs), [stats.rs](../../crates/rill-load/src/stats.rs)
+- [rill-bench/src/lib.rs](../../tools/bench/src/lib.rs), [rill-bench/benches/core.rs](../../tools/bench/benches/core.rs), [rill-bench/benches/meta.rs](../../tools/bench/benches/meta.rs)
+- [rill-load/src/run.rs](../../tools/load/src/run.rs), [workload.rs](../../tools/load/src/workload.rs), [profile.rs](../../tools/load/src/profile.rs), [stats.rs](../../tools/load/src/stats.rs)
 
 ---
 ← Previous: [Simulation](simulation.md) · [Index](../index.md) · Next: [Architecture decisions](../10-decisions/README.md) →

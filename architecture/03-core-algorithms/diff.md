@@ -19,14 +19,14 @@ flowchart LR
 ```
 
 The server's `Diff` RPC
-([services/diff.rs](../../crates/rill-api/src/services/diff.rs)) drives
+([services/diff.rs](../../crates/server/api/src/services/diff.rs)) drives
 this pipeline. It treats an absent side as empty, reports content larger
 than `MAX_DIFF_BYTES` (4 MiB) as binary, and returns either structured hunks
 or unified text depending on `DiffFormat`.
 
 ## Line tokens
 
-`split_lines` ([tokens.rs](../../crates/rill-core/src/diff/tokens.rs))
+`split_lines` ([tokens.rs](../../crates/engine/core/src/diff/tokens.rs))
 yields each line with its `\n` included. The last line may have no
 terminator. Diff and merge share these tokens. As a result:
 
@@ -39,7 +39,7 @@ terminator. Diff and merge share these tokens. As a result:
 
 ## Line diff
 
-[lines.rs](../../crates/rill-core/src/diff/lines.rs):
+[lines.rs](../../crates/engine/core/src/diff/lines.rs):
 
 - `edit_script(old, new)` is `pub(crate)`. It runs `imara-diff` with
   `Algorithm::Histogram`, then `postprocess_lines`, and returns raw
@@ -50,7 +50,7 @@ terminator. Diff and merge share these tokens. As a result:
   one `Hunk`. It pads `context` lines on each side, clamped to the buffer,
   and tags every line `Context`, `Removed` or `Added`.
 
-A `Hunk` ([hunk.rs](../../crates/rill-core/src/diff/hunk.rs)) has 1-based
+A `Hunk` ([hunk.rs](../../crates/engine/core/src/diff/hunk.rs)) has 1-based
 `old_start`/`new_start` and `old_len`/`new_len` that count context lines too,
 as `diff -u` does. Identical inputs give an empty `Vec<Hunk>`. Histogram is
 the only algorithm; there is no word-level diff.
@@ -58,7 +58,7 @@ the only algorithm; there is no word-level diff.
 ## Unified text
 
 `to_unified(path, hunks) -> Vec<u8>`
-([unified.rs](../../crates/rill-core/src/diff/unified.rs)) writes
+([unified.rs](../../crates/engine/core/src/diff/unified.rs)) writes
 `--- a/<path>` and `+++ b/<path>`, one `@@ -s,l +s,l @@` per hunk, and the
 prefixes ` `, `-`, `+`. A range of length 1 prints as `s`; length 0 prints
 as `s-1,0`. When there is exactly one hunk and one side has length 0, that
@@ -68,7 +68,7 @@ through `apply_unified`. The server's `Diff` RPC returns unified text in a
 proto `string` and converts lossily only at that boundary.
 
 `apply_unified(old, patch)`
-([patch.rs](../../crates/rill-core/src/diff/patch.rs)) is the inverse, used
+([patch.rs](../../crates/engine/core/src/diff/patch.rs)) is the inverse, used
 by the `Patch` edit of `ApplyEdits`. It accepts the subset `to_unified`
 emits. Hunks apply in order. Each must match its context and removed lines
 at the stated line, or within `FUZZ_WINDOW = 50` lines of it, never before
@@ -78,14 +78,14 @@ terminator differences do not block a match. Anything else is
 
 ## Binary detection
 
-`is_binary` ([binary.rs](../../crates/rill-core/src/diff/binary.rs)) is true
+`is_binary` ([binary.rs](../../crates/engine/core/src/diff/binary.rs)) is true
 when a NUL byte appears in the first `BINARY_SNIFF_LEN` (8 KiB). The same
 test decides whether `merge_file_state` may text-merge a path.
 
 ## Tree diff
 
 `diff_trees(ops, before, after)`
-([tree.rs](../../crates/rill-core/src/diff/tree.rs)) takes an
+([tree.rs](../../crates/engine/core/src/diff/tree.rs)) takes an
 `Option<TreeHash>` per side; `None` means "no tree", the parent of a root
 change. It returns `Vec<TreeDiffEntry>` sorted by path. Each entry has
 `before` and `after` as `Option<(ContentRef, FileKind)>`.
@@ -123,15 +123,15 @@ path.
 
 ## Code
 
-- [diff/mod.rs](../../crates/rill-core/src/diff/mod.rs)
-- [diff/tokens.rs](../../crates/rill-core/src/diff/tokens.rs)
-- [diff/lines.rs](../../crates/rill-core/src/diff/lines.rs)
-- [diff/hunk.rs](../../crates/rill-core/src/diff/hunk.rs)
-- [diff/unified.rs](../../crates/rill-core/src/diff/unified.rs)
-- [diff/patch.rs](../../crates/rill-core/src/diff/patch.rs)
-- [diff/binary.rs](../../crates/rill-core/src/diff/binary.rs)
-- [diff/tree.rs](../../crates/rill-core/src/diff/tree.rs)
-- [rill-api services/diff.rs](../../crates/rill-api/src/services/diff.rs)
+- [diff/mod.rs](../../crates/engine/core/src/diff/mod.rs)
+- [diff/tokens.rs](../../crates/engine/core/src/diff/tokens.rs)
+- [diff/lines.rs](../../crates/engine/core/src/diff/lines.rs)
+- [diff/hunk.rs](../../crates/engine/core/src/diff/hunk.rs)
+- [diff/unified.rs](../../crates/engine/core/src/diff/unified.rs)
+- [diff/patch.rs](../../crates/engine/core/src/diff/patch.rs)
+- [diff/binary.rs](../../crates/engine/core/src/diff/binary.rs)
+- [diff/tree.rs](../../crates/engine/core/src/diff/tree.rs)
+- [rill-api services/diff.rs](../../crates/server/api/src/services/diff.rs)
 
 ---
 ← Previous: [Derived data](../02-data/derived-data.md) · [Index](../index.md) · Next: [Merge](merge.md) →

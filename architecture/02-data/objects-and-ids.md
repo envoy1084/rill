@@ -203,10 +203,10 @@ compare-and-swap request: `expected: None` means the ref must not exist,
 
 ## Code
 
-* [hash.rs](../../crates/rill-types/src/hash.rs), [ids.rs](../../crates/rill-types/src/ids.rs), [encoding.rs](../../crates/rill-types/src/encoding.rs)
-* [path.rs](../../crates/rill-types/src/path.rs), [limits.rs](../../crates/rill-types/src/limits.rs), [rill-core validate.rs](../../crates/rill-core/src/validate.rs), [time.rs](../../crates/rill-types/src/time.rs), [principal.rs](../../crates/rill-types/src/principal.rs), [error.rs](../../crates/rill-types/src/error.rs)
-* [objects/tree/](../../crates/rill-types/src/objects/tree/mod.rs), [objects/change.rs](../../crates/rill-types/src/objects/change.rs), [objects/blob.rs](../../crates/rill-types/src/objects/blob.rs), [objects/refs.rs](../../crates/rill-types/src/objects/refs.rs)
-* [objects/workspace.rs](../../crates/rill-types/src/objects/workspace.rs), [objects/review.rs](../../crates/rill-types/src/objects/review.rs), [objects/intent.rs](../../crates/rill-types/src/objects/intent.rs)
+* [hash.rs](../../crates/foundation/types/src/hash.rs), [ids.rs](../../crates/foundation/types/src/ids.rs), [encoding.rs](../../crates/foundation/types/src/encoding.rs)
+* [path.rs](../../crates/foundation/types/src/path.rs), [limits.rs](../../crates/foundation/types/src/limits.rs), [rill-core validate.rs](../../crates/engine/core/src/validate.rs), [time.rs](../../crates/foundation/types/src/time.rs), [principal.rs](../../crates/foundation/types/src/principal.rs), [error.rs](../../crates/foundation/types/src/error.rs)
+* [objects/tree/](../../crates/foundation/types/src/objects/tree/mod.rs), [objects/change.rs](../../crates/foundation/types/src/objects/change.rs), [objects/blob.rs](../../crates/foundation/types/src/objects/blob.rs), [objects/refs.rs](../../crates/foundation/types/src/objects/refs.rs)
+* [objects/workspace.rs](../../crates/foundation/types/src/objects/workspace.rs), [objects/review.rs](../../crates/foundation/types/src/objects/review.rs), [objects/intent.rs](../../crates/foundation/types/src/objects/intent.rs)
 
 ---
 ← Previous: [Glossary](../01-overview/glossary.md) · [Index](../index.md) · Next: [Storage and keyspace](storage-and-keyspace.md) →

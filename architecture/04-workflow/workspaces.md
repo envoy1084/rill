@@ -21,7 +21,7 @@ flowchart LR
 
 ## Record
 
-`Workspace` ([workspace.rs](../../crates/rill-types/src/objects/workspace.rs)):
+`Workspace` ([workspace.rs](../../crates/foundation/types/src/objects/workspace.rs)):
 
 | Field | Meaning |
 | --- | --- |
@@ -137,13 +137,13 @@ history.
 
 ## Code
 
-* [rill-types/src/objects/workspace.rs](../../crates/rill-types/src/objects/workspace.rs)
-* [rill-api/src/services/workspace.rs](../../crates/rill-api/src/services/workspace.rs)
-* [rill-api/src/services/repo/write.rs](../../crates/rill-api/src/services/repo/write.rs) (`commit_version`, `version_from_diff`)
-* [rill-store/src/repo/records.rs](../../crates/rill-store/src/repo/records.rs) (`append_operation`, `list_operations`)
-* [rill-store/src/keys.rs](../../crates/rill-store/src/keys.rs)
-* [rill-sdk/src/workspace.rs](../../crates/rill-sdk/src/workspace.rs)
-* [rill-cli/src/commands/ws.rs](../../crates/rill-cli/src/commands/ws.rs)
+* [rill-types/src/objects/workspace.rs](../../crates/foundation/types/src/objects/workspace.rs)
+* [rill-api/src/services/workspace.rs](../../crates/server/api/src/services/workspace.rs)
+* [rill-api/src/services/repo/write.rs](../../crates/server/api/src/services/repo/write.rs) (`commit_version`, `version_from_diff`)
+* [rill-store/src/repo/records.rs](../../crates/foundation/store/src/repo/records.rs) (`append_operation`, `list_operations`)
+* [rill-store/src/keys.rs](../../crates/foundation/store/src/keys.rs)
+* [rill-sdk/src/workspace.rs](../../crates/clients/sdk/src/workspace.rs)
+* [rill-cli/src/commands/ws.rs](../../crates/clients/cli/src/commands/ws.rs)
 
 ---
 ← Previous: [Change builder](../03-core-algorithms/change-builder.md) · [Index](../index.md) · Next: [Checkouts](checkouts.md) →

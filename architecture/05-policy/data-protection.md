@@ -8,7 +8,7 @@ administrators, and per-org encryption at rest.
 ## Secret scanning
 
 Every version is scanned as it is committed
-([`services/repo/secrets.rs`](../../crates/rill-api/src/services/repo/secrets.rs)),
+([`services/repo/secrets.rs`](../../crates/server/api/src/services/repo/secrets.rs)),
 whatever the entry point: `ApplyEdits`, `CreateChangeVersion`, rebases and
 merges, workspace changes (`NewChange`) and imports all store versions
 through the same commit path, which checks the author's rights (including
@@ -28,7 +28,7 @@ at an allowed path is never remembered as clean.
 
 The detectors are [gitleaks](https://github.com/gitleaks/gitleaks)' rule
 set (about 220 rules, MIT), vendored unmodified in
-[`rill-policy/rules/gitleaks.toml`](../../crates/rill-policy/rules/) and
+[`rill-policy/rules/gitleaks.toml`](../../crates/domain/policy/rules/) and
 applied as gitleaks applies them: a case-insensitive keyword prefilter
 chooses the rules to run, each rule's secret group and minimum entropy
 decide a match, rule and global allowlists (regexes, stopwords, paths)
@@ -70,10 +70,10 @@ refusing to serve it. A redaction names an org, an object kind and a hash.
 One administrator requests it with a reason, and a second one approves it.
 Approving one's own request is refused. Approval writes `RedactionApplied`
 to the identity log, which every server applies to its identity view
-([`rill-store/src/identity/redactions.rs`](../../crates/rill-store/src/identity/redactions.rs)).
+([`rill-store/src/identity/redactions.rs`](../../crates/foundation/store/src/identity/redactions.rs)).
 
 Each repository's object store is wrapped in a `RedactingObjectStore`
-([`rill-store/src/redact.rs`](../../crates/rill-store/src/redact.rs)) that
+([`rill-store/src/redact.rs`](../../crates/foundation/store/src/redact.rs)) that
 consults the redacted set. Every read and write of a redacted hash fails
 with `Error::Redacted`:
 
@@ -97,7 +97,7 @@ Requests and approvals are audited as `redaction.request` and
 ## Encryption at rest
 
 Objects on local disk and in S3 are sealed with AES-256-GCM under their
-org's data keys ([`rill-store/src/seal/org.rs`](../../crates/rill-store/src/seal/org.rs)).
+org's data keys ([`rill-store/src/seal/org.rs`](../../crates/foundation/store/src/seal/org.rs)).
 Sealing is on by default outside dev mode (`[encryption] enabled`,
 `RILL_ENCRYPTION`); in-memory storage is never sealed.
 
@@ -144,12 +144,12 @@ Sealing is on by default outside dev mode (`[encryption] enabled`,
 
 ## Code
 
-* [`rill-policy/src/secrets/`](../../crates/rill-policy/src/secrets/): the rule catalog, repository rules, the scanner; [`rill-policy/rules/`](../../crates/rill-policy/rules/): the vendored gitleaks rules.
-* [`rill-api/src/services/repo/secrets.rs`](../../crates/rill-api/src/services/repo/secrets.rs), [`commit.rs`](../../crates/rill-api/src/services/repo/commit.rs): scanning at commit.
-* [`rill-api/src/services/protection.rs`](../../crates/rill-api/src/services/protection.rs): `ProtectionService`.
-* [`rill-store/src/repo/quarantine.rs`](../../crates/rill-store/src/repo/quarantine.rs), [`redact.rs`](../../crates/rill-store/src/redact.rs).
-* [`rill-cache/src/redactions.rs`](../../crates/rill-cache/src/redactions.rs).
-* [`rill-store/src/seal/`](../../crates/rill-store/src/seal/): the `Sealer` hook and `OrgSealer`; [`rill-identity/src/keys/data.rs`](../../crates/rill-identity/src/keys/data.rs): `DataKeyManager`.
+* [`rill-policy/src/secrets/`](../../crates/domain/policy/src/secrets/): the rule catalog, repository rules, the scanner; [`rill-policy/rules/`](../../crates/domain/policy/rules/): the vendored gitleaks rules.
+* [`rill-api/src/services/repo/secrets.rs`](../../crates/server/api/src/services/repo/secrets.rs), [`commit.rs`](../../crates/server/api/src/services/repo/commit.rs): scanning at commit.
+* [`rill-api/src/services/protection.rs`](../../crates/server/api/src/services/protection.rs): `ProtectionService`.
+* [`rill-store/src/repo/quarantine.rs`](../../crates/foundation/store/src/repo/quarantine.rs), [`redact.rs`](../../crates/foundation/store/src/redact.rs).
+* [`rill-cache/src/redactions.rs`](../../crates/server/cache/src/redactions.rs).
+* [`rill-store/src/seal/`](../../crates/foundation/store/src/seal/): the `Sealer` hook and `OrgSealer`; [`rill-identity/src/keys/data.rs`](../../crates/domain/identity/src/keys/data.rs): `DataKeyManager`.
 * Tests: `rill-api/tests/grpc/protection.rs`, `rill-api/tests/grpc/encryption.rs`, `rill-cli/tests/cache.rs`.
 
 ---

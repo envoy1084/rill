@@ -11,20 +11,20 @@ go in the `_instance` stream.
 Audit records are not written by each handler. Every state change already
 writes, in its own transaction, either an identity log entry or a
 repository event; the audit worker projects those
-([`audit/project.rs`](../../crates/rill-api/src/audit/project.rs)). An
+([`audit/project.rs`](../../crates/server/api/src/audit/project.rs)). An
 action is therefore audited exactly when it happens.
 
 | Source | Actions |
 | --- | --- |
 | Identity log | `keys.change`, `token.revoke`, `session.revoke`, `session.open` (sign-in and workload exchange), `token.issue` (`IssueToken` and `mint-token`), `user.change`, `idp.change`, `agent.change`, `trust.change`, `team.change`, `org.settings`, `org.create`, `scim.credential.create`/`revoke` |
 | Repository events | `repo.create`, `relation.add`/`remove`, `policy.set`, `ref.move`, `review.submit`, `review.vote`, `land.request`, `land.refuse`, `land` |
-| Refusals | `repo.<verb>` with outcome `Denied`, from every `Permit` refusal, sampled to one per principal and repository a minute and written best effort ([`audit/denials.rs`](../../crates/rill-api/src/audit/denials.rs)) |
+| Refusals | `repo.<verb>` with outcome `Denied`, from every `Permit` refusal, sampled to one per principal and repository a minute and written best effort ([`audit/denials.rs`](../../crates/server/api/src/audit/denials.rs)) |
 
 Stored versions, workspace operations, comments and intents are routine
 work, not audited. The kill switch is audited through the changes it makes
 (`agent.change`, `session.revoke`, `org.settings`).
 
-An `AuditRecord` ([types](../../crates/rill-types/src/audit/entry.rs)) holds:
+An `AuditRecord` ([types](../../crates/foundation/types/src/audit/entry.rs)) holds:
 
 * the org;
 * the time;
@@ -37,8 +37,8 @@ An `AuditRecord` ([types](../../crates/rill-types/src/audit/entry.rs)) holds:
 ## The chain
 
 Records are first queued in `(audq, org, stamp)`. The worker
-([`audit/worker.rs`](../../crates/rill-api/src/audit/worker.rs)) then
-places them ([`rill-store/src/audit/`](../../crates/rill-store/src/audit/mod.rs)):
+([`audit/worker.rs`](../../crates/server/api/src/audit/worker.rs)) then
+places them ([`rill-store/src/audit/`](../../crates/foundation/store/src/audit/mod.rs)):
 
 * `AuditEntry { seq, prev, record }` at `(aud, org, seq)`, where `prev` is
   the hash of entry `seq - 1` (zeros for the first);
@@ -77,7 +77,7 @@ these keys.
 
 ## Verifying
 
-[`verify_chain`](../../crates/rill-policy/src/audit.rs) takes the whole
+[`verify_chain`](../../crates/domain/policy/src/audit.rs) takes the whole
 chain, its seals and the published keys, and reports the first break:
 
 * a missing entry;
@@ -92,7 +92,7 @@ Entries and seals travel as the exact bytes that were hashed and signed.
 
 ## Service and CLI
 
-[`AuditService`](../../crates/rill-api/src/services/audit.rs) is for
+[`AuditService`](../../crates/server/api/src/services/audit.rs) is for
 administrators of the org (instance administrators for `_instance`):
 
 * `ListAuditEntries`;
@@ -119,10 +119,10 @@ The CLI is `rill admin audit list/watch/seal/verify/export`. `export
 
 ## Code
 
-* [`rill-types/src/audit/`](../../crates/rill-types/src/audit/mod.rs): records, entries, roots.
-* [`rill-store/src/audit/`](../../crates/rill-store/src/audit/mod.rs): queue, chain, cursors, roots.
-* [`rill-api/src/audit/`](../../crates/rill-api/src/audit/mod.rs): projection, worker, seals, refusals.
-* [`rill-policy/src/audit.rs`](../../crates/rill-policy/src/audit.rs): the audit key and `verify_chain`.
+* [`rill-types/src/audit/`](../../crates/foundation/types/src/audit/mod.rs): records, entries, roots.
+* [`rill-store/src/audit/`](../../crates/foundation/store/src/audit/mod.rs): queue, chain, cursors, roots.
+* [`rill-api/src/audit/`](../../crates/server/api/src/audit/mod.rs): projection, worker, seals, refusals.
+* [`rill-policy/src/audit.rs`](../../crates/domain/policy/src/audit.rs): the audit key and `verify_chain`.
 * Tests: `rill-store/tests/conformance/audit.rs` (racing chainers and projectors), `rill-api/tests/grpc/audit.rs` (end to end, tampering, refusals).
 
 ---

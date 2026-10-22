@@ -223,11 +223,11 @@ size refilled over a minute ([identity](../05-policy/identity-and-auth.md)).
 
 ## Code
 
-* [proto/rill/v1/types.proto](../../crates/rill-proto/proto/rill/v1/types.proto), [repo.proto](../../crates/rill-proto/proto/rill/v1/repo.proto), [workspace.proto](../../crates/rill-proto/proto/rill/v1/workspace.proto), [review.proto](../../crates/rill-proto/proto/rill/v1/review.proto), [intent.proto](../../crates/rill-proto/proto/rill/v1/intent.proto), [lander.proto](../../crates/rill-proto/proto/rill/v1/lander.proto), [admin.proto](../../crates/rill-proto/proto/rill/v1/admin.proto)
-* [build.rs](../../crates/rill-proto/build.rs), [src/lib.rs](../../crates/rill-proto/src/lib.rs), [src/error.rs](../../crates/rill-proto/src/error.rs)
-* [convert/mod.rs](../../crates/rill-proto/src/convert/mod.rs), [convert/primitives.rs](../../crates/rill-proto/src/convert/primitives.rs), [convert/roundtrip_tests.rs](../../crates/rill-proto/src/convert/roundtrip_tests.rs)
-* [rill-api/src/serve.rs](../../crates/rill-api/src/serve.rs), [services/mod.rs](../../crates/rill-api/src/services/mod.rs)
-* [objects/mod.rs](../../crates/rill-api/src/objects/mod.rs), [objects/handlers.rs](../../crates/rill-api/src/objects/handlers.rs), [objects/batch.rs](../../crates/rill-api/src/objects/batch.rs), [auth/http.rs](../../crates/rill-api/src/auth/http.rs)
+* [proto/rill/v1/types.proto](../../crates/foundation/proto/proto/rill/v1/types.proto), [repo.proto](../../crates/foundation/proto/proto/rill/v1/repo.proto), [workspace.proto](../../crates/foundation/proto/proto/rill/v1/workspace.proto), [review.proto](../../crates/foundation/proto/proto/rill/v1/review.proto), [intent.proto](../../crates/foundation/proto/proto/rill/v1/intent.proto), [lander.proto](../../crates/foundation/proto/proto/rill/v1/lander.proto), [admin.proto](../../crates/foundation/proto/proto/rill/v1/admin.proto)
+* [build.rs](../../crates/foundation/proto/build.rs), [src/lib.rs](../../crates/foundation/proto/src/lib.rs), [src/error.rs](../../crates/foundation/proto/src/error.rs)
+* [convert/mod.rs](../../crates/foundation/proto/src/convert/mod.rs), [convert/primitives.rs](../../crates/foundation/proto/src/convert/primitives.rs), [convert/roundtrip_tests.rs](../../crates/foundation/proto/src/convert/roundtrip_tests.rs)
+* [rill-api/src/serve.rs](../../crates/server/api/src/serve.rs), [services/mod.rs](../../crates/server/api/src/services/mod.rs)
+* [objects/mod.rs](../../crates/server/api/src/objects/mod.rs), [objects/handlers.rs](../../crates/server/api/src/objects/handlers.rs), [objects/batch.rs](../../crates/server/api/src/objects/batch.rs), [auth/http.rs](../../crates/server/api/src/auth/http.rs)
 
 ---
 ← Previous: [Server](server.md) · [Index](../index.md) · Next: [Events and workers](events-and-workers.md) →

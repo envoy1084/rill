@@ -23,7 +23,7 @@ flowchart LR
 
 ## Primitives
 
-[commit_graph.rs](../../crates/rill-core/src/graph/commit_graph.rs):
+[commit_graph.rs](../../crates/engine/core/src/graph/commit_graph.rs):
 
 | Method | Source | Cache |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ flowchart LR
 | `ancestry(hash)`, `generation(hash)` | `DeriveManager::get::<Ancestry>` | `moka` cache of 200,000 versions |
 | `ancestor_at_depth(from, depth)` | jump pointers | |
 
-`Ancestry` ([derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs))
+`Ancestry` ([derive/ancestry.rs](../../crates/engine/core/src/derive/ancestry.rs))
 is a land-critical derivation with kind `anc`. `AncestryInfo` holds the
 generation (`1 + max(parent generations)`, 1 for a root), the first-parent
 `depth` (0 for a root), `merges` (true when the version or any ancestor
@@ -98,7 +98,7 @@ the result is deterministic. `merge_bases(a, a)` is `[a]`.
 
 ## Log walks
 
-[walk.rs](../../crates/rill-core/src/graph/walk.rs). Both walks pop from a
+[walk.rs](../../crates/engine/core/src/graph/walk.rs). Both walks pop from a
 heap keyed `Key(generation, created_at, hash)`, highest first. A version is
 always emitted before its parents, unrelated versions come newest first,
 and the order is total.
@@ -115,7 +115,7 @@ stops at `limit` or when nothing interesting is queued. Each result is a
 `LogEntry { info, generation }`.
 
 The server's `Log` RPC
-([repo/history.rs](../../crates/rill-api/src/services/repo/history.rs))
+([repo/history.rs](../../crates/server/api/src/services/repo/history.rs))
 uses `ancestors(start, limit + 1)` for the full walk, so it can detect
 truncation. A `first_parent` log is a plain first-parent loop in the server,
 and a path filter goes to the path-history derivation; neither uses
@@ -141,11 +141,11 @@ that fails part-way returns the error, not a partial list.
 
 ## Code
 
-- [graph/mod.rs](../../crates/rill-core/src/graph/mod.rs)
-- [graph/commit_graph.rs](../../crates/rill-core/src/graph/commit_graph.rs)
-- [graph/walk.rs](../../crates/rill-core/src/graph/walk.rs)
-- [derive/ancestry.rs](../../crates/rill-core/src/derive/ancestry.rs), [tests/ancestry.rs](../../crates/rill-core/tests/ancestry.rs)
-- [rill-types objects/change.rs](../../crates/rill-types/src/objects/change.rs)
+- [graph/mod.rs](../../crates/engine/core/src/graph/mod.rs)
+- [graph/commit_graph.rs](../../crates/engine/core/src/graph/commit_graph.rs)
+- [graph/walk.rs](../../crates/engine/core/src/graph/walk.rs)
+- [derive/ancestry.rs](../../crates/engine/core/src/derive/ancestry.rs), [tests/ancestry.rs](../../crates/engine/core/tests/ancestry.rs)
+- [rill-types objects/change.rs](../../crates/foundation/types/src/objects/change.rs)
 
 ---
 ← Previous: [Trees](trees.md) · [Index](../index.md) · Next: [Change builder](change-builder.md) →

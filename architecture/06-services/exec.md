@@ -164,12 +164,12 @@ The lander picks a `VerifyMode` per risk class: `None` skips verification;
 
 ## Code
 
-* [lib.rs](../../crates/rill-exec/src/lib.rs), [error.rs](../../crates/rill-exec/src/error.rs)
-* [action.rs](../../crates/rill-exec/src/action.rs), [cache.rs](../../crates/rill-exec/src/cache.rs), [runner.rs](../../crates/rill-exec/src/runner.rs), [materialize.rs](../../crates/rill-exec/src/materialize.rs)
-* [sandbox/mod.rs](../../crates/rill-exec/src/sandbox/mod.rs), [sandbox/local.rs](../../crates/rill-exec/src/sandbox/local.rs), [sandbox/confine.rs](../../crates/rill-exec/src/sandbox/confine.rs)
-* [verify.rs](../../crates/rill-exec/src/verify.rs)
-* Server: [workers/verifier.rs](../../crates/rill-api/src/workers/verifier.rs), [state/registry.rs](../../crates/rill-api/src/state/registry.rs), [config/server.rs](../../crates/rill-api/src/config/server.rs)
-* Lander: [config.rs](../../crates/rill-lander/src/config.rs), [land/sequence.rs](../../crates/rill-lander/src/land/sequence.rs)
+* [lib.rs](../../crates/domain/exec/src/lib.rs), [error.rs](../../crates/domain/exec/src/error.rs)
+* [action.rs](../../crates/domain/exec/src/action.rs), [cache.rs](../../crates/domain/exec/src/cache.rs), [runner.rs](../../crates/domain/exec/src/runner.rs), [materialize.rs](../../crates/domain/exec/src/materialize.rs)
+* [sandbox/mod.rs](../../crates/domain/exec/src/sandbox/mod.rs), [sandbox/local.rs](../../crates/domain/exec/src/sandbox/local.rs), [sandbox/confine.rs](../../crates/domain/exec/src/sandbox/confine.rs)
+* [verify.rs](../../crates/domain/exec/src/verify.rs)
+* Server: [workers/verifier.rs](../../crates/server/api/src/workers/verifier.rs), [state/registry.rs](../../crates/server/api/src/state/registry.rs), [config/server.rs](../../crates/server/api/src/config/server.rs)
+* Lander: [config.rs](../../crates/domain/lander/src/config.rs), [land/sequence.rs](../../crates/domain/lander/src/land/sequence.rs)
 
 ---
 ← Previous: [Search](search.md) · [Index](../index.md) · Next: [Git import](git-import.md) →

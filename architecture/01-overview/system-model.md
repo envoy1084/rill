@@ -135,14 +135,14 @@ The rules these mechanisms must keep are listed in
 
 ## Code
 
-- [Server composition](../../crates/rill-api/src/lib.rs)
-- [RepoContext and registry](../../crates/rill-api/src/state/registry.rs)
-- [Request opening](../../crates/rill-api/src/services/common.rs)
-- [Permission checks](../../crates/rill-api/src/auth/permit.rs)
-- [Event log readers](../../crates/rill-events/src/lib.rs)
-- [Trunk CAS](../../crates/rill-store/src/repo/trunk.rs)
-- [Landing sequencer](../../crates/rill-lander/src/land/sequence.rs)
-- [Object model](../../crates/rill-types/src/objects/mod.rs)
+- [Server composition](../../crates/server/api/src/lib.rs)
+- [RepoContext and registry](../../crates/server/api/src/state/registry.rs)
+- [Request opening](../../crates/server/api/src/services/common.rs)
+- [Permission checks](../../crates/server/api/src/auth/permit.rs)
+- [Event log readers](../../crates/foundation/events/src/lib.rs)
+- [Trunk CAS](../../crates/foundation/store/src/repo/trunk.rs)
+- [Landing sequencer](../../crates/domain/lander/src/land/sequence.rs)
+- [Object model](../../crates/foundation/types/src/objects/mod.rs)
 
 ---
 ← Previous: [Index](../index.md) · [Index](../index.md) · Next: [Principles and invariants](principles-and-invariants.md) →

@@ -53,7 +53,7 @@ and optional `token` and `timeout_secs`. The path is
 `dirs::config_dir()/rill/config.toml`: `~/.config` on Linux,
 `~/Library/Application Support` on macOS.
 
-Credentials ([auth/](../../crates/rill-sdk/src/auth/mod.rs)): every request
+Credentials ([auth/](../../crates/clients/sdk/src/auth/mod.rs)): every request
 reads its bearer token from a `TokenSource`. `ClientConfig::token` gives a
 `StaticToken`; `with_session(credentials, store)` gives a `SessionSource`,
 which a background task refreshes through `SessionService.RefreshSession`
@@ -198,11 +198,11 @@ cancelled land and `Error::Timeout` when the deadline passes.
 
 ## Code
 
-- [lib.rs](../../crates/rill-sdk/src/lib.rs), [client.rs](../../crates/rill-sdk/src/client.rs), [config.rs](../../crates/rill-sdk/src/config.rs), [error.rs](../../crates/rill-sdk/src/error.rs), [stream.rs](../../crates/rill-sdk/src/stream.rs)
-- [repo/mod.rs](../../crates/rill-sdk/src/repo/mod.rs), [repo/blobs.rs](../../crates/rill-sdk/src/repo/blobs.rs), [repo/write.rs](../../crates/rill-sdk/src/repo/write.rs), [repo/history.rs](../../crates/rill-sdk/src/repo/history.rs), [repo/watch.rs](../../crates/rill-sdk/src/repo/watch.rs)
-- [types/root.rs](../../crates/rill-sdk/src/types/root.rs), [types/edit.rs](../../crates/rill-sdk/src/types/edit.rs), [types/page.rs](../../crates/rill-sdk/src/types/page.rs)
-- [local/checkout.rs](../../crates/rill-sdk/src/local/checkout.rs), [local/meta.rs](../../crates/rill-sdk/src/local/meta.rs), [local/status.rs](../../crates/rill-sdk/src/local/status.rs), [local/update.rs](../../crates/rill-sdk/src/local/update.rs), [local/walk.rs](../../crates/rill-sdk/src/local/walk.rs)
-- [stack.rs](../../crates/rill-sdk/src/stack.rs), [review.rs](../../crates/rill-sdk/src/review.rs), [workspace.rs](../../crates/rill-sdk/src/workspace.rs), [lander.rs](../../crates/rill-sdk/src/lander.rs), [admin.rs](../../crates/rill-sdk/src/admin.rs)
+- [lib.rs](../../crates/clients/sdk/src/lib.rs), [client.rs](../../crates/clients/sdk/src/client.rs), [config.rs](../../crates/clients/sdk/src/config.rs), [error.rs](../../crates/clients/sdk/src/error.rs), [stream.rs](../../crates/clients/sdk/src/stream.rs)
+- [repo/mod.rs](../../crates/clients/sdk/src/repo/mod.rs), [repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs), [repo/write.rs](../../crates/clients/sdk/src/repo/write.rs), [repo/history.rs](../../crates/clients/sdk/src/repo/history.rs), [repo/watch.rs](../../crates/clients/sdk/src/repo/watch.rs)
+- [types/root.rs](../../crates/clients/sdk/src/types/root.rs), [types/edit.rs](../../crates/clients/sdk/src/types/edit.rs), [types/page.rs](../../crates/clients/sdk/src/types/page.rs)
+- [local/checkout.rs](../../crates/clients/sdk/src/local/checkout.rs), [local/meta.rs](../../crates/clients/sdk/src/local/meta.rs), [local/status.rs](../../crates/clients/sdk/src/local/status.rs), [local/update.rs](../../crates/clients/sdk/src/local/update.rs), [local/walk.rs](../../crates/clients/sdk/src/local/walk.rs)
+- [stack.rs](../../crates/clients/sdk/src/stack.rs), [review.rs](../../crates/clients/sdk/src/review.rs), [workspace.rs](../../crates/clients/sdk/src/workspace.rs), [lander.rs](../../crates/clients/sdk/src/lander.rs), [admin.rs](../../crates/clients/sdk/src/admin.rs)
 
 ---
 ← Previous: [Cache tier](../07-runtime/cache.md) · [Index](../index.md) · Next: [CLI](cli.md) →

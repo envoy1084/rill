@@ -120,11 +120,11 @@ range of any file needs memory for a few chunks, not the file.
 
 ## Code
 
-* [rill-core blobs/](../../crates/rill-core/src/blobs/mod.rs): `store.rs` (`store_content`, `chunk_boundaries`), `stream.rs` (`store_content_stream`), `read.rs` (`read_content`, `read_content_range`, `content_parts`)
-* [rill-types objects/blob.rs](../../crates/rill-types/src/objects/blob.rs): `ContentRef`, `ChunkRef`, `BlobManifest`, thresholds
-* [rill-store object.rs](../../crates/rill-store/src/object.rs): `put_blob`, `get_many`, `verify`
-* [rill-api services/repo/trees.rs](../../crates/rill-api/src/services/repo/trees.rs): `PutBlob`, `GetBlob`, `check_content_exists`, `MAX_INLINE`
-* [rill-sdk repo/blobs.rs](../../crates/rill-sdk/src/repo/blobs.rs): client-side `store_content` and `put_blob`
+* [rill-core blobs/](../../crates/engine/core/src/blobs/mod.rs): `store.rs` (`store_content`, `chunk_boundaries`), `stream.rs` (`store_content_stream`), `read.rs` (`read_content`, `read_content_range`, `content_parts`)
+* [rill-types objects/blob.rs](../../crates/foundation/types/src/objects/blob.rs): `ContentRef`, `ChunkRef`, `BlobManifest`, thresholds
+* [rill-store object.rs](../../crates/foundation/store/src/object.rs): `put_blob`, `get_many`, `verify`
+* [rill-api services/repo/trees.rs](../../crates/server/api/src/services/repo/trees.rs): `PutBlob`, `GetBlob`, `check_content_exists`, `MAX_INLINE`
+* [rill-sdk repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs): client-side `store_content` and `put_blob`
 
 ---
 ← Previous: [Merge algebra](merge-algebra.md) · [Index](../index.md) · Next: [Derived data](derived-data.md) →

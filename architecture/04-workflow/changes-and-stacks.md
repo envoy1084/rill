@@ -41,7 +41,7 @@ read time from the `trunkh/` index.
 ## The single write path
 
 Every RPC that creates a version goes through `commit_version_with`
-([commit.rs](../../crates/rill-api/src/services/repo/commit.rs)). It
+([commit.rs](../../crates/server/api/src/services/repo/commit.rs)). It
 checks the change limits and path rules, that parents and predecessor
 exist, that no change targets the root path, and that every `Set` content
 and copy source exists. It writes the version object and its
@@ -84,7 +84,7 @@ names a stored version gets that version back instead of storing another
 exist, else `FailedPrecondition`), `Delete`, or `Patch`. A `Patch` is a
 unified diff applied on the server against the base file by
 `rill_core::apply_unified`
-([patch.rs](../../crates/rill-core/src/diff/patch.rs)). Each hunk must
+([patch.rs](../../crates/engine/core/src/diff/patch.rs)). Each hunk must
 match exactly at its stated line or within 50 lines of it; otherwise the
 request is `InvalidArgument`. `write(path)` is checked per edit. A version
 with no file changes requires `write(root)`.
@@ -122,7 +122,7 @@ parents from it until it reaches a landed version, with a bound of 10 000
 hops. Nothing is stored.
 
 **Declared.** `ReviewService::set_stack` (RPC `SetStack`,
-[stacks.rs](../../crates/rill-review/src/stacks.rs)) requires a non-empty
+[stacks.rs](../../crates/domain/review/src/stacks.rs)) requires a non-empty
 list in which every member is under review and no id repeats. Each
 member's current version must have the previous member's current version
 as its first parent; otherwise it fails with `InvalidStack`. The list is
@@ -130,7 +130,7 @@ written to every member's `ReviewState.stack`. Risk and status are
 recomputed with `stack_depth` = position, and `StackChanged` is emitted.
 `stack_of` returns `[id]` for an undeclared change.
 
-SDK helpers in [stack.rs](../../crates/rill-sdk/src/stack.rs):
+SDK helpers in [stack.rs](../../crates/clients/sdk/src/stack.rs):
 
 * `submit_stack`: submits each change, then calls `set_stack`.
 * `sync_stack`: rebases bottom-up, each current version onto the previous
@@ -157,14 +157,14 @@ rebases those dependents automatically.
 
 ## Code
 
-* [rill-types/src/objects/change.rs](../../crates/rill-types/src/objects/change.rs), [ids.rs](../../crates/rill-types/src/ids.rs)
-* [rill-store/src/repo/versions.rs](../../crates/rill-store/src/repo/versions.rs) (`put_change_version`, `change_versions`)
-* [rill-api/src/services/repo/commit.rs](../../crates/rill-api/src/services/repo/commit.rs), [write.rs](../../crates/rill-api/src/services/repo/write.rs)
-* [rill-core/src/rebase.rs](../../crates/rill-core/src/rebase.rs), [builder.rs](../../crates/rill-core/src/builder.rs)
-* [rill-review/src/stacks.rs](../../crates/rill-review/src/stacks.rs)
-* [rill-api/src/workers/hooks.rs](../../crates/rill-api/src/workers/hooks.rs) (`dependents_of`)
-* [rill-sdk/src/stack.rs](../../crates/rill-sdk/src/stack.rs)
-* [rill-cli/src/commands/change.rs](../../crates/rill-cli/src/commands/change.rs), [stack.rs](../../crates/rill-cli/src/commands/stack.rs)
+* [rill-types/src/objects/change.rs](../../crates/foundation/types/src/objects/change.rs), [ids.rs](../../crates/foundation/types/src/ids.rs)
+* [rill-store/src/repo/versions.rs](../../crates/foundation/store/src/repo/versions.rs) (`put_change_version`, `change_versions`)
+* [rill-api/src/services/repo/commit.rs](../../crates/server/api/src/services/repo/commit.rs), [write.rs](../../crates/server/api/src/services/repo/write.rs)
+* [rill-core/src/rebase.rs](../../crates/engine/core/src/rebase.rs), [builder.rs](../../crates/engine/core/src/builder.rs)
+* [rill-review/src/stacks.rs](../../crates/domain/review/src/stacks.rs)
+* [rill-api/src/workers/hooks.rs](../../crates/server/api/src/workers/hooks.rs) (`dependents_of`)
+* [rill-sdk/src/stack.rs](../../crates/clients/sdk/src/stack.rs)
+* [rill-cli/src/commands/change.rs](../../crates/clients/cli/src/commands/change.rs), [stack.rs](../../crates/clients/cli/src/commands/stack.rs)
 
 ---
 ← Previous: [Checkouts](checkouts.md) · [Index](../index.md) · Next: [Review](review.md) →

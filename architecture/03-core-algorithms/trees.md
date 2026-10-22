@@ -42,7 +42,7 @@ All three are `ObjectKind::Tree` objects. A parent entry points at a
 directory's top node; `summary` on each child lets a split directory's
 `DirSummary` be summed from its top node alone.
 
-**Boundaries** ([shape.rs](../../crates/rill-types/src/objects/tree/shape.rs)).
+**Boundaries** ([shape.rs](../../crates/foundation/types/src/objects/tree/shape.rs)).
 Chunking a sorted sequence left to right, a node at `level` ends after an
 item when BLAKE3 (keyed `"rill tree node boundary"`, over the level and
 the item's key) is divisible by the target (1,024 for leaves, 64 for inner
@@ -57,7 +57,7 @@ case check for a new name is a prefix lookup, not a scan.
 
 ## Editing a split list
 
-[shard/list.rs](../../crates/rill-core/src/tree/shard/list.rs). `edit`
+[shard/list.rs](../../crates/engine/core/src/tree/shard/list.rs). `edit`
 takes the leaf pointers (read from the inner nodes, which are few) and the
 edits by key. Leaves before the first edited one are kept. From there it
 re-chunks the edited leaves' items through a `Chunker`, continuing into
@@ -72,8 +72,8 @@ written. A directory that drops to 4,096 entries or fewer becomes one
 ## TreeOps
 
 `TreeOps::new(objects, cache_size)`
-([ops.rs](../../crates/rill-core/src/tree/ops.rs),
-[shard/dir.rs](../../crates/rill-core/src/tree/shard/dir.rs)) binds an
+([ops.rs](../../crates/engine/core/src/tree/ops.rs),
+[shard/dir.rs](../../crates/engine/core/src/tree/shard/dir.rs)) binds an
 object store to a `moka` cache (`Cache<TreeHash, NodeRef>`, TinyLFU
 eviction) of decoded nodes. The
 server uses `DEFAULT_TREE_CACHE = 4096` nodes per repository. Clones share
@@ -95,7 +95,7 @@ benchmarks.
 
 ## TreeBuilder
 
-[builder.rs](../../crates/rill-core/src/tree/builder.rs) records `Edit`s in
+[builder.rs](../../crates/engine/core/src/tree/builder.rs) records `Edit`s in
 a trie keyed by path component. `build(ops, base)` walks the trie once.
 
 | `Edit` | Effect at the path |
@@ -127,7 +127,7 @@ O(log n) per edit plus a read of its inner nodes.
 ## Applying a change version
 
 `TreeOps::materialize(parent_root, cv, roots)`
-([materialize.rs](../../crates/rill-core/src/tree/materialize.rs)) computes
+([materialize.rs](../../crates/engine/core/src/tree/materialize.rs)) computes
 a version's root from its first parent's root. The `RootTree` derivation
 calls it; see [derived data](../02-data/derived-data.md). Steps:
 
@@ -146,7 +146,7 @@ Conflicts leave no trace in the tree; they live only in the change.
 ## Walk
 
 `TreeOps::walk(root, prefix, sparse) -> Vec<WalkEntry>`
-([walk.rs](../../crates/rill-core/src/tree/walk.rs)) lists every file under
+([walk.rs](../../crates/engine/core/src/tree/walk.rs)) lists every file under
 `prefix` as `(path, content, kind)`, sorted by path. `SparseProfile`
 filters files, and excluded directories are pruned before loading.
 
@@ -177,10 +177,10 @@ exactly one node per directory level.
 
 ## Code
 
-- [tree/ops.rs](../../crates/rill-core/src/tree/ops.rs), [tree/builder.rs](../../crates/rill-core/src/tree/builder.rs), [tree/materialize.rs](../../crates/rill-core/src/tree/materialize.rs), [tree/walk.rs](../../crates/rill-core/src/tree/walk.rs)
-- [tree/shard/](../../crates/rill-core/src/tree/shard/mod.rs): [dir.rs](../../crates/rill-core/src/tree/shard/dir.rs), [list.rs](../../crates/rill-core/src/tree/shard/list.rs), [layout.rs](../../crates/rill-core/src/tree/shard/layout.rs)
-- [rill-types objects/tree/](../../crates/rill-types/src/objects/tree/mod.rs): [listing.rs](../../crates/rill-types/src/objects/tree/listing.rs), [node.rs](../../crates/rill-types/src/objects/tree/node.rs), [shape.rs](../../crates/rill-types/src/objects/tree/shape.rs)
-- [tests/large_dirs.rs](../../crates/rill-core/tests/large_dirs.rs), [rill-bench benches/trees.rs](../../crates/rill-bench/benches/trees.rs)
+- [tree/ops.rs](../../crates/engine/core/src/tree/ops.rs), [tree/builder.rs](../../crates/engine/core/src/tree/builder.rs), [tree/materialize.rs](../../crates/engine/core/src/tree/materialize.rs), [tree/walk.rs](../../crates/engine/core/src/tree/walk.rs)
+- [tree/shard/](../../crates/engine/core/src/tree/shard/mod.rs): [dir.rs](../../crates/engine/core/src/tree/shard/dir.rs), [list.rs](../../crates/engine/core/src/tree/shard/list.rs), [layout.rs](../../crates/engine/core/src/tree/shard/layout.rs)
+- [rill-types objects/tree/](../../crates/foundation/types/src/objects/tree/mod.rs): [listing.rs](../../crates/foundation/types/src/objects/tree/listing.rs), [node.rs](../../crates/foundation/types/src/objects/tree/node.rs), [shape.rs](../../crates/foundation/types/src/objects/tree/shape.rs)
+- [tests/large_dirs.rs](../../crates/engine/core/tests/large_dirs.rs), [rill-bench benches/trees.rs](../../tools/bench/benches/trees.rs)
 
 ---
 ← Previous: [Rebase](rebase.md) · [Index](../index.md) · Next: [History graph](history-graph.md) →

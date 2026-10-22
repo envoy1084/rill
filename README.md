@@ -61,22 +61,22 @@ Rust 2021 workspace; `cargo build --workspace` needs Rust 1.85+ and no `protoc`
 
 | Crate | Purpose |
 | --- | --- |
-| [rill-types](crates/rill-types) | Object model, ids, hashing, `Merge<T>` conflict algebra |
-| [rill-store](crates/rill-store) | Object and metadata store traits; memory, local (redb + files), S3, FoundationDB |
-| [rill-core](crates/rill-core) | Diff, three-way merge, trees, rebase, ancestry graph, derived data, blob chunking |
-| [rill-policy](crates/rill-policy) | Risk classification, Cedar submit rules, ReBAC, Biscuit capability tokens, signing |
-| [rill-review](crates/rill-review) | Labels, votes, threads, interdiff, stacks, submit evaluation, review agents |
-| [rill-lander](crates/rill-lander) | Landing pipeline, sequence numbers, post-land verification, bisect, revert |
-| [rill-search](crates/rill-search) | Trigram index and symbol extraction |
-| [rill-exec](crates/rill-exec) | Verification runner with a content-addressed action cache |
-| [rill-proto](crates/rill-proto) | `rill.v1` protobufs and generated tonic services |
-| [rill-events](crates/rill-events) | Reading the event log: resumable, filtered tails and retention |
-| [rill-jobs](crates/rill-jobs) | Durable job queues with leased claims and a worker runtime |
-| [rill-api](crates/rill-api) | gRPC API, object HTTP protocol, authentication, watch streams, workers |
-| [rill-sdk](crates/rill-sdk) | Typed client and the local checkout |
-| [rill-cli](crates/rill-cli) | The `rill` binary: client commands, `rill dev` and `rill api` |
-| [rill-mcp](crates/rill-mcp) | MCP server exposing the SDK to agents |
-| [rill-git-import](crates/rill-git-import) | One-way importer from git |
+| [rill-types](crates/foundation/types) | Object model, ids, hashing, `Merge<T>` conflict algebra |
+| [rill-store](crates/foundation/store) | Object and metadata store traits; memory, local (redb + files), S3, FoundationDB |
+| [rill-core](crates/engine/core) | Diff, three-way merge, trees, rebase, ancestry graph, derived data, blob chunking |
+| [rill-policy](crates/domain/policy) | Risk classification, Cedar submit rules, ReBAC, Biscuit capability tokens, signing |
+| [rill-review](crates/domain/review) | Labels, votes, threads, interdiff, stacks, submit evaluation, review agents |
+| [rill-lander](crates/domain/lander) | Landing pipeline, sequence numbers, post-land verification, bisect, revert |
+| [rill-search](crates/domain/search) | Trigram index and symbol extraction |
+| [rill-exec](crates/domain/exec) | Verification runner with a content-addressed action cache |
+| [rill-proto](crates/foundation/proto) | `rill.v1` protobufs and generated tonic services |
+| [rill-events](crates/foundation/events) | Reading the event log: resumable, filtered tails and retention |
+| [rill-jobs](crates/foundation/jobs) | Durable job queues with leased claims and a worker runtime |
+| [rill-api](crates/server/api) | gRPC API, object HTTP protocol, authentication, watch streams, workers |
+| [rill-sdk](crates/clients/sdk) | Typed client and the local checkout |
+| [rill-cli](crates/clients/cli) | The `rill` binary: client commands, `rill dev` and `rill api` |
+| [rill-mcp](crates/clients/mcp) | MCP server exposing the SDK to agents |
+| [rill-git-import](crates/domain/git-import) | One-way importer from git |
 
 The [architecture knowledge base](architecture/index.md) documents each
 boundary: data model, algorithms, workflow, policy, runtime and integrations.

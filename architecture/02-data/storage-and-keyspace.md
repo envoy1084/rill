@@ -236,11 +236,11 @@ version or method.
 
 ## Code
 
-* [lib.rs](../../crates/rill-store/src/lib.rs), [error.rs](../../crates/rill-store/src/error.rs), [object.rs](../../crates/rill-store/src/object.rs), [meta.rs](../../crates/rill-store/src/meta.rs)
-* [keys.rs](../../crates/rill-store/src/keys.rs), [repo/](../../crates/rill-store/src/repo/mod.rs) ([landing.rs](../../crates/rill-store/src/repo/landing.rs), [reviews.rs](../../crates/rill-store/src/repo/reviews.rs), [idem.rs](../../crates/rill-store/src/repo/idem.rs), [orgs.rs](../../crates/rill-store/src/repo/orgs.rs), [events.rs](../../crates/rill-store/src/repo/events.rs)), [codec.rs](../../crates/rill-store/src/codec.rs), [verified.rs](../../crates/rill-store/src/verified.rs), [seal/](../../crates/rill-store/src/seal/mod.rs)
-* [memory.rs](../../crates/rill-store/src/memory.rs), [backend.rs](../../crates/rill-store/src/backend.rs), [local/](../../crates/rill-store/src/local/mod.rs)
-* [tests/conformance/](../../crates/rill-store/tests/conformance/main.rs): every scenario on every backend
-* [rill-api state/stores.rs](../../crates/rill-api/src/state/stores.rs): `open_stores`
+* [lib.rs](../../crates/foundation/store/src/lib.rs), [error.rs](../../crates/foundation/store/src/error.rs), [object.rs](../../crates/foundation/store/src/object.rs), [meta.rs](../../crates/foundation/store/src/meta.rs)
+* [keys.rs](../../crates/foundation/store/src/keys.rs), [repo/](../../crates/foundation/store/src/repo/mod.rs) ([landing.rs](../../crates/foundation/store/src/repo/landing.rs), [reviews.rs](../../crates/foundation/store/src/repo/reviews.rs), [idem.rs](../../crates/foundation/store/src/repo/idem.rs), [orgs.rs](../../crates/foundation/store/src/repo/orgs.rs), [events.rs](../../crates/foundation/store/src/repo/events.rs)), [codec.rs](../../crates/foundation/store/src/codec.rs), [verified.rs](../../crates/foundation/store/src/verified.rs), [seal/](../../crates/foundation/store/src/seal/mod.rs)
+* [memory.rs](../../crates/foundation/store/src/memory.rs), [backend.rs](../../crates/foundation/store/src/backend.rs), [local/](../../crates/foundation/store/src/local/mod.rs)
+* [tests/conformance/](../../crates/foundation/store/tests/conformance/main.rs): every scenario on every backend
+* [rill-api state/stores.rs](../../crates/server/api/src/state/stores.rs): `open_stores`
 
 ---
 ← Previous: [Objects and ids](objects-and-ids.md) · [Index](../index.md) · Next: [Metadata engines](metadata-engines.md) →

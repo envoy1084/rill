@@ -236,7 +236,7 @@ locally when the sequencer's commit protocol changes, not in CI.
 
 ## Fuzzing
 
-`fuzz/` is a separate `cargo-fuzz` workspace (it needs nightly and
+`tools/fuzz/` is a separate `cargo-fuzz` workspace (it needs nightly and
 libFuzzer) with targets for code that parses untrusted bytes:
 
 | Target | Checks |
@@ -260,7 +260,7 @@ cd fuzz && cargo +nightly fuzz run decode_objects -- -max_total_time=600
 
 Fuzzing is not part of CI. The first six targets ran 10 minutes without a
 crash when added; the rest ran one minute each (Phase 12). Corpora under
-`fuzz/corpus/` are local and untracked.
+`tools/fuzz/corpus/` are local and untracked.
 
 ## Limitations
 
@@ -281,12 +281,12 @@ crash when added; the rest ran one minute each (Phase 12). Corpora under
 
 ## Code
 
-- [rill-store/tests/conformance/](../../crates/rill-store/tests/conformance/main.rs), [rill-core/tests/workflow.rs](../../crates/rill-core/tests/workflow.rs), [rill-review/tests/review_flow.rs](../../crates/rill-review/tests/review_flow.rs), [rill-review/src/testing.rs](../../crates/rill-review/src/testing.rs)
-- [rill-lander/tests/landing.rs](../../crates/rill-lander/tests/landing.rs), [rill-search/tests/end_to_end.rs](../../crates/rill-search/tests/end_to_end.rs)
-- [rill-sdk/tests/common/mod.rs](../../crates/rill-sdk/tests/common/mod.rs), [rill-sdk/tests/repo_rpc.rs](../../crates/rill-sdk/tests/repo_rpc.rs), [rill-sdk/tests/stack.rs](../../crates/rill-sdk/tests/stack.rs), [rill-sdk/tests/checkout.rs](../../crates/rill-sdk/tests/checkout.rs)
-- [rill-mcp/tests/common/mod.rs](../../crates/rill-mcp/tests/common/mod.rs), [rill-mcp/tests/protocol.rs](../../crates/rill-mcp/tests/protocol.rs)
-- [rill-api/tests/grpc/](../../crates/rill-api/tests/grpc/main.rs), [rill-cli/tests/cli_e2e.rs](../../crates/rill-cli/tests/cli_e2e.rs), [rill-cli/tests/parse.rs](../../crates/rill-cli/tests/parse.rs)
-- [rill-git-import/tests/real_git.rs](../../crates/rill-git-import/tests/real_git.rs), [rill-proto/src/convert/roundtrip_tests.rs](../../crates/rill-proto/src/convert/roundtrip_tests.rs)
+- [rill-store/tests/conformance/](../../crates/foundation/store/tests/conformance/main.rs), [rill-core/tests/workflow.rs](../../crates/engine/core/tests/workflow.rs), [rill-review/tests/review_flow.rs](../../crates/domain/review/tests/review_flow.rs), [rill-review/src/testing.rs](../../crates/domain/review/src/testing.rs)
+- [rill-lander/tests/landing.rs](../../crates/domain/lander/tests/landing.rs), [rill-search/tests/end_to_end.rs](../../crates/domain/search/tests/end_to_end.rs)
+- [rill-sdk/tests/common/mod.rs](../../crates/clients/sdk/tests/common/mod.rs), [rill-sdk/tests/repo_rpc.rs](../../crates/clients/sdk/tests/repo_rpc.rs), [rill-sdk/tests/stack.rs](../../crates/clients/sdk/tests/stack.rs), [rill-sdk/tests/checkout.rs](../../crates/clients/sdk/tests/checkout.rs)
+- [rill-mcp/tests/common/mod.rs](../../crates/clients/mcp/tests/common/mod.rs), [rill-mcp/tests/protocol.rs](../../crates/clients/mcp/tests/protocol.rs)
+- [rill-api/tests/grpc/](../../crates/server/api/tests/grpc/main.rs), [rill-cli/tests/cli_e2e.rs](../../crates/clients/cli/tests/cli_e2e.rs), [rill-cli/tests/parse.rs](../../crates/clients/cli/tests/parse.rs)
+- [rill-git-import/tests/real_git.rs](../../crates/domain/git-import/tests/real_git.rs), [rill-proto/src/convert/roundtrip_tests.rs](../../crates/foundation/proto/src/convert/roundtrip_tests.rs)
 
 ---
 ← Previous: [Development](development.md) · [Index](../index.md) · Next: [Simulation](simulation.md) →

@@ -50,7 +50,7 @@ fn dashboards_query_only_metrics_the_server_exports() {
         .iter()
         .cloned()
         .collect();
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/grafana");
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../deploy/grafana");
     let mut checked = 0;
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
@@ -100,7 +100,7 @@ fn metric_names(expr: &str) -> Vec<String> {
 
 #[test]
 fn shipped_configurations_parse() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let config = ServerConfig::load(Some(&root.join("deploy/compose/rill.toml"))).unwrap();
     assert!(!config.dev_mode);
     assert!(matches!(

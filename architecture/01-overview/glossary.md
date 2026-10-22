@@ -133,16 +133,16 @@ flowchart LR
 
 ## Code
 
-- [Ids](../../crates/rill-types/src/ids.rs)
-- [Hashes and object kinds](../../crates/rill-types/src/hash.rs)
-- [ChangeVersion and FileChange](../../crates/rill-types/src/objects/change.rs)
-- [Merge](../../crates/rill-types/src/merge.rs)
-- [Review records](../../crates/rill-types/src/objects/review.rs)
-- [Intent and RiskClass](../../crates/rill-types/src/objects/intent.rs)
-- [Workspace](../../crates/rill-types/src/objects/workspace.rs)
-- [Relations](../../crates/rill-policy/src/rebac/model.rs)
-- [Capability verbs](../../crates/rill-policy/src/tokens/capability.rs)
-- [Checkout](../../crates/rill-sdk/src/local/checkout.rs)
+- [Ids](../../crates/foundation/types/src/ids.rs)
+- [Hashes and object kinds](../../crates/foundation/types/src/hash.rs)
+- [ChangeVersion and FileChange](../../crates/foundation/types/src/objects/change.rs)
+- [Merge](../../crates/foundation/types/src/merge.rs)
+- [Review records](../../crates/foundation/types/src/objects/review.rs)
+- [Intent and RiskClass](../../crates/foundation/types/src/objects/intent.rs)
+- [Workspace](../../crates/foundation/types/src/objects/workspace.rs)
+- [Relations](../../crates/domain/policy/src/rebac/model.rs)
+- [Capability verbs](../../crates/domain/policy/src/tokens/capability.rs)
+- [Checkout](../../crates/clients/sdk/src/local/checkout.rs)
 
 ---
 ← Previous: [Crates and layering](crates-and-layering.md) · [Index](../index.md) · Next: [Objects and ids](../02-data/objects-and-ids.md) →

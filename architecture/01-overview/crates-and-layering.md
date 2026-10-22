@@ -31,7 +31,7 @@ and policy crates stay free of RPC and storage-layout concerns.
 Tooling crates, never depended on by product crates: `rill-sim` (seeded
 fault simulation, [simulation](../09-engineering/simulation.md)),
 `rill-bench` and `rill-load` (benchmarks and load generation,
-[performance](../09-engineering/performance.md)), and `fuzz/` (a separate
+[performance](../09-engineering/performance.md)), and `tools/fuzz/` (a separate
 `cargo-fuzz` workspace).
 
 ## Dependency graph
@@ -126,13 +126,13 @@ for build profiles and features.
 ## Code
 
 - [Workspace manifest](../../Cargo.toml)
-- [rill-policy/Cargo.toml](../../crates/rill-policy/Cargo.toml)
-- [rill-lander/Cargo.toml](../../crates/rill-lander/Cargo.toml)
-- [rill-api/Cargo.toml](../../crates/rill-api/Cargo.toml)
-- [rill-sdk/Cargo.toml](../../crates/rill-sdk/Cargo.toml)
-- [rill-mcp/Cargo.toml](../../crates/rill-mcp/Cargo.toml)
-- [rill-cli/Cargo.toml](../../crates/rill-cli/Cargo.toml)
-- [Lander adapters](../../crates/rill-api/src/workers/mod.rs)
+- [rill-policy/Cargo.toml](../../crates/domain/policy/Cargo.toml)
+- [rill-lander/Cargo.toml](../../crates/domain/lander/Cargo.toml)
+- [rill-api/Cargo.toml](../../crates/server/api/Cargo.toml)
+- [rill-sdk/Cargo.toml](../../crates/clients/sdk/Cargo.toml)
+- [rill-mcp/Cargo.toml](../../crates/clients/mcp/Cargo.toml)
+- [rill-cli/Cargo.toml](../../crates/clients/cli/Cargo.toml)
+- [Lander adapters](../../crates/server/api/src/workers/mod.rs)
 
 ---
 ← Previous: [Principles and invariants](principles-and-invariants.md) · [Index](../index.md) · Next: [Glossary](glossary.md) →

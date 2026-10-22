@@ -14,12 +14,12 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4.13"
 arbitrary = { version = "1.5.0", features = ["derive"] }
-rill-types = { path = "../crates/rill-types" }
-rill-core = { path = "../crates/rill-core" }
-rill-proto = { path = "../crates/rill-proto" }
-rill-policy = { path = "../crates/rill-policy" }
-rill-identity = { path = "../crates/rill-identity" }
-rill-api = { path = "../crates/rill-api" }
+rill-types = { path = "../../crates/foundation/types" }
+rill-core = { path = "../../crates/engine/core" }
+rill-proto = { path = "../../crates/foundation/proto" }
+rill-policy = { path = "../../crates/domain/policy" }
+rill-identity = { path = "../../crates/domain/identity" }
+rill-api = { path = "../../crates/server/api" }
 prost = "0.14"
 serde_json = "1"
 

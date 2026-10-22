@@ -1,7 +1,7 @@
 # Cache tier
 
 `rill-cache` is the regional cache in front of the origin
-([crate](../../crates/rill-cache/src/lib.rs)). Objects never change, so a
+([crate](../../crates/server/cache/src/lib.rs)). Objects never change, so a
 cache near its clients answers object reads without asking the origin
 anything: it checks each request's [read grant](../05-policy/permissions.md#read-grants)
 against the origin's published grant keys and serves from local disk. The
@@ -51,14 +51,14 @@ Responses carry `ETag` and `Cache-Control: private, immutable, …`.
 
 ## Coalescing
 
-[`Coalescer`](../../crates/rill-cache/src/coalesce.rs) makes concurrent
+[`Coalescer`](../../crates/server/cache/src/coalesce.rs) makes concurrent
 misses on one object share one origin fetch. A waiter takes the leader's
 bytes when the fetch succeeds. When it fails, each waiter fetches with its
 own credentials, because the failure may have been the leader's token.
 
 ## Disk
 
-[`DiskCache`](../../crates/rill-cache/src/disk.rs) keeps raw objects at
+[`DiskCache`](../../crates/server/cache/src/disk.rs) keeps raw objects at
 `<dir>/<kind>/<hh>/<hash-hex>`:
 
 * the least recently used index lives in memory and is rebuilt from the
@@ -105,9 +105,9 @@ principals and instance administrators.
 
 ## Code
 
-* [`server.rs`](../../crates/rill-cache/src/server.rs): routes, `Cache`, `CacheStats`.
-* [`keys.rs`](../../crates/rill-cache/src/keys.rs), [`origin.rs`](../../crates/rill-cache/src/origin.rs), [`coalesce.rs`](../../crates/rill-cache/src/coalesce.rs), [`disk.rs`](../../crates/rill-cache/src/disk.rs).
-* CLI: [`server/cache.rs`](../../crates/rill-cli/src/server/cache.rs). Test: `rill-cli/tests/cache.rs`.
+* [`server.rs`](../../crates/server/cache/src/server.rs): routes, `Cache`, `CacheStats`.
+* [`keys.rs`](../../crates/server/cache/src/keys.rs), [`origin.rs`](../../crates/server/cache/src/origin.rs), [`coalesce.rs`](../../crates/server/cache/src/coalesce.rs), [`disk.rs`](../../crates/server/cache/src/disk.rs).
+* CLI: [`server/cache.rs`](../../crates/clients/cli/src/server/cache.rs). Test: `rill-cli/tests/cache.rs`.
 
 ---
 ← Previous: [Observability](observability.md) · [Index](../index.md) · Next: [SDK](../08-clients/sdk.md) →
