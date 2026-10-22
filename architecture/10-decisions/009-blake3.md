@@ -1,6 +1,6 @@
 # 009 · Keep domain-separated BLAKE3
 
-Status: accepted
+Status: superseded by [016](016-plain-blake3-for-content.md) for raw content (blobs and chunks)
 
 ## Context
 

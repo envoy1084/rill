@@ -21,6 +21,12 @@ pub enum ObjectKind {
 }
 
 impl ObjectKind {
+    /// Whether objects of this kind are raw content, hashed without a
+    /// domain separator.
+    pub fn is_raw(self) -> bool {
+        matches!(self, ObjectKind::Blob | ObjectKind::Chunk)
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             ObjectKind::Blob => "blob",
@@ -110,32 +116,32 @@ impl ObjectHash {
         self.to_hex()[..12].to_string()
     }
 
-    /// Hash raw bytes under the domain separator for `kind`.
+    /// Hash `bytes` as an object of `kind` (see [`ObjectHash::hasher`]).
     pub fn digest(kind: ObjectKind, bytes: &[u8]) -> Self {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"rill:");
-        hasher.update(kind.as_str().as_bytes());
-        hasher.update(b":");
+        let mut hasher = Self::hasher(kind);
         hasher.update(bytes);
-        ObjectHash(*hasher.finalize().as_bytes())
+        hasher.finalize()
     }
 
     /// Hash a large payload using BLAKE3's multithreaded tree hashing.
     pub fn digest_parallel(kind: ObjectKind, bytes: &[u8]) -> Self {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"rill:");
-        hasher.update(kind.as_str().as_bytes());
-        hasher.update(b":");
-        hasher.update_rayon(bytes);
-        ObjectHash(*hasher.finalize().as_bytes())
+        let mut hasher = Self::hasher(kind);
+        hasher.inner.update_rayon(bytes);
+        hasher.finalize()
     }
 
-    /// Streaming hasher for content that does not fit in memory.
+    /// Streaming hasher for objects of `kind`. Raw content (blobs and
+    /// chunks) is plain BLAKE3 of its bytes, the digest REAPI clients
+    /// compute, so build tools and repositories share one store (ADR 016).
+    /// Structured kinds hash `"rill:" ++ kind ++ ":" ++ bytes`, so an
+    /// encoded tree or version can never pass for another kind.
     pub fn hasher(kind: ObjectKind) -> Hasher {
         let mut inner = blake3::Hasher::new();
-        inner.update(b"rill:");
-        inner.update(kind.as_str().as_bytes());
-        inner.update(b":");
+        if !kind.is_raw() {
+            inner.update(b"rill:");
+            inner.update(kind.as_str().as_bytes());
+            inner.update(b":");
+        }
         Hasher { inner }
     }
 
@@ -209,5 +215,18 @@ mod tests {
         let mut h = ObjectHash::hasher(ObjectKind::Blob);
         h.update(b"hel").update(b"lo");
         assert_eq!(h.finalize(), ObjectHash::digest(ObjectKind::Blob, b"hello"));
+    }
+
+    #[test]
+    fn raw_content_hashes_to_the_digest_build_tools_compute() {
+        let bytes = b"fn main() {}\n";
+        let reapi = *blake3::hash(bytes).as_bytes();
+        assert_eq!(ObjectHash::digest(ObjectKind::Blob, bytes).0, reapi);
+        assert_eq!(ObjectHash::digest(ObjectKind::Chunk, bytes).0, reapi);
+        assert_ne!(ObjectHash::digest(ObjectKind::Tree, bytes).0, reapi);
+        assert_ne!(
+            ObjectHash::digest(ObjectKind::Tree, bytes),
+            ObjectHash::digest(ObjectKind::ChangeVersion, bytes)
+        );
     }
 }

@@ -22,13 +22,14 @@ accepted one beyond fixing errors. Status is one of `accepted`,
 | [006](006-workspace-authoritative.md) | The server workspace is authoritative; checkouts are caches | accepted |
 | [007](007-reapi-execution.md) | Execution speaks REAPI v2 with BLAKE3 | accepted |
 | [008](008-derived-data-async.md) | Derived data is asynchronous except a land-critical set | accepted |
-| [009](009-blake3.md) | Keep domain-separated BLAKE3 | accepted |
+| [009](009-blake3.md) | Keep domain-separated BLAKE3 | superseded by 016 for raw content |
 | [010](010-multi-tenancy.md) | Multi-tenancy is built into the keyspace | accepted |
 | [011](011-idempotent-api.md) | Every mutation is idempotent; every list is paginated | accepted |
 | [012](012-rust-server-generated-clients.md) | Rust on the server; generated clients elsewhere | accepted |
 | [013](013-p256-envelope-token-keys.md) | P-256 everywhere, with token keys wrapped by a key service | accepted |
 | [014](014-objects-per-organization.md) | Objects are stored and deduplicated per organization | accepted |
 | [015](015-reuse-open-source.md) | Reuse mature open source; build only what is Rill's | accepted |
+| [016](016-plain-blake3-for-content.md) | Raw content is plain BLAKE3 | accepted |
 
 ## Template
 

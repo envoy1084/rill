@@ -34,9 +34,13 @@ flowchart TD
 ## Hashing
 
 `ObjectHash` is 32 bytes, shown as hex (`short()` is the first 12 hex
-characters). `ObjectHash::digest(kind, bytes)` is BLAKE3 over
-`"rill:" ++ kind.as_str() ++ ":" ++ bytes`. The `ObjectKind` is a domain
-separator, so equal bytes stored as different kinds never collide.
+characters). For raw content (`Blob`, `Chunk`; `ObjectKind::is_raw`),
+`ObjectHash::digest(kind, bytes)` is plain BLAKE3 of the bytes, the digest
+REAPI clients compute, so repository content and the execution CAS share
+one store ([ADR 016](../10-decisions/016-plain-blake3-for-content.md)).
+Structured kinds hash `"rill:" ++ kind.as_str() ++ ":" ++ bytes`, so an
+encoded tree, manifest or version never collides with another structured
+kind, and objects are always addressed by `(kind, hash)`.
 
 | `ObjectKind` | `as_str()` | What it names |
 | --- | --- | --- |
