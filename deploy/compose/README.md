@@ -6,7 +6,7 @@ running every role behind nginx, Prometheus and Grafana with the
 dashboards from `../grafana`.
 
 ```sh
-docker build -t rill:dev ../..
+docker build -f ../docker/Dockerfile -t rill:dev ../..
 docker compose up -d
 export RILL_ENDPOINT=http://localhost:7470
 export RILL_TOKEN=$(docker compose exec rill1 \

@@ -3,7 +3,7 @@
 # The rill image: one binary, every role (`rill api --roles ...`), with
 # FoundationDB client support. Multi-arch (amd64, arm64).
 #
-#   docker build -t rill .
+#   docker build -f deploy/docker/Dockerfile -t rill .   (from the repository root)
 #   docker run rill api --config /etc/rill/rill.toml
 
 ARG RUST_VERSION=1.99

@@ -1,4 +1,4 @@
-# The rill image (see the Dockerfile at the repository root).
+# The rill image (built from deploy/docker/Dockerfile).
 image:
   repository: rill
   tag: dev

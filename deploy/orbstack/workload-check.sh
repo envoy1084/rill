@@ -6,7 +6,7 @@
 #
 #   KUBE_CONTEXT=orbstack deploy/orbstack/workload-check.sh
 #
-# Needs the rill:dev image (docker build -t rill:dev .), a debug or release
+# Needs the rill:dev image (docker build -f deploy/docker/Dockerfile -t rill:dev .), a debug or release
 # `rill` binary, and a cluster that can reach the host as
 # host.orb.internal (OrbStack). Refuses any context but the one named.
 set -euo pipefail
