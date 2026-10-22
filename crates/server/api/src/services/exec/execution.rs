@@ -19,7 +19,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
-use super::access::{admit, ExecCaller};
+use super::access::{admit, spend_execution, ExecCaller};
 use super::operations::{cached, operation_of};
 use super::service::ExecSvc;
 
@@ -59,6 +59,7 @@ impl Execution for ExecSvc {
             }
         }
         check_inputs(&caller, &action).await?;
+        spend_execution(&self.state, &caller.ctx).await?;
         let platform = match action.platform.clone() {
             Some(p) => Some(p),
             None => command_platform(&caller.space, &action).await?,
@@ -218,11 +219,13 @@ fn follow(state: Arc<AppState>, space: ExecSpace, id: String) -> OperationStream
                     return;
                 }
             }
-            if let Err(e) = state
-                .exec
-                .wait_operation(&space, &id, seen, KEEPALIVE)
-                .await
-            {
+            // A stopping server ends its streams; clients resume with
+            // WaitExecution on another server.
+            let waited = tokio::select! {
+                _ = state.lifecycle.stop.cancelled() => return,
+                waited = state.exec.wait_operation(&space, &id, seen, KEEPALIVE) => waited,
+            };
+            if let Err(e) = waited {
                 let _ = tx.send(Err(Status::from(Error::from(e)))).await;
                 return;
             }

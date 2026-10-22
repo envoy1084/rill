@@ -63,3 +63,39 @@ pub async fn admit<T>(
         worker: worker || state.dev_mode(),
     })
 }
+
+/// The daily budget metric remote executions spend.
+pub const EXECUTIONS: &str = "executions";
+
+/// Spend one of a registered agent's daily executions; refused once they
+/// are spent. Everyone else has no such budget.
+pub async fn spend_execution(state: &AppState, ctx: &AuthContext) -> Result<()> {
+    let Some(limit) = ctx
+        .scope
+        .as_ref()
+        .and_then(|s| s.budgets.executions_per_day)
+    else {
+        return Ok(());
+    };
+    let day = rill_store::repo::day_of(rill_types::Timestamp::now());
+    let identity = state.stores.identity();
+    for _ in 0..8 {
+        let Some(tx) = identity
+            .spend(&ctx.principal, EXECUTIONS, day, limit)
+            .await?
+        else {
+            return Err(Error::Exhausted(format!(
+                "agent {} has run its {limit} remote executions for today",
+                ctx.principal
+            )));
+        };
+        match state.stores.meta.transact(tx).await {
+            Ok(_) => return Ok(()),
+            Err(e) if e.is_conflict() => continue,
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Err(Error::Unavailable(
+        "execution budget contended; retry".into(),
+    ))
+}

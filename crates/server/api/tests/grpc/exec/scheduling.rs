@@ -185,6 +185,6 @@ async fn a_progress_report_keeps_the_worker_on_its_action() {
              even for the same action, makes a Buildbarn worker restart it"
         );
     }
-    pending.abort();
+    drop(pending);
     server.stop().await;
 }

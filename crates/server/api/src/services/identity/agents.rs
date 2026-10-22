@@ -35,6 +35,7 @@ pub fn agent_proto(a: &AgentRecord) -> pb::Agent {
                 versions_per_day: a.budgets.versions_per_day,
                 lands_per_day: a.budgets.lands_per_day,
                 requests_per_minute: a.budgets.requests_per_minute,
+                executions_per_day: a.budgets.executions_per_day,
             }),
             workloads: a
                 .workloads
@@ -86,6 +87,7 @@ fn from_spec(spec: pb::AgentSpec, created_by: &Principal, now: Timestamp) -> Res
             versions_per_day: budgets.versions_per_day,
             lands_per_day: budgets.lands_per_day,
             requests_per_minute: budgets.requests_per_minute,
+            executions_per_day: budgets.executions_per_day,
         },
         workloads: spec
             .workloads

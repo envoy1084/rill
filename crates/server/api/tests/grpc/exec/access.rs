@@ -88,3 +88,33 @@ async fn only_workers_write_the_action_cache_and_narrow_tokens_need_execute() {
     );
     server.stop().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_agent_runs_only_its_daily_executions() {
+    let dir = tempfile::tempdir().unwrap();
+    let secrets = dir.path().join("workers");
+    std::fs::write(&secrets, "s3cret\n").unwrap();
+    let stores = rill_store::Stores::memory();
+    crate::common::register_bot(
+        &stores,
+        rill_types::identity::AgentBudgets {
+            executions_per_day: Some(1),
+            ..Default::default()
+        },
+    )
+    .await;
+    let server = TestServer::start_on(config(&secrets), stores).await;
+    let bot = server.token_for(&Principal::agent("bot"));
+    let mut exec = exec_clients(&server, Some(&bot)).await;
+    let first = upload_action(&mut exec, &["first"]).await;
+    let second = upload_action(&mut exec, &["second"]).await;
+    let request = |action| rill_reapi_proto::reapi::ExecuteRequest {
+        action_digest: Some(action),
+        ..Default::default()
+    };
+    let queued = exec.execution.execute(request(first)).await.unwrap();
+    let err = exec.execution.execute(request(second)).await.unwrap_err();
+    assert_eq!(err.code(), Code::ResourceExhausted, "{err}");
+    drop(queued);
+    server.stop().await;
+}

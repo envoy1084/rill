@@ -3598,16 +3598,19 @@ dependencies = [
  "parking_lot",
  "postcard",
  "prost 0.14.4",
+ "prost-types 0.14.4",
  "rand 0.10.3",
  "reqwest",
  "rill-core",
  "rill-events",
+ "rill-exec",
  "rill-identity",
  "rill-jobs",
  "rill-lander",
  "rill-merge-syntax",
  "rill-policy",
  "rill-proto",
+ "rill-reapi-proto",
  "rill-review",
  "rill-runtime",
  "rill-search",
@@ -3668,11 +3671,19 @@ name = "rill-exec"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "blake3",
  "bytes",
  "dashmap",
+ "futures",
+ "hex",
  "landlock",
  "libc",
+ "parking_lot",
+ "prost 0.14.4",
+ "prost-types 0.14.4",
  "rill-core",
+ "rill-jobs",
+ "rill-reapi-proto",
  "rill-store",
  "rill-types",
  "seccompiler",
@@ -3681,6 +3692,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "toml 1.1.8+spec-1.1.0",
+ "tonic",
  "tracing",
 ]
 
@@ -3733,7 +3745,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
- "rand 0.10.3",
  "rill-store",
  "rill-types",
  "serde",
@@ -3816,6 +3827,19 @@ dependencies = [
  "protox",
  "rill-types",
  "thiserror 2.0.21",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+]
+
+[[package]]
+name = "rill-reapi-proto"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "prost 0.14.4",
+ "prost-types 0.14.4",
+ "protox",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",

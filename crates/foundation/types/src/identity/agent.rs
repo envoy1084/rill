@@ -68,6 +68,8 @@ pub struct AgentBudgets {
     pub versions_per_day: Option<u64>,
     pub lands_per_day: Option<u64>,
     pub requests_per_minute: Option<u64>,
+    /// Actions it may run on remote execution per day (cache hits are free).
+    pub executions_per_day: Option<u64>,
 }
 
 /// A registered agent.

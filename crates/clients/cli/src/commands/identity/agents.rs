@@ -14,7 +14,7 @@ use crate::Result;
 #[derive(Subcommand, Debug)]
 pub enum AgentCmd {
     /// Register an agent.
-    Register(RegisterArgs),
+    Register(Box<RegisterArgs>),
     /// The org's agents (or those you sponsor).
     List(OrgArg),
     /// Suspend an agent.
@@ -56,6 +56,9 @@ pub struct RegisterArgs {
     /// Requests it may make per minute, per server.
     #[arg(long)]
     pub requests_per_minute: Option<u64>,
+    /// Actions it may run on remote execution per day.
+    #[arg(long)]
+    pub executions_per_day: Option<u64>,
     /// The organization.
     #[command(flatten)]
     pub org: OrgArg,
@@ -170,6 +173,7 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                         versions_per_day: a.versions_per_day,
                         lands_per_day: a.lands_per_day,
                         requests_per_minute: a.requests_per_minute,
+                        executions_per_day: a.executions_per_day,
                     }),
                     workloads,
                     expires_at: None,

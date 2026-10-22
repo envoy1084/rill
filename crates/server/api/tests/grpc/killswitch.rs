@@ -3,10 +3,11 @@
 use rill_identity::keys::KeyServiceConfig;
 use rill_proto::rill::v1::identity_service_client::IdentityServiceClient;
 use rill_runtime::config::IdentityConfig;
-use rill_types::identity::{AccountStatus, AgentBudgets, AgentRecord, Sponsor, UserRecord};
-use rill_types::{Principal, Timestamp};
+use rill_types::identity::AgentBudgets;
+use rill_types::Principal;
 
 use super::*;
+use crate::common::register_bot;
 
 fn config() -> ServerConfig {
     ServerConfig {
@@ -20,56 +21,6 @@ fn config() -> ServerConfig {
         },
         ..ServerConfig::default()
     }
-}
-
-async fn setup(stores: &rill_store::Stores, budgets: AgentBudgets) {
-    stores.ensure_default_org().await.unwrap();
-    let root = Principal::human("root");
-    let now = Timestamp::now();
-    stores
-        .identity()
-        .create_user(
-            &UserRecord {
-                org: "default".into(),
-                principal: Principal::human("ann"),
-                email: None,
-                display_name: None,
-                external: vec![],
-                status: AccountStatus::Active,
-                roles: vec![],
-                teams: vec![],
-                scim_id: None,
-                external_id: None,
-                created_at: now,
-                updated_at: now,
-            },
-            &root,
-        )
-        .await
-        .unwrap();
-    stores
-        .identity()
-        .create_agent(
-            &AgentRecord {
-                org: "default".into(),
-                principal: Principal::agent("bot"),
-                sponsor: Sponsor::User("ann".into()),
-                purpose: "tests".into(),
-                repos: vec!["*".into()],
-                paths: vec![],
-                models: vec![],
-                budgets,
-                workloads: vec![],
-                status: AccountStatus::Active,
-                expires_at: None,
-                created_by: root.clone(),
-                created_at: now,
-                updated_at: now,
-            },
-            &root,
-        )
-        .await
-        .unwrap();
 }
 
 /// A repository `r` the agent may write.
@@ -115,7 +66,7 @@ fn edit(i: usize) -> pb::ApplyEditsRequest {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_daily_version_budget_is_never_exceeded() {
     let stores = rill_store::Stores::memory();
-    setup(
+    register_bot(
         &stores,
         AgentBudgets {
             versions_per_day: Some(5),
@@ -144,7 +95,7 @@ async fn a_daily_version_budget_is_never_exceeded() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_request_rate_budget_refuses_the_excess() {
     let stores = rill_store::Stores::memory();
-    setup(
+    register_bot(
         &stores,
         AgentBudgets {
             requests_per_minute: Some(3),
@@ -179,7 +130,7 @@ async fn a_request_rate_budget_refuses_the_excess() {
 #[tokio::test(flavor = "multi_thread")]
 async fn killing_an_agent_ejects_its_queued_landing() {
     let stores = rill_store::Stores::memory();
-    setup(&stores, AgentBudgets::default()).await;
+    register_bot(&stores, AgentBudgets::default()).await;
     // Requests queue on a server without the lander.
     let mut api_only = config();
     api_only.roles.workers = false;
