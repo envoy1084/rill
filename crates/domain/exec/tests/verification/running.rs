@@ -53,6 +53,23 @@ async fn a_failing_step_is_red_with_the_end_of_its_output() {
 }
 
 #[tokio::test]
+async fn on_trunk_every_failing_step_is_reported_not_only_the_first() {
+    let fx = Fixture::new().await;
+    let plan = "[[step]]\nname = \"fast\"\ncommand = [\"sh\", \"-c\", \"exit 1\"]\n\n\
+                [[step]]\nname = \"slow\"\ncommand = [\"sh\", \"-c\", \"sleep 1; exit 2\"]\n";
+    let root = fx.tree(None, &[("PLAN", plan)]).await;
+    let outcome = fx.verify_at(root, None, true).await;
+    let failed: Vec<_> = outcome
+        .steps
+        .iter()
+        .filter(|s| !s.status.is_ok())
+        .map(|s| s.step.as_str())
+        .collect();
+    assert_eq!(failed.len(), 2, "{}", outcome.summary());
+    assert!(failed.contains(&"fast") && failed.contains(&"slow"));
+}
+
+#[tokio::test]
 async fn a_step_sees_only_its_inputs_so_other_edits_keep_its_cache() {
     let fx = Fixture::new().await;
     let plan = r#"

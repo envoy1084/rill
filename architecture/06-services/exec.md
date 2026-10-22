@@ -125,8 +125,10 @@ and `nextest --partition` scripts read.
 3. for each action, returns the cached result if the space's action cache
    has one, otherwise submits it to the scheduler as `verify:<repo>` and
    waits on the operation's update counter;
-4. stops at the first step that does not pass, and keeps the last 4 KiB of
-   its standard error (or output) as the excerpt.
+4. before landing, stops at the first step that does not pass; on trunk
+   (post-land) waits for every step, so each failing step is known and a
+   second break is not hidden behind the first. It keeps the last 4 KiB of
+   the first failure's standard error (or output) as the excerpt.
 
 `VerificationOutcome { green, steps, excerpt, run }` lists each step or shard
 as `Passed`, `Failed { exit_code }`, `TimedOut`, `Error` (the action could

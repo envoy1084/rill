@@ -103,7 +103,8 @@ impl PlanRunner {
     }
 
     /// Verify `target` by its own plan. A tree without a plan is green;
-    /// the first failing step ends verification.
+    /// before landing the first failing step ends verification, on trunk
+    /// every step runs.
     pub async fn verify(&self, target: &Target) -> Result<VerificationOutcome> {
         let Some(plan) = load_plan(&self.trees, target.root).await? else {
             return Ok(VerificationOutcome {
@@ -223,15 +224,18 @@ impl PlanRunner {
                 });
             }
         }
+        // Before landing the first failure decides; on trunk every failing
+        // step is wanted, so a second break is not hidden behind the first.
+        let mut green = true;
         while let Some(result) = running.next().await {
             let result = result?;
-            let ok = result.status.is_ok();
+            green &= result.status.is_ok();
             steps.push(result);
-            if !ok {
-                return self.finish(false, steps, &progress).await;
+            if !green && !target.trunk {
+                break;
             }
         }
-        self.finish(true, steps, &progress).await
+        self.finish(green, steps, &progress).await
     }
 
     /// The build targets `target` affects against its base: every target
