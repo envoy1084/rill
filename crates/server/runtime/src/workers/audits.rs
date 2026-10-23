@@ -75,12 +75,13 @@ impl Consumer for Sampler {
         if assignees.is_empty() {
             assignees.insert("owners".into());
         }
+        let assignees_list: Vec<String> = assignees.into_iter().collect();
         let opened = review
             .open_audit(&Audit {
                 seq: *seq,
                 change: *change,
                 version: *version,
-                assignees: assignees.into_iter().collect(),
+                assignees: assignees_list.clone(),
                 risk: landing.risk,
                 status: AuditStatus::Pending,
                 sampled_at: Timestamp::now(),
@@ -91,6 +92,20 @@ impl Consumer for Sampler {
             .await?;
         if opened {
             tracing::info!(repo = %ctx.config.name, seq = seq.0, "landing sampled for audit");
+            let m = crate::notify::Message::new(
+                format!(
+                    "Audit trunk@{} in {}: it landed on agent review alone",
+                    seq.0, ctx.config.name
+                ),
+                format!("rill review audit trunk@{} --pass|--fail", seq.0),
+            );
+            crate::notify::notify_people(
+                ctx,
+                &assignees_list,
+                Some(crate::notify::Topic::Audits),
+                &m,
+            )
+            .await?;
         }
         Ok(())
     }

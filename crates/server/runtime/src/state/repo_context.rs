@@ -64,7 +64,9 @@ pub struct RepoContext {
     pub(super) review_events: broadcast::Sender<ReviewEvent>,
     /// Teams and sponsors for review.
     pub(super) directory: Arc<dyn rill_policy::Directory>,
-    pub(super) server_config: Arc<ServerConfig>,
+    pub(crate) server_config: Arc<ServerConfig>,
+    /// The execution scheduler, which also keeps the org's secrets.
+    pub exec: Arc<rill_exec::remote::Scheduler>,
     /// Signs an attestation for every committed version.
     pub attestor: Arc<rill_policy::Signer>,
     pub(super) index_requests: super::index_requests::IndexRequests,

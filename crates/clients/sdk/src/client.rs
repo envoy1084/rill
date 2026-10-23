@@ -11,10 +11,10 @@ use http::{HeaderValue, Uri};
 use rill_proto::rill::v1::{
     AccessServiceClient, AdminServiceClient, AttentionServiceClient, AuditServiceClient,
     ChangeServiceClient, ChecksServiceClient, ContentServiceClient, EventServiceClient,
-    IdentityServiceClient, IntentServiceClient, LandingServiceClient, OperationServiceClient,
-    OrgServiceClient, PolicyServiceClient, ProtectionServiceClient, RepoServiceClient,
-    ReviewServiceClient, ReviewerServiceClient, SecretServiceClient, SessionServiceClient,
-    TrunkServiceClient, WorkspaceServiceClient,
+    IdentityServiceClient, IntentServiceClient, LandingServiceClient, NotificationServiceClient,
+    OperationServiceClient, OrgServiceClient, PolicyServiceClient, ProtectionServiceClient,
+    RepoServiceClient, ReviewServiceClient, ReviewerServiceClient, SecretServiceClient,
+    SessionServiceClient, TrunkServiceClient, WorkspaceServiceClient,
 };
 
 use crate::access::AccessClient;
@@ -200,6 +200,8 @@ pub type WorkspaceSvc = WorkspaceServiceClient<Transport>;
 pub type ReviewSvc = ReviewServiceClient<Transport>;
 /// Generated intent client over the SDK transport.
 pub type IntentSvc = IntentServiceClient<Transport>;
+/// Generated notification client over the SDK transport.
+pub type NotificationSvc = NotificationServiceClient<Transport>;
 /// Generated attention client over the SDK transport.
 pub type AttentionSvc = AttentionServiceClient<Transport>;
 /// Generated reviewer-fleet client over the SDK transport.
@@ -484,6 +486,11 @@ impl Client {
     /// A fresh generated intent client.
     pub fn intent_svc(&self) -> IntentSvc {
         IntentServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated notification client.
+    pub fn notification_svc(&self) -> NotificationSvc {
+        NotificationServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated attention client.

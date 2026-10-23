@@ -26,6 +26,7 @@ pub mod intent_scope;
 pub mod land;
 pub mod log;
 pub mod man;
+pub mod notify;
 pub mod org;
 pub mod owners;
 pub mod policy;

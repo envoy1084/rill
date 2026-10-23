@@ -175,6 +175,23 @@ impl Scheduler {
         Ok(None)
     }
 
+    /// The value of `org`'s secret `name` for the server's own use on
+    /// behalf of `repo` (signing its webhooks): refused when the secret is
+    /// missing or limited to other repositories.
+    pub async fn server_secret(&self, org: &str, name: &str, repo: &str) -> Result<Vec<u8>> {
+        if let Some(why) = self
+            .secret_refusal(org, &[name.to_string()], repo, true)
+            .await?
+        {
+            return Err(Error::InvalidAction(why));
+        }
+        Ok(self
+            .open_secrets(org, &[name.to_string()])
+            .await?
+            .remove(0)
+            .1)
+    }
+
     /// The values of `names` in `org`; a missing secret is an error.
     pub(crate) async fn open_secrets(
         &self,

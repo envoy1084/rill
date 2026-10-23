@@ -96,7 +96,12 @@ pub async fn blob_edit(server: &TestServer, path: &str, bytes: Vec<u8>) -> pb::E
 
 impl Acl {
     pub async fn start() -> Self {
-        let server = TestServer::start(ServerConfig::default()).await;
+        Self::start_with(ServerConfig::default()).await
+    }
+
+    /// [`Acl::start`] on a server with `config`.
+    pub async fn start_with(config: ServerConfig) -> Self {
+        let server = TestServer::start(config).await;
         let owner = clients(&server, Some(&server.token_for(&alice()))).await;
         owner
             .repo

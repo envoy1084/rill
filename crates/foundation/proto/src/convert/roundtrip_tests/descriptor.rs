@@ -26,6 +26,7 @@ fn descriptor_set_declares_every_service() {
             "IdentityService",
             "IntentService",
             "LandingService",
+            "NotificationService",
             "OperationService",
             "OrgService",
             "PolicyService",

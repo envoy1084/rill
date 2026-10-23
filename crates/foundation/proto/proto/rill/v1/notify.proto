@@ -1,0 +1,112 @@
+// Notifications: a repository's webhooks (every event of chosen kinds,
+// signed per Standard Webhooks), and each person's channels (Slack,
+// Teams, email) for what concerns them, plus daily digests.
+//
+// A webhook is `orgs/{org}/repos/{repo}/webhooks/{webhook}`.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+// Webhooks and notification preferences.
+service NotificationService {
+  // The repository's webhooks (repository owners).
+  rpc ListWebhooks(ListWebhooksRequest) returns (ListWebhooksResponse);
+  // Add a webhook (repository owners).
+  rpc CreateWebhook(CreateWebhookRequest) returns (CreateWebhookResponse);
+  // Remove a webhook (repository owners).
+  rpc DeleteWebhook(DeleteWebhookRequest) returns (DeleteWebhookResponse);
+  // The caller's preferences in a repository.
+  rpc GetNotificationPrefs(GetNotificationPrefsRequest) returns (GetNotificationPrefsResponse);
+  // Replace the caller's preferences in a repository.
+  rpc UpdateNotificationPrefs(UpdateNotificationPrefsRequest) returns (UpdateNotificationPrefsResponse);
+  // Send a test message to each of the caller's channels.
+  rpc SendTestNotification(SendTestNotificationRequest) returns (SendTestNotificationResponse);
+}
+
+message Webhook {
+  // `…/webhooks/{webhook}`. Output only.
+  string name = 1;
+  // `https://` (or `http://` where the server allows it).
+  string url = 2;
+  // The org secret whose value signs deliveries; empty for unsigned.
+  string secret = 3;
+  // Event kinds (`landed`, `review_submitted`, …); empty is every event.
+  repeated string events = 4;
+  // Output only.
+  Principal created_by = 5;
+  // Output only.
+  int64 created_at = 6;
+}
+
+message ListWebhooksRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+}
+message ListWebhooksResponse {
+  repeated Webhook webhooks = 1;
+}
+
+message CreateWebhookRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  Webhook webhook = 3;
+}
+message CreateWebhookResponse {
+  Webhook webhook = 1;
+}
+
+message DeleteWebhookRequest {
+  string request_id = 1;
+  // `…/webhooks/{webhook}`. Required.
+  string name = 2;
+}
+message DeleteWebhookResponse {}
+
+message NotificationChannel {
+  oneof channel {
+    // A Slack incoming-webhook URL.
+    string slack = 1;
+    // A Microsoft Teams incoming-webhook URL.
+    string teams = 2;
+    // An email address.
+    string email = 3;
+  }
+}
+
+message NotificationPrefs {
+  repeated NotificationChannel channels = 1;
+  // `addressed`, `own_changes`, `audits`; empty is all.
+  repeated string topics = 2;
+  // A daily digest of the intents the caller owns.
+  bool digest = 3;
+}
+
+message GetNotificationPrefsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+}
+message GetNotificationPrefsResponse {
+  NotificationPrefs prefs = 1;
+}
+
+message UpdateNotificationPrefsRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  NotificationPrefs prefs = 3;
+}
+message UpdateNotificationPrefsResponse {
+  NotificationPrefs prefs = 1;
+}
+
+message SendTestNotificationRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+}
+message SendTestNotificationResponse {
+  // Deliveries queued.
+  uint32 queued = 1;
+}

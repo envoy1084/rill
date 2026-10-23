@@ -246,6 +246,9 @@ pub enum Command {
     /// Code owners: who owns a path, and a change's standing with them.
     #[command(subcommand)]
     Owners(crate::commands::owners::OwnersCmd),
+    /// Webhooks and where your notifications go.
+    #[command(subcommand)]
+    Notify(crate::commands::notify::NotifyCmd),
     /// Submit rules in force, simulating a candidate, org guardrails.
     #[command(subcommand)]
     Policy(crate::commands::policy::PolicyCmd),

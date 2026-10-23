@@ -73,6 +73,8 @@ day, the intent's changes that:
 - of those, were sampled for audit;
 - are still in review.
 
+People who ask get it daily ([notifications](../07-runtime/notifications.md#personal-notifications)).
+
 ## Limitations
 
 - The inbox scans the repository's reviews and intents on each call.

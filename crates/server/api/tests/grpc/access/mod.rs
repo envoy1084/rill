@@ -7,6 +7,7 @@ mod holes;
 mod intents;
 mod matrix;
 mod mechanics;
+mod notifications;
 mod owners;
 mod policy_code;
 mod raw;

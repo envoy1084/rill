@@ -46,6 +46,7 @@ defaults with a comment header that lists every alternative.
 | `[risk]` | `RiskConfig::default()` | risk rules, used when a repository has no stored `risk` policy |
 | `[labels]` | `LabelSet::default()` | vote labels for every repository |
 | `[verify]` | `enabled = false`, `platform = {}`, `env = { PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }`, `retention_days = 30`, `[verify.flakes]` `rerun_above_permille = 200`, `reruns = 2`, `quarantine_above_permille = 500`, `quarantine_flips = 5` | `.rill/verify.toml` runs through the execution scheduler before and after landing, each step asking for `platform` plus its own properties and getting `env` beneath its own (workers give a command only its action's environment, so this is its `PATH`; `rill dev` uses the server's own `PATH`); runs (and so their logs and artifacts) stay readable `retention_days`; failures of flaky targets are re-run and chronic flakes quarantined per `flakes` ([checks](../06-services/checks.md#re-runs-and-quarantine)); when disabled the lander uses `AlwaysGreen` ([exec](../06-services/exec.md), [checks](../06-services/checks.md)) |
+| `[notify]` | `smtp_url` (none), `from = "rill@localhost"`, `allow_insecure_urls = false`, `digest_hour_utc = 8` | email transport, sender, whether `http://` webhook and chat URLs are accepted, when daily digests go out ([notifications](notifications.md)) |
 | `[exec]` | `enabled = true`, `worker_secret_file` (none), `idle_wait_secs = 5`, `report_every_secs = 10`, `lease_secs = 45`, `max_attempts = 3`, `default_timeout_secs = 1800`, `max_timeout_secs = 7200`, `probe_per_mille = 20` | remote execution: REAPI services, worker secrets (one per line, presented as `Bearer rwk_<secret>`), worker protocol timings, action timeouts, the share of cached results re-run as hermeticity probes ([remote execution](../06-services/remote-execution.md)) |
 | `[exec.local]` | `workers = 0`, `sandbox = "local"` (or `confined`, `gvisor`), `network = false`, `runsc = "runsc"`, `platform = {}` | execution workers inside the server (workers role), one action each, for development and single hosts |
 | `[rate_limit]` | `per_principal_per_sec = 1000`, `burst = 2000` | per-principal token bucket on every authenticated request; 0 turns it off ([rate limits](api-surface.md#rate-limits)) |
@@ -185,4 +186,4 @@ startup. In dev mode:
 * [rill-lander/src/config.rs](../../crates/domain/lander/src/config.rs)
 
 ---
-← Previous: [Events and workers](events-and-workers.md) · [Index](../index.md) · Next: [Observability](observability.md) →
+← Previous: [Notifications](notifications.md) · [Index](../index.md) · Next: [Observability](observability.md) →

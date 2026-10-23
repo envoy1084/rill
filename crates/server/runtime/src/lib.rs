@@ -7,6 +7,7 @@
 //! * [`state`]: shared state and lazily built per-repository contexts;
 //! * [`workers`]: background tasks;
 //! * [`fleet`]: the reviewer fleet's queues;
+//! * [`notify`]: webhooks and personal notifications;
 //! * [`identity`]: token keys, revocations and callers as this server sees them;
 //! * [`audit`]: the audit log's projection, seals and denials;
 //! * [`secrets`], [`quarantine`], [`writes`]: checks every stored version passes;
@@ -19,6 +20,7 @@ pub mod error;
 pub mod exec;
 pub mod fleet;
 pub mod identity;
+pub mod notify;
 pub mod quarantine;
 pub mod rate;
 pub mod secrets;

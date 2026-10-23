@@ -84,29 +84,30 @@ Read in this order the first time; each page ends with Previous / Next links.
 44. [API surface](07-runtime/api-surface.md)
 45. [API reference](07-runtime/api-reference.md)
 46. [Events and workers](07-runtime/events-and-workers.md)
-47. [Configuration](07-runtime/configuration.md)
-48. [Observability](07-runtime/observability.md)
-49. [Cache tier](07-runtime/cache.md)
+47. [Notifications](07-runtime/notifications.md)
+48. [Configuration](07-runtime/configuration.md)
+49. [Observability](07-runtime/observability.md)
+50. [Cache tier](07-runtime/cache.md)
 
 **08 Clients**
 
-50. [SDK](08-clients/sdk.md)
-51. [SDKs in other languages](08-clients/other-sdks.md)
-52. [Client daemon](08-clients/daemon.md)
-53. [CLI](08-clients/cli.md)
-54. [MCP server](08-clients/mcp.md)
-55. [IDE extensions](08-clients/ide.md)
+51. [SDK](08-clients/sdk.md)
+52. [SDKs in other languages](08-clients/other-sdks.md)
+53. [Client daemon](08-clients/daemon.md)
+54. [CLI](08-clients/cli.md)
+55. [MCP server](08-clients/mcp.md)
+56. [IDE extensions](08-clients/ide.md)
 
 **09 Engineering**
 
-56. [Development](09-engineering/development.md)
-57. [Testing](09-engineering/testing.md)
-58. [Simulation](09-engineering/simulation.md)
-59. [Performance](09-engineering/performance.md)
+57. [Development](09-engineering/development.md)
+58. [Testing](09-engineering/testing.md)
+59. [Simulation](09-engineering/simulation.md)
+60. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-60. [Architecture decisions](10-decisions/README.md): the twenty ADRs that
+61. [Architecture decisions](10-decisions/README.md): the twenty ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -130,6 +131,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Labels, votes, threads | [Review](04-workflow/review.md) |
 | Who must approve which paths, escalation | [Code owners](04-workflow/ownership.md) |
 | What needs a human: inbox, audits, batch review, digests | [Human attention](04-workflow/attention.md) |
+| Webhooks, Slack, Teams, email | [Notifications](07-runtime/notifications.md) |
 | How trunk moves and sequence numbers are assigned | [Landing](04-workflow/landing.md) |
 | Bisect and automatic revert | [Post-land verification](04-workflow/post-land-verification.md) |
 | Who a caller is and what they may do | [Identity and authentication](05-policy/identity-and-auth.md), [Capability tokens](05-policy/capability-tokens.md), [Token keys](05-policy/token-keys.md), [Permissions](05-policy/permissions.md) |

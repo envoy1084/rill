@@ -12,6 +12,7 @@ mod encryption;
 mod env;
 mod exec;
 mod identity;
+mod notify;
 mod rate_limit;
 mod server;
 mod storage;
@@ -21,6 +22,7 @@ pub use auth::{AuthConfig, StaticToken};
 pub use encryption::EncryptionConfig;
 pub use exec::{ExecConfig, LocalWorkersConfig, SandboxKind};
 pub use identity::{IdentityConfig, LifetimesConfig, RotationConfig};
+pub use notify::NotifyConfig;
 pub use rate_limit::RateLimitConfig;
 pub use server::{
     FlakeConfig, LogFormat, PostLandConfig, Roles, ServerConfig, ShutdownConfig, TelemetryConfig,

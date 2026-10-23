@@ -61,6 +61,11 @@ impl RepoClient {
         IntentClient::new(self.client.clone(), self.resource.clone())
     }
 
+    /// Webhooks and the caller's notification preferences.
+    pub fn notifications(&self) -> crate::notifications::NotificationClient {
+        crate::notifications::NotificationClient::new(self.client.clone(), self.resource.clone())
+    }
+
     /// Human attention: inbox, audits, batch review, digests.
     pub fn attention(&self) -> crate::attention::AttentionClient {
         crate::attention::AttentionClient::new(self.client.clone(), self.resource.clone())

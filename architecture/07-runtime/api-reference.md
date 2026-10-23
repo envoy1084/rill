@@ -16,6 +16,7 @@ revisions, pages, filters, etags, request ids, errors) are in
 - [IdentityService](#rill-v1-IdentityService)
 - [IntentService](#rill-v1-IntentService)
 - [LandingService](#rill-v1-LandingService)
+- [NotificationService](#rill-v1-NotificationService)
 - [OperationService](#rill-v1-OperationService)
 - [OrgService](#rill-v1-OrgService)
 - [PolicyService](#rill-v1-PolicyService)
@@ -4724,6 +4725,208 @@ A request for a change to land.
 | `LAND_STATUS_LANDED` | 3 |  |
 | `LAND_STATUS_FAILED` | 4 |  |
 | `LAND_STATUS_CANCELLED` | 5 |  |
+
+
+
+## rill/v1/notify.proto
+
+Notifications: a repository's webhooks (every event of chosen kinds,
+signed per Standard Webhooks), and each person's channels (Slack,
+Teams, email) for what concerns them, plus daily digests.
+
+A webhook is `orgs/{org}/repos/{repo}/webhooks/{webhook}`.
+
+<a name="rill-v1-NotificationService"></a>
+
+### NotificationService
+
+Webhooks and notification preferences.
+
+| Method | Request | Response | Description |
+| --- | --- | --- | --- |
+| `ListWebhooks` | [ListWebhooksRequest](#rill-v1-ListWebhooksRequest) | [ListWebhooksResponse](#rill-v1-ListWebhooksResponse) | The repository's webhooks (repository owners). |
+| `CreateWebhook` | [CreateWebhookRequest](#rill-v1-CreateWebhookRequest) | [CreateWebhookResponse](#rill-v1-CreateWebhookResponse) | Add a webhook (repository owners). |
+| `DeleteWebhook` | [DeleteWebhookRequest](#rill-v1-DeleteWebhookRequest) | [DeleteWebhookResponse](#rill-v1-DeleteWebhookResponse) | Remove a webhook (repository owners). |
+| `GetNotificationPrefs` | [GetNotificationPrefsRequest](#rill-v1-GetNotificationPrefsRequest) | [GetNotificationPrefsResponse](#rill-v1-GetNotificationPrefsResponse) | The caller's preferences in a repository. |
+| `UpdateNotificationPrefs` | [UpdateNotificationPrefsRequest](#rill-v1-UpdateNotificationPrefsRequest) | [UpdateNotificationPrefsResponse](#rill-v1-UpdateNotificationPrefsResponse) | Replace the caller's preferences in a repository. |
+| `SendTestNotification` | [SendTestNotificationRequest](#rill-v1-SendTestNotificationRequest) | [SendTestNotificationResponse](#rill-v1-SendTestNotificationResponse) | Send a test message to each of the caller's channels. |
+
+
+
+<a name="rill-v1-CreateWebhookRequest"></a>
+
+### CreateWebhookRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `webhook` | [Webhook](#rill-v1-Webhook) |  |  |
+
+
+<a name="rill-v1-CreateWebhookResponse"></a>
+
+### CreateWebhookResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `webhook` | [Webhook](#rill-v1-Webhook) |  |  |
+
+
+<a name="rill-v1-DeleteWebhookRequest"></a>
+
+### DeleteWebhookRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `name` | [string](#string) |  | `…/webhooks/{webhook}`. Required. |
+
+
+<a name="rill-v1-DeleteWebhookResponse"></a>
+
+### DeleteWebhookResponse
+
+
+
+
+<a name="rill-v1-GetNotificationPrefsRequest"></a>
+
+### GetNotificationPrefsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+
+
+<a name="rill-v1-GetNotificationPrefsResponse"></a>
+
+### GetNotificationPrefsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `prefs` | [NotificationPrefs](#rill-v1-NotificationPrefs) |  |  |
+
+
+<a name="rill-v1-ListWebhooksRequest"></a>
+
+### ListWebhooksRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+
+
+<a name="rill-v1-ListWebhooksResponse"></a>
+
+### ListWebhooksResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `webhooks` | [Webhook](#rill-v1-Webhook) | repeated |  |
+
+
+<a name="rill-v1-NotificationChannel"></a>
+
+### NotificationChannel
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `slack` | [string](#string) |  | A Slack incoming-webhook URL. |
+| `teams` | [string](#string) |  | A Microsoft Teams incoming-webhook URL. |
+| `email` | [string](#string) |  | An email address. |
+
+
+<a name="rill-v1-NotificationPrefs"></a>
+
+### NotificationPrefs
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `channels` | [NotificationChannel](#rill-v1-NotificationChannel) | repeated |  |
+| `topics` | [string](#string) | repeated | `addressed`, `own_changes`, `audits`; empty is all. |
+| `digest` | [bool](#bool) |  | A daily digest of the intents the caller owns. |
+
+
+<a name="rill-v1-SendTestNotificationRequest"></a>
+
+### SendTestNotificationRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+
+
+<a name="rill-v1-SendTestNotificationResponse"></a>
+
+### SendTestNotificationResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `queued` | [uint32](#uint32) |  | Deliveries queued. |
+
+
+<a name="rill-v1-UpdateNotificationPrefsRequest"></a>
+
+### UpdateNotificationPrefsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `prefs` | [NotificationPrefs](#rill-v1-NotificationPrefs) |  |  |
+
+
+<a name="rill-v1-UpdateNotificationPrefsResponse"></a>
+
+### UpdateNotificationPrefsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `prefs` | [NotificationPrefs](#rill-v1-NotificationPrefs) |  |  |
+
+
+<a name="rill-v1-Webhook"></a>
+
+### Webhook
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `name` | [string](#string) |  | `…/webhooks/{webhook}`. Output only. |
+| `url` | [string](#string) |  | `https://` (or `http://` where the server allows it). |
+| `secret` | [string](#string) |  | The org secret whose value signs deliveries; empty for unsigned. |
+| `events` | [string](#string) | repeated | Event kinds (`landed`, `review_submitted`, …); empty is every event. |
+| `created_by` | [Principal](#rill-v1-Principal) |  | Output only. |
+| `created_at` | [int64](#int64) |  | Output only. |
+
 
 
 

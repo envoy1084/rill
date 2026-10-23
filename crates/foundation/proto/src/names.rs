@@ -51,6 +51,7 @@ patterns! {
     RUN = "run", "orgs/{org}/repos/{repo}/runs/{run}";
     QUARANTINE = "quarantine", "orgs/{org}/repos/{repo}/quarantines/{target=**}";
     INTENT = "intent", "orgs/{org}/repos/{repo}/intents/{intent}";
+    WEBHOOK = "webhook", "orgs/{org}/repos/{repo}/webhooks/{webhook}";
     AGENT = "agent", "orgs/{org}/agents/{agent}";
     USER = "user", "orgs/{org}/users/{user}";
     IDENTITY_PROVIDER = "identity provider", "orgs/{org}/identityProviders/{provider}";

@@ -178,6 +178,7 @@ impl RepoRegistry {
             review_events,
             directory,
             server_config: self.config.clone(),
+            exec: self.exec.clone(),
             attestor: self.attestor.clone(),
             index_requests: Default::default(),
         })

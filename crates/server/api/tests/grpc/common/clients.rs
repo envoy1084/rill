@@ -4,10 +4,10 @@ use connectrpc::client::{ClientConfig, HttpClient};
 use rill_proto::rill::v1::{
     AccessServiceClient, AdminServiceClient, AttentionServiceClient, AuditServiceClient,
     ChangeServiceClient, ChecksServiceClient, ContentServiceClient, EventServiceClient,
-    IdentityServiceClient, IntentServiceClient, LandingServiceClient, OperationServiceClient,
-    OrgServiceClient, PolicyServiceClient, ProtectionServiceClient, RepoServiceClient,
-    ReviewServiceClient, ReviewerServiceClient, SecretServiceClient, SessionServiceClient,
-    TrunkServiceClient, WorkspaceServiceClient,
+    IdentityServiceClient, IntentServiceClient, LandingServiceClient, NotificationServiceClient,
+    OperationServiceClient, OrgServiceClient, PolicyServiceClient, ProtectionServiceClient,
+    RepoServiceClient, ReviewServiceClient, ReviewerServiceClient, SecretServiceClient,
+    SessionServiceClient, TrunkServiceClient, WorkspaceServiceClient,
 };
 
 use super::server::TestServer;
@@ -101,6 +101,7 @@ authed!(
     ProtectionServiceClient,
     RepoServiceClient,
     ReviewServiceClient,
+    NotificationServiceClient,
     ReviewerServiceClient,
     SecretServiceClient,
     SessionServiceClient,
@@ -128,6 +129,7 @@ pub(crate) struct Clients {
     pub(crate) reviewers: ReviewerServiceClient<Svc>,
     pub(crate) trunk: TrunkServiceClient<Svc>,
     pub(crate) attention: AttentionServiceClient<Svc>,
+    pub(crate) notifications: NotificationServiceClient<Svc>,
 }
 
 pub(crate) async fn clients(server: &TestServer, token: Option<&str>) -> Clients {
@@ -156,7 +158,8 @@ pub(crate) async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
         intents: IntentServiceClient::authed(channel.clone(), bearer.clone()),
         reviewers: ReviewerServiceClient::authed(channel.clone(), bearer.clone()),
         trunk: TrunkServiceClient::authed(channel.clone(), bearer.clone()),
-        attention: AttentionServiceClient::authed(channel, bearer),
+        attention: AttentionServiceClient::authed(channel.clone(), bearer.clone()),
+        notifications: NotificationServiceClient::authed(channel, bearer),
     }
 }
 

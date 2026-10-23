@@ -80,6 +80,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Ref(cmd) => refs::run(ctx, cmd).await,
         Command::Release(cmd) => release::run(ctx, cmd).await,
         Command::Owners(cmd) => crate::commands::owners::run(ctx, cmd).await,
+        Command::Notify(cmd) => crate::commands::notify::run(ctx, cmd).await,
         Command::Policy(cmd) => crate::commands::policy::run(ctx, cmd).await,
         Command::Why(args) => crate::commands::policy::why(ctx, args).await,
         Command::Reviewer(cmd) => crate::commands::reviewer::run(ctx, cmd).await,

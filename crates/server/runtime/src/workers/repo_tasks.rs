@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use super::{
-    audits, calibration, consumer, decisions, deriver, escalation, follower, indexer, intents,
-    reverter, reviewers,
+    audits, calibration, consumer, decisions, deriver, digests, escalation, follower, indexer,
+    intents, notifier, reverter, reviewers,
 };
 use crate::state::RepoContext;
 
@@ -82,6 +82,17 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>, roles: crate::config::Roles) {
         Arc::new(audits::Sampler),
         shutdown.clone(),
     ));
+    ctx.lifecycle.tasks.spawn(consumer::run(
+        ctx.clone(),
+        Arc::new(notifier::Notifier),
+        shutdown.clone(),
+    ));
+    ctx.lifecycle
+        .tasks
+        .spawn(crate::notify::jobs::run(ctx.clone(), shutdown.clone()));
+    ctx.lifecycle
+        .tasks
+        .spawn(digests::run(ctx.clone(), shutdown.clone()));
     ctx.lifecycle
         .tasks
         .spawn(indexer::run(ctx.clone(), shutdown));

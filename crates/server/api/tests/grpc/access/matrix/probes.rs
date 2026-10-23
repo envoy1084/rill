@@ -116,6 +116,11 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
             ..Default::default()
         }
         .encode_to_vec(),
+        "NotificationService/DeleteWebhook" => pb::DeleteWebhookRequest {
+            name: format!("{}/webhooks/probe", repo()),
+            ..Default::default()
+        }
+        .encode_to_vec(),
         "ReviewService/ApplySuggestion" => pb::ApplySuggestionRequest {
             thread: format!(
                 "{}/changes/{}/review/threads/probe",

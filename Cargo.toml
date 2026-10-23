@@ -105,6 +105,10 @@ aes-gcm = "0.11.1"
 samael = "0.0.22"
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs", "use_pem"] }
 sha2 = "0.10.9"
+# Standard Webhooks signatures (HMAC-SHA256); matches sha2 0.10.
+hmac = "=0.12.1"
+# Email notifications over SMTP (or files, for tests).
+lettre = { version = "=0.11.23", default-features = false, features = ["builder", "smtp-transport", "hostname", "pool", "tokio1", "tokio1-rustls", "rustls-native-certs", "aws-lc-rs", "file-transport"] }
 keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
 base64 = "0.23.1"
 aws-config = { version = "1.13.0", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio", "credentials-process", "sso"] }
