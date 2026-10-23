@@ -67,9 +67,10 @@ do not introduce v2 names or compatibility shims. The roadmap's "v2" means
   races a vote). Name tests for the behavior they guard
   (`partial_resolution_keeps_remaining_conflict`), not the function.
 * Units live next to the code (`#[cfg(test)] mod tests`); cross-module
-  behavior lives in the crate's `tests/`, grouped by topic
-  (`tests/merge/`, `tests/workflow/`) with shared fixtures in
-  `tests/common/`.
+  behavior lives in the crate's one integration-test binary,
+  `tests/<name>/main.rs`, a module per topic (`tests/<name>/merge.rs`)
+  with shared fixtures in `tests/<name>/common/`. Do not add a test
+  binary per file: each links the whole dependency tree.
 * **Every bug fix adds a test** that fails before the fix.
 
 ## Commits
@@ -158,7 +159,7 @@ env) and runs the store conformance suite and the end-to-end server test
 with the `fdb` feature. Keep it that small; anything else is run locally or
 added only when it catches real problems.
 
-The daemon's FUSE tests (`rill-daemon/tests/lazy.rs`) mount only on
+The daemon's FUSE tests (`rill-daemon/tests/daemon/lazy.rs`) mount only on
 Linux; locally run them in the OrbStack machine `rill-fuse` with a
 separate target directory:
 `orb -m rill-fuse bash -lc 'cd <repo> && CARGO_TARGET_DIR=$HOME/target cargo test -p rill-daemon'`.

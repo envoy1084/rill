@@ -1,0 +1,13 @@
+---
+source: crates/clients/cli/tests/cli/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.trunk.verify",
+  "result": {
+    "seq": 1,
+    "status": "pending",
+    "culprit": null,
+    "reports": []
+  }
+}

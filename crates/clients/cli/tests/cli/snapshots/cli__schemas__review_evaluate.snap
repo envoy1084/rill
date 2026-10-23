@@ -1,0 +1,18 @@
+---
+source: crates/clients/cli/tests/cli/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.review.evaluate",
+  "result": {
+    "allowed": true,
+    "reasons": [
+      "land_normal_human_review: permit"
+    ],
+    "matched_policies": [
+      "land_normal_human_review"
+    ],
+    "risk": "normal",
+    "risk_reasons": []
+  }
+}

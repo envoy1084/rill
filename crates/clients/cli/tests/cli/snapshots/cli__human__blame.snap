@@ -1,0 +1,8 @@
+---
+source: crates/clients/cli/tests/cli/human.rs
+expression: "shot(&server, &co, &dir, &[\"blame\", \"main.rs\", \"--at\", \"trunk\"]).await"
+---
+[hash12] dev      @1 1 │ fn main() {
+                         2 │     let x = 1;
+                         3 │     println!("{}", x);
+                         4 │ }

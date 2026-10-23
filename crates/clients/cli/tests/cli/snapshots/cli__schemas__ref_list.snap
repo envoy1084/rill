@@ -1,0 +1,16 @@
+---
+source: crates/clients/cli/tests/cli/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.ref.list",
+  "result": {
+    "refs": [
+      {
+        "name": "trunk",
+        "target": "[hash]",
+        "trunk_seq": 1
+      }
+    ]
+  }
+}

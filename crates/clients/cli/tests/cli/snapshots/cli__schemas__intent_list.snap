@@ -1,0 +1,37 @@
+---
+source: crates/clients/cli/tests/cli/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.intent.list",
+  "result": {
+    "items": [
+      {
+        "id": "in_[id]",
+        "title": "Shape the API",
+        "body": "",
+        "kind": "feature",
+        "status": "open",
+        "owner": {
+          "id": "pr_[id]",
+          "kind": "human",
+          "name": "dev",
+          "identity": null,
+          "display": "dev"
+        },
+        "parent": null,
+        "risk_override": null,
+        "changes": [],
+        "created_at": {
+          "rfc3339": "[time]",
+          "millis": 0
+        },
+        "updated_at": {
+          "rfc3339": "[time]",
+          "millis": 0
+        }
+      }
+    ],
+    "next_page_token": null
+  }
+}

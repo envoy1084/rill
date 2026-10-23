@@ -56,25 +56,6 @@ tokio-stream = { workspace = true }
 async-trait = { workspace = true }
 
 [[test]]
-name = "conformance"
-required-features = ["testing"]
-
-[[test]]
-name = "workspace_snapshots"
-required-features = ["testing"]
-
-[[test]]
-name = "cache_tier"
-required-features = ["testing"]
-
-[[test]]
-name = "land_cancel"
-required-features = ["testing"]
-
-[[test]]
-name = "amend"
-required-features = ["testing"]
-
-[[test]]
-name = "trunk_status"
+name = "live"
+path = "tests/live/main.rs"
 required-features = ["testing"]

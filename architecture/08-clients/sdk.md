@@ -209,7 +209,7 @@ limit) is not retried.
 The `testing` feature adds `testing::DevServer`: a dev-mode, memory-backed
 server in the test's process on a free port, with `client()` connected to
 it and `start_with(config)` for other settings. The load tools use it, and
-`tests/conformance.rs` runs the [SDK conformance
+`tests/live/conformance.rs` runs the [SDK conformance
 scenarios](../../sdks/conformance/README.md) against it.
 
 ## Limitations
@@ -230,7 +230,7 @@ scenarios](../../sdks/conformance/README.md) against it.
 - [repo/mod.rs](../../crates/clients/sdk/src/repo/mod.rs), [repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs), [repo/write.rs](../../crates/clients/sdk/src/repo/write.rs), [repo/history.rs](../../crates/clients/sdk/src/repo/history.rs), [repo/watch.rs](../../crates/clients/sdk/src/repo/watch.rs)
 - [types/root.rs](../../crates/clients/sdk/src/types/root.rs), [types/edit.rs](../../crates/clients/sdk/src/types/edit.rs), [types/page.rs](../../crates/clients/sdk/src/types/page.rs)
 - [stack.rs](../../crates/clients/sdk/src/stack.rs), [review.rs](../../crates/clients/sdk/src/review.rs), [workspace.rs](../../crates/clients/sdk/src/workspace.rs), [trunk.rs](../../crates/clients/sdk/src/trunk.rs), [admin.rs](../../crates/clients/sdk/src/admin.rs), [checks.rs](../../crates/clients/sdk/src/checks.rs), [operations.rs](../../crates/clients/sdk/src/operations.rs), [identity/](../../crates/clients/sdk/src/identity/mod.rs), [protection.rs](../../crates/clients/sdk/src/protection.rs), [secrets.rs](../../crates/clients/sdk/src/secrets.rs)
-- [names.rs](../../crates/clients/sdk/src/names.rs), [filter.rs](../../crates/clients/sdk/src/filter.rs), [paging.rs](../../crates/clients/sdk/src/paging.rs), [testing.rs](../../crates/clients/sdk/src/testing.rs), [tests/conformance.rs](../../crates/clients/sdk/tests/conformance.rs)
+- [names.rs](../../crates/clients/sdk/src/names.rs), [filter.rs](../../crates/clients/sdk/src/filter.rs), [paging.rs](../../crates/clients/sdk/src/paging.rs), [testing.rs](../../crates/clients/sdk/src/testing.rs), [tests/live/conformance.rs](../../crates/clients/sdk/tests/live/conformance.rs)
 
 ---
 ← Previous: [Cache tier](../07-runtime/cache.md) · [Index](../index.md) · Next: [SDKs in other languages](other-sdks.md) →

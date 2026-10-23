@@ -1,8 +1,0 @@
----
-source: crates/clients/cli/tests/human.rs
-expression: "shot(&server, &co, &dir, &[\"diff\", \"--stat\"]).await"
----
- README.md | 1 -
- main.rs   | 4 ++--
- notes.txt | 2 ++
- 3 files changed, 4 insertions(+), 3 deletions(-)

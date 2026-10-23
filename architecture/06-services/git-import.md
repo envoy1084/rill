@@ -141,7 +141,7 @@ modes for executables and symlinks; the first position, or one whose diff
 the server truncates, is written as a full snapshot. An export resumes
 after the position named in the branch's last commit and refuses a branch
 whose last commit is not an export. Importing a git history and exporting
-it again gives the same git tree (`rill-cli/tests/import.rs`).
+it again gives the same git tree (`rill-cli/tests/cli/import.rs`).
 
 `--follow` keeps a standing mirror: after the first export it watches
 trunk (`WatchTrunk` from the mirrored head) and runs the same incremental

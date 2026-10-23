@@ -58,7 +58,7 @@ TypeScript 7 over the sources and tests):
   formats `materialize.rs` writes;
 - the CLI runner against a stand-in binary;
 - a contract test that parses the CLI's own snapshot files
-  (`crates/clients/cli/tests/snapshots`).
+  (`crates/clients/cli/tests/cli/snapshots`).
 
 With `RILL_BIN` set to a built `rill`, an end-to-end test also runs. It
 starts `rill dev --memory` on free ports, with an isolated `HOME`, config

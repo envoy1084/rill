@@ -82,7 +82,7 @@ sequenceDiagram
 * [`rill-identity/src/keys/`](../../crates/domain/identity/src/keys/mod.rs): services, `KeyManager`.
 * [`rill-store/src/identity/`](../../crates/foundation/store/src/identity/mod.rs): key, session and revocation tables, identity log.
 * [`rill-types/src/identity/`](../../crates/foundation/types/src/identity/mod.rs): records.
-* Tests: `rill-identity/tests/keys.rs` (lifecycle), `tests/key_services.rs` (Vault, AWS KMS on LocalStack; run when configured), `tests/gcp_kms.rs` (REST contract); `rill-store/tests/conformance/identity.rs`.
+* Tests: `rill-identity/tests/identity/keys.rs` (lifecycle), `tests/key_services.rs` (Vault, AWS KMS on LocalStack; run when configured), `tests/gcp_kms.rs` (REST contract); `rill-store/tests/conformance/identity.rs`.
 
 ---
 ← Previous: [Capability tokens](capability-tokens.md) · [Index](../index.md) · Next: [Permissions](permissions.md) →

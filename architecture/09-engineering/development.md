@@ -191,7 +191,7 @@ logging in all three binaries.
 - [Cargo.toml](../../Cargo.toml), [rust-toolchain.toml](../../rust-toolchain.toml), [rustfmt.toml](../../rustfmt.toml), [CLAUDE.md](../../CLAUDE.md)
 - [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
 - [rill-proto/build.rs](../../crates/foundation/proto/build.rs), [rill-store/Cargo.toml](../../crates/foundation/store/Cargo.toml), [rill-cli/Cargo.toml](../../crates/clients/cli/Cargo.toml)
-- [rill-cli/src/server/mod.rs](../../crates/clients/cli/src/server/mod.rs)
+- [rill-server/src/lib.rs](../../crates/server/server/src/lib.rs)
 
 ---
 ← Previous: [IDE extensions](../08-clients/ide.md) · [Index](../index.md) · Next: [Testing](testing.md) →

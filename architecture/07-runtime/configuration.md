@@ -181,7 +181,7 @@ startup. In dev mode:
 ## Code
 
 * [rill-runtime/src/config/](../../crates/server/runtime/src/config/mod.rs), [state/stores.rs](../../crates/server/runtime/src/state/stores.rs), [auth/authenticator.rs](../../crates/server/api/src/auth/authenticator.rs)
-* [rill-cli/src/server/mod.rs](../../crates/clients/cli/src/server/mod.rs), [rill-cli/src/server/template.rs](../../crates/clients/cli/src/server/template.rs)
+* [rill-server/src/lib.rs](../../crates/server/server/src/lib.rs), [rill-server/src/template.rs](../../crates/server/server/src/template.rs)
 * [rill-lander/src/config.rs](../../crates/domain/lander/src/config.rs)
 
 ---

@@ -184,7 +184,7 @@ exactly one node per directory level.
 - [tree/ops.rs](../../crates/engine/core/src/tree/ops.rs), [tree/builder.rs](../../crates/engine/core/src/tree/builder.rs), [tree/materialize.rs](../../crates/engine/core/src/tree/materialize.rs), [tree/walk.rs](../../crates/engine/core/src/tree/walk.rs)
 - [tree/shard/](../../crates/engine/core/src/tree/shard/mod.rs): [dir.rs](../../crates/engine/core/src/tree/shard/dir.rs), [list.rs](../../crates/engine/core/src/tree/shard/list.rs), [layout.rs](../../crates/engine/core/src/tree/shard/layout.rs)
 - [rill-types objects/tree/](../../crates/foundation/types/src/objects/tree/mod.rs): [listing.rs](../../crates/foundation/types/src/objects/tree/listing.rs), [node.rs](../../crates/foundation/types/src/objects/tree/node.rs), [shape.rs](../../crates/foundation/types/src/objects/tree/shape.rs)
-- [tests/large_dirs.rs](../../crates/engine/core/tests/large_dirs.rs), [rill-bench benches/trees.rs](../../tools/bench/benches/trees.rs)
+- [tests/engine/large_dirs.rs](../../crates/engine/core/tests/engine/large_dirs.rs), [rill-bench benches/trees.rs](../../tools/bench/benches/trees.rs)
 
 ---
 ← Previous: [Rebase](rebase.md) · [Index](../index.md) · Next: [History graph](history-graph.md) →

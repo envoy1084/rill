@@ -144,7 +144,7 @@ that fails part-way returns the error, not a partial list.
 - [graph/mod.rs](../../crates/engine/core/src/graph/mod.rs)
 - [graph/commit_graph.rs](../../crates/engine/core/src/graph/commit_graph.rs)
 - [graph/walk.rs](../../crates/engine/core/src/graph/walk.rs)
-- [derive/ancestry.rs](../../crates/engine/core/src/derive/ancestry.rs), [tests/ancestry.rs](../../crates/engine/core/tests/ancestry.rs)
+- [derive/ancestry.rs](../../crates/engine/core/src/derive/ancestry.rs), [tests/engine/ancestry.rs](../../crates/engine/core/tests/engine/ancestry.rs)
 - [rill-types objects/change.rs](../../crates/foundation/types/src/objects/change.rs)
 
 ---

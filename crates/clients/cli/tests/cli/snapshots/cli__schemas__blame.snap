@@ -1,0 +1,26 @@
+---
+source: crates/clients/cli/tests/cli/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.blame",
+  "result": {
+    "path": "src/lib.rs",
+    "version": "[hash]",
+    "lines": [
+      {
+        "line_no": 1,
+        "version": "[hash]",
+        "author": {
+          "id": "pr_[id]",
+          "kind": "human",
+          "name": "dev",
+          "identity": null,
+          "display": "dev"
+        },
+        "trunk_seq": 1,
+        "text": "pub fn one() -> u32 { 1 }\n"
+      }
+    ]
+  }
+}

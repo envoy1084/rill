@@ -36,7 +36,7 @@ retries up to `MAX_WRITE_ATTEMPTS` (8), then fails with `Contended` (gRPC
 A vote that does not change the status re-checks it after writing: votes
 cast together each see only some of the others, and whoever writes last
 re-evaluates with every vote in view, so the change reaches the status the
-votes add up to (`tests/concurrency.rs`).
+votes add up to (`tests/review/concurrency.rs`).
 
 ## Labels and votes
 

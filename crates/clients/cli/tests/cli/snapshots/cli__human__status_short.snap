@@ -1,0 +1,7 @@
+---
+source: crates/clients/cli/tests/cli/human.rs
+expression: "shot(&server, &co, &dir, &[\"status\", \"-s\"]).await"
+---
+D README.md
+M main.rs
+A notes.txt

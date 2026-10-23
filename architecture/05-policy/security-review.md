@@ -33,7 +33,7 @@ execution of verification steps (phase 15), and the release pipeline
 | Authorization | [permissions](permissions.md) | `tests/grpc/access/` (matrix, holes, grants, writes) |
 | Audit log | [audit log](audit.md) | `tests/grpc/audit.rs` (tamper detection), store conformance `audit.rs`; `rill admin audit verify` |
 | Secret scanning, quarantine | [data protection](data-protection.md#secret-scanning) | `tests/grpc/protection.rs` (block on every write path, quarantine at land and `ImportTrunkPosition`) |
-| Redaction | [data protection](data-protection.md#redaction) | `tests/grpc/protection.rs` (two admins; gRPC, `/o`, batch, re-upload, search), `rill-cli/tests/cache.rs` (cache drops and refuses) |
+| Redaction | [data protection](data-protection.md#redaction) | `tests/grpc/protection.rs` (two admins; gRPC, `/o`, batch, re-upload, search), `rill-cli/tests/cli/cache.rs` (cache drops and refuses) |
 | Encryption at rest | [data protection](data-protection.md#encryption-at-rest) | `rill-store/src/seal/org.rs` tests, `tests/grpc/encryption.rs` (nothing on disk in the clear, cross-org copy refused, rotation, a server without the key service reads nothing) |
 | Input limits | [API surface](../07-runtime/api-surface.md#input-limits) | `tests/grpc/limits.rs`, `rill-types/src/limits.rs` tests |
 | Untrusted parsers | [testing](../09-engineering/testing.md#fuzzing) | twelve `cargo-fuzz` targets |

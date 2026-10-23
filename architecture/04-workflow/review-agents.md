@@ -4,7 +4,7 @@
 [review](review.md): they read a bounded context for a change, return
 findings, and the pool posts those findings as threads and casts a
 `Review` vote. It is library code; the server never constructs a
-`ReviewerPool`, and only `crates/domain/review/tests/review_flow.rs`
+`ReviewerPool`, and only `crates/domain/review/tests/review/review_flow.rs`
 exercises it.
 
 ```mermaid
@@ -100,7 +100,7 @@ conflicts to the owner instead of invoking resolvers.
 * [rill-review/src/agents/heuristic.rs](../../crates/domain/review/src/agents/heuristic.rs)
 * [rill-review/src/agents/pool.rs](../../crates/domain/review/src/agents/pool.rs)
 * [rill-review/src/agents/resolver.rs](../../crates/domain/review/src/agents/resolver.rs)
-* [rill-review/tests/review_flow.rs](../../crates/domain/review/tests/review_flow.rs)
+* [rill-review/tests/review/review_flow.rs](../../crates/domain/review/tests/review/review_flow.rs)
 
 ---
 ← Previous: [Review](review.md) · [Index](../index.md) · Next: [Landing](landing.md) →

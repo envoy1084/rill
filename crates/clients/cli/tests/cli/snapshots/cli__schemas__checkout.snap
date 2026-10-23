@@ -1,0 +1,16 @@
+---
+source: crates/clients/cli/tests/cli/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.checkout",
+  "result": {
+    "dir": "[dir]/co",
+    "repo": "shape",
+    "mount": "mounts/[id]",
+    "base": "trunk",
+    "base_version": null,
+    "files": 0,
+    "workspace": "ws_[id]"
+  }
+}

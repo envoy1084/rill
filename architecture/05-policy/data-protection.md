@@ -153,7 +153,7 @@ Sealing is on by default outside dev mode (`[encryption] enabled`,
 * [`rill-store/src/repo/quarantine.rs`](../../crates/foundation/store/src/repo/quarantine.rs), [`redact.rs`](../../crates/foundation/store/src/redact.rs).
 * [`rill-cache/src/redactions.rs`](../../crates/server/cache/src/redactions.rs).
 * [`rill-store/src/seal/`](../../crates/foundation/store/src/seal/): the `Sealer` hook and `OrgSealer`; [`rill-identity/src/keys/data.rs`](../../crates/domain/identity/src/keys/data.rs): `DataKeyManager`.
-* Tests: `rill-api/tests/grpc/protection.rs`, `rill-api/tests/grpc/encryption.rs`, `rill-cli/tests/cache.rs`.
+* Tests: `rill-api/tests/grpc/protection.rs`, `rill-api/tests/grpc/encryption.rs`, `rill-cli/tests/cli/cache.rs`.
 
 ---
 ← Previous: [Audit log](audit.md) · [Index](../index.md) · Next: [Threat model](threat-model.md) →

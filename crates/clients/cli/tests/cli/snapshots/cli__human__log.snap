@@ -1,0 +1,6 @@
+---
+source: crates/clients/cli/tests/cli/human.rs
+expression: "shot(&server, &co, &dir, &[\"log\"]).await"
+---
+@ ch_[short]  [hash8]  dev  just now  tweak main  (working change)
+◆ trunk@1  [hash8]  dev  just now  first change

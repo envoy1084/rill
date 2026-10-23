@@ -125,9 +125,9 @@ The human output reads like git's, through one layer (`output/`):
   handling is a pure state machine.
 - **Aliases** (`aliases.rs`): `[alias] lg = "log --oneline"`; built-ins win.
 
-`tests/human.rs` snapshots the human output of the everyday commands
+`tests/cli/human.rs` snapshots the human output of the everyday commands
 (plain and coloured) at a fixed width, beside the JSON schemas in
-`tests/schemas.rs`.
+`tests/cli/schemas.rs`.
 
 ## Context resolution
 
@@ -155,7 +155,7 @@ Every JSON document is versioned: `{"schema": "rill.cli.v1.<command>",
 "result": …}`, where `<command>` is the command's path with dots
 (`rill.cli.v1.review.list`, `rill.cli.v1.trunk.landings`). Streams
 (`watch`) print one compact `{"schema": "rill.cli.v1.watch.<kind>.event",
-"event": …}` per line. `tests/schemas.rs` runs a session against an
+"event": …}` per line. `tests/cli/schemas.rs` runs a session against an
 in-process dev server and snapshots each command's document (`insta`, with
 hashes, ids, times and paths redacted); a changed snapshot is a changed
 schema, and a breaking one needs a new version.
@@ -203,9 +203,9 @@ and replaces itself with `rill-server dev ARGS`
 
 - [lib.rs](../../crates/clients/cli/src/lib.rs), [cli.rs](../../crates/clients/cli/src/cli.rs), [context.rs](../../crates/clients/cli/src/context.rs), [error.rs](../../crates/clients/cli/src/error.rs), [exit.rs](../../crates/clients/cli/src/exit.rs)
 - [commands/mod.rs](../../crates/clients/cli/src/commands/mod.rs), [commands/parse.rs](../../crates/clients/cli/src/commands/parse.rs), [commands/change/mod.rs](../../crates/clients/cli/src/commands/change/mod.rs), [commands/import/](../../crates/clients/cli/src/commands/import/mod.rs), [commands/export.rs](../../crates/clients/cli/src/commands/export.rs)
-- [tests/schemas.rs](../../crates/clients/cli/tests/schemas.rs), [tests/human.rs](../../crates/clients/cli/tests/human.rs), [output/mod.rs](../../crates/clients/cli/src/output/mod.rs), [output/theme.rs](../../crates/clients/cli/src/output/theme.rs), [output/diff.rs](../../crates/clients/cli/src/output/diff.rs), [output/graph.rs](../../crates/clients/cli/src/output/graph.rs), [output/pager.rs](../../crates/clients/cli/src/output/pager.rs), [settings.rs](../../crates/clients/cli/src/settings.rs), [aliases.rs](../../crates/clients/cli/src/aliases.rs)
+- [tests/cli/schemas.rs](../../crates/clients/cli/tests/cli/schemas.rs), [tests/cli/human.rs](../../crates/clients/cli/tests/cli/human.rs), [output/mod.rs](../../crates/clients/cli/src/output/mod.rs), [output/theme.rs](../../crates/clients/cli/src/output/theme.rs), [output/diff.rs](../../crates/clients/cli/src/output/diff.rs), [output/graph.rs](../../crates/clients/cli/src/output/graph.rs), [output/pager.rs](../../crates/clients/cli/src/output/pager.rs), [settings.rs](../../crates/clients/cli/src/settings.rs), [aliases.rs](../../crates/clients/cli/src/aliases.rs)
 - [commands/review/browse/](../../crates/clients/cli/src/commands/review/browse/mod.rs), [commands/change/pick.rs](../../crates/clients/cli/src/commands/change/pick.rs), [commands/help.rs](../../crates/clients/cli/src/commands/help.rs), [guides/](../../crates/clients/cli/guides/getting-started.md)
-- [server/mod.rs](../../crates/clients/cli/src/server/mod.rs), [server/template.rs](../../crates/clients/cli/src/server/template.rs)
+- [commands/dev.rs](../../crates/clients/cli/src/commands/dev.rs) (`rill dev` hands over to [rill-server](../../crates/server/server/src/lib.rs))
 - [bin/rill.rs](../../crates/clients/cli/src/bin/rill.rs)
 
 ---

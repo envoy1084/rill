@@ -1,0 +1,25 @@
+---
+source: crates/clients/cli/tests/cli/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.land",
+  "result": {
+    "ticket": {
+      "id": "[ticket]",
+      "change_id": "ch_[id]",
+      "status": "landed",
+      "requested_at": {
+        "rfc3339": "[time]",
+        "millis": 0
+      }
+    },
+    "status": "landed",
+    "seq": 1,
+    "landed_hash": "[hash]",
+    "error": null,
+    "position": null,
+    "eta_ms": null,
+    "synced": true
+  }
+}

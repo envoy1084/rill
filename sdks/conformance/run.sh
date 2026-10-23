@@ -24,7 +24,7 @@ export RILL_ENDPOINT="http://127.0.0.1:$api"
 for lang in $langs; do
   echo "== $lang"
   case $lang in
-    rust) cargo test -q -p rill-sdk --features testing --test conformance \
+    rust) cargo test -q -p rill-sdk --features testing --test live conformance \
       --manifest-path "$root/Cargo.toml" ;;
     go) (cd "$root/sdks/go" && go test -count=1 -v ./rill | grep -E "^(--- |ok|FAIL)") ;;
     ts) (cd "$root" && pnpm install --frozen-lockfile --silent && pnpm --filter @rill/sdk test) ;;

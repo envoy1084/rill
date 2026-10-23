@@ -13,10 +13,10 @@ import { healthView } from "../src/model/health";
 import { fileGroups } from "../src/model/status";
 import { placedThreads } from "../src/model/threads";
 
-const SNAPSHOTS = path.join(__dirname, "../../../crates/clients/cli/tests/snapshots");
+const SNAPSHOTS = path.join(__dirname, "../../../crates/clients/cli/tests/cli/snapshots");
 
 function snapshot<T>(name: string, schema: string): T {
-  const text = fs.readFileSync(path.join(SNAPSHOTS, `schemas__${name}.snap`), "utf8");
+  const text = fs.readFileSync(path.join(SNAPSHOTS, `cli__schemas__${name}.snap`), "utf8");
   const body = text.split(/^---$/m).slice(2).join("---");
   return parseDoc<T>(body, schema);
 }

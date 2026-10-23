@@ -65,7 +65,7 @@ bytes as they pass,
 returns `StoredContent { content, blob_hash, size }`, and fails with
 `Error::Upload` past 5 GiB. Content that ends up under `CHUNK_THRESHOLD`
 falls back to `store_content`. A 1 GiB upload grows resident memory by less
-than 64 MiB (`tests/streaming_memory.rs`).
+than 64 MiB (`tests/engine/streaming_memory.rs`).
 
 Producers: the server's `WriteBlob` RPC reads the header message, checks
 write permission, streams the rest through `store_content_stream`, then

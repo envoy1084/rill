@@ -23,14 +23,14 @@ flowchart TD
 | --- | --- | --- |
 | Unit | one module: encodings, parsers, policy evaluation, hash framing, exit codes | `src/**`; most in `rill-policy`, `rill-core`, `rill-proto`, `rill-search`, `rill-store` |
 | Crate integration | a crate's public API over memory stores | `tests/` in `rill-store`, `rill-core`, `rill-review`, `rill-lander`, `rill-search` |
-| Mock server | SDK against hand-written services | `rill-sdk/tests` |
+| Mock server | SDK against hand-written services | `rill-sdk/tests/mock/` |
 | API end to end | the real server through generated clients, raw gRPC and Connect JSON over HTTP/1.1 | `rill-api/tests/grpc/` |
-| CLI | the real server driven through the CLI library; clap parsing alone | `rill-cli/tests/cli_e2e.rs`, `rill-cli/tests/landing.rs`, `rill-cli/tests/parse/main.rs` |
-| MCP | agent sessions over a pipe and streamable HTTP against a dev server | `rill-mcp/tests/` |
+| CLI | the real server driven through the CLI library; clap parsing alone | `rill-cli/tests/cli/cli_e2e.rs`, `rill-cli/tests/cli/landing.rs`, `rill-cli/tests/cli/parse/mod.rs` |
+| MCP | agent sessions over a pipe and streamable HTTP against a dev server | `rill-mcp/tests/mcp/` |
 | External | import from a repository built with `git` | `rill-git-import/tests/real_git.rs` |
 
 `rill-exec`, `rill-policy` and `rill-proto` have no `tests/` directory;
-`rill-types/tests/merge_laws.rs` property-tests the `Merge` algebra. `rill-proto` keeps its conversion
+`rill-types/tests/types/merge_laws.rs` property-tests the `Merge` algebra. `rill-proto` keeps its conversion
 round trips in `src/convert/roundtrip_tests/`.
 
 ## Fixtures
@@ -56,20 +56,20 @@ round trips in `src/convert/roundtrip_tests/`.
   fixture. `fixture()` builds a `ReviewService` over default policy with a
   human and an agent principal. The helpers are `root_change`,
   `child_change` and `amend`.
-- **SDK mock** (`rill-sdk/tests/common/mod.rs`): `MockRepo` and `MockReview`
+- **SDK mock** (`rill-sdk/tests/mock/common/mod.rs`): `MockRepo` and `MockReview`
   implement the generated service traits and are served by a `connectrpc`
   router. Every RPC they do not implement answers
   `Unimplemented` through the `unimplemented_rpcs!` macro.
   `Harness::start(repo, review, token)` serves them on an ephemeral port and
   builds a `Client`.
-- **MCP sessions** (`rill-mcp/tests/common/mod.rs`): `Fixture` starts
+- **MCP sessions** (`rill-mcp/tests/mcp/common/mod.rs`): `Fixture` starts
   `rill_sdk::testing::DevServer` with a repository; `Session` speaks
   newline-delimited JSON-RPC to an `McpServer` over an in-memory pipe.
 - **Server harness** (`rill-api/tests/grpc/main.rs`): `TestServer` calls `Listeners::bind`
   on port 0, then `build_state` and `serve_with_state`
-  ([server](../07-runtime/server.md)). `rill-cli/tests/common/mod.rs`
+  ([server](../07-runtime/server.md)). `rill-cli/tests/cli/common/mod.rs`
   embeds a dev-mode memory server the same way for every CLI test, on a
-  multi-threaded tokio runtime. `rill-core/tests/common/` holds the
+  multi-threaded tokio runtime. `rill-core/tests/engine/common/` holds the
   core history fixture.
 
 ## What is covered
@@ -88,18 +88,18 @@ round trips in `src/convert/roundtrip_tests/`.
     repositories, explanations and relation versions; `writes.rs` covers
     configuration paths, merges, a revoke between commit and land, and
     Owner approvals.
-  - `rill-cli/tests/access.rs` and `cache.rs` run the SDK and the cache
+  - `rill-cli/tests/cli/access.rs` and `cache.rs` run the SDK and the cache
     tier against a real server.
 - **Core**: building history, trees, merge, rebase, resolve and blame, and
-  delete-versus-modify conflicts as data (`rill-core/tests/workflow.rs`);
+  delete-versus-modify conflicts as data (`rill-core/tests/engine/workflow.rs`);
   criss-cross merges against a virtual base (`criss_cross.rs`); subtree
   operations surviving rebase without clobbering (`rebase.rs`).
 - **Formats and limits**: golden fixtures pin the bytes of every encoded
-  object (`rill-types/tests/golden.rs`); every store backend refuses a
+  object (`rill-types/tests/types/golden.rs`); every store backend refuses a
   store with another format marker (`rill-store/tests/conformance/`); a
   flipped byte on disk is reported as corrupt; a blob-stored symlink that
   escapes the repository is rejected and an existing case collision does
-  not block unrelated edits (`rill-core/tests/validation.rs`).
+  not block unrelated edits (`rill-core/tests/engine/validation.rs`).
 - **Records and transactions**: votes from 24 reviewers at once never
   exhaust retries, and three votes cast together over a store with real
   latency reach the status they add up to (`rill-review/tests/
@@ -123,23 +123,23 @@ round trips in `src/convert/roundtrip_tests/`.
   first outcome, with landing carried on by the survivors (`grpc/cluster/`,
   also on FoundationDB). Shutdown turns unready, then stops and frees its
   leases (`grpc/shutdown.rs`); TLS checks server certificates and mutual
-  TLS refuses clients without one (`rill-cli/tests/tls.rs`); a reader finds
+  TLS refuses clients without one (`rill-cli/tests/cli/tls.rs`); a reader finds
   what another process indexed and a replaced search writer cannot write
   (`rill-search/tests/end_to_end.rs`); the SDK retries a write through
-  `UNAVAILABLE` with one operation id (`rill-sdk/tests/repo_rpc.rs`);
+  `UNAVAILABLE` with one operation id (`rill-sdk/tests/mock/repo_rpc.rs`);
   dashboards query only exported metrics (`grpc/telemetry.rs`).
 - **Trees and derived data**: a directory built by random batches of
   adds, rewrites and deletes across the split threshold hashes the same
   as one built at once; a rewrite in a 200k-entry directory writes at most
   5 nodes and an insert at most 10; case collisions are found in split
   directories; diffs of split directories report exactly the changes
-  (`rill-core/tests/large_dirs.rs`). Skip-pointer `is_ancestor` and
+  (`rill-core/tests/engine/large_dirs.rs`). Skip-pointer `is_ancestor` and
   `merge_base` agree with brute force on 2,000 queries over a random
-  branching history (`tests/ancestry.rs`). Job queues claim by priority
+  branching history (`tests/engine/ancestry.rs`). Job queues claim by priority
   and age, back off and dead-letter failures, rerun the job of a worker
   that died and refuse its late writes, and enqueue only with the
   transaction that needs them (`rill-jobs/tests/`); each landing queues its
-  derive and index jobs (`rill-lander/tests/landing/pipeline.rs`). Every store
+  derive and index jobs (`rill-lander/tests/lander/landing/pipeline.rs`). Every store
   write records one event, and tails resume after a cursor and wake on new
   events on every backend (`rill-store/tests/conformance/events.rs`,
   `rill-events`); `WatchEvents` delivers each change once over gRPC
@@ -148,10 +148,10 @@ round trips in `src/convert/roundtrip_tests/`.
   land-critical value before replying to a commit.
 - **Content**: streamed storage equals whole-content storage; a 4 KiB range
   read touches at most two chunks; a 1 GiB upload grows memory by less than
-  64 MiB (`rill-core/tests/streaming_memory.rs`).
+  64 MiB (`rill-core/tests/engine/streaming_memory.rs`).
 - **Landing from a checkout**: a stale change conflicts at landing and is
   reported as such, markers are refused by `resolve`, and the checkout
-  syncs after landing (`rill-cli/tests/landing.rs`).
+  syncs after landing (`rill-cli/tests/cli/landing.rs`).
 - **Review**: vote thresholds (human +2, or agents plus owner), vote carry-over
   on trivial rebase, thread re-anchoring and blocking, stack validation, the
   heuristic reviewer, and review context.
@@ -188,12 +188,19 @@ cargo test --workspace                       # the check job in CI
 cargo test -p rill-store --features fdb,s3   # conformance on FoundationDB too
 cargo test -p rill-api --features fdb --test grpc
 cargo test -p rill-api --test grpc
-cargo test -p rill-cli --test cli_e2e
+cargo test -p rill-cli --test cli cli_e2e
 RUST_LOG=debug cargo test -p rill-lander -- --nocapture
 ```
 
-The test profile builds with line-table debuginfo to keep binaries small
-([development](development.md)). The git importer test needs `git` on
+Each crate has one integration-test binary, `tests/<name>/main.rs` with a
+module per topic and shared fixtures in `tests/<name>/common/`: every test
+binary links the crate's whole dependency tree, so one per file multiplied
+link time and disk use. (`rill-sdk` has two: `mock`, and `live`, which
+needs the `testing` dev server.) Pick a topic with a filter:
+`cargo nextest run -p rill-cli --test cli -E 'test(landing)'`. Insta
+names snapshots after the binary and module (`cli__schemas__grep.snap`).
+Rill's crates build with line-table debuginfo and dependencies without
+any, to keep binaries small ([development](development.md)). The git importer test needs `git` on
 `PATH`.
 
 Tests against real external services run only when told where the service
@@ -223,12 +230,12 @@ The properties they drive:
 
 | Property | Where |
 | --- | --- |
-| `Merge` laws: simplify keeps the value and leaves no cancellable pair; flatten agrees with nested evaluation | `rill-types/tests/merge_laws.rs` |
-| Change versions round-trip and re-encode byte-identically; a changed field changes the hash | `rill-types/tests/encoding.rs` |
-| Valid paths round-trip; any invalid component is rejected | `rill-types/tests/paths.rs` |
-| A rendered patch reproduces the edit at any context width; hunks rebuild both sides | `rill-core/tests/diff_properties.rs` |
-| Materialized conflict markers parse back and re-materialize identically | `rill-core/tests/marker_properties.rs` |
-| A tree diff reports exactly the paths that differ | `rill-core/tests/tree_properties.rs` |
+| `Merge` laws: simplify keeps the value and leaves no cancellable pair; flatten agrees with nested evaluation | `rill-types/tests/types/merge_laws.rs` |
+| Change versions round-trip and re-encode byte-identically; a changed field changes the hash | `rill-types/tests/types/encoding.rs` |
+| Valid paths round-trip; any invalid component is rejected | `rill-types/tests/types/paths.rs` |
+| A rendered patch reproduces the edit at any context width; hunks rebuild both sides | `rill-core/tests/engine/diff_properties.rs` |
+| Materialized conflict markers parse back and re-materialize identically | `rill-core/tests/engine/marker_properties.rs` |
+| A tree diff reports exactly the paths that differ | `rill-core/tests/engine/tree_properties.rs` |
 
 ## Formal models
 
@@ -284,11 +291,11 @@ crash when added; the rest ran one minute each (Phase 12). Corpora under
 
 ## Code
 
-- [rill-store/tests/conformance/](../../crates/foundation/store/tests/conformance/main.rs), [rill-core/tests/workflow.rs](../../crates/engine/core/tests/workflow.rs), [rill-review/tests/review_flow.rs](../../crates/domain/review/tests/review_flow.rs), [rill-review/src/testing.rs](../../crates/domain/review/src/testing.rs)
-- [rill-lander/tests/landing/](../../crates/domain/lander/tests/landing/main.rs), [rill-search/tests/end_to_end.rs](../../crates/domain/search/tests/end_to_end.rs)
-- [rill-sdk/tests/common/mod.rs](../../crates/clients/sdk/tests/common/mod.rs), [rill-sdk/tests/repo_rpc.rs](../../crates/clients/sdk/tests/repo_rpc.rs), [rill-sdk/tests/stack.rs](../../crates/clients/sdk/tests/stack.rs), [rill-daemon/tests/eager.rs](../../crates/clients/daemon/tests/eager.rs)
-- [rill-mcp/tests/common/mod.rs](../../crates/clients/mcp/tests/common/mod.rs), [rill-mcp/tests/protocol.rs](../../crates/clients/mcp/tests/protocol.rs)
-- [rill-api/tests/grpc/](../../crates/server/api/tests/grpc/main.rs), [rill-cli/tests/cli_e2e.rs](../../crates/clients/cli/tests/cli_e2e.rs), [rill-cli/tests/parse/main.rs](../../crates/clients/cli/tests/parse/main.rs)
+- [rill-store/tests/conformance/](../../crates/foundation/store/tests/conformance/main.rs), [rill-core/tests/engine/workflow.rs](../../crates/engine/core/tests/engine/workflow.rs), [rill-review/tests/review/review_flow.rs](../../crates/domain/review/tests/review/review_flow.rs), [rill-review/src/testing.rs](../../crates/domain/review/src/testing.rs)
+- [rill-lander/tests/lander/landing/](../../crates/domain/lander/tests/lander/landing/mod.rs), [rill-search/tests/end_to_end.rs](../../crates/domain/search/tests/end_to_end.rs)
+- [rill-sdk/tests/mock/common/mod.rs](../../crates/clients/sdk/tests/mock/common/mod.rs), [rill-sdk/tests/mock/repo_rpc.rs](../../crates/clients/sdk/tests/mock/repo_rpc.rs), [rill-sdk/tests/mock/stack.rs](../../crates/clients/sdk/tests/mock/stack.rs), [rill-daemon/tests/daemon/eager.rs](../../crates/clients/daemon/tests/daemon/eager.rs)
+- [rill-mcp/tests/mcp/common/mod.rs](../../crates/clients/mcp/tests/mcp/common/mod.rs), [rill-mcp/tests/mcp/agent_loop.rs](../../crates/clients/mcp/tests/mcp/agent_loop.rs)
+- [rill-api/tests/grpc/](../../crates/server/api/tests/grpc/main.rs), [rill-cli/tests/cli/cli_e2e.rs](../../crates/clients/cli/tests/cli/cli_e2e.rs), [rill-cli/tests/cli/parse/mod.rs](../../crates/clients/cli/tests/cli/parse/mod.rs)
 - [rill-git-import/tests/real_git.rs](../../crates/domain/git-import/tests/real_git.rs), [rill-proto/src/convert/roundtrip_tests/](../../crates/foundation/proto/src/convert/roundtrip_tests/mod.rs)
 
 ---
