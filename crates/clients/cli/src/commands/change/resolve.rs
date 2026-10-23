@@ -49,6 +49,22 @@ async fn conflicted(ctx: &mut Ctx<'_>) -> Result<Vec<RepoPathBuf>> {
 
 /// Run `rill resolve`.
 pub async fn resolve(ctx: &mut Ctx<'_>, args: ResolveArgs) -> Result<()> {
+    if args.interactive {
+        let paths: Vec<RepoPathBuf> = if args.paths.is_empty() {
+            conflicted(ctx).await?
+        } else {
+            args.paths
+                .iter()
+                .map(RepoPathBuf::new)
+                .collect::<std::result::Result<_, _>>()?
+        };
+        if paths.is_empty() {
+            return ctx.emit(j!({ "resolved": [], "remaining": [] }), |out| {
+                out.line(out.dim("no conflicted paths"))
+            });
+        }
+        return super::pick::interactive(ctx, paths).await;
+    }
     if args.paths.is_empty() && !args.all {
         return Err(CliError::usage(
             "name the paths to mark resolved, or `--all`; `rill conflicts` lists them",

@@ -43,6 +43,10 @@ pub struct ResolveArgs {
     /// Mark every conflicted path resolved.
     #[arg(long)]
     pub all: bool,
+    /// Walk each conflict and pick a side (all conflicted paths when none
+    /// are named).
+    #[arg(long, short = 'i', conflicts_with_all = ["all", "force"])]
+    pub interactive: bool,
     /// Skip the check that no conflict markers remain.
     #[arg(long)]
     pub force: bool,

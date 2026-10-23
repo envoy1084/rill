@@ -9,6 +9,7 @@
 //! last operation and restores its base locally.
 
 mod args;
+mod pick;
 mod render;
 mod resolve;
 mod snapshot;

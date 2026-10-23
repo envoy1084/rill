@@ -73,6 +73,51 @@ pub fn parse_materialized(bytes: &[u8]) -> Option<Merge<Option<Bytes>>> {
     Merge::from_vec(values).ok()
 }
 
+/// A piece of a file with conflict markers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Region {
+    /// Text outside any conflict.
+    Text(Bytes),
+    /// One conflict: its marker text as written, and its terms (sides and
+    /// bases interleaved, as in [`Merge`]).
+    Conflict { raw: Bytes, terms: Merge<Bytes> },
+}
+
+/// The regions of a file with conflict markers, in order, so each
+/// conflict can be resolved on its own; `None` for malformed markers.
+pub fn parse_regions(bytes: &[u8]) -> Option<Vec<Region>> {
+    let lines: Vec<&[u8]> = split_lines(bytes).collect();
+    let Some(marker_len) = lines.iter().filter_map(|l| conflict_header(l)).max() else {
+        return Some(vec![Region::Text(Bytes::copy_from_slice(bytes))]);
+    };
+    let mut out = Vec::new();
+    let mut text = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        if conflict_header(lines[i]) != Some(marker_len) {
+            text.extend_from_slice(lines[i]);
+            i += 1;
+            continue;
+        }
+        if !text.is_empty() {
+            out.push(Region::Text(Bytes::from(std::mem::take(&mut text))));
+        }
+        let start = i;
+        let (parts, next) = parse_conflict(&lines, i + 1, marker_len)?;
+        let raw: Vec<u8> = lines[start..next].concat();
+        let terms = Merge::from_vec(parts.into_iter().map(Bytes::from).collect()).ok()?;
+        out.push(Region::Conflict {
+            raw: Bytes::from(raw),
+            terms,
+        });
+        i = next;
+    }
+    if !text.is_empty() {
+        out.push(Region::Text(Bytes::from(text)));
+    }
+    Some(out)
+}
+
 /// Parse the sections of one conflict starting after its header; returns
 /// the interleaved terms and the index after the end marker.
 fn parse_conflict(
@@ -276,5 +321,42 @@ mod tests {
         assert!(
             parse_materialized(b"<<<<<<< Conflict 1 of 1 (2 sides)\n%%%%%%% x\n-a\n").is_none()
         );
+    }
+}
+
+#[cfg(test)]
+mod region_tests {
+    use super::*;
+    use crate::merge::materialize;
+
+    #[test]
+    fn regions_split_text_from_each_conflict() {
+        let terms = Merge::three_way(
+            Some(Bytes::from_static(b"a\nb\nc\nd\ne\n")),
+            Some(Bytes::from_static(b"a\nB1\nc\nd\nE1\n")),
+            Some(Bytes::from_static(b"a\nB2\nc\nd\nE2\n")),
+        );
+        let text = materialize(&terms);
+        let regions = parse_regions(&text).unwrap();
+        let conflicts: Vec<&Merge<Bytes>> = regions
+            .iter()
+            .filter_map(|r| match r {
+                Region::Conflict { terms, .. } => Some(terms),
+                Region::Text(_) => None,
+            })
+            .collect();
+        assert_eq!(conflicts.len(), 2);
+        let sides: Vec<&Bytes> = conflicts[0].adds().collect();
+        assert_eq!(&sides[0][..], b"B1\n");
+        assert_eq!(&sides[1][..], b"B2\n");
+        assert_eq!(&conflicts[0].removes().next().unwrap()[..], b"b\n");
+        let rebuilt: Vec<u8> = regions
+            .iter()
+            .flat_map(|r| match r {
+                Region::Text(t) => t.to_vec(),
+                Region::Conflict { raw, .. } => raw.to_vec(),
+            })
+            .collect();
+        assert_eq!(rebuilt, text, "raw regions rebuild the file");
     }
 }
