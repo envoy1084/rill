@@ -1,4 +1,4 @@
-//! `rill cache`: the regional cache tier in front of an origin.
+//! `rill-server cache`: the regional cache tier in front of an origin.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -7,10 +7,9 @@ use clap::Args;
 use rill_cache::CacheConfig;
 use tokio_util::sync::CancellationToken;
 
-use crate::error::CliError;
-use crate::Result;
+use crate::error::{Error, Result};
 
-/// `rill cache`.
+/// `rill-server cache`.
 #[derive(Args, Debug)]
 pub struct CacheArgs {
     /// The origin's HTTP listener, e.g. `https://rill.internal:7421`.
@@ -41,17 +40,17 @@ pub fn parse_size(text: &str) -> Result<u64> {
         .map_or((text, ""), |i| text.split_at(i));
     let n: u64 = digits
         .parse()
-        .map_err(|_| CliError::usage(format!("invalid size {text:?}")))?;
+        .map_err(|_| Error::usage(format!("invalid size {text:?}")))?;
     let scale: u64 = match unit.to_ascii_uppercase().as_str() {
         "" | "B" => 1,
         "K" | "KB" => 1 << 10,
         "M" | "MB" => 1 << 20,
         "G" | "GB" => 1 << 30,
         "T" | "TB" => 1 << 40,
-        _ => return Err(CliError::usage(format!("invalid size unit in {text:?}"))),
+        _ => return Err(Error::usage(format!("invalid size unit in {text:?}"))),
     };
     n.checked_mul(scale)
-        .ok_or_else(|| CliError::usage(format!("size {text:?} is too large")))
+        .ok_or_else(|| Error::usage(format!("size {text:?} is too large")))
 }
 
 /// Run the cache until interrupted.

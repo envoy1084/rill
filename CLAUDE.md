@@ -104,9 +104,12 @@ do not introduce v2 names or compatibility shims. The roadmap's "v2" means
 `rill-types` ← `rill-store` ← `rill-events` / `rill-jobs` / `rill-core` ←
 `rill-policy` / `rill-review` / `rill-lander` / `rill-search` / `rill-exec` ←
 `rill-identity` ← `rill-runtime` ← `rill-api` ← `rill-sdk` ← `rill-cli` /
-`rill-mcp`, with `rill-cache` beside the server crates on `rill-policy` and
+`rill-mcp`, with `rill-server` (the services' binary) above `rill-api`,
+`rill-cache` beside the server crates on `rill-policy` and
 `rill-merge-syntax` just above `rill-core`. Lower crates never depend on
-higher ones. Tooling crates (`tools/`: `rill-sim`, `rill-bench`,
+higher ones. The client binaries (`rill-cli`, `rill-mcp`) never link the
+server crates (`rill-api`, `rill-runtime`, `rill-cache`, the domain
+services); CI checks it. Tooling crates (`tools/`: `rill-sim`, `rill-bench`,
 `rill-load`, `fuzz`) may depend on anything; nothing depends on them.
 
 Crates live in `crates/<group>/<name>` (groups `foundation`, `engine`,
@@ -133,7 +136,7 @@ Tiered, so a phase spends its time on work rather than rebuilds:
 * **End of a work item:** `cargo clippy --workspace --all-targets -- -D warnings`.
 * **End of a phase (the full sweep):** `cargo fmt --check`,
   `cargo nextest run --workspace`, `cargo test --workspace --doc`, clippy
-  with the deployment features (`-p rill-cli --features fdb,aws,gcp,saml`),
+  with the deployment features (`-p rill-server --features fdb,aws,gcp,saml`),
   and the FoundationDB suites below.
 * Build feature combinations (`fdb`, `saml`, cloud key services) and
   `--release` only in the full sweep or for load runs. Run long gates

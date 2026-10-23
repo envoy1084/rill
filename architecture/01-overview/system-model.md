@@ -130,7 +130,7 @@ The rules these mechanisms must keep are listed in
 
 - Several servers can share only a FoundationDB metadata store; redb is
   opened by one process.
-- No identity provider yet: tokens come from `rill api mint-token` and
+- No identity provider yet: tokens come from `rill-server mint-token` and
   `IssueToken`.
 
 ## Code

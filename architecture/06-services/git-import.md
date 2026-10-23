@@ -55,11 +55,12 @@ not overflow the stack.
 content, store a version, read the trunk head and a version's position,
 append to trunk, and load and save the map.
 
-* `RepoStore` implements them directly (`--storage-dir`): content and
+* `RepoStore` implements them directly (`rill-server import git
+  --storage-dir`): content and
   versions go into the stores, trunk moves with `land_on_trunk`, the map
   is the misc record `git_import_map`. Run it while no server uses the
   directory.
-* The CLI's `RemoteTarget` (the default) goes through a server: content
+* The CLI's `RemoteTarget` (`rill import git`) goes through a server: content
   through `WriteBlob` or inline, versions through `CreateVersion`,
   trunk through the admin-only `ImportTrunkPosition` RPC (`land_on_trunk` with the
   expected head, idempotent like every mutation), and the map is a JSON
@@ -154,8 +155,8 @@ position twice.
 
 `rill import git <path> --repo <name> [--ref HEAD] [--no-land]` imports
 into the server the client is configured for, creating the repository if
-missing; `--storage-dir <dir>` (or `RILL_STORAGE_DIR`) imports into a
-storage directory instead. See [CLI](../08-clients/cli.md).
+missing. `rill-server import git <path> --repo <name> --storage-dir <dir>`
+(or `RILL_STORAGE_DIR`) imports into a storage directory instead. See [CLI](../08-clients/cli.md).
 
 ## Limitations
 

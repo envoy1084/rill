@@ -1,0 +1,46 @@
+[package]
+name = "rill-server"
+description = "The `rill-server` command: the Rill services, the dev server, the cache tier and storage-level tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "rill_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rill-server"
+path = "src/bin/rill_server.rs"
+
+[features]
+# Keep metadata in FoundationDB.
+fdb = ["rill-api/fdb"]
+# AWS KMS and Google Cloud KMS as token key services.
+aws = ["rill-api/aws"]
+gcp = ["rill-api/gcp"]
+# SAML 2.0 sign-in. Needs libxml2 and xmlsec1.
+saml = ["rill-api/saml"]
+
+[dependencies]
+rill-api = { workspace = true }
+rill-runtime = { workspace = true }
+rill-cache = { workspace = true }
+rill-identity = { workspace = true }
+rill-store = { workspace = true }
+rill-git-import = { workspace = true }
+rill-types = { workspace = true }
+clap = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+rill-sdk = { workspace = true }
+tempfile = { workspace = true }

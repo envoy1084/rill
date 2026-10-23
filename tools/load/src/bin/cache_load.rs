@@ -1,4 +1,4 @@
-//! `cache_load`: read load through a `rill cache` in front of an origin.
+//! `cache_load`: read load through a `rill-server cache` in front of an origin.
 //! Seeds files in directories, lists each directory for its read grant,
 //! checks that 100 simultaneous misses on one object cost the origin one
 //! fetch, then reads hot and cold files through the cache for a while and

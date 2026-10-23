@@ -1,13 +1,11 @@
-//! `rill import git`: one-way import of a git repository, either into a
-//! running server through its API (the default) or directly into a
-//! storage directory (`--storage-dir`, the layout `rill api --storage
-//! local:<dir>` uses) while no server has it open.
+//! `rill import git`: one-way import of a git repository into a running
+//! server through its API. Imports straight into a storage directory are
+//! `rill-server import git`.
 
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 use rill_git_import::{GixSource, ImportOptions, Importer};
-use rill_store::LocalStores;
 use serde_json::json as j;
 
 use super::remote::RemoteTarget;
@@ -17,7 +15,7 @@ use crate::Result;
 /// `rill import <subcommand>`.
 #[derive(Subcommand, Debug)]
 pub enum ImportCmd {
-    /// Import a git repository's history into local storage.
+    /// Import a git repository's history into a server.
     Git(GitArgs),
 }
 
@@ -32,10 +30,6 @@ pub struct GitArgs {
     /// Git ref to import from.
     #[arg(long, default_value = "HEAD")]
     pub r#ref: String,
-    /// Import straight into this storage directory (the server's
-    /// `local:<dir>`) instead of through a server.
-    #[arg(long, env = "RILL_STORAGE_DIR")]
-    pub storage_dir: Option<PathBuf>,
     /// Where an import through a server keeps its sha map (default: inside
     /// the git directory).
     #[arg(long)]
@@ -58,46 +52,27 @@ async fn git(ctx: &mut Ctx<'_>, args: GitArgs) -> Result<()> {
         ..ImportOptions::default()
     };
     let source = GixSource::open(&args.path)?;
-    let (repo_name, report) = match &args.storage_dir {
-        Some(dir) => {
-            let stores = LocalStores::open(dir).await?;
-            stores.check_format().await?;
-            let config = match stores.get_repo_by_name(&args.repo).await? {
-                Some(c) => c,
-                None => stores.create_repo(&args.repo, "").await?,
-            };
-            let mut importer = Importer::open(stores.repo(config.id)).await?;
-            (
-                config.name,
-                importer.import(source, &args.r#ref, options).await?,
-            )
-        }
-        None => {
-            let client = ctx.client()?;
-            if client.repo(&args.repo).info().await.is_err() {
-                client.create_repo(&args.repo, None).await?;
-            }
-            let map_file = args.map_file.clone().unwrap_or_else(|| {
-                let git_dir = args.path.join(".git");
-                let dir = if git_dir.is_dir() {
-                    git_dir
-                } else {
-                    args.path.clone()
-                };
-                dir.join(format!("rill-import-{}.json", args.repo))
-            });
-            let target = RemoteTarget::new(client, args.repo.clone(), map_file);
-            let mut importer = Importer::open(target).await?;
-            let options = ImportOptions {
-                save_every: 1,
-                ..options
-            };
-            (
-                args.repo.clone(),
-                importer.import(source, &args.r#ref, options).await?,
-            )
-        }
+    let client = ctx.client()?;
+    if client.repo(&args.repo).info().await.is_err() {
+        client.create_repo(&args.repo, None).await?;
+    }
+    let map_file = args.map_file.clone().unwrap_or_else(|| {
+        let git_dir = args.path.join(".git");
+        let dir = if git_dir.is_dir() {
+            git_dir
+        } else {
+            args.path.clone()
+        };
+        dir.join(format!("rill-import-{}.json", args.repo))
+    });
+    let target = RemoteTarget::new(client, args.repo.clone(), map_file);
+    let mut importer = Importer::open(target).await?;
+    let options = ImportOptions {
+        save_every: 1,
+        ..options
     };
+    let repo_name = args.repo.clone();
+    let report = importer.import(source, &args.r#ref, options).await?;
     ctx.emit(
         j!({
             "repo": repo_name,

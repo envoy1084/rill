@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.7
 #
-# The rill image: one binary, every role (`rill api --roles ...`), with
+# The server image: `rill-server`, every role (`rill-server run --roles ...`), with
 # FoundationDB client support. Multi-arch (amd64, arm64).
 #
 #   docker build -f deploy/docker/Dockerfile -t rill .   (from the repository root)
-#   docker run rill api --config /etc/rill/rill.toml
+#   docker run rill run --config /etc/rill/rill.toml
 
 # The image's rustup installs the exact toolchain rust-toolchain.toml pins.
 ARG RUST_VERSION=1.96.0
 
 FROM rust:${RUST_VERSION}-bookworm AS build
 ARG TARGETARCH
-# Cargo features of the `rill` binary: FoundationDB, the cloud key services
+# Cargo features of `rill-server`: FoundationDB, the cloud key services
 # and SAML sign-in.
 ARG FEATURES=fdb,aws,gcp,saml
 ARG FDB_VERSION=7.3.77
@@ -40,8 +40,8 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
     find crates tools -name '*.rs' -exec touch {} + \
-    && cargo build --release --locked -p rill-cli --features "$FEATURES" \
-    && cp target/release/rill /usr/local/bin/rill
+    && cargo build --profile dist --locked -p rill-server --features "$FEATURES" \
+    && cp target/dist/rill-server /usr/local/bin/rill-server
 
 FROM debian:bookworm-slim
 RUN apt-get update \
@@ -50,8 +50,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --no-create-home rill
 COPY --from=build /usr/lib/libfdb_c.so /usr/lib/libfdb_c.so
-COPY --from=build /usr/local/bin/rill /usr/local/bin/rill
+COPY --from=build /usr/local/bin/rill-server /usr/local/bin/rill-server
 USER 10001
 EXPOSE 7420 7421
-ENTRYPOINT ["/usr/local/bin/rill"]
-CMD ["api"]
+ENTRYPOINT ["/usr/local/bin/rill-server"]
+CMD ["run"]

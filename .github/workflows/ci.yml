@@ -18,6 +18,13 @@ jobs:
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
+      # Clients ship without the services (ADR 020).
+      - name: The client binaries link no server crates
+        run: |
+          bad=$(cargo tree -p rill-cli -p rill-mcp -e normal,build --prefix none \
+            | awk '{print $1}' | sort -u \
+            | grep -xE 'rill-(api|runtime|server|cache|lander|exec|identity|review|search|events|jobs)' || true)
+          if [ -n "$bad" ]; then echo "client links server crates: $bad"; exit 1; fi
       # Licences (ADR 015), advisories and sources, per deny.toml.
       - uses: EmbarkStudios/cargo-deny-action@v2
       - run: cargo clippy --workspace --all-targets
@@ -96,6 +103,6 @@ jobs:
           done
           fdbcli --exec status
           exit 1
-      - run: cargo clippy -p rill-store -p rill-api -p rill-cli --all-targets --features rill-store/fdb,rill-store/s3,rill-api/fdb
+      - run: cargo clippy -p rill-store -p rill-api -p rill-server --all-targets --features rill-store/fdb,rill-store/s3,rill-api/fdb
       - run: cargo test -p rill-store --features fdb,s3
       - run: cargo test -p rill-api --features fdb --test grpc

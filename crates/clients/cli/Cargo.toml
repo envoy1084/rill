@@ -1,6 +1,6 @@
 [package]
 name = "rill-cli"
-description = "The `rill` command: the client, `rill dev` and `rill api`"
+description = "The `rill` command: the client and the checkout daemon"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,15 +10,6 @@ repository.workspace = true
 [lib]
 name = "rill_cli"
 path = "src/lib.rs"
-
-[features]
-# Let `rill api` keep metadata in FoundationDB.
-fdb = ["rill-api/fdb"]
-# AWS KMS and Google Cloud KMS as token key services.
-aws = ["rill-api/aws"]
-gcp = ["rill-api/gcp"]
-# SAML 2.0 sign-in. Needs libxml2 and xmlsec1.
-saml = ["rill-api/saml"]
 
 [[bin]]
 name = "rill"
@@ -32,17 +23,11 @@ connectrpc = { workspace = true }
 rill-mcp = { workspace = true }
 rill-types = { workspace = true }
 rill-core = { workspace = true }
-rill-cache = { workspace = true }
-rill-runtime = { workspace = true }
-rill-api = { workspace = true }
-rill-store = { workspace = true }
 rill-git-import = { workspace = true }
-rill-identity = { workspace = true }
 rill-proto = { workspace = true }
 rill-policy = { workspace = true }
 dirs = { workspace = true }
 hex = { workspace = true }
-rand = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
 comfy-table = { workspace = true }
@@ -73,6 +58,11 @@ bytes = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
+# The tests run a server in-process and drive it through the CLI.
+rill-api = { workspace = true }
+rill-runtime = { workspace = true }
+rill-cache = { workspace = true }
+rill-store = { workspace = true }
 insta = { workspace = true }
 regex = { workspace = true }
 rill-identity = { workspace = true, features = ["testing"] }

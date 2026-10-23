@@ -1,4 +1,4 @@
-//! The annotated configuration file `rill api init-config` writes.
+//! The annotated configuration file `rill-server init-config` writes.
 //!
 //! The body is the serialized default configuration, so every key and
 //! default is exactly what the server would use; the comments explain the
@@ -6,7 +6,7 @@
 
 use rill_api::ServerConfig;
 
-const HEADER: &str = r#"# rill api configuration.
+const HEADER: &str = r#"# rill-server configuration.
 #
 # Every key is optional; a missing key takes the default shown here. The
 # RILL_* environment variables override individual keys:
@@ -56,7 +56,7 @@ const HEADER: &str = r#"# rill api configuration.
 #   key_id = "arn:aws:kms:..."
 #
 # The first administrator signs in with a token from
-#   rill api mint-token human:<name> --config rill.toml
+#   rill-server mint-token human:<name> --config rill.toml
 # and is listed in identity.admins.
 #
 # Static tokens are accepted in dev mode only:
@@ -72,7 +72,7 @@ const HEADER: &str = r#"# rill api configuration.
 "#;
 
 /// The annotated default configuration as TOML text.
-pub fn annotated_config() -> anyhow::Result<String> {
+pub fn annotated_config() -> crate::Result<String> {
     let body = ServerConfig::default().to_toml()?;
     Ok(format!("{HEADER}{body}"))
 }

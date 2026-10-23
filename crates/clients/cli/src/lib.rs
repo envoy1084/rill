@@ -1,5 +1,5 @@
-//! The `rill` command line, including `rill dev` and `rill api`, which run
-//! the service.
+//! The `rill` command line: the client and the checkout daemon. The
+//! services ship separately in `rill-server`; `rill dev` hands over to it.
 //!
 //! The binary is thin: it calls [`run_cli`]. Everything else lives here so
 //! tests can drive the CLI as a library with [`run_cli_with_args`] and
@@ -19,7 +19,6 @@ pub mod credentials;
 pub mod error;
 pub mod exit;
 pub mod output;
-pub mod server;
 pub mod settings;
 
 use std::ffi::OsString;
@@ -244,15 +243,7 @@ pub fn run_cli() -> std::process::ExitCode {
         .map(|a| a.to_string_lossy().matches('v').count() as u8)
         .sum();
     let quiet = args.iter().any(|a| a == "-q" || a == "--quiet");
-    // The service installs its own telemetry (`rill dev`, `rill api`).
-    let serving = args
-        .iter()
-        .skip(1)
-        .find(|a| !a.to_string_lossy().starts_with('-'))
-        .is_some_and(|a| a == "dev" || a == "api");
-    if !serving {
-        init_logging(verbose, quiet);
-    }
+    init_logging(verbose, quiet);
 
     let runtime = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,

@@ -93,8 +93,8 @@ unconfigured, run `fdbcli --exec "configure new single ssd"`.
 ```
 cargo test -p rill-store --features fdb,s3              # conformance on FoundationDB
 cargo test -p rill-api --features fdb --test grpc    # end to end on FoundationDB
-RILL_FDB_CLUSTER_FILE= RILL_DEV_MODE=true cargo run -p rill-cli --features fdb -- \
-    api --storage local:/tmp/rill-dev                   # objects on disk, metadata in FoundationDB
+RILL_FDB_CLUSTER_FILE= RILL_DEV_MODE=true cargo run -p rill-server --features fdb -- \
+    run --storage local:/tmp/rill-dev                   # objects on disk, metadata in FoundationDB
 ```
 
 Keep objects persistent when metadata is: `memory` storage keeps objects in
@@ -160,7 +160,7 @@ the store conformance suite and the server's end-to-end test against it.
 ## Running locally
 
 ```
-cargo run -p rill-cli --bin rill -- dev --memory   # every role, gRPC :7470, HTTP :7471
+cargo run -p rill-server -- dev --memory            # every role, gRPC :7470, HTTP :7471
 cargo run -p rill-cli --bin rill -- --endpoint http://127.0.0.1:7470 repo create demo
 cargo run -p rill-cli --bin rill -- --endpoint http://127.0.0.1:7470 checkout demo ./demo
 cd demo && echo 'fn main() {}' > main.rs
@@ -169,7 +169,7 @@ rill new -m "initial" && rill submit && rill land --wait
 
 Inside a checkout, its `.rill/mount.json` marker supplies the endpoint
 and repository ([cli](../08-clients/cli.md)); the first checkout command
-starts the client daemon in the background ([client daemon](../08-clients/daemon.md)). `rill api init-config` prints
+starts the client daemon in the background ([client daemon](../08-clients/daemon.md)). `rill-server init-config` prints
 an annotated default config ([configuration](../07-runtime/configuration.md)).
 `rill-mcp --list-tools` prints the MCP tool schemas. `RUST_LOG` controls
 logging in all three binaries.

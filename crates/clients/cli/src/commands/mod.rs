@@ -12,6 +12,7 @@ pub mod checkout;
 pub mod checks;
 pub mod clone;
 pub mod daemon;
+pub mod dev;
 pub mod diff;
 pub mod doctor;
 pub mod export;

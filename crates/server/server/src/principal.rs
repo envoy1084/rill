@@ -1,7 +1,6 @@
 //! Parsing principals given on the command line.
 
-use crate::error::CliError;
-use crate::Result;
+use crate::error::{Error, Result};
 
 /// Parse `kind:name` or `name`.
 pub fn parse_principal(spec: &str) -> Result<rill_types::Principal> {
@@ -11,7 +10,7 @@ pub fn parse_principal(spec: &str) -> Result<rill_types::Principal> {
         Some(("human", name)) => Ok(Principal::human(name)),
         Some(("agent", name)) => Ok(Principal::agent(name)),
         Some(("service", name)) => Ok(Principal::service(name)),
-        Some((kind, _)) => Err(CliError::Usage(format!(
+        Some((kind, _)) => Err(Error::Usage(format!(
             "principal kind must be human, agent or service, not {kind:?}"
         ))),
     }

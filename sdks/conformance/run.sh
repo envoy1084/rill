@@ -9,8 +9,8 @@ langs=${*:-rust go ts python}
 api=${RILL_CONFORMANCE_PORT:-17470}
 http=$((api + 1))
 
-cargo build -q -p rill-cli --manifest-path "$root/Cargo.toml"
-"$root/target/debug/rill" dev --memory \
+cargo build -q -p rill-server --manifest-path "$root/Cargo.toml"
+"$root/target/debug/rill-server" dev --memory \
   --listen-grpc "127.0.0.1:$api" --listen-http "127.0.0.1:$http" \
   >"${TMPDIR:-/tmp}/rill-conformance.log" 2>&1 &
 server=$!

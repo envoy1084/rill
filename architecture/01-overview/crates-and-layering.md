@@ -54,7 +54,8 @@ only needs a folder in the right group. `tools/fuzz` is a separate
 | `rill-api` | Authentication interceptor and `Permit`, API handlers and watch streams, the object HTTP protocol, read grants, SCIM, sign-in, binding and serving the listeners | State and workers |
 | `rill-cache` | The regional cache tier: grant checks, a disk LRU, coalesced origin fetches | Authorization decisions (the origin's grants carry them) |
 | `rill-sdk` | Typed client, blob upload, local checkout (`.rill/`), status, sync, stack helpers | User interface |
-| `rill-cli` | The `rill` binary: client commands, `rill dev`, `rill api`, `rill cache`, output formats, exit codes | Business rules |
+| `rill-server` | The `rill-server` binary: `run`, `dev`, `cache`, `init-config`, `mint-token`, `import git --storage-dir`; the deployment features | Client commands |
+| `rill-cli` | The `rill` binary: client commands, the client daemon, output formats, exit codes; `rill dev` hands over to `rill-server dev` | Business rules, the services |
 | `rill-mcp` | The MCP tool surface over the SDK for agents (`rmcp`); `rill-mcp` binary | Anything the SDK cannot do |
 
 Tooling crates, never depended on by product crates: `rill-sim` (seeded
@@ -90,7 +91,8 @@ flowchart BT
   cache[rill-cache] --> policy
   sdk[rill-sdk] --> proto & core & mergesyn
   mcp[rill-mcp] --> sdk & core
-  cli[rill-cli] --> sdk & mcp & api & cache & store & import
+  cli[rill-cli] --> sdk & mcp & import
+  server[rill-server] --> api & cache & import
 ```
 
 ## Layering rules
@@ -98,8 +100,9 @@ flowchart BT
 The declared order is `rill-types` <- `rill-store` <- `rill-events` /
 `rill-jobs` / `rill-core` <- `rill-policy` / `rill-review` / `rill-lander` /
 `rill-search` / `rill-exec` <- `rill-identity` <- `rill-runtime` <-
-`rill-api` <- `rill-sdk` <- `rill-cli` / `rill-mcp`, with `rill-cache`
-beside the server crates on `rill-policy` and `rill-merge-syntax` just
+`rill-api` <- `rill-sdk` <- `rill-cli` / `rill-mcp`, with `rill-server`
+above `rill-api` and `rill-cache`, `rill-cache` beside the server crates
+on `rill-policy` and `rill-merge-syntax` just
 above `rill-core`. Lower crates never depend on higher ones. The manifests refine
 that order in a few places:
 
@@ -131,10 +134,13 @@ that order in a few places:
 - `rill-cache` depends on `rill-policy` (grant verification), `rill-store`
   (hash checks) and `rill-types`, not on `rill-api`: it talks to the origin
   only over the object protocol.
-- The binary crate `rill-cli` additionally links `rill-api` and
-  `rill-runtime` (for `rill dev` and `rill api`), `rill-cache` (for `rill cache`), `rill-store` and `rill-git-import` (for
-  `rill import git`), and `rill-mcp` (shared JSON encoding and error
-  codes). No library crate links those.
+- The binary crates split clients from services (ADR 020). `rill-cli`
+  links the client side only: `rill-sdk`, `rill-daemon`, `rill-git-import`
+  (`rill import git`, `rill export git`), `rill-policy` (offline audit
+  verification) and `rill-mcp` (shared JSON encoding and error codes).
+  `rill-server` links `rill-api`, `rill-runtime`, `rill-cache` and
+  `rill-git-import`. CI fails if `rill-cli` or `rill-mcp` links a server
+  crate. No library crate links either binary crate.
 - The tooling crates `rill-sim` and `rill-load` link the server crates to
   reuse their wiring; they sit above every product crate and nothing depends on
   them. `rill-types` exposes its test strategies and clock overrides only

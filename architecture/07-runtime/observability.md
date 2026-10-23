@@ -48,7 +48,7 @@ server exports.
 
 ## Traces and logs
 
-`telemetry::init` installs the subscriber for `rill dev` and `rill api`:
+`telemetry::init` installs the subscriber for `rill-server run`, `dev` and `cache`:
 
 * **Logs** go to stderr as text or JSON (`[telemetry] log_format`,
   `RILL_LOG_FORMAT`), filtered by `RUST_LOG` (default `info`). JSON lines

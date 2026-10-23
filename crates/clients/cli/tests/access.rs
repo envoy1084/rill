@@ -39,19 +39,18 @@ async fn a_directory_reader_reads_its_directory_and_nothing_else() {
         ),
     )
     .unwrap();
-    let config_arg = config_path.display().to_string();
+    let config = ServerConfig::load(Some(&config_path)).unwrap();
     let mint = |who: &'static str| {
-        let config_arg = config_arg.clone();
+        let config = config.clone();
         async move {
-            let (code, out) =
-                rill(&["rill", "api", "--config", &config_arg, "mint-token", who]).await;
-            assert_eq!(code, 0, "{out}");
-            out.trim().to_string()
+            let human = rill_types::Principal::human(who);
+            rill_runtime::identity::mint_token(&config, &human, rill_store::DEFAULT_ORG, None)
+                .await
+                .unwrap()
         }
     };
     let (ann, bob) = (mint("ann").await, mint("bob").await);
 
-    let config = ServerConfig::load(Some(&config_path)).unwrap();
     let any: SocketAddr = "127.0.0.1:0".parse().unwrap();
     let listeners = Listeners::bind(any, any).await.unwrap();
     let (grpc, _) = listeners.addrs().unwrap();

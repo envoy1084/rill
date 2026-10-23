@@ -1,8 +1,9 @@
 # CLI
 
-`rill-cli` builds two binaries: `rill`, the user command, and `rill-api`,
-the server process. Both are thin `main`s over the `rill_cli` library, so
-tests run the CLI in-process with `run_cli_with_args`. Every command builds
+`rill-cli` builds `rill`: the user command and the client daemon it starts
+(`rill daemon run`). The binary is a thin `main` over the `rill_cli`
+library, so tests run the CLI in-process with `run_cli_with_args`. The
+services are a separate binary, `rill-server`. Every command builds
 one JSON value with `rill_mcp::json`, the same encoding the MCP tools return.
 It prints that value under `--json` and a human view of it otherwise.
 
@@ -51,7 +52,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Services | `dev`, `api [--roles]`, `cache --origin --dir --max-bytes` ([cache tier](../07-runtime/cache.md)) |
 | Access | `access grant/revoke <subject> <relation> [path]`, `access list [--path] [--subject] [--relation]`, `access check <relation> [path] [--as]`, `access who <relation> [path]`, `access where <relation> [--as]` |
 | Admin | `admin policy get/set` (of the current repository), `admin health`, `admin idp add/list/remove` (OIDC, or SAML with `--saml-metadata`), `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session`, `admin trust add/list/remove` (workload issuers), `admin kill --agent/--session/--sponsor/--model`, `admin scim create/list/revoke`, `admin audit list/watch/seal/verify/export`, `admin protect redact/approve/redactions/release/rotate-key`, `admin secret set/list/delete` (the value from standard input or `--from-file`, never an argument) |
-| Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch; `--follow` keeps it following), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>`, `help [topic \| command]` (guides: getting-started, checkouts, stacks, conflicts, agents, config), `doctor`, `bug-report [-o]`, `man -o <dir>` (hidden; for packagers) |
+| Other | `import git` (through the server), `export git` (mirror trunk to a git branch; `--follow` keeps it following), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>`, `help [topic \| command]` (guides: getting-started, checkouts, stacks, conflicts, agents, config), `doctor`, `bug-report [-o]`, `man -o <dir>` (hidden; for packagers) |
 
 Each group lives in `commands/<group>.rs`. `commands/parse.rs` holds the
 shared positional parsers: `root_arg` (defaults to trunk), `seq_arg` (`7` or
@@ -72,8 +73,8 @@ Behaviours worth knowing:
   server, the daemon, reads per cache tier, each checkout and what to
   fix.
 - `rill import git <path> --repo R` imports through the server the client
-  is configured for; `--storage-dir DIR` (or `RILL_STORAGE_DIR`) opens
-  `LocalStores` directly instead. `rill export git <dir>` mirrors trunk into
+  is configured for (`rill-server import git --storage-dir DIR` imports
+  into a storage directory instead). `rill export git <dir>` mirrors trunk into
   a git branch, and with `--follow` keeps exporting each landing. See [git import and export](../06-services/git-import.md).
 - Every change the CLI creates has `Provenance {tool: "rill-cli"}`.
 - `rill login` lists the org's providers through `SessionService`, runs the
@@ -181,37 +182,20 @@ decide", 4 "get permission or approval", 5 "try again later".
 The MCP server reports a failed tool the same way: its structured error
 carries `code`, `reason`, `missing` and `retry_after_ms`.
 
-## Running the service
+## The services
 
-The service runs from the same binary (`server/mod.rs`):
-
-* `rill dev [--data DIR | --memory] [--listen-grpc ADDR] [--listen-http ADDR]`
-  runs every role in one process with `dev_mode` on, storage in
-  `~/.rill/dev` by default, and ports 7470 / 7471 (`DEV_GRPC_PORT` /
-  `DEV_HTTP_PORT`). Verification is on, with two unisolated in-process
-  execution workers (`DEV_LOCAL_WORKERS`) running `.rill/verify.toml`.
-* `rill api [--config PATH] [--listen-grpc ADDR] [--listen-http ADDR]
-  [--storage memory|local:<dir>] [--roles api,workers]` loads the file and
-  `RILL_*` environment through `ServerConfig::load`, then applies the
-  flags. `rill api init-config [--out PATH] [--force]` prints an annotated
-  `ServerConfig::default()`.
-* `rill api [--config PATH] mint-token <human:|agent:|service:>NAME
-  [--org ORG] [--ttl SECS]` signs a token with the instance's key, reading
-  the store and key service from the configuration like a server would. It
-  is how the first administrator (and staging) gets a token; the lifetime
-  defaults to the longest the kind allows.
-
-Both log at `info` unless `-q` or `RUST_LOG` say otherwise. Ctrl-C cancels
-the root `CancellationToken`. See
-[configuration](../07-runtime/configuration.md).
+The services are not in `rill`; they ship as `rill-server` ([server
+binary](../07-runtime/server.md#the-rill-server-binary), ADR 020), so the
+client links none of their crates. `rill dev [ARGS]` is the one exception
+for convenience: it finds `rill-server` next to `rill` (else on `PATH`)
+and replaces itself with `rill-server dev ARGS`
+(`commands/dev.rs`).
 
 ## Limitations
 
 - If the checkout marker fails to parse, the CLI acts as if it is outside
   a checkout.
 - `rill import git` prints only its final result, with no progress output.
-- `rill api` has no flags for S3 storage or the key service. Those come
-  from the config file or the environment.
 - The `--endpoint` help text gives `~/.config/rill/config.toml` as the config
   path. On macOS the SDK reads `~/Library/Application Support/rill/config.toml`.
 

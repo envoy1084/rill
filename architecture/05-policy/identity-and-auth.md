@@ -304,7 +304,7 @@ changes cannot land ([landing](../04-workflow/landing.md#sequencing)).
 ## Bootstrap
 
 A server outside dev mode accepts only tokens the instance signed. The first
-comes from `rill api mint-token <kind:name>`
+comes from `rill-server mint-token <kind:name>`
 ([mint.rs](../../crates/server/runtime/src/identity/mint.rs)): it opens the store
 and key service from the server configuration, makes sure a key exists, and
 signs an unnarrowed token for the principal (by default as long as its kind

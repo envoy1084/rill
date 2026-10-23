@@ -1,15 +1,22 @@
 //! Bootstrapping a server without dev mode: the first token comes from
-//! `rill api mint-token`, signed with the key the server then uses.
+//! `rill-server mint-token`, signed with the key the server then uses.
 
 use std::net::SocketAddr;
 
 use rill_api::{Listeners, ServerConfig};
 use tokio_util::sync::CancellationToken;
 
-async fn rill(args: &[&str]) -> (i32, String) {
+async fn rill_server(args: &[&str]) -> (i32, String) {
     let mut out = Vec::new();
-    let code = rill_cli::run_cli_with_args(args.iter().copied(), &mut out).await;
+    let code = rill_server::run_with_args(args.iter().copied(), &mut out).await;
     (code, String::from_utf8(out).unwrap())
+}
+
+async fn whoami(endpoint: &str, token: &str) -> rill_sdk::Result<String> {
+    let mut config = rill_sdk::ClientConfig::new(endpoint);
+    config.token = Some(token.to_string());
+    let client = rill_sdk::Client::connect(config).await?;
+    Ok(client.admin().whoami().await?.principal.name)
 }
 
 #[tokio::test]
@@ -36,19 +43,19 @@ async fn a_minted_token_signs_in_to_a_server_on_the_same_store() {
     .unwrap();
     let config_arg = config_path.display().to_string();
 
-    let (code, out) = rill(&["rill", "api", "--config", &config_arg, "mint-token", "root"]).await;
+    let (code, out) =
+        rill_server(&["rill-server", "mint-token", "root", "--config", &config_arg]).await;
     assert_eq!(code, 0, "{out}");
     let token = out.trim().to_string();
     // An agent token cannot outlive the agent limit.
-    let (code, _) = rill(&[
-        "rill",
-        "api",
-        "--config",
-        &config_arg,
+    let (code, _) = rill_server(&[
+        "rill-server",
         "mint-token",
         "agent:bot",
         "--ttl",
         "86400",
+        "--config",
+        &config_arg,
     ])
     .await;
     assert_ne!(code, 0);
@@ -69,30 +76,11 @@ async fn a_minted_token_signs_in_to_a_server_on_the_same_store() {
     ));
 
     let endpoint = format!("http://{grpc}");
-    let (code, out) = rill(&[
-        "rill",
-        "--endpoint",
-        &endpoint,
-        "--token",
-        &token,
-        "--json",
-        "whoami",
-    ])
-    .await;
-    assert_eq!(code, 0, "{out}");
-    let me: serde_json::Value = serde_json::from_str(&out).unwrap();
-    let me = me["result"].clone();
-    assert_eq!(me["principal"]["name"], "root", "{me}");
-    let (code, _) = rill(&[
-        "rill",
-        "--endpoint",
-        &endpoint,
-        "--token",
-        "made-up",
-        "whoami",
-    ])
-    .await;
-    assert_ne!(code, 0, "an unsigned token is refused");
+    assert_eq!(whoami(&endpoint, &token).await.unwrap(), "root");
+    assert!(
+        whoami(&endpoint, "made-up").await.is_err(),
+        "an unsigned token is refused"
+    );
 
     shutdown.cancel();
     serving.await.unwrap().unwrap();

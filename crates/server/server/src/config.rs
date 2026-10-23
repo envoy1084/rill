@@ -1,22 +1,21 @@
-//! The server configuration `rill dev` and `rill api` build from flags.
+//! The server configuration `dev` and `run` build from flags.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use rill_api::{Roles, ServerConfig, StorageConfig};
 
-use super::args::{ApiArgs, DevArgs};
-use crate::error::CliError;
-use crate::Result;
+use crate::args::{DevArgs, ServeArgs};
+use crate::error::{Error, Result};
 
-/// gRPC port `rill dev` listens on.
+/// gRPC port `dev` listens on.
 pub const DEV_GRPC_PORT: u16 = 7470;
-/// HTTP port `rill dev` listens on.
+/// HTTP port `dev` listens on.
 pub const DEV_HTTP_PORT: u16 = 7471;
-/// Execution workers `rill dev` runs in-process.
+/// Execution workers `dev` runs in-process.
 pub const DEV_LOCAL_WORKERS: usize = 2;
 
-/// The configuration `rill dev` runs with.
+/// The configuration `dev` runs with.
 pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
     let (storage, master_key_file) = if args.memory {
         (StorageConfig::Memory, None)
@@ -71,9 +70,9 @@ pub fn dev_config(args: &DevArgs) -> Result<ServerConfig> {
     })
 }
 
-/// The configuration `rill api` runs with: file (or defaults), then
+/// The configuration `run` runs with: file (or defaults), then
 /// environment, then flags.
-pub fn api_config(args: &ApiArgs) -> Result<ServerConfig> {
+pub fn serve_config(args: &ServeArgs) -> Result<ServerConfig> {
     let mut config = ServerConfig::load(args.config.as_deref())?;
     if let Some(addr) = args.listen_grpc {
         config.listen_grpc = addr;
@@ -97,7 +96,7 @@ pub fn parse_storage(spec: &str) -> Result<StorageConfig> {
         Some(("local", dir)) if !dir.is_empty() => Ok(StorageConfig::Local {
             dir: PathBuf::from(dir),
         }),
-        _ => Err(CliError::Usage(format!(
+        _ => Err(Error::Usage(format!(
             "--storage: expected `memory` or `local:<dir>`, got {spec:?}"
         ))),
     }
@@ -105,7 +104,7 @@ pub fn parse_storage(spec: &str) -> Result<StorageConfig> {
 
 fn default_dev_dir() -> Result<PathBuf> {
     let home = std::env::var_os("HOME")
-        .ok_or_else(|| CliError::Usage("HOME is not set; pass --data or --memory".into()))?;
+        .ok_or_else(|| Error::usage("HOME is not set; pass --data or --memory"))?;
     Ok(PathBuf::from(home).join(".rill").join("dev"))
 }
 
@@ -114,7 +113,7 @@ mod tests {
     use clap::Parser;
 
     use super::*;
-    use crate::cli::{Cli, Command};
+    use crate::args::{Cli, Command};
 
     fn parse(args: &[&str]) -> Command {
         Cli::try_parse_from(args).unwrap().command
@@ -122,7 +121,7 @@ mod tests {
 
     #[test]
     fn dev_runs_every_role_on_fixed_ports() {
-        let Command::Dev(args) = parse(&["rill", "dev", "--data", "/tmp/rill-dev"]) else {
+        let Command::Dev(args) = parse(&["rill-server", "dev", "--data", "/tmp/rill-dev"]) else {
             panic!("not dev");
         };
         let config = dev_config(&args).unwrap();
@@ -135,17 +134,17 @@ mod tests {
             }
         );
         assert_eq!(config.listen_grpc.port(), DEV_GRPC_PORT);
-        let Command::Dev(args) = parse(&["rill", "dev", "--memory"]) else {
+        let Command::Dev(args) = parse(&["rill-server", "dev", "--memory"]) else {
             panic!("not dev");
         };
         assert_eq!(dev_config(&args).unwrap().storage, StorageConfig::Memory);
     }
 
     #[test]
-    fn api_flags_override_the_file() {
-        let Command::Api(args) = parse(&[
-            "rill",
-            "api",
+    fn run_flags_override_the_file() {
+        let Command::Run(args) = parse(&[
+            "rill-server",
+            "run",
             "--listen-grpc",
             "127.0.0.1:0",
             "--storage",
@@ -153,9 +152,9 @@ mod tests {
             "--roles",
             "workers",
         ]) else {
-            panic!("not api");
+            panic!("not run");
         };
-        let config = api_config(&args).unwrap();
+        let config = serve_config(&args).unwrap();
         assert!(!config.dev_mode);
         assert_eq!(config.listen_grpc.port(), 0);
         assert_eq!(

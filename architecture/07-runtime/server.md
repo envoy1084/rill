@@ -3,14 +3,15 @@
 `rill-api` is the one process that owns every repository. It serves the
 `rill.v1` API (Connect, gRPC and gRPC-web, with REAPI beside it) and the
 HTTP object protocol, and runs the background
-workers for each repository. The crate is a library; `rill dev` and
-`rill api` in `rill-cli` build a `ServerConfig` and call `rill_api::run`.
+workers for each repository. The crate is a library; `rill-server dev`
+and `rill-server run` (the `rill-server` crate, see below) build a
+`ServerConfig` and call `rill_api::run`.
 
 ## Composition
 
 ```mermaid
 flowchart TD
-    Bin[rill dev / rill api] -->|ServerConfig| Run[rill_api::run]
+    Bin[rill-server dev / run] -->|ServerConfig| Run[rill_api::run]
     Run --> L[Listeners::bind]
     Run --> BS[build_state]
     BS --> AS[AppState]
@@ -157,6 +158,39 @@ Linux. Shutdown follows `[shutdown]`
    running then, the abort token fires and job workers give their running
    jobs back to the queue (`Queue::release`) instead of letting the claims
    expire.
+
+## The `rill-server` binary
+
+The `rill-server` crate (`crates/server/server`) is the services' command
+line; clients never link it (ADR 020, enforced in CI). It carries the
+deployment features (`fdb`, `aws`, `gcp`, `saml`); the image builds it
+with the `dist` profile.
+
+* `rill-server run [--config PATH] [--listen-grpc ADDR] [--listen-http ADDR]
+  [--storage memory|local:<dir>] [--roles api,workers]` loads the file and
+  `RILL_*` environment through `ServerConfig::load`, then applies the
+  flags (`serve_config`). S3 storage and the key service come only from
+  the file or the environment.
+* `rill-server dev [--data DIR | --memory] [--listen-grpc ADDR]
+  [--listen-http ADDR]` runs every role in one process with `dev_mode` on,
+  storage in `~/.rill/dev` by default, and ports 7470 / 7471. Verification
+  is on, with two unisolated in-process execution workers running
+  `.rill/verify.toml`. `rill dev` in the client hands over to it.
+* `rill-server init-config [--out PATH] [--force]` writes an annotated
+  `ServerConfig::default()` ([configuration](configuration.md)).
+* `rill-server mint-token <human:|agent:|service:>NAME [--org ORG]
+  [--ttl SECS] [--config PATH …]` signs a token with the instance's key,
+  reading the store and key service from the configuration like a server
+  would: how the first administrator (and staging) gets a token.
+* `rill-server cache --origin URL --dir DIR [--max-bytes 10G]` runs the
+  [cache tier](cache.md).
+* `rill-server import git <path> --repo NAME --storage-dir DIR` imports
+  into a storage directory no server has open ([git
+  import](../06-services/git-import.md)).
+
+`run`, `dev` and `cache` install the configured telemetry; the other
+commands log warnings to stderr. Ctrl-C cancels the root
+`CancellationToken`.
 
 ## Limitations
 

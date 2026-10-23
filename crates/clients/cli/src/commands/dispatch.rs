@@ -16,8 +16,6 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
     let local = matches!(
         command,
         Command::Dev(_)
-            | Command::Api(_)
-            | Command::Cache(_)
             | Command::Login(_)
             | Command::Logout
             | Command::Completions(_)
@@ -91,9 +89,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Import(cmd) => import::run(ctx, cmd).await,
         Command::Export(cmd) => export::run(ctx, cmd).await,
         Command::Watch(cmd) => watch::run(ctx, cmd).await,
-        Command::Dev(args) => crate::server::dev(args).await,
-        Command::Api(args) => crate::server::api(ctx, args).await,
-        Command::Cache(args) => crate::server::cache::run(args).await,
+        Command::Dev(args) => crate::commands::dev::run(args),
         Command::Completions(args) => {
             let mut cmd = Cli::command();
             let mut buf = Vec::new();

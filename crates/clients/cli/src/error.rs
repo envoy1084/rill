@@ -33,18 +33,6 @@ pub enum CliError {
     #[error("import error: {0}")]
     Import(#[from] rill_git_import::Error),
 
-    /// Local storage failed (import runs directly against it).
-    #[error("storage error: {0}")]
-    Store(#[from] rill_store::Error),
-
-    /// The service failed to start or stopped with an error.
-    #[error("server error: {0}")]
-    Server(#[from] rill_api::Error),
-
-    /// The cache tier failed to start or stopped with an error.
-    #[error("cache error: {0}")]
-    Cache(#[from] rill_cache::Error),
-
     /// A JSON value could not be written.
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
@@ -74,9 +62,6 @@ impl CliError {
             CliError::Invalid(_) => "invalid".into(),
             CliError::Io(_) => "io".into(),
             CliError::Import(_) => "import".into(),
-            CliError::Store(_) => "storage".into(),
-            CliError::Server(_) => "server".into(),
-            CliError::Cache(_) => "cache".into(),
             CliError::Json(_) => "json".into(),
             CliError::Other(_) => "error".into(),
         }

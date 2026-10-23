@@ -125,7 +125,7 @@ laptop:
 | Server | Landed | Lands/s sustained | Land p50 | Give-ups | Resolved by a driver |
 | --- | --- | --- | --- | --- | --- |
 | embedded, memory | 1,199 | 13.3 | 254 ms | 0 | 68% |
-| `rill api`, local FoundationDB, objects on local disk | 1,196 | about 11–12 | 21 s | 0 | 66% |
+| `rill-server run`, local FoundationDB, objects on local disk | 1,196 | about 11–12 | 21 s | 0 | 66% |
 | same, steady 10/s for 30 s | 299 | 10.0 | 1.3 s | 0 | 70% |
 
 On FoundationDB the lander keeps up with 10/s and absorbs bursts as a

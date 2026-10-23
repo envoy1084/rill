@@ -6832,7 +6832,6 @@ dependencies = [
  "inquire",
  "insta",
  "owo-colors",
- "rand 0.10.3",
  "ratatui",
  "rcgen",
  "regex",
@@ -7331,6 +7330,29 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "rill-server"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "hex",
+ "rand 0.10.3",
+ "rill-api",
+ "rill-cache",
+ "rill-git-import",
+ "rill-identity",
+ "rill-runtime",
+ "rill-sdk",
+ "rill-store",
+ "rill-types",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

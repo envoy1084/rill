@@ -5,7 +5,7 @@
 cache near its clients answers object reads without asking the origin
 anything: it checks each request's [read grant](../05-policy/permissions.md#read-grants)
 against the origin's published grant keys and serves from local disk. The
-origin is the `rill api` HTTP listener; `rill cache` runs the tier.
+origin is the `rill-server run` HTTP listener; `rill-server cache` runs the tier.
 
 ```mermaid
 flowchart LR
@@ -72,7 +72,7 @@ own credentials, because the failure may have been the leader's token.
 ## Running
 
 ```sh
-rill cache --origin https://rill.internal:7421 --dir /var/cache/rill \
+rill-server cache --origin https://rill.internal:7421 --dir /var/cache/rill \
   --max-bytes 500G --listen 0.0.0.0:7422 --origin-token "$CACHE_TOKEN"
 ```
 

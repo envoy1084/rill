@@ -288,14 +288,9 @@ pub enum Command {
     /// Print a shell completion script.
     Completions(CompletionsArgs),
 
-    /// Run every role in one process for development: no authentication.
-    Dev(crate::server::DevArgs),
-
-    /// Run the service from a configuration file.
-    Api(crate::server::ApiArgs),
-
-    /// Run the regional cache tier in front of an origin.
-    Cache(crate::server::cache::CacheArgs),
+    /// Run a development server (every role, no authentication) with
+    /// `rill-server dev`.
+    Dev(crate::commands::dev::DevArgs),
 }
 
 /// `rill completions`.

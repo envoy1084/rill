@@ -17,16 +17,16 @@ flowchart LR
 ```
 
 `ServerConfig::load(path)` reads the file, or uses the defaults when no
-path is given, and then calls `apply_env`. `api_config` in
-`rill-cli/src/server/mod.rs` then applies the individual flags of
-`rill api`. (`rill dev` builds its own configuration; see below.)
+path is given, and then calls `apply_env`. `serve_config` in
+`rill-server/src/config.rs` then applies the individual flags of
+`rill-server run`. (`rill-server dev` builds its own configuration; see below.)
 A later step overrides an earlier one. A malformed file or variable is an
 `Error::Config`, and the binary exits non-zero.
 
 ## The file
 
 `ServerConfig` is `#[serde(default)]`, so any key may be omitted.
-`rill api init-config [--out FILE] [--force]` writes the serialized
+`rill-server init-config [--out FILE] [--force]` writes the serialized
 defaults with a comment header that lists every alternative.
 
 | Key | Default | Meaning |
@@ -74,7 +74,7 @@ move metadata elsewhere:
 | `fdb` | `cluster_file` (optional, platform default), `root` (default `rill`) | FoundationDB, every key under the subspace `(root,)`, so one cluster can hold several deployments |
 
 `fdb` needs a server built with the `fdb` feature (`cargo build -p
-rill-cli --features fdb`), which links the FoundationDB client library;
+rill-server --features fdb`), which links the FoundationDB client library;
 other builds refuse the setting at start-up.
 
 See [storage and keyspace](../02-data/storage-and-keyspace.md) for what the
@@ -99,7 +99,7 @@ Servers sharing a store must share the key service, or each mints its own
 key. `[[auth.tokens]]` (`token`, `principal_name`, `kind` = `Human`,
 `Agent` or `Service`, `teams`) are accepted only with `dev_mode`; a server
 refuses to start with them otherwise. The first token for a production
-instance comes from `rill api mint-token`. See
+instance comes from `rill-server mint-token`. See
 [identity and auth](../05-policy/identity-and-auth.md).
 
 ## Audit

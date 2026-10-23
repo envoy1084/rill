@@ -41,8 +41,6 @@ fn import_watch_completions() {
         "main",
         "--ref",
         "main",
-        "--storage-dir",
-        "/data",
     ])
     .command
     {

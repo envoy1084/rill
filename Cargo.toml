@@ -30,6 +30,7 @@ rill-search = { path = "crates/domain/search" }
 rill-exec = { path = "crates/domain/exec" }
 rill-runtime = { path = "crates/server/runtime" }
 rill-api = { path = "crates/server/api" }
+rill-server = { path = "crates/server/server" }
 rill-cache = { path = "crates/server/cache" }
 rill-sdk = { path = "crates/clients/sdk" }
 rill-daemon = { path = "crates/clients/daemon" }

@@ -10,7 +10,7 @@ docker build -f ../docker/Dockerfile -t rill:dev ../..
 docker compose up -d
 export RILL_ENDPOINT=http://localhost:7470
 export RILL_TOKEN=$(docker compose exec rill1 \
-  rill api --config /etc/rill/rill.toml mint-token service:staging-admin)
+  rill-server mint-token service:staging-admin --config /etc/rill/rill.toml)
 rill repo create demo
 ```
 

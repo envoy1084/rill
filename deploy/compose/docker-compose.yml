@@ -5,14 +5,14 @@
 #   docker build -f ../docker/Dockerfile -t rill:dev ../..
 #   docker compose up -d
 #   export RILL_ENDPOINT=http://localhost:7470
-#   export RILL_TOKEN=$(docker compose exec rill1 rill api --config /etc/rill/rill.toml mint-token service:staging-admin)
+#   export RILL_TOKEN=$(docker compose exec rill1 rill-server mint-token service:staging-admin --config /etc/rill/rill.toml)
 #
 # gRPC on :7470 and the object protocol on :7471 (both through nginx),
 # Grafana on :3000 (admin/admin), Prometheus on :9090, S3 on :8333.
 
 x-rill: &rill
   image: ${RILL_IMAGE:-rill:dev}
-  command: ["api", "--config", "/etc/rill/rill.toml"]
+  command: ["run", "--config", "/etc/rill/rill.toml"]
   environment:
     AWS_ENDPOINT: http://seaweedfs:8333
     AWS_ALLOW_HTTP: "true"
