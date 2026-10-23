@@ -14,6 +14,17 @@ service PolicyService {
   rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
   // Replace a policy's text (repository owners).
   rpc UpdatePolicy(UpdatePolicyRequest) returns (UpdatePolicyResponse);
+  // The submit rules in force: trunk's `.rill/policy/*.cedar`, else the
+  // stored policy, else the default, with the org's guardrails after them.
+  rpc GetEffectivePolicy(GetEffectivePolicyRequest) returns (GetEffectivePolicyResponse);
+  // Why a landing was allowed: the policy and the decision recorded.
+  rpc ExplainLanding(ExplainLandingRequest) returns (ExplainLandingResponse);
+  // Replay recorded landings under a candidate policy.
+  rpc SimulatePolicy(SimulatePolicyRequest) returns (SimulatePolicyResponse);
+  // An org's guardrails: forbid rules above every repository's policy.
+  rpc GetGuardrails(GetGuardrailsRequest) returns (GetGuardrailsResponse);
+  // Replace an org's guardrails (org administrators).
+  rpc UpdateGuardrails(UpdateGuardrailsRequest) returns (UpdateGuardrailsResponse);
 }
 
 // A repository policy.
@@ -47,4 +58,86 @@ message UpdatePolicyRequest {
 }
 message UpdatePolicyResponse {
   Policy policy = 1;
+}
+
+message GetEffectivePolicyRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+}
+message GetEffectivePolicyResponse {
+  string text = 1;
+  // `default`, `stored`, or the `.rill/policy/` files, with
+  // ` + org guardrails` when the org has any.
+  string source = 2;
+  // BLAKE3 of `text`, hex: what landings record.
+  string digest = 3;
+}
+
+message ExplainLandingRequest {
+  // `…/trunk/positions/{n}`. Required.
+  string landing = 1;
+}
+message ExplainLandingResponse {
+  // `…/changes/{change}`.
+  string change = 1;
+  // The policy digest the landing recorded, and where the policy came from.
+  string policy = 2;
+  string source = 3;
+  bool allowed = 4;
+  repeated string matched_policies = 5;
+  repeated string reasons = 6;
+  // The change's facts and review facts the decision saw, as JSON.
+  string facts_json = 7;
+  // The policy text, when this repository kept it.
+  string policy_text = 8;
+}
+
+message SimulatePolicyRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // The candidate Cedar text. Required.
+  string text = 2;
+  // Trunk positions to replay, inclusive; 0 for the first or the last.
+  uint64 since = 3;
+  uint64 until = 4;
+}
+message SimulatedLanding {
+  // `…/trunk/positions/{n}`.
+  string landing = 1;
+  string change = 2;
+  repeated string reasons = 3;
+}
+message SimulatePolicyResponse {
+  // Landings replayed (those with a recorded decision).
+  uint32 replayed = 1;
+  // Landings in range without a recorded decision.
+  uint32 unrecorded = 2;
+  // Still allowed under the candidate.
+  uint32 allowed = 3;
+  // Allowed then, blocked under the candidate.
+  repeated SimulatedLanding blocked = 4;
+  // Landings that could have landed with no human vote: under the policy
+  // recorded, and under the candidate.
+  uint32 agent_only_before = 5;
+  uint32 agent_only_after = 6;
+}
+
+message GetGuardrailsRequest {
+  // `orgs/{org}`. Required.
+  string org = 1;
+}
+message GetGuardrailsResponse {
+  string text = 1;
+}
+
+message UpdateGuardrailsRequest {
+  string request_id = 1;
+  // `orgs/{org}`. Required.
+  string org = 2;
+  // Cedar `forbid` rules, each with an `@id` starting `org_`; empty
+  // removes them.
+  string text = 3;
+}
+message UpdateGuardrailsResponse {
+  string text = 1;
 }

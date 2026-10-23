@@ -11,10 +11,12 @@
 //! * [`stacks`]: chains of dependent changes.
 //! * [`facts`] and [`evaluate`]: building policy facts and deciding
 //!   whether a change may land.
+//! * [`attention`]: inbox, sampled audits, batch review and digests.
 //! * [`agents`]: the reviewer fleet's context, result checks and run
 //!   records.
 
 pub mod agents;
+pub mod attention;
 mod content;
 pub mod error;
 pub mod evaluate;

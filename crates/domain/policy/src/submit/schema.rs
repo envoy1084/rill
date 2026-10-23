@@ -65,6 +65,20 @@ namespace Rill {
         // The lowest trust (permille, from reviewers' track records) among
         // those approvals; 0 when there are none.
         "min_agent_trust": Long,
+        // Size: files and lines touched, depth in its stack.
+        "files": Long,
+        "lines": Long,
+        "stack_depth": Long,
+        // The author's model and sponsor from the version's provenance
+        // ("" when none).
+        "author_model": String,
+        "author_sponsor": String,
+        // When the facts were taken, UTC: a Saturday or Sunday; the hour.
+        "weekend": Bool,
+        "hour": Long,
+        // Trunk's health ("green", "red", "fixing", "guarded") and freeze.
+        "trunk_state": String,
+        "frozen": Bool,
         // Names of the labels present as tags, for `.contains` checks.
         "label_names": Set<String>,
     } tags VoteSummary;

@@ -30,8 +30,10 @@ pub struct Args {
     /// The server; default `RILL_ENDPOINT`.
     #[arg(long)]
     pub endpoint: Option<String>,
+    /// Review changes or resolve conflicts.
     #[arg(long, value_enum, default_value_t = Mode::Review)]
     pub mode: Mode,
+    /// What runs the jobs.
     #[arg(long, value_enum, default_value_t = BackendKind::Fake)]
     pub backend: BackendKind,
     /// Stop when no job is waiting instead of waiting for more.

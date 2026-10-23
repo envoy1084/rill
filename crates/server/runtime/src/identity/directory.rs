@@ -55,4 +55,13 @@ impl Directory for OrgDirectory {
             PrincipalKind::Service => Person::default(),
         })
     }
+
+    async fn guardrails(&self) -> rill_policy::Result<Option<String>> {
+        let settings = self
+            .identity
+            .org_settings(&self.org)
+            .await
+            .map_err(|e| rill_policy::Error::PolicyEvaluation(e.to_string()))?;
+        Ok(settings.guardrails.clone())
+    }
 }

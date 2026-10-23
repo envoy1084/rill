@@ -1,17 +1,24 @@
-//! Per-repository policy records: the Cedar submit policy and the risk
-//! configuration, stored as JSON in the repository's misc keyspace and
-//! hot-swapped into the review service when changed.
+//! Per-repository policy: the Cedar submit rules (trunk's `.rill/policy/`
+//! files, else the stored policy, else the default, with the org's
+//! guardrails after them) and the risk configuration, hot-swapped into the
+//! review service when they change.
+
+use std::sync::Arc;
 
 use bytes::Bytes;
+use rill_core::{DeriveManager, RootTree};
+use rill_policy::submit::with_guardrails;
 use rill_policy::{CompiledRiskConfig, RiskConfig, SubmitPolicy};
 use rill_store::RepoStore;
-use rill_types::{Principal, Timestamp};
+use rill_types::{EntryKind, Principal, RepoPathBuf, Timestamp};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
 /// Name of the Cedar submit policy.
 pub const SUBMIT_POLICY: &str = "submit";
+/// Where a repository keeps its own submit rules, on trunk.
+pub const POLICY_DIR: &str = ".rill/policy";
 /// Name of the risk configuration (JSON `RiskConfig`).
 pub const RISK_POLICY: &str = "risk";
 
@@ -28,6 +35,29 @@ pub struct StoredPolicy {
 
 fn misc_key(name: &str) -> String {
     format!("policy:{name}")
+}
+
+/// The name `PolicyChanged` carries when an org's guardrails change.
+pub const GUARDRAILS: &str = "guardrails";
+
+/// Tell every server following `repo` that its policy `name` changed
+/// elsewhere (an org's guardrails), so each reloads it.
+pub async fn announce(repo: &RepoStore, name: &str, by: &Principal) -> Result<()> {
+    let at = Timestamp::now();
+    let event = rill_types::Event {
+        kind: rill_types::EventKind::PolicyChanged {
+            name: name.to_string(),
+        },
+        actor: by.clone(),
+        at,
+    };
+    repo.set_misc_with_event(
+        &misc_key(&format!("{name}-changed")),
+        Bytes::from(at.millis().to_string()),
+        &event,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Read a stored policy, if one was ever set.
@@ -74,12 +104,105 @@ pub fn parse_risk(text: &str) -> Result<RiskConfig> {
     serde_json::from_str(text).map_err(|e| Error::invalid(format!("risk config: {e}")))
 }
 
-/// The effective submit policy: the stored one, or the crate default.
-pub async fn effective_submit(repo: &RepoStore) -> Result<SubmitPolicy> {
-    match load(repo, SUBMIT_POLICY).await? {
-        Some(stored) => Ok(SubmitPolicy::from_source(&stored.text)?),
-        None => Ok(SubmitPolicy::default_rules()),
+/// The submit policy in force, its full text and where it came from.
+pub struct EffectiveSubmit {
+    pub policy: SubmitPolicy,
+    pub text: String,
+    pub source: String,
+}
+
+/// The `*.cedar` files in trunk's `.rill/policy/`, by path.
+pub async fn trunk_policy_files(
+    repo: &RepoStore,
+    derive: &Arc<DeriveManager>,
+) -> Result<Vec<(String, String)>> {
+    let Some((_, head)) = repo.trunk_head().await? else {
+        return Ok(Vec::new());
+    };
+    let root = derive.get::<RootTree>(&head).await?;
+    let dir = RepoPathBuf::new(POLICY_DIR)?;
+    let Ok(entries) = derive.trees().list_dir(root, &dir).await else {
+        return Ok(Vec::new());
+    };
+    let mut files = Vec::new();
+    for (name, kind) in entries {
+        let EntryKind::File { content, .. } = kind else {
+            continue;
+        };
+        if !name.ends_with(".cedar") {
+            continue;
+        }
+        let bytes = rill_core::read_content(repo.objects().as_ref(), &content).await?;
+        files.push((
+            format!("{POLICY_DIR}/{name}"),
+            String::from_utf8_lossy(&bytes).into_owned(),
+        ));
     }
+    Ok(files)
+}
+
+/// The repository's rules before guardrails: trunk's `.rill/policy/`
+/// files, else the stored `submit` policy, else the default.
+async fn repo_rules(repo: &RepoStore, derive: &Arc<DeriveManager>) -> Result<(String, String)> {
+    let files = trunk_policy_files(repo, derive).await?;
+    if !files.is_empty() {
+        let names: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
+        let source = names.join(", ");
+        let text = files
+            .iter()
+            .map(|(p, t)| format!("// ---- {p} ----\n{t}\n"))
+            .collect::<String>();
+        match SubmitPolicy::from_source(&text) {
+            Ok(_) => return Ok((text, source)),
+            // Commits are linted file by file; a set that does not compile
+            // together falls back rather than stopping review.
+            Err(e) => tracing::error!(error = %e, files = %source, "ignoring trunk's policy files"),
+        }
+    }
+    Ok(match load(repo, SUBMIT_POLICY).await? {
+        Some(stored) => (stored.text, "stored".to_string()),
+        None => (
+            rill_policy::submit::default_policy().to_string(),
+            "default".to_string(),
+        ),
+    })
+}
+
+/// The effective submit policy: the repository's rules with the org's
+/// guardrails after them. Its text is kept by digest, so a landing's
+/// recorded policy can be read back.
+pub async fn effective_submit(
+    repo: &RepoStore,
+    derive: &Arc<DeriveManager>,
+    guardrails: Option<String>,
+) -> Result<EffectiveSubmit> {
+    let (rules, mut source) = repo_rules(repo, derive).await?;
+    let text = with_guardrails(&rules, guardrails.as_deref());
+    if text != rules {
+        source.push_str(" + org guardrails");
+    }
+    let policy = SubmitPolicy::from_source(&text)?;
+    let key = policy_text_key(&policy.digest());
+    if repo.get_misc(&key).await?.is_none() {
+        repo.set_misc(&key, Bytes::from(text.clone())).await?;
+    }
+    Ok(EffectiveSubmit {
+        policy,
+        text,
+        source,
+    })
+}
+
+fn policy_text_key(digest: &[u8; 32]) -> String {
+    format!("policy-text:{}", hex::encode(digest))
+}
+
+/// The policy text a digest names, when this repository ever used it.
+pub async fn policy_text(repo: &RepoStore, digest: &[u8; 32]) -> Result<Option<String>> {
+    Ok(repo
+        .get_misc(&policy_text_key(digest))
+        .await?
+        .map(|b| String::from_utf8_lossy(&b).into_owned()))
 }
 
 /// The effective risk configuration: the stored one, or `fallback` from
@@ -127,6 +250,18 @@ mod tests {
         store(&repo, RISK_POLICY, &stored).await.unwrap();
         assert_eq!(load(&repo, RISK_POLICY).await.unwrap(), Some(stored));
         effective_risk(&repo, &RiskConfig::default()).await.unwrap();
-        effective_submit(&repo).await.unwrap();
+        let derive = DeriveManager::new(
+            repo.clone(),
+            rill_core::TreeOps::new(repo.objects().clone(), 64),
+            64,
+        );
+        let effective = effective_submit(&repo, &derive, None).await.unwrap();
+        assert_eq!(effective.source, "default");
+        assert_eq!(
+            policy_text(&repo, &effective.policy.digest())
+                .await
+                .unwrap(),
+            Some(effective.text)
+        );
     }
 }

@@ -2,7 +2,8 @@
 //!
 //! A landing credits every agent whose positive `Review` vote the policy
 //! saw. A revert of that landing, or an incident blaming it, turns those
-//! credits into escapes, once per landing whichever comes first. A
+//! credits into escapes, once per landing whichever comes first (a failed
+//! audit too). A
 //! blocking finding (Bug or Security, confidence 70 or more) resolved
 //! after the author stored a newer version counts as a catch; resolved on
 //! the version it was raised on, as a false alarm. A reviewer whose trust
@@ -96,7 +97,7 @@ async fn credit(ctx: &RepoContext, seq: TrunkSeq) -> Result<()> {
 
 /// Count the landing at `seq` as an escape for its approvers, once.
 pub async fn escape(ctx: &RepoContext, seq: TrunkSeq) -> Result<()> {
-    let marker = format!("escaped:{}", seq.0);
+    let marker = rill_review::attention::escaped_key(seq);
     match ctx
         .repo
         .set_misc_cas(&marker, None, Bytes::from_static(b"1"))

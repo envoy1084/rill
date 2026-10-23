@@ -39,7 +39,9 @@ fn agent_approvals(n: u32) -> VoteSummary {
 fn reviewed_by_agents(risk: RiskClass, n: u32) -> SubmitFacts {
     SubmitFacts {
         independent_agent_approvals: n,
-        ..SubmitFacts::new(risk).with_label("Review", agent_approvals(n))
+        ..SubmitFacts::new(risk)
+            .with_label("Review", agent_approvals(n))
+            .with_label("Verified", verified())
     }
 }
 
@@ -62,16 +64,47 @@ fn eval(facts: SubmitFacts) -> SubmitDecision {
 #[test]
 fn default_policy_validates() {
     let p = SubmitPolicy::default_rules();
-    assert_eq!(p.len(), 7);
+    assert_eq!(p.len(), 9);
 }
 
 #[test]
-fn trivial_lands_on_verified() {
-    for risk in [RiskClass::Trivial, RiskClass::Low] {
-        let d = eval(SubmitFacts::new(risk).with_label("Verified", verified()));
-        assert!(d.allowed, "{risk}: {:?}", d.reasons);
-        assert_eq!(d.matched_policies, vec!["land_trivial_or_low"]);
-    }
+fn trivial_and_low_need_verification_and_independent_approvals() {
+    let verified_only = SubmitFacts::new(RiskClass::Trivial).with_label("Verified", verified());
+    assert!(!eval(verified_only).allowed, "verification alone");
+    let d = eval(reviewed_by_agents(RiskClass::Trivial, 1));
+    assert_eq!(d.matched_policies, ["land_trivial"]);
+    assert!(
+        !eval(reviewed_by_agents(RiskClass::Low, 1)).allowed,
+        "low needs two"
+    );
+    let d = eval(reviewed_by_agents(RiskClass::Low, 2));
+    assert_eq!(d.matched_policies, ["land_low"]);
+    let human = SubmitFacts::new(RiskClass::Low)
+        .with_label("Verified", verified())
+        .with_label("Review", human_review(1));
+    assert!(eval(human).allowed, "a human's approval stands in");
+}
+
+#[test]
+fn an_approved_intent_in_scope_replaces_the_owner_up_to_its_quorum() {
+    let mut f = reviewed_by_agents(RiskClass::Normal, 2);
+    assert!(!eval(f.clone()).allowed, "no owner, no intent");
+    let mut change = change();
+    change.intent = Some(crate::intents::IntentFacts {
+        approved: true,
+        in_scope: true,
+        reasons: vec![],
+        agent_quorum: Some(3),
+    });
+    let with = |f: &SubmitFacts, change: &ChangeFacts| {
+        SubmitPolicy::default_rules()
+            .evaluate(&Principal::human("lander"), change, f)
+            .unwrap()
+    };
+    assert!(!with(&f, &change).allowed, "the intent asks for three");
+    f.independent_agent_approvals = 3;
+    let d = with(&f, &change);
+    assert_eq!(d.matched_policies, ["land_normal_agent_review"]);
 }
 
 #[test]
@@ -111,10 +144,7 @@ fn normal_needs_human_plus_two() {
 fn normal_accepts_two_agents_plus_human_owner() {
     let d = eval(reviewed_by_agents(RiskClass::Normal, 2).with_label("Owner", human_review(1)));
     assert!(d.allowed, "{:?}", d.reasons);
-    assert_eq!(
-        d.matched_policies,
-        vec!["land_normal_agent_review_with_owner"]
-    );
+    assert_eq!(d.matched_policies, vec!["land_normal_agent_review"]);
 
     // One agent is not enough.
     let d = eval(reviewed_by_agents(RiskClass::Normal, 1).with_label("Owner", human_review(1)));

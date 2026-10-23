@@ -24,6 +24,10 @@ async fn normal_change_needs_human_plus_two_or_agents_plus_owner() {
 
     // Agent-only approval is insufficient.
     h.service
+        .vote(&cid, &h.bob, "Verified", 1, None)
+        .await
+        .unwrap();
+    h.service
         .vote(&cid, &h.agent_a, "Review", 1, None)
         .await
         .unwrap();
@@ -44,7 +48,8 @@ async fn normal_change_needs_human_plus_two_or_agents_plus_owner() {
         Err(Error::MaxRequiresHuman(_))
     ));
 
-    // Two agent approvals plus a human owner +1 is enough.
+    // A verification and two agent approvals plus a human owner +1 is
+    // enough.
     let state = h
         .service
         .vote(&cid, &h.bob, "Owner", 1, Some("owner ok".into()))
@@ -55,7 +60,7 @@ async fn normal_change_needs_human_plus_two_or_agents_plus_owner() {
     assert!(d.allowed);
     assert!(d
         .matched_policies
-        .contains(&"land_normal_agent_review_with_owner".to_string()));
+        .contains(&"land_normal_agent_review".to_string()));
 
     // Re-voting replaces rather than accumulates.
     let state = h
@@ -63,7 +68,7 @@ async fn normal_change_needs_human_plus_two_or_agents_plus_owner() {
         .vote(&cid, &h.agent_b, "Review", -1, None)
         .await
         .unwrap();
-    assert_eq!(state.current_votes().count(), 3);
+    assert_eq!(state.current_votes().count(), 4);
     assert_eq!(state.status, ReviewStatus::Open);
 
     // A human +2 alone is enough.

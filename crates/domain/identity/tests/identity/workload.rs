@@ -184,6 +184,7 @@ async fn registration_model_and_sponsor_gate_the_exchange() {
             &OrgIdentitySettings {
                 org: "acme".into(),
                 blocked_models: vec!["model-a".into()],
+                guardrails: None,
             },
             &admin(),
         )
@@ -195,6 +196,7 @@ async fn registration_model_and_sponsor_gate_the_exchange() {
             &OrgIdentitySettings {
                 org: "acme".into(),
                 blocked_models: vec![],
+                guardrails: None,
             },
             &admin(),
         )

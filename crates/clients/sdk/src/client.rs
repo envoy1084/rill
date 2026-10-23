@@ -9,12 +9,12 @@ use connectrpc::ConnectError;
 use futures::future::BoxFuture;
 use http::{HeaderValue, Uri};
 use rill_proto::rill::v1::{
-    AccessServiceClient, AdminServiceClient, AuditServiceClient, ChangeServiceClient,
-    ChecksServiceClient, ContentServiceClient, EventServiceClient, IdentityServiceClient,
-    IntentServiceClient, LandingServiceClient, OperationServiceClient, OrgServiceClient,
-    PolicyServiceClient, ProtectionServiceClient, RepoServiceClient, ReviewServiceClient,
-    ReviewerServiceClient, SecretServiceClient, SessionServiceClient, TrunkServiceClient,
-    WorkspaceServiceClient,
+    AccessServiceClient, AdminServiceClient, AttentionServiceClient, AuditServiceClient,
+    ChangeServiceClient, ChecksServiceClient, ContentServiceClient, EventServiceClient,
+    IdentityServiceClient, IntentServiceClient, LandingServiceClient, OperationServiceClient,
+    OrgServiceClient, PolicyServiceClient, ProtectionServiceClient, RepoServiceClient,
+    ReviewServiceClient, ReviewerServiceClient, SecretServiceClient, SessionServiceClient,
+    TrunkServiceClient, WorkspaceServiceClient,
 };
 
 use crate::access::AccessClient;
@@ -200,6 +200,8 @@ pub type WorkspaceSvc = WorkspaceServiceClient<Transport>;
 pub type ReviewSvc = ReviewServiceClient<Transport>;
 /// Generated intent client over the SDK transport.
 pub type IntentSvc = IntentServiceClient<Transport>;
+/// Generated attention client over the SDK transport.
+pub type AttentionSvc = AttentionServiceClient<Transport>;
 /// Generated reviewer-fleet client over the SDK transport.
 pub type ReviewerSvc = ReviewerServiceClient<Transport>;
 /// Generated landing client over the SDK transport.
@@ -482,6 +484,11 @@ impl Client {
     /// A fresh generated intent client.
     pub fn intent_svc(&self) -> IntentSvc {
         IntentServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated attention client.
+    pub fn attention_svc(&self) -> AttentionSvc {
+        AttentionServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated reviewer-fleet client.

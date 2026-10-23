@@ -69,6 +69,10 @@ impl ReviewService {
             }
         }
         self.fill_trust(&mut facts).await?;
+        let health = self.repo.trunk_health().await?;
+        facts.at = rill_types::Timestamp::now();
+        facts.trunk_state = health.state.as_str().to_string();
+        facts.frozen = health.frozen;
         Ok(facts)
     }
 

@@ -7,6 +7,7 @@ revisions, pages, filters, etags, request ids, errors) are in
 
 - [AccessService](#rill-v1-AccessService)
 - [AdminService](#rill-v1-AdminService)
+- [AttentionService](#rill-v1-AttentionService)
 - [AuditService](#rill-v1-AuditService)
 - [ChangeService](#rill-v1-ChangeService)
 - [ChecksService](#rill-v1-ChecksService)
@@ -1335,6 +1336,259 @@ Instance operations.
 | --- | --- | --- | --- |
 | `position` | [uint64](#uint64) |  |  |
 
+
+
+
+## rill/v1/attention.proto
+
+Human attention: what needs a given person, sampled audits of changes
+that landed on agent review alone, batch review of look-alike changes,
+and daily digests per intent.
+
+<a name="rill-v1-AttentionService"></a>
+
+### AttentionService
+
+Routing human attention.
+
+| Method | Request | Response | Description |
+| --- | --- | --- | --- |
+| `ListInbox` | [ListInboxRequest](#rill-v1-ListInboxRequest) | [ListInboxResponse](#rill-v1-ListInboxResponse) | What waits on the caller in a repository, most urgent first. |
+| `ListAudits` | [ListAuditsRequest](#rill-v1-ListAuditsRequest) | [ListAuditsResponse](#rill-v1-ListAuditsResponse) | Audits still waiting for a human. |
+| `RecordAudit` | [RecordAuditRequest](#rill-v1-RecordAuditRequest) | [RecordAuditResponse](#rill-v1-RecordAuditResponse) | Pass or fail an audit (an assignee or a repository owner). A failure counts against the agents that approved the change and can revert it. |
+| `ListSimilarChanges` | [ListSimilarChangesRequest](#rill-v1-ListSimilarChangesRequest) | [ListSimilarChangesResponse](#rill-v1-ListSimilarChangesResponse) | An intent's changes in review, grouped by the edit they make. |
+| `BatchVote` | [BatchVoteRequest](#rill-v1-BatchVoteRequest) | [BatchVoteResponse](#rill-v1-BatchVoteResponse) | Vote on every change of a group at once; each must still make the group's edit at the version it was grouped at. |
+| `GetIntentDigest` | [GetIntentDigestRequest](#rill-v1-GetIntentDigestRequest) | [GetIntentDigestResponse](#rill-v1-GetIntentDigestResponse) | What happened under an intent on one day. |
+
+
+
+<a name="rill-v1-Audit"></a>
+
+### Audit
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `landing` | [string](#string) |  | `…/trunk/positions/{n}`. |
+| `change` | [string](#string) |  |  |
+| `version` | [string](#string) |  |  |
+| `assignees` | [string](#string) | repeated | `user:…`, `team:…`, or `owners`. |
+| `risk` | [string](#string) |  |  |
+| `status` | [string](#string) |  | `pending`, `passed` or `failed`. |
+| `sampled_at` | [int64](#int64) |  |  |
+| `decided_by` | [Principal](#rill-v1-Principal) |  |  |
+| `decided_at` | [int64](#int64) |  |  |
+| `note` | [string](#string) |  |  |
+
+
+<a name="rill-v1-BatchVoteRequest"></a>
+
+### BatchVoteRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `intent` | [string](#string) |  | `…/intents/{intent}`. Required. |
+| `signature` | [string](#string) |  | The group voted on. Required. |
+| `label` | [string](#string) |  |  |
+| `value` | [int32](#int32) |  |  |
+| `reason` | [string](#string) |  |  |
+
+
+<a name="rill-v1-BatchVoteResponse"></a>
+
+### BatchVoteResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `results` | [BatchVoteResult](#rill-v1-BatchVoteResult) | repeated |  |
+
+
+<a name="rill-v1-BatchVoteResult"></a>
+
+### BatchVoteResult
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `change` | [string](#string) |  |  |
+| `voted` | [bool](#bool) |  |  |
+| `error` | [string](#string) |  | Why not, when not. |
+
+
+<a name="rill-v1-GetIntentDigestRequest"></a>
+
+### GetIntentDigestRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `intent` | [string](#string) |  | `…/intents/{intent}`. Required. |
+| `day` | [string](#string) |  | `YYYY-MM-DD`, UTC; default today. |
+
+
+<a name="rill-v1-GetIntentDigestResponse"></a>
+
+### GetIntentDigestResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `day` | [string](#string) |  |  |
+| `landed` | [uint32](#uint32) |  |  |
+| `reverted` | [uint32](#uint32) |  |  |
+| `flagged` | [uint32](#uint32) |  |  |
+| `sampled` | [uint32](#uint32) |  |  |
+| `open` | [uint32](#uint32) |  |  |
+
+
+<a name="rill-v1-InboxItem"></a>
+
+### InboxItem
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `kind` | [InboxKind](#rill-v1-InboxKind) |  |  |
+| `change` | [string](#string) |  | `…/changes/{change}`, when about a change. |
+| `intent` | [string](#string) |  | `…/intents/{intent}`, when about an intent. |
+| `landing` | [string](#string) |  | `…/trunk/positions/{n}`, when about a landing. |
+| `title` | [string](#string) |  |  |
+| `detail` | [string](#string) |  |  |
+| `since` | [int64](#int64) |  |  |
+| `urgency` | [uint32](#uint32) |  |  |
+
+
+<a name="rill-v1-ListAuditsRequest"></a>
+
+### ListAuditsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+
+
+<a name="rill-v1-ListAuditsResponse"></a>
+
+### ListAuditsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `audits` | [Audit](#rill-v1-Audit) | repeated |  |
+
+
+<a name="rill-v1-ListInboxRequest"></a>
+
+### ListInboxRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `limit` | [uint32](#uint32) |  | At most this many items (default 50, at most 500). |
+
+
+<a name="rill-v1-ListInboxResponse"></a>
+
+### ListInboxResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `items` | [InboxItem](#rill-v1-InboxItem) | repeated |  |
+
+
+<a name="rill-v1-ListSimilarChangesRequest"></a>
+
+### ListSimilarChangesRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `intent` | [string](#string) |  | `…/intents/{intent}`. Required. |
+
+
+<a name="rill-v1-ListSimilarChangesResponse"></a>
+
+### ListSimilarChangesResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `groups` | [SimilarGroup](#rill-v1-SimilarGroup) | repeated |  |
+
+
+<a name="rill-v1-RecordAuditRequest"></a>
+
+### RecordAuditRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `landing` | [string](#string) |  | `…/trunk/positions/{n}`. Required. |
+| `passed` | [bool](#bool) |  |  |
+| `note` | [string](#string) |  |  |
+| `revert` | [bool](#bool) |  | On failure, also revert the landing. |
+
+
+<a name="rill-v1-RecordAuditResponse"></a>
+
+### RecordAuditResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `audit` | [Audit](#rill-v1-Audit) |  |  |
+
+
+<a name="rill-v1-SimilarGroup"></a>
+
+### SimilarGroup
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `signature` | [string](#string) |  |  |
+| `changes` | [string](#string) | repeated | `…/changes/{change}`, and the versions they were grouped at. |
+| `versions` | [string](#string) | repeated |  |
+
+
+
+<a name="rill-v1-InboxKind"></a>
+
+### InboxKind
+
+
+
+| Name | Number | Description |
+| --- | --- | --- |
+| `INBOX_KIND_UNSPECIFIED` | 0 |  |
+| `INBOX_KIND_ESCALATION` | 1 |  |
+| `INBOX_KIND_AUDIT` | 2 |  |
+| `INBOX_KIND_OWNER_REVIEW` | 3 |  |
+| `INBOX_KIND_INTENT_APPROVAL` | 4 |  |
+| `INBOX_KIND_THREAD` | 5 |  |
 
 
 
@@ -4719,7 +4973,87 @@ Repository policies.
 | --- | --- | --- | --- |
 | `GetPolicy` | [GetPolicyRequest](#rill-v1-GetPolicyRequest) | [GetPolicyResponse](#rill-v1-GetPolicyResponse) | A policy; the default text when it was never set. |
 | `UpdatePolicy` | [UpdatePolicyRequest](#rill-v1-UpdatePolicyRequest) | [UpdatePolicyResponse](#rill-v1-UpdatePolicyResponse) | Replace a policy's text (repository owners). |
+| `GetEffectivePolicy` | [GetEffectivePolicyRequest](#rill-v1-GetEffectivePolicyRequest) | [GetEffectivePolicyResponse](#rill-v1-GetEffectivePolicyResponse) | The submit rules in force: trunk's `.rill/policy/*.cedar`, else the stored policy, else the default, with the org's guardrails after them. |
+| `ExplainLanding` | [ExplainLandingRequest](#rill-v1-ExplainLandingRequest) | [ExplainLandingResponse](#rill-v1-ExplainLandingResponse) | Why a landing was allowed: the policy and the decision recorded. |
+| `SimulatePolicy` | [SimulatePolicyRequest](#rill-v1-SimulatePolicyRequest) | [SimulatePolicyResponse](#rill-v1-SimulatePolicyResponse) | Replay recorded landings under a candidate policy. |
+| `GetGuardrails` | [GetGuardrailsRequest](#rill-v1-GetGuardrailsRequest) | [GetGuardrailsResponse](#rill-v1-GetGuardrailsResponse) | An org's guardrails: forbid rules above every repository's policy. |
+| `UpdateGuardrails` | [UpdateGuardrailsRequest](#rill-v1-UpdateGuardrailsRequest) | [UpdateGuardrailsResponse](#rill-v1-UpdateGuardrailsResponse) | Replace an org's guardrails (org administrators). |
 
+
+
+<a name="rill-v1-ExplainLandingRequest"></a>
+
+### ExplainLandingRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `landing` | [string](#string) |  | `…/trunk/positions/{n}`. Required. |
+
+
+<a name="rill-v1-ExplainLandingResponse"></a>
+
+### ExplainLandingResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `change` | [string](#string) |  | `…/changes/{change}`. |
+| `policy` | [string](#string) |  | The policy digest the landing recorded, and where the policy came from. |
+| `source` | [string](#string) |  |  |
+| `allowed` | [bool](#bool) |  |  |
+| `matched_policies` | [string](#string) | repeated |  |
+| `reasons` | [string](#string) | repeated |  |
+| `facts_json` | [string](#string) |  | The change's facts and review facts the decision saw, as JSON. |
+| `policy_text` | [string](#string) |  | The policy text, when this repository kept it. |
+
+
+<a name="rill-v1-GetEffectivePolicyRequest"></a>
+
+### GetEffectivePolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+
+
+<a name="rill-v1-GetEffectivePolicyResponse"></a>
+
+### GetEffectivePolicyResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `text` | [string](#string) |  |  |
+| `source` | [string](#string) |  | `default`, `stored`, or the `.rill/policy/` files, with ` + org guardrails` when the org has any. |
+| `digest` | [string](#string) |  | BLAKE3 of `text`, hex: what landings record. |
+
+
+<a name="rill-v1-GetGuardrailsRequest"></a>
+
+### GetGuardrailsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `org` | [string](#string) |  | `orgs/{org}`. Required. |
+
+
+<a name="rill-v1-GetGuardrailsResponse"></a>
+
+### GetGuardrailsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `text` | [string](#string) |  |  |
 
 
 <a name="rill-v1-GetPolicyRequest"></a>
@@ -4757,6 +5091,73 @@ A repository policy.
 | `updated_at` | [int64](#int64) |  | Output only. |
 | `updated_by` | [Principal](#rill-v1-Principal) |  | Output only. |
 | `etag` | [string](#string) |  | Output only. |
+
+
+<a name="rill-v1-SimulatePolicyRequest"></a>
+
+### SimulatePolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `text` | [string](#string) |  | The candidate Cedar text. Required. |
+| `since` | [uint64](#uint64) |  | Trunk positions to replay, inclusive; 0 for the first or the last. |
+| `until` | [uint64](#uint64) |  |  |
+
+
+<a name="rill-v1-SimulatePolicyResponse"></a>
+
+### SimulatePolicyResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `replayed` | [uint32](#uint32) |  | Landings replayed (those with a recorded decision). |
+| `unrecorded` | [uint32](#uint32) |  | Landings in range without a recorded decision. |
+| `allowed` | [uint32](#uint32) |  | Still allowed under the candidate. |
+| `blocked` | [SimulatedLanding](#rill-v1-SimulatedLanding) | repeated | Allowed then, blocked under the candidate. |
+| `agent_only_before` | [uint32](#uint32) |  | Landings that could have landed with no human vote: under the policy recorded, and under the candidate. |
+| `agent_only_after` | [uint32](#uint32) |  |  |
+
+
+<a name="rill-v1-SimulatedLanding"></a>
+
+### SimulatedLanding
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `landing` | [string](#string) |  | `…/trunk/positions/{n}`. |
+| `change` | [string](#string) |  |  |
+| `reasons` | [string](#string) | repeated |  |
+
+
+<a name="rill-v1-UpdateGuardrailsRequest"></a>
+
+### UpdateGuardrailsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `org` | [string](#string) |  | `orgs/{org}`. Required. |
+| `text` | [string](#string) |  | Cedar `forbid` rules, each with an `@id` starting `org_`; empty removes them. |
+
+
+<a name="rill-v1-UpdateGuardrailsResponse"></a>
+
+### UpdateGuardrailsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `text` | [string](#string) |  |  |
 
 
 <a name="rill-v1-UpdatePolicyRequest"></a>

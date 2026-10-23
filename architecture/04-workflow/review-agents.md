@@ -150,7 +150,7 @@ follows what happens after review:
 | Event | Effect on the record |
 | --- | --- |
 | a landing, for each agent whose `Review +` vote the policy saw | `approvals += 1` |
-| that landing reverted (a landing whose provenance names it in `reverts`), or blamed by a newly opened incident | `escapes += 1` for those agents, once per landing (`escaped:<seq>`) |
+| that landing reverted (a landing whose provenance names it in `reverts`), blamed by a newly opened incident, or failed in a [human audit](attention.md#sampled-audits) | `escapes += 1` for those agents, once per landing (`escaped:<seq>`) |
 | a reviewer's blocking finding (Bug/Security, confidence 70 or more) resolved after a newer version | `blocks += 1` |
 | the same, resolved on the version it was raised on | `dismissed += 1` |
 
@@ -207,7 +207,6 @@ or a workload identity exchanged for an agent token. It runs
 
 ## Limitations
 
-- Sampled human audits feed escapes once they exist ([attention](review.md)); until then only reverts and incidents do.
 - Independence does not compare sessions, and does not expand a team
   sponsor to its members.
 - A reviewer's daily budget is per repository, not across the org.
@@ -224,4 +223,4 @@ or a workload identity exchanged for an agent token. It runs
 - Tests: [api access/reviewers.rs](../../crates/server/api/tests/grpc/access/reviewers.rs), [runner tests](../../crates/clients/review-runner/tests/runner/main.rs)
 
 ---
-← Previous: [Code owners](ownership.md) · [Index](../index.md) · Next: [Landing](landing.md) →
+← Previous: [Code owners](ownership.md) · [Index](../index.md) · Next: [Human attention](attention.md) →

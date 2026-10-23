@@ -2,12 +2,14 @@
 //! verification, the derive and index job workers, event retention, the
 //! follower that keeps cached policy and relations current, and durable
 //! event consumers (owner-review escalation, intent budgets, reviewer
-//! routing and calibration); per server, local
+//! routing and calibration, landing decisions, audit sampling); per server, local
 //! execution workers.
 
+pub mod audits;
 mod build_graph;
 pub mod calibration;
 pub mod consumer;
+pub mod decisions;
 mod deriver;
 mod discovery;
 pub mod escalation;

@@ -25,5 +25,8 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ReviewCmd) -> Result<()> {
         ReviewCmd::Evaluate(args) => evaluate(ctx, args).await,
         ReviewCmd::Request(args) => super::fleet::request(ctx, args).await,
         ReviewCmd::Runs(args) => super::fleet::runs(ctx, args).await,
+        ReviewCmd::Audits => super::attention::audits(ctx).await,
+        ReviewCmd::Audit(args) => super::attention::audit(ctx, args).await,
+        ReviewCmd::Batch(args) => super::attention::batch(ctx, args).await,
     }
 }

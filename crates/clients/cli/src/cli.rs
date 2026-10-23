@@ -246,6 +246,11 @@ pub enum Command {
     /// Code owners: who owns a path, and a change's standing with them.
     #[command(subcommand)]
     Owners(crate::commands::owners::OwnersCmd),
+    /// Submit rules in force, simulating a candidate, org guardrails.
+    #[command(subcommand)]
+    Policy(crate::commands::policy::PolicyCmd),
+    /// Why a landing was allowed: the policy and decision recorded.
+    Why(crate::commands::policy::WhyArgs),
     /// Agent reviewers' track records: trust, demotion, reinstating.
     #[command(subcommand)]
     Reviewer(crate::commands::reviewer::ReviewerCmd),

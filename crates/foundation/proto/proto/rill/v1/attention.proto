@@ -1,0 +1,146 @@
+// Human attention: what needs a given person, sampled audits of changes
+// that landed on agent review alone, batch review of look-alike changes,
+// and daily digests per intent.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/types.proto";
+
+// Routing human attention.
+service AttentionService {
+  // What waits on the caller in a repository, most urgent first.
+  rpc ListInbox(ListInboxRequest) returns (ListInboxResponse);
+  // Audits still waiting for a human.
+  rpc ListAudits(ListAuditsRequest) returns (ListAuditsResponse);
+  // Pass or fail an audit (an assignee or a repository owner). A failure
+  // counts against the agents that approved the change and can revert it.
+  rpc RecordAudit(RecordAuditRequest) returns (RecordAuditResponse);
+  // An intent's changes in review, grouped by the edit they make.
+  rpc ListSimilarChanges(ListSimilarChangesRequest) returns (ListSimilarChangesResponse);
+  // Vote on every change of a group at once; each must still make the
+  // group's edit at the version it was grouped at.
+  rpc BatchVote(BatchVoteRequest) returns (BatchVoteResponse);
+  // What happened under an intent on one day.
+  rpc GetIntentDigest(GetIntentDigestRequest) returns (GetIntentDigestResponse);
+}
+
+enum InboxKind {
+  INBOX_KIND_UNSPECIFIED = 0;
+  INBOX_KIND_ESCALATION = 1;
+  INBOX_KIND_AUDIT = 2;
+  INBOX_KIND_OWNER_REVIEW = 3;
+  INBOX_KIND_INTENT_APPROVAL = 4;
+  INBOX_KIND_THREAD = 5;
+}
+
+message InboxItem {
+  InboxKind kind = 1;
+  // `…/changes/{change}`, when about a change.
+  string change = 2;
+  // `…/intents/{intent}`, when about an intent.
+  string intent = 3;
+  // `…/trunk/positions/{n}`, when about a landing.
+  string landing = 4;
+  string title = 5;
+  string detail = 6;
+  int64 since = 7;
+  uint32 urgency = 8;
+}
+
+message ListInboxRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // At most this many items (default 50, at most 500).
+  uint32 limit = 2;
+}
+message ListInboxResponse {
+  repeated InboxItem items = 1;
+}
+
+message Audit {
+  // `…/trunk/positions/{n}`.
+  string landing = 1;
+  string change = 2;
+  string version = 3;
+  // `user:…`, `team:…`, or `owners`.
+  repeated string assignees = 4;
+  string risk = 5;
+  // `pending`, `passed` or `failed`.
+  string status = 6;
+  int64 sampled_at = 7;
+  Principal decided_by = 8;
+  int64 decided_at = 9;
+  string note = 10;
+}
+
+message ListAuditsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+}
+message ListAuditsResponse {
+  repeated Audit audits = 1;
+}
+
+message RecordAuditRequest {
+  string request_id = 1;
+  // `…/trunk/positions/{n}`. Required.
+  string landing = 2;
+  bool passed = 3;
+  string note = 4;
+  // On failure, also revert the landing.
+  bool revert = 5;
+}
+message RecordAuditResponse {
+  Audit audit = 1;
+}
+
+message SimilarGroup {
+  string signature = 1;
+  // `…/changes/{change}`, and the versions they were grouped at.
+  repeated string changes = 2;
+  repeated string versions = 3;
+}
+
+message ListSimilarChangesRequest {
+  // `…/intents/{intent}`. Required.
+  string intent = 1;
+}
+message ListSimilarChangesResponse {
+  repeated SimilarGroup groups = 1;
+}
+
+message BatchVoteRequest {
+  string request_id = 1;
+  // `…/intents/{intent}`. Required.
+  string intent = 2;
+  // The group voted on. Required.
+  string signature = 3;
+  string label = 4;
+  int32 value = 5;
+  string reason = 6;
+}
+message BatchVoteResult {
+  string change = 1;
+  bool voted = 2;
+  // Why not, when not.
+  string error = 3;
+}
+message BatchVoteResponse {
+  repeated BatchVoteResult results = 1;
+}
+
+message GetIntentDigestRequest {
+  // `…/intents/{intent}`. Required.
+  string intent = 1;
+  // `YYYY-MM-DD`, UTC; default today.
+  string day = 2;
+}
+message GetIntentDigestResponse {
+  string day = 1;
+  uint32 landed = 2;
+  uint32 reverted = 3;
+  uint32 flagged = 4;
+  uint32 sampled = 5;
+  uint32 open = 6;
+}

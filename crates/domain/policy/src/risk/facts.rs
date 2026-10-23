@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use rill_types::{IntentKind, Principal, Provenance, RepoPathBuf, RiskClass};
+use rill_types::{IntentKind, Principal, Provenance, RepoPathBuf, RiskClass, Timestamp};
 use serde::{Deserialize, Serialize};
 
 use crate::directory::Person;
@@ -125,6 +125,13 @@ pub struct ChangeFacts {
     pub people: BTreeMap<String, Person>,
     /// The linked intent's approval and whether the change is in its scope.
     pub intent: Option<IntentFacts>,
+    /// When the facts were taken: time rules (weekends, hours) read it, so
+    /// a recorded decision replays the same.
+    pub at: Timestamp,
+    /// Trunk's health then (`green`, `red`, `fixing`, `guarded`).
+    pub trunk_state: String,
+    /// Whether trunk was frozen.
+    pub frozen: bool,
 }
 
 impl ChangeFacts {
@@ -145,7 +152,22 @@ impl ChangeFacts {
             owner_sets: Vec::new(),
             people: BTreeMap::new(),
             intent: None,
+            at: Timestamp::from_millis(0),
+            trunk_state: "green".into(),
+            frozen: false,
         }
+    }
+
+    /// Whether `at` falls on a Saturday or Sunday, UTC.
+    pub fn weekend(&self) -> bool {
+        // Day 0 of the epoch was a Thursday (index 3 from Monday).
+        let day = self.at.millis().div_euclid(86_400_000);
+        (day + 3).rem_euclid(7) >= 5
+    }
+
+    /// The UTC hour of `at`.
+    pub fn hour(&self) -> u32 {
+        (self.at.millis().rem_euclid(86_400_000) / 3_600_000) as u32
     }
 
     /// Attach the owner sets of the touched paths.

@@ -23,6 +23,21 @@ class PolicyService(Protocol):
     async def update_policy(self, request: rill_dot_v1_dot_policy__pb2.UpdatePolicyRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.UpdatePolicyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_effective_policy(self, request: rill_dot_v1_dot_policy__pb2.GetEffectivePolicyRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.GetEffectivePolicyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def explain_landing(self, request: rill_dot_v1_dot_policy__pb2.ExplainLandingRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.ExplainLandingResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def simulate_policy(self, request: rill_dot_v1_dot_policy__pb2.SimulatePolicyRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.SimulatePolicyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_guardrails(self, request: rill_dot_v1_dot_policy__pb2.GetGuardrailsRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.GetGuardrailsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def update_guardrails(self, request: rill_dot_v1_dot_policy__pb2.UpdateGuardrailsRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.UpdateGuardrailsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class PolicyServiceASGIApplication(ConnectASGIApplication[PolicyService]):
     def __init__(self, service: PolicyService | AsyncGenerator[PolicyService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None) -> None:
@@ -48,6 +63,56 @@ class PolicyServiceASGIApplication(ConnectASGIApplication[PolicyService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.update_policy,
+                ),
+                "/rill.v1.PolicyService/GetEffectivePolicy": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetEffectivePolicy",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.GetEffectivePolicyRequest,
+                        output=rill_dot_v1_dot_policy__pb2.GetEffectivePolicyResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_effective_policy,
+                ),
+                "/rill.v1.PolicyService/ExplainLanding": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ExplainLanding",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.ExplainLandingRequest,
+                        output=rill_dot_v1_dot_policy__pb2.ExplainLandingResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.explain_landing,
+                ),
+                "/rill.v1.PolicyService/SimulatePolicy": Endpoint.unary(
+                    method=MethodInfo(
+                        name="SimulatePolicy",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.SimulatePolicyRequest,
+                        output=rill_dot_v1_dot_policy__pb2.SimulatePolicyResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.simulate_policy,
+                ),
+                "/rill.v1.PolicyService/GetGuardrails": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetGuardrails",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.GetGuardrailsRequest,
+                        output=rill_dot_v1_dot_policy__pb2.GetGuardrailsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_guardrails,
+                ),
+                "/rill.v1.PolicyService/UpdateGuardrails": Endpoint.unary(
+                    method=MethodInfo(
+                        name="UpdateGuardrails",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.UpdateGuardrailsRequest,
+                        output=rill_dot_v1_dot_policy__pb2.UpdateGuardrailsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.update_guardrails,
                 ),
             },
             interceptors=interceptors,
@@ -102,11 +167,121 @@ class PolicyServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_effective_policy(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.GetEffectivePolicyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.GetEffectivePolicyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetEffectivePolicy",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.GetEffectivePolicyRequest,
+                output=rill_dot_v1_dot_policy__pb2.GetEffectivePolicyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def explain_landing(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.ExplainLandingRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.ExplainLandingResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ExplainLanding",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.ExplainLandingRequest,
+                output=rill_dot_v1_dot_policy__pb2.ExplainLandingResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def simulate_policy(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.SimulatePolicyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.SimulatePolicyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SimulatePolicy",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.SimulatePolicyRequest,
+                output=rill_dot_v1_dot_policy__pb2.SimulatePolicyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_guardrails(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.GetGuardrailsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.GetGuardrailsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetGuardrails",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.GetGuardrailsRequest,
+                output=rill_dot_v1_dot_policy__pb2.GetGuardrailsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def update_guardrails(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.UpdateGuardrailsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.UpdateGuardrailsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="UpdateGuardrails",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.UpdateGuardrailsRequest,
+                output=rill_dot_v1_dot_policy__pb2.UpdateGuardrailsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 class PolicyServiceSync(Protocol):
     def get_policy(self, request: rill_dot_v1_dot_policy__pb2.GetPolicyRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.GetPolicyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def update_policy(self, request: rill_dot_v1_dot_policy__pb2.UpdatePolicyRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.UpdatePolicyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_effective_policy(self, request: rill_dot_v1_dot_policy__pb2.GetEffectivePolicyRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.GetEffectivePolicyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def explain_landing(self, request: rill_dot_v1_dot_policy__pb2.ExplainLandingRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.ExplainLandingResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def simulate_policy(self, request: rill_dot_v1_dot_policy__pb2.SimulatePolicyRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.SimulatePolicyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_guardrails(self, request: rill_dot_v1_dot_policy__pb2.GetGuardrailsRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.GetGuardrailsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def update_guardrails(self, request: rill_dot_v1_dot_policy__pb2.UpdateGuardrailsRequest, ctx: RequestContext) -> rill_dot_v1_dot_policy__pb2.UpdateGuardrailsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -133,6 +308,56 @@ class PolicyServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.update_policy,
+                ),
+                "/rill.v1.PolicyService/GetEffectivePolicy": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetEffectivePolicy",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.GetEffectivePolicyRequest,
+                        output=rill_dot_v1_dot_policy__pb2.GetEffectivePolicyResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_effective_policy,
+                ),
+                "/rill.v1.PolicyService/ExplainLanding": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ExplainLanding",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.ExplainLandingRequest,
+                        output=rill_dot_v1_dot_policy__pb2.ExplainLandingResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.explain_landing,
+                ),
+                "/rill.v1.PolicyService/SimulatePolicy": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="SimulatePolicy",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.SimulatePolicyRequest,
+                        output=rill_dot_v1_dot_policy__pb2.SimulatePolicyResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.simulate_policy,
+                ),
+                "/rill.v1.PolicyService/GetGuardrails": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetGuardrails",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.GetGuardrailsRequest,
+                        output=rill_dot_v1_dot_policy__pb2.GetGuardrailsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_guardrails,
+                ),
+                "/rill.v1.PolicyService/UpdateGuardrails": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="UpdateGuardrails",
+                        service_name="rill.v1.PolicyService",
+                        input=rill_dot_v1_dot_policy__pb2.UpdateGuardrailsRequest,
+                        output=rill_dot_v1_dot_policy__pb2.UpdateGuardrailsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.update_guardrails,
                 ),
             },
             interceptors=interceptors,
@@ -181,6 +406,106 @@ class PolicyServiceClientSync(ConnectClientSync):
                 service_name="rill.v1.PolicyService",
                 input=rill_dot_v1_dot_policy__pb2.UpdatePolicyRequest,
                 output=rill_dot_v1_dot_policy__pb2.UpdatePolicyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_effective_policy(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.GetEffectivePolicyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.GetEffectivePolicyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetEffectivePolicy",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.GetEffectivePolicyRequest,
+                output=rill_dot_v1_dot_policy__pb2.GetEffectivePolicyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def explain_landing(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.ExplainLandingRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.ExplainLandingResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ExplainLanding",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.ExplainLandingRequest,
+                output=rill_dot_v1_dot_policy__pb2.ExplainLandingResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def simulate_policy(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.SimulatePolicyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.SimulatePolicyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SimulatePolicy",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.SimulatePolicyRequest,
+                output=rill_dot_v1_dot_policy__pb2.SimulatePolicyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_guardrails(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.GetGuardrailsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.GetGuardrailsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetGuardrails",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.GetGuardrailsRequest,
+                output=rill_dot_v1_dot_policy__pb2.GetGuardrailsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def update_guardrails(
+        self,
+        request: rill_dot_v1_dot_policy__pb2.UpdateGuardrailsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_policy__pb2.UpdateGuardrailsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="UpdateGuardrails",
+                service_name="rill.v1.PolicyService",
+                input=rill_dot_v1_dot_policy__pb2.UpdateGuardrailsRequest,
+                output=rill_dot_v1_dot_policy__pb2.UpdateGuardrailsResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

@@ -10,7 +10,12 @@ use super::super::*;
 use super::fixture::*;
 use super::writes::{change_of, edit, vote};
 
-async fn add_agent(server: &TestServer, name: &str, sponsor: &str, family: Option<&str>) {
+pub(super) async fn add_agent(
+    server: &TestServer,
+    name: &str,
+    sponsor: &str,
+    family: Option<&str>,
+) {
     let now = Timestamp::now();
     let reviewer = family.map(|f| ReviewerProfile {
         model_family: f.into(),
@@ -242,6 +247,7 @@ async fn routed_reviewers_post_checked_results_and_count_when_independent() {
         }
     };
     vote(&mut acl.owner, &change, "Owner", 1).await.unwrap();
+    vote(&mut acl.owner, &change, "Verified", 1).await.unwrap();
     // The twin shares the author's sponsor: its approval does not count.
     let mut twin = acl.as_principal(&Principal::agent("twin")).await;
     vote(&mut twin, &change, "Review", 1).await.unwrap();
@@ -258,7 +264,7 @@ async fn routed_reviewers_post_checked_results_and_count_when_independent() {
     assert!(d.allowed, "{:?}", d.reasons);
     assert!(d
         .matched_policies
-        .contains(&"land_normal_agent_review_with_owner".to_string()));
+        .contains(&"land_normal_agent_review".to_string()));
 
     let all = runs(&mut acl.owner, &change).await;
     let count = |status: pb::ReviewRunStatus| {

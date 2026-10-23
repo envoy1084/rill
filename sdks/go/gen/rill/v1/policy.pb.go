@@ -303,6 +303,681 @@ func (x *UpdatePolicyResponse) GetPolicy() *Policy {
 	return nil
 }
 
+type GetEffectivePolicyRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `orgs/{org}/repos/{repo}`. Required.
+	Parent        string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetEffectivePolicyRequest) Reset() {
+	*x = GetEffectivePolicyRequest{}
+	mi := &file_rill_v1_policy_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetEffectivePolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetEffectivePolicyRequest) ProtoMessage() {}
+
+func (x *GetEffectivePolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetEffectivePolicyRequest.ProtoReflect.Descriptor instead.
+func (*GetEffectivePolicyRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetEffectivePolicyRequest) GetParent() string {
+	if x != nil {
+		return x.Parent
+	}
+	return ""
+}
+
+type GetEffectivePolicyResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	// `default`, `stored`, or the `.rill/policy/` files, with
+	// ` + org guardrails` when the org has any.
+	Source string `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
+	// BLAKE3 of `text`, hex: what landings record.
+	Digest        string `protobuf:"bytes,3,opt,name=digest,proto3" json:"digest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetEffectivePolicyResponse) Reset() {
+	*x = GetEffectivePolicyResponse{}
+	mi := &file_rill_v1_policy_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetEffectivePolicyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetEffectivePolicyResponse) ProtoMessage() {}
+
+func (x *GetEffectivePolicyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetEffectivePolicyResponse.ProtoReflect.Descriptor instead.
+func (*GetEffectivePolicyResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetEffectivePolicyResponse) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *GetEffectivePolicyResponse) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *GetEffectivePolicyResponse) GetDigest() string {
+	if x != nil {
+		return x.Digest
+	}
+	return ""
+}
+
+type ExplainLandingRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `…/trunk/positions/{n}`. Required.
+	Landing       string `protobuf:"bytes,1,opt,name=landing,proto3" json:"landing,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExplainLandingRequest) Reset() {
+	*x = ExplainLandingRequest{}
+	mi := &file_rill_v1_policy_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExplainLandingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExplainLandingRequest) ProtoMessage() {}
+
+func (x *ExplainLandingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExplainLandingRequest.ProtoReflect.Descriptor instead.
+func (*ExplainLandingRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ExplainLandingRequest) GetLanding() string {
+	if x != nil {
+		return x.Landing
+	}
+	return ""
+}
+
+type ExplainLandingResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `…/changes/{change}`.
+	Change string `protobuf:"bytes,1,opt,name=change,proto3" json:"change,omitempty"`
+	// The policy digest the landing recorded, and where the policy came from.
+	Policy          string   `protobuf:"bytes,2,opt,name=policy,proto3" json:"policy,omitempty"`
+	Source          string   `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	Allowed         bool     `protobuf:"varint,4,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	MatchedPolicies []string `protobuf:"bytes,5,rep,name=matched_policies,json=matchedPolicies,proto3" json:"matched_policies,omitempty"`
+	Reasons         []string `protobuf:"bytes,6,rep,name=reasons,proto3" json:"reasons,omitempty"`
+	// The change's facts and review facts the decision saw, as JSON.
+	FactsJson string `protobuf:"bytes,7,opt,name=facts_json,json=factsJson,proto3" json:"facts_json,omitempty"`
+	// The policy text, when this repository kept it.
+	PolicyText    string `protobuf:"bytes,8,opt,name=policy_text,json=policyText,proto3" json:"policy_text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExplainLandingResponse) Reset() {
+	*x = ExplainLandingResponse{}
+	mi := &file_rill_v1_policy_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExplainLandingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExplainLandingResponse) ProtoMessage() {}
+
+func (x *ExplainLandingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExplainLandingResponse.ProtoReflect.Descriptor instead.
+func (*ExplainLandingResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ExplainLandingResponse) GetChange() string {
+	if x != nil {
+		return x.Change
+	}
+	return ""
+}
+
+func (x *ExplainLandingResponse) GetPolicy() string {
+	if x != nil {
+		return x.Policy
+	}
+	return ""
+}
+
+func (x *ExplainLandingResponse) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *ExplainLandingResponse) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *ExplainLandingResponse) GetMatchedPolicies() []string {
+	if x != nil {
+		return x.MatchedPolicies
+	}
+	return nil
+}
+
+func (x *ExplainLandingResponse) GetReasons() []string {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+func (x *ExplainLandingResponse) GetFactsJson() string {
+	if x != nil {
+		return x.FactsJson
+	}
+	return ""
+}
+
+func (x *ExplainLandingResponse) GetPolicyText() string {
+	if x != nil {
+		return x.PolicyText
+	}
+	return ""
+}
+
+type SimulatePolicyRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `orgs/{org}/repos/{repo}`. Required.
+	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
+	// The candidate Cedar text. Required.
+	Text string `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	// Trunk positions to replay, inclusive; 0 for the first or the last.
+	Since         uint64 `protobuf:"varint,3,opt,name=since,proto3" json:"since,omitempty"`
+	Until         uint64 `protobuf:"varint,4,opt,name=until,proto3" json:"until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SimulatePolicyRequest) Reset() {
+	*x = SimulatePolicyRequest{}
+	mi := &file_rill_v1_policy_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SimulatePolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SimulatePolicyRequest) ProtoMessage() {}
+
+func (x *SimulatePolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SimulatePolicyRequest.ProtoReflect.Descriptor instead.
+func (*SimulatePolicyRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SimulatePolicyRequest) GetParent() string {
+	if x != nil {
+		return x.Parent
+	}
+	return ""
+}
+
+func (x *SimulatePolicyRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *SimulatePolicyRequest) GetSince() uint64 {
+	if x != nil {
+		return x.Since
+	}
+	return 0
+}
+
+func (x *SimulatePolicyRequest) GetUntil() uint64 {
+	if x != nil {
+		return x.Until
+	}
+	return 0
+}
+
+type SimulatedLanding struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `…/trunk/positions/{n}`.
+	Landing       string   `protobuf:"bytes,1,opt,name=landing,proto3" json:"landing,omitempty"`
+	Change        string   `protobuf:"bytes,2,opt,name=change,proto3" json:"change,omitempty"`
+	Reasons       []string `protobuf:"bytes,3,rep,name=reasons,proto3" json:"reasons,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SimulatedLanding) Reset() {
+	*x = SimulatedLanding{}
+	mi := &file_rill_v1_policy_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SimulatedLanding) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SimulatedLanding) ProtoMessage() {}
+
+func (x *SimulatedLanding) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SimulatedLanding.ProtoReflect.Descriptor instead.
+func (*SimulatedLanding) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SimulatedLanding) GetLanding() string {
+	if x != nil {
+		return x.Landing
+	}
+	return ""
+}
+
+func (x *SimulatedLanding) GetChange() string {
+	if x != nil {
+		return x.Change
+	}
+	return ""
+}
+
+func (x *SimulatedLanding) GetReasons() []string {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+type SimulatePolicyResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Landings replayed (those with a recorded decision).
+	Replayed uint32 `protobuf:"varint,1,opt,name=replayed,proto3" json:"replayed,omitempty"`
+	// Landings in range without a recorded decision.
+	Unrecorded uint32 `protobuf:"varint,2,opt,name=unrecorded,proto3" json:"unrecorded,omitempty"`
+	// Still allowed under the candidate.
+	Allowed uint32 `protobuf:"varint,3,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	// Allowed then, blocked under the candidate.
+	Blocked []*SimulatedLanding `protobuf:"bytes,4,rep,name=blocked,proto3" json:"blocked,omitempty"`
+	// Landings that could have landed with no human vote: under the policy
+	// recorded, and under the candidate.
+	AgentOnlyBefore uint32 `protobuf:"varint,5,opt,name=agent_only_before,json=agentOnlyBefore,proto3" json:"agent_only_before,omitempty"`
+	AgentOnlyAfter  uint32 `protobuf:"varint,6,opt,name=agent_only_after,json=agentOnlyAfter,proto3" json:"agent_only_after,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SimulatePolicyResponse) Reset() {
+	*x = SimulatePolicyResponse{}
+	mi := &file_rill_v1_policy_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SimulatePolicyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SimulatePolicyResponse) ProtoMessage() {}
+
+func (x *SimulatePolicyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SimulatePolicyResponse.ProtoReflect.Descriptor instead.
+func (*SimulatePolicyResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SimulatePolicyResponse) GetReplayed() uint32 {
+	if x != nil {
+		return x.Replayed
+	}
+	return 0
+}
+
+func (x *SimulatePolicyResponse) GetUnrecorded() uint32 {
+	if x != nil {
+		return x.Unrecorded
+	}
+	return 0
+}
+
+func (x *SimulatePolicyResponse) GetAllowed() uint32 {
+	if x != nil {
+		return x.Allowed
+	}
+	return 0
+}
+
+func (x *SimulatePolicyResponse) GetBlocked() []*SimulatedLanding {
+	if x != nil {
+		return x.Blocked
+	}
+	return nil
+}
+
+func (x *SimulatePolicyResponse) GetAgentOnlyBefore() uint32 {
+	if x != nil {
+		return x.AgentOnlyBefore
+	}
+	return 0
+}
+
+func (x *SimulatePolicyResponse) GetAgentOnlyAfter() uint32 {
+	if x != nil {
+		return x.AgentOnlyAfter
+	}
+	return 0
+}
+
+type GetGuardrailsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `orgs/{org}`. Required.
+	Org           string `protobuf:"bytes,1,opt,name=org,proto3" json:"org,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGuardrailsRequest) Reset() {
+	*x = GetGuardrailsRequest{}
+	mi := &file_rill_v1_policy_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGuardrailsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGuardrailsRequest) ProtoMessage() {}
+
+func (x *GetGuardrailsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGuardrailsRequest.ProtoReflect.Descriptor instead.
+func (*GetGuardrailsRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetGuardrailsRequest) GetOrg() string {
+	if x != nil {
+		return x.Org
+	}
+	return ""
+}
+
+type GetGuardrailsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGuardrailsResponse) Reset() {
+	*x = GetGuardrailsResponse{}
+	mi := &file_rill_v1_policy_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGuardrailsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGuardrailsResponse) ProtoMessage() {}
+
+func (x *GetGuardrailsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGuardrailsResponse.ProtoReflect.Descriptor instead.
+func (*GetGuardrailsResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetGuardrailsResponse) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+type UpdateGuardrailsRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// `orgs/{org}`. Required.
+	Org string `protobuf:"bytes,2,opt,name=org,proto3" json:"org,omitempty"`
+	// Cedar `forbid` rules, each with an `@id` starting `org_`; empty
+	// removes them.
+	Text          string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateGuardrailsRequest) Reset() {
+	*x = UpdateGuardrailsRequest{}
+	mi := &file_rill_v1_policy_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateGuardrailsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateGuardrailsRequest) ProtoMessage() {}
+
+func (x *UpdateGuardrailsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateGuardrailsRequest.ProtoReflect.Descriptor instead.
+func (*UpdateGuardrailsRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *UpdateGuardrailsRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *UpdateGuardrailsRequest) GetOrg() string {
+	if x != nil {
+		return x.Org
+	}
+	return ""
+}
+
+func (x *UpdateGuardrailsRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+type UpdateGuardrailsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateGuardrailsResponse) Reset() {
+	*x = UpdateGuardrailsResponse{}
+	mi := &file_rill_v1_policy_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateGuardrailsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateGuardrailsResponse) ProtoMessage() {}
+
+func (x *UpdateGuardrailsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_policy_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateGuardrailsResponse.ProtoReflect.Descriptor instead.
+func (*UpdateGuardrailsResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_policy_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UpdateGuardrailsResponse) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
 var File_rill_v1_policy_proto protoreflect.FileDescriptor
 
 const file_rill_v1_policy_proto_rawDesc = "" +
@@ -326,10 +1001,63 @@ const file_rill_v1_policy_proto_rawDesc = "" +
 	"\x06policy\x18\x02 \x01(\v2\x0f.rill.v1.PolicyR\x06policy\x12\x12\n" +
 	"\x04etag\x18\x03 \x01(\tR\x04etag\"?\n" +
 	"\x14UpdatePolicyResponse\x12'\n" +
-	"\x06policy\x18\x01 \x01(\v2\x0f.rill.v1.PolicyR\x06policy2\xa0\x01\n" +
+	"\x06policy\x18\x01 \x01(\v2\x0f.rill.v1.PolicyR\x06policy\"3\n" +
+	"\x19GetEffectivePolicyRequest\x12\x16\n" +
+	"\x06parent\x18\x01 \x01(\tR\x06parent\"`\n" +
+	"\x1aGetEffectivePolicyResponse\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12\x16\n" +
+	"\x06source\x18\x02 \x01(\tR\x06source\x12\x16\n" +
+	"\x06digest\x18\x03 \x01(\tR\x06digest\"1\n" +
+	"\x15ExplainLandingRequest\x12\x18\n" +
+	"\alanding\x18\x01 \x01(\tR\alanding\"\xff\x01\n" +
+	"\x16ExplainLandingResponse\x12\x16\n" +
+	"\x06change\x18\x01 \x01(\tR\x06change\x12\x16\n" +
+	"\x06policy\x18\x02 \x01(\tR\x06policy\x12\x16\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source\x12\x18\n" +
+	"\aallowed\x18\x04 \x01(\bR\aallowed\x12)\n" +
+	"\x10matched_policies\x18\x05 \x03(\tR\x0fmatchedPolicies\x12\x18\n" +
+	"\areasons\x18\x06 \x03(\tR\areasons\x12\x1d\n" +
+	"\n" +
+	"facts_json\x18\a \x01(\tR\tfactsJson\x12\x1f\n" +
+	"\vpolicy_text\x18\b \x01(\tR\n" +
+	"policyText\"o\n" +
+	"\x15SimulatePolicyRequest\x12\x16\n" +
+	"\x06parent\x18\x01 \x01(\tR\x06parent\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12\x14\n" +
+	"\x05since\x18\x03 \x01(\x04R\x05since\x12\x14\n" +
+	"\x05until\x18\x04 \x01(\x04R\x05until\"^\n" +
+	"\x10SimulatedLanding\x12\x18\n" +
+	"\alanding\x18\x01 \x01(\tR\alanding\x12\x16\n" +
+	"\x06change\x18\x02 \x01(\tR\x06change\x12\x18\n" +
+	"\areasons\x18\x03 \x03(\tR\areasons\"\xf9\x01\n" +
+	"\x16SimulatePolicyResponse\x12\x1a\n" +
+	"\breplayed\x18\x01 \x01(\rR\breplayed\x12\x1e\n" +
+	"\n" +
+	"unrecorded\x18\x02 \x01(\rR\n" +
+	"unrecorded\x12\x18\n" +
+	"\aallowed\x18\x03 \x01(\rR\aallowed\x123\n" +
+	"\ablocked\x18\x04 \x03(\v2\x19.rill.v1.SimulatedLandingR\ablocked\x12*\n" +
+	"\x11agent_only_before\x18\x05 \x01(\rR\x0fagentOnlyBefore\x12(\n" +
+	"\x10agent_only_after\x18\x06 \x01(\rR\x0eagentOnlyAfter\"(\n" +
+	"\x14GetGuardrailsRequest\x12\x10\n" +
+	"\x03org\x18\x01 \x01(\tR\x03org\"+\n" +
+	"\x15GetGuardrailsResponse\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"^\n" +
+	"\x17UpdateGuardrailsRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x10\n" +
+	"\x03org\x18\x02 \x01(\tR\x03org\x12\x12\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\".\n" +
+	"\x18UpdateGuardrailsResponse\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text2\xce\x04\n" +
 	"\rPolicyService\x12B\n" +
 	"\tGetPolicy\x12\x19.rill.v1.GetPolicyRequest\x1a\x1a.rill.v1.GetPolicyResponse\x12K\n" +
-	"\fUpdatePolicy\x12\x1c.rill.v1.UpdatePolicyRequest\x1a\x1d.rill.v1.UpdatePolicyResponseB\x8c\x01\n" +
+	"\fUpdatePolicy\x12\x1c.rill.v1.UpdatePolicyRequest\x1a\x1d.rill.v1.UpdatePolicyResponse\x12]\n" +
+	"\x12GetEffectivePolicy\x12\".rill.v1.GetEffectivePolicyRequest\x1a#.rill.v1.GetEffectivePolicyResponse\x12Q\n" +
+	"\x0eExplainLanding\x12\x1e.rill.v1.ExplainLandingRequest\x1a\x1f.rill.v1.ExplainLandingResponse\x12Q\n" +
+	"\x0eSimulatePolicy\x12\x1e.rill.v1.SimulatePolicyRequest\x1a\x1f.rill.v1.SimulatePolicyResponse\x12N\n" +
+	"\rGetGuardrails\x12\x1d.rill.v1.GetGuardrailsRequest\x1a\x1e.rill.v1.GetGuardrailsResponse\x12W\n" +
+	"\x10UpdateGuardrails\x12 .rill.v1.UpdateGuardrailsRequest\x1a!.rill.v1.UpdateGuardrailsResponseB\x8c\x01\n" +
 	"\vcom.rill.v1B\vPolicyProtoP\x01Z3github.com/rill-vcs/rill/sdks/go/gen/rill/v1;rillv1\xa2\x02\x03RXX\xaa\x02\aRill.V1\xca\x02\aRill\\V1\xe2\x02\x13Rill\\V1\\GPBMetadata\xea\x02\bRill::V1b\x06proto3"
 
 var (
@@ -344,29 +1072,51 @@ func file_rill_v1_policy_proto_rawDescGZIP() []byte {
 	return file_rill_v1_policy_proto_rawDescData
 }
 
-var file_rill_v1_policy_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_rill_v1_policy_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_rill_v1_policy_proto_goTypes = []any{
-	(*Policy)(nil),               // 0: rill.v1.Policy
-	(*GetPolicyRequest)(nil),     // 1: rill.v1.GetPolicyRequest
-	(*GetPolicyResponse)(nil),    // 2: rill.v1.GetPolicyResponse
-	(*UpdatePolicyRequest)(nil),  // 3: rill.v1.UpdatePolicyRequest
-	(*UpdatePolicyResponse)(nil), // 4: rill.v1.UpdatePolicyResponse
-	(*Principal)(nil),            // 5: rill.v1.Principal
+	(*Policy)(nil),                     // 0: rill.v1.Policy
+	(*GetPolicyRequest)(nil),           // 1: rill.v1.GetPolicyRequest
+	(*GetPolicyResponse)(nil),          // 2: rill.v1.GetPolicyResponse
+	(*UpdatePolicyRequest)(nil),        // 3: rill.v1.UpdatePolicyRequest
+	(*UpdatePolicyResponse)(nil),       // 4: rill.v1.UpdatePolicyResponse
+	(*GetEffectivePolicyRequest)(nil),  // 5: rill.v1.GetEffectivePolicyRequest
+	(*GetEffectivePolicyResponse)(nil), // 6: rill.v1.GetEffectivePolicyResponse
+	(*ExplainLandingRequest)(nil),      // 7: rill.v1.ExplainLandingRequest
+	(*ExplainLandingResponse)(nil),     // 8: rill.v1.ExplainLandingResponse
+	(*SimulatePolicyRequest)(nil),      // 9: rill.v1.SimulatePolicyRequest
+	(*SimulatedLanding)(nil),           // 10: rill.v1.SimulatedLanding
+	(*SimulatePolicyResponse)(nil),     // 11: rill.v1.SimulatePolicyResponse
+	(*GetGuardrailsRequest)(nil),       // 12: rill.v1.GetGuardrailsRequest
+	(*GetGuardrailsResponse)(nil),      // 13: rill.v1.GetGuardrailsResponse
+	(*UpdateGuardrailsRequest)(nil),    // 14: rill.v1.UpdateGuardrailsRequest
+	(*UpdateGuardrailsResponse)(nil),   // 15: rill.v1.UpdateGuardrailsResponse
+	(*Principal)(nil),                  // 16: rill.v1.Principal
 }
 var file_rill_v1_policy_proto_depIdxs = []int32{
-	5, // 0: rill.v1.Policy.updated_by:type_name -> rill.v1.Principal
-	0, // 1: rill.v1.GetPolicyResponse.policy:type_name -> rill.v1.Policy
-	0, // 2: rill.v1.UpdatePolicyRequest.policy:type_name -> rill.v1.Policy
-	0, // 3: rill.v1.UpdatePolicyResponse.policy:type_name -> rill.v1.Policy
-	1, // 4: rill.v1.PolicyService.GetPolicy:input_type -> rill.v1.GetPolicyRequest
-	3, // 5: rill.v1.PolicyService.UpdatePolicy:input_type -> rill.v1.UpdatePolicyRequest
-	2, // 6: rill.v1.PolicyService.GetPolicy:output_type -> rill.v1.GetPolicyResponse
-	4, // 7: rill.v1.PolicyService.UpdatePolicy:output_type -> rill.v1.UpdatePolicyResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	16, // 0: rill.v1.Policy.updated_by:type_name -> rill.v1.Principal
+	0,  // 1: rill.v1.GetPolicyResponse.policy:type_name -> rill.v1.Policy
+	0,  // 2: rill.v1.UpdatePolicyRequest.policy:type_name -> rill.v1.Policy
+	0,  // 3: rill.v1.UpdatePolicyResponse.policy:type_name -> rill.v1.Policy
+	10, // 4: rill.v1.SimulatePolicyResponse.blocked:type_name -> rill.v1.SimulatedLanding
+	1,  // 5: rill.v1.PolicyService.GetPolicy:input_type -> rill.v1.GetPolicyRequest
+	3,  // 6: rill.v1.PolicyService.UpdatePolicy:input_type -> rill.v1.UpdatePolicyRequest
+	5,  // 7: rill.v1.PolicyService.GetEffectivePolicy:input_type -> rill.v1.GetEffectivePolicyRequest
+	7,  // 8: rill.v1.PolicyService.ExplainLanding:input_type -> rill.v1.ExplainLandingRequest
+	9,  // 9: rill.v1.PolicyService.SimulatePolicy:input_type -> rill.v1.SimulatePolicyRequest
+	12, // 10: rill.v1.PolicyService.GetGuardrails:input_type -> rill.v1.GetGuardrailsRequest
+	14, // 11: rill.v1.PolicyService.UpdateGuardrails:input_type -> rill.v1.UpdateGuardrailsRequest
+	2,  // 12: rill.v1.PolicyService.GetPolicy:output_type -> rill.v1.GetPolicyResponse
+	4,  // 13: rill.v1.PolicyService.UpdatePolicy:output_type -> rill.v1.UpdatePolicyResponse
+	6,  // 14: rill.v1.PolicyService.GetEffectivePolicy:output_type -> rill.v1.GetEffectivePolicyResponse
+	8,  // 15: rill.v1.PolicyService.ExplainLanding:output_type -> rill.v1.ExplainLandingResponse
+	11, // 16: rill.v1.PolicyService.SimulatePolicy:output_type -> rill.v1.SimulatePolicyResponse
+	13, // 17: rill.v1.PolicyService.GetGuardrails:output_type -> rill.v1.GetGuardrailsResponse
+	15, // 18: rill.v1.PolicyService.UpdateGuardrails:output_type -> rill.v1.UpdateGuardrailsResponse
+	12, // [12:19] is the sub-list for method output_type
+	5,  // [5:12] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_policy_proto_init() }
@@ -381,7 +1131,7 @@ func file_rill_v1_policy_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_policy_proto_rawDesc), len(file_rill_v1_policy_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

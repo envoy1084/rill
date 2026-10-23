@@ -96,6 +96,8 @@ pub struct ReviewService {
     pub(crate) derive: Arc<DeriveManager>,
     pub(crate) graph: Arc<CommitGraph>,
     pub(crate) policy: Arc<SubmitPolicy>,
+    /// Where the submit policy came from, for explanations.
+    pub(crate) policy_source: String,
     pub(crate) risk: Arc<CompiledRiskConfig>,
     pub(crate) labels: Arc<LabelSet>,
     pub(crate) events: broadcast::Sender<ReviewEvent>,
@@ -122,12 +124,25 @@ impl ReviewService {
             derive,
             graph,
             policy,
+            policy_source: "default".into(),
             risk,
             labels,
             events,
             directory: Arc::new(EmptyDirectory),
             owners: parking_lot::Mutex::new(None),
         }
+    }
+
+    /// Record where the submit policy came from.
+    pub fn with_policy_source(mut self, source: impl Into<String>) -> Self {
+        self.policy_source = source.into();
+        self
+    }
+
+    /// Where the submit policy came from: `default`, `stored`, or the
+    /// repository's `.rill/policy/` files, with `+ org guardrails`.
+    pub fn policy_source(&self) -> &str {
+        &self.policy_source
     }
 
     /// Answer teams and sponsors from `directory`.

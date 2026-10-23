@@ -56,9 +56,35 @@ fn line(out: &Out<'_>, r: &ReviewState) -> String {
     )
 }
 
+fn item_line(out: &Out<'_>, i: &rill_sdk::pb::InboxItem) -> String {
+    let kind = match i.kind.as_known() {
+        Some(rill_sdk::pb::InboxKind::Escalation) => out.paint(Role::Warning, "escalated"),
+        Some(rill_sdk::pb::InboxKind::Audit) => out.paint(Role::Warning, "audit"),
+        Some(rill_sdk::pb::InboxKind::OwnerReview) => "owner review".to_string(),
+        Some(rill_sdk::pb::InboxKind::IntentApproval) => "intent".to_string(),
+        _ => "thread".to_string(),
+    };
+    let what = [&i.change, &i.intent]
+        .into_iter()
+        .find(|s| !s.is_empty())
+        .map(|s| s.rsplit('/').next().unwrap_or_default().to_string())
+        .unwrap_or_default();
+    format!(
+        "  {kind:<12} {}  {}{}",
+        out.paint(Role::Id, &what),
+        i.title,
+        if i.detail.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", i.detail)
+        }
+    )
+}
+
 /// Run `rill inbox`.
 pub async fn inbox(ctx: &mut Ctx<'_>) -> Result<()> {
     let me = ctx.client()?.admin().whoami().await?.principal;
+    let needs = ctx.repo()?.attention().inbox(50).await?;
     let reviews = ctx
         .repo()?
         .reviews()
@@ -82,11 +108,24 @@ pub async fn inbox(ctx: &mut Ctx<'_>) -> Result<()> {
         })
     };
     let value = j!({
+        "needs_you": needs.iter().map(|i| j!({
+            "kind": i.kind.to_i32(), "change": i.change, "intent": i.intent, "landing": i.landing,
+            "title": i.title, "detail": i.detail, "urgency": i.urgency,
+        })).collect::<Vec<_>>(),
         "waiting": waiting.iter().map(|r| summary(r)).collect::<Vec<_>>(),
         "yours": yours.iter().map(|r| summary(r)).collect::<Vec<_>>(),
     });
     ctx.emit(value, |out| {
-        let header = out.paint(Role::Header, "Waiting on you");
+        let header = out.paint(Role::Header, "Needs you");
+        out.line(header)?;
+        if needs.is_empty() {
+            out.line(out.dim("  nothing"))?;
+        }
+        for i in &needs {
+            out.line(item_line(out, i))?;
+        }
+        out.blank()?;
+        let header = out.paint(Role::Header, "Not yet reviewed by you");
         out.line(header)?;
         if waiting.is_empty() {
             out.line(out.dim("  nothing"))?;

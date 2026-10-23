@@ -17,6 +17,7 @@ fn descriptor_set_declares_every_service() {
         [
             "AccessService",
             "AdminService",
+            "AttentionService",
             "AuditService",
             "ChangeService",
             "ChecksService",

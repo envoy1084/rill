@@ -121,6 +121,28 @@ pub fn change_entity(change: &ChangeFacts, review: &SubmitFacts) -> Result<(Enti
             long(review.independent_agent_approvals.into()),
         ),
         ("min_agent_trust", long(review.min_agent_trust.into())),
+        ("files", long(change.total_files as i64)),
+        ("lines", long(change.total_lines as i64)),
+        ("stack_depth", long(change.stack_depth.into())),
+        (
+            "author_model",
+            string(change.provenance.model.as_deref().unwrap_or("")),
+        ),
+        (
+            "author_sponsor",
+            string(
+                &change
+                    .provenance
+                    .sponsor
+                    .as_ref()
+                    .map(|p| p.to_string())
+                    .unwrap_or_default(),
+            ),
+        ),
+        ("weekend", RestrictedExpression::new_bool(change.weekend())),
+        ("hour", long(change.hour().into())),
+        ("trunk_state", string(&change.trunk_state)),
+        ("frozen", RestrictedExpression::new_bool(change.frozen)),
         (
             "intent_agent_quorum",
             long(

@@ -6,7 +6,7 @@ use super::fixture::*;
 use super::writes::change_of;
 use crate::common::trunk_base;
 
-async fn create_intent(c: &mut Clients, scope: pb::IntentScope) -> pb::Intent {
+pub(super) async fn create_intent(c: &mut Clients, scope: pb::IntentScope) -> pb::Intent {
     c.intents
         .create_intent(pb::CreateIntentRequest {
             parent: common::names::repo("acl"),
@@ -22,7 +22,7 @@ async fn create_intent(c: &mut Clients, scope: pb::IntentScope) -> pb::Intent {
         .unwrap()
 }
 
-async fn approve(c: &mut Clients, intent: &str, revision: u32) -> Result<(), Code> {
+pub(super) async fn approve(c: &mut Clients, intent: &str, revision: u32) -> Result<(), Code> {
     c.intents
         .approve_intent(pb::ApproveIntentRequest {
             name: intent.into(),
@@ -45,7 +45,7 @@ async fn explain(c: &mut Clients, change: &Bytes) -> pb::ExplainIntentScopeRespo
 }
 
 /// A change by `c` writing `paths`, linked to `intent`, submitted.
-async fn change_under(c: &mut Clients, intent: &str, paths: &[&str]) -> Bytes {
+pub(super) async fn change_under(c: &mut Clients, intent: &str, paths: &[&str]) -> Bytes {
     let version = c
         .changes
         .apply_edits(pb::ApplyEditsRequest {

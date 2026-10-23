@@ -41,6 +41,15 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
             ..Default::default()
         }
         .encode_to_vec(),
+        "PolicyService/GetGuardrails" => pb::GetGuardrailsRequest {
+            org: names::org("default"),
+        }
+        .encode_to_vec(),
+        "PolicyService/UpdateGuardrails" => pb::UpdateGuardrailsRequest {
+            org: names::org("default"),
+            ..Default::default()
+        }
+        .encode_to_vec(),
         "OrgService/CreateOrg" => pb::CreateOrgRequest {
             org_id: "neworg".into(),
             ..Default::default()
@@ -104,6 +113,22 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
             })
             .into(),
             allow_missing: true,
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "AttentionService/ListSimilarChanges" => pb::ListSimilarChangesRequest {
+            intent: format!("{}/intents/{}", repo(), rill_types::IntentId::new()),
+        }
+        .encode_to_vec(),
+        "AttentionService/GetIntentDigest" => pb::GetIntentDigestRequest {
+            intent: format!("{}/intents/{}", repo(), rill_types::IntentId::new()),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "AttentionService/BatchVote" => pb::BatchVoteRequest {
+            intent: format!("{}/intents/{}", repo(), rill_types::IntentId::new()),
+            label: "Review".into(),
+            value: 1,
             ..Default::default()
         }
         .encode_to_vec(),

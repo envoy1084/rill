@@ -36,17 +36,19 @@ pub(super) async fn build_review(
     events: broadcast::Sender<ReviewEvent>,
     directory: Arc<dyn rill_policy::Directory>,
 ) -> Result<ReviewService> {
-    let submit = policy::effective_submit(repo).await?;
+    let guardrails = directory.guardrails().await?;
+    let submit = policy::effective_submit(repo, derive, guardrails).await?;
     let risk = policy::effective_risk(repo, &config.risk).await?;
     Ok(ReviewService::new(
         repo.clone(),
         derive.clone(),
         graph.clone(),
-        Arc::new(submit),
+        Arc::new(submit.policy),
         Arc::new(risk),
         labels.clone(),
     )
     .with_events(events)
+    .with_policy_source(submit.source)
     .with_directory(directory))
 }
 

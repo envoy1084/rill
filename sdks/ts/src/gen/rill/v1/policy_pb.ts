@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file rill/v1/policy.proto.
  */
 export const file_rill_v1_policy: GenFile = /*@__PURE__*/
-  fileDesc("ChRyaWxsL3YxL3BvbGljeS5wcm90bxIHcmlsbC52MSJuCgZQb2xpY3kSDAoEbmFtZRgBIAEoCRIMCgR0ZXh0GAIgASgJEhIKCnVwZGF0ZWRfYXQYAyABKAMSJgoKdXBkYXRlZF9ieRgEIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsEgwKBGV0YWcYBSABKAkiIAoQR2V0UG9saWN5UmVxdWVzdBIMCgRuYW1lGAEgASgJIjQKEUdldFBvbGljeVJlc3BvbnNlEh8KBnBvbGljeRgBIAEoCzIPLnJpbGwudjEuUG9saWN5IlgKE1VwZGF0ZVBvbGljeVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIfCgZwb2xpY3kYAiABKAsyDy5yaWxsLnYxLlBvbGljeRIMCgRldGFnGAMgASgJIjcKFFVwZGF0ZVBvbGljeVJlc3BvbnNlEh8KBnBvbGljeRgBIAEoCzIPLnJpbGwudjEuUG9saWN5MqABCg1Qb2xpY3lTZXJ2aWNlEkIKCUdldFBvbGljeRIZLnJpbGwudjEuR2V0UG9saWN5UmVxdWVzdBoaLnJpbGwudjEuR2V0UG9saWN5UmVzcG9uc2USSwoMVXBkYXRlUG9saWN5EhwucmlsbC52MS5VcGRhdGVQb2xpY3lSZXF1ZXN0Gh0ucmlsbC52MS5VcGRhdGVQb2xpY3lSZXNwb25zZWIGcHJvdG8z", [file_rill_v1_types]);
+  fileDesc("ChRyaWxsL3YxL3BvbGljeS5wcm90bxIHcmlsbC52MSJuCgZQb2xpY3kSDAoEbmFtZRgBIAEoCRIMCgR0ZXh0GAIgASgJEhIKCnVwZGF0ZWRfYXQYAyABKAMSJgoKdXBkYXRlZF9ieRgEIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsEgwKBGV0YWcYBSABKAkiIAoQR2V0UG9saWN5UmVxdWVzdBIMCgRuYW1lGAEgASgJIjQKEUdldFBvbGljeVJlc3BvbnNlEh8KBnBvbGljeRgBIAEoCzIPLnJpbGwudjEuUG9saWN5IlgKE1VwZGF0ZVBvbGljeVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIfCgZwb2xpY3kYAiABKAsyDy5yaWxsLnYxLlBvbGljeRIMCgRldGFnGAMgASgJIjcKFFVwZGF0ZVBvbGljeVJlc3BvbnNlEh8KBnBvbGljeRgBIAEoCzIPLnJpbGwudjEuUG9saWN5IisKGUdldEVmZmVjdGl2ZVBvbGljeVJlcXVlc3QSDgoGcGFyZW50GAEgASgJIkoKGkdldEVmZmVjdGl2ZVBvbGljeVJlc3BvbnNlEgwKBHRleHQYASABKAkSDgoGc291cmNlGAIgASgJEg4KBmRpZ2VzdBgDIAEoCSIoChVFeHBsYWluTGFuZGluZ1JlcXVlc3QSDwoHbGFuZGluZxgBIAEoCSKtAQoWRXhwbGFpbkxhbmRpbmdSZXNwb25zZRIOCgZjaGFuZ2UYASABKAkSDgoGcG9saWN5GAIgASgJEg4KBnNvdXJjZRgDIAEoCRIPCgdhbGxvd2VkGAQgASgIEhgKEG1hdGNoZWRfcG9saWNpZXMYBSADKAkSDwoHcmVhc29ucxgGIAMoCRISCgpmYWN0c19qc29uGAcgASgJEhMKC3BvbGljeV90ZXh0GAggASgJIlMKFVNpbXVsYXRlUG9saWN5UmVxdWVzdBIOCgZwYXJlbnQYASABKAkSDAoEdGV4dBgCIAEoCRINCgVzaW5jZRgDIAEoBBINCgV1bnRpbBgEIAEoBCJEChBTaW11bGF0ZWRMYW5kaW5nEg8KB2xhbmRpbmcYASABKAkSDgoGY2hhbmdlGAIgASgJEg8KB3JlYXNvbnMYAyADKAkisAEKFlNpbXVsYXRlUG9saWN5UmVzcG9uc2USEAoIcmVwbGF5ZWQYASABKA0SEgoKdW5yZWNvcmRlZBgCIAEoDRIPCgdhbGxvd2VkGAMgASgNEioKB2Jsb2NrZWQYBCADKAsyGS5yaWxsLnYxLlNpbXVsYXRlZExhbmRpbmcSGQoRYWdlbnRfb25seV9iZWZvcmUYBSABKA0SGAoQYWdlbnRfb25seV9hZnRlchgGIAEoDSIjChRHZXRHdWFyZHJhaWxzUmVxdWVzdBILCgNvcmcYASABKAkiJQoVR2V0R3VhcmRyYWlsc1Jlc3BvbnNlEgwKBHRleHQYASABKAkiSAoXVXBkYXRlR3VhcmRyYWlsc1JlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRILCgNvcmcYAiABKAkSDAoEdGV4dBgDIAEoCSIoChhVcGRhdGVHdWFyZHJhaWxzUmVzcG9uc2USDAoEdGV4dBgBIAEoCTLOBAoNUG9saWN5U2VydmljZRJCCglHZXRQb2xpY3kSGS5yaWxsLnYxLkdldFBvbGljeVJlcXVlc3QaGi5yaWxsLnYxLkdldFBvbGljeVJlc3BvbnNlEksKDFVwZGF0ZVBvbGljeRIcLnJpbGwudjEuVXBkYXRlUG9saWN5UmVxdWVzdBodLnJpbGwudjEuVXBkYXRlUG9saWN5UmVzcG9uc2USXQoSR2V0RWZmZWN0aXZlUG9saWN5EiIucmlsbC52MS5HZXRFZmZlY3RpdmVQb2xpY3lSZXF1ZXN0GiMucmlsbC52MS5HZXRFZmZlY3RpdmVQb2xpY3lSZXNwb25zZRJRCg5FeHBsYWluTGFuZGluZxIeLnJpbGwudjEuRXhwbGFpbkxhbmRpbmdSZXF1ZXN0Gh8ucmlsbC52MS5FeHBsYWluTGFuZGluZ1Jlc3BvbnNlElEKDlNpbXVsYXRlUG9saWN5Eh4ucmlsbC52MS5TaW11bGF0ZVBvbGljeVJlcXVlc3QaHy5yaWxsLnYxLlNpbXVsYXRlUG9saWN5UmVzcG9uc2USTgoNR2V0R3VhcmRyYWlscxIdLnJpbGwudjEuR2V0R3VhcmRyYWlsc1JlcXVlc3QaHi5yaWxsLnYxLkdldEd1YXJkcmFpbHNSZXNwb25zZRJXChBVcGRhdGVHdWFyZHJhaWxzEiAucmlsbC52MS5VcGRhdGVHdWFyZHJhaWxzUmVxdWVzdBohLnJpbGwudjEuVXBkYXRlR3VhcmRyYWlsc1Jlc3BvbnNlYgZwcm90bzM", [file_rill_v1_types]);
 
 /**
  * A repository policy.
@@ -153,6 +153,341 @@ export const UpdatePolicyResponseSchema: GenMessage<UpdatePolicyResponse> = /*@_
   messageDesc(file_rill_v1_policy, 4);
 
 /**
+ * @generated from message rill.v1.GetEffectivePolicyRequest
+ */
+export type GetEffectivePolicyRequest = Message<"rill.v1.GetEffectivePolicyRequest"> & {
+  /**
+   * `orgs/{org}/repos/{repo}`. Required.
+   *
+   * @generated from field: string parent = 1;
+   */
+  parent: string;
+};
+
+/**
+ * Describes the message rill.v1.GetEffectivePolicyRequest.
+ * Use `create(GetEffectivePolicyRequestSchema)` to create a new message.
+ */
+export const GetEffectivePolicyRequestSchema: GenMessage<GetEffectivePolicyRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 5);
+
+/**
+ * @generated from message rill.v1.GetEffectivePolicyResponse
+ */
+export type GetEffectivePolicyResponse = Message<"rill.v1.GetEffectivePolicyResponse"> & {
+  /**
+   * @generated from field: string text = 1;
+   */
+  text: string;
+
+  /**
+   * `default`, `stored`, or the `.rill/policy/` files, with
+   * ` + org guardrails` when the org has any.
+   *
+   * @generated from field: string source = 2;
+   */
+  source: string;
+
+  /**
+   * BLAKE3 of `text`, hex: what landings record.
+   *
+   * @generated from field: string digest = 3;
+   */
+  digest: string;
+};
+
+/**
+ * Describes the message rill.v1.GetEffectivePolicyResponse.
+ * Use `create(GetEffectivePolicyResponseSchema)` to create a new message.
+ */
+export const GetEffectivePolicyResponseSchema: GenMessage<GetEffectivePolicyResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 6);
+
+/**
+ * @generated from message rill.v1.ExplainLandingRequest
+ */
+export type ExplainLandingRequest = Message<"rill.v1.ExplainLandingRequest"> & {
+  /**
+   * `…/trunk/positions/{n}`. Required.
+   *
+   * @generated from field: string landing = 1;
+   */
+  landing: string;
+};
+
+/**
+ * Describes the message rill.v1.ExplainLandingRequest.
+ * Use `create(ExplainLandingRequestSchema)` to create a new message.
+ */
+export const ExplainLandingRequestSchema: GenMessage<ExplainLandingRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 7);
+
+/**
+ * @generated from message rill.v1.ExplainLandingResponse
+ */
+export type ExplainLandingResponse = Message<"rill.v1.ExplainLandingResponse"> & {
+  /**
+   * `…/changes/{change}`.
+   *
+   * @generated from field: string change = 1;
+   */
+  change: string;
+
+  /**
+   * The policy digest the landing recorded, and where the policy came from.
+   *
+   * @generated from field: string policy = 2;
+   */
+  policy: string;
+
+  /**
+   * @generated from field: string source = 3;
+   */
+  source: string;
+
+  /**
+   * @generated from field: bool allowed = 4;
+   */
+  allowed: boolean;
+
+  /**
+   * @generated from field: repeated string matched_policies = 5;
+   */
+  matchedPolicies: string[];
+
+  /**
+   * @generated from field: repeated string reasons = 6;
+   */
+  reasons: string[];
+
+  /**
+   * The change's facts and review facts the decision saw, as JSON.
+   *
+   * @generated from field: string facts_json = 7;
+   */
+  factsJson: string;
+
+  /**
+   * The policy text, when this repository kept it.
+   *
+   * @generated from field: string policy_text = 8;
+   */
+  policyText: string;
+};
+
+/**
+ * Describes the message rill.v1.ExplainLandingResponse.
+ * Use `create(ExplainLandingResponseSchema)` to create a new message.
+ */
+export const ExplainLandingResponseSchema: GenMessage<ExplainLandingResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 8);
+
+/**
+ * @generated from message rill.v1.SimulatePolicyRequest
+ */
+export type SimulatePolicyRequest = Message<"rill.v1.SimulatePolicyRequest"> & {
+  /**
+   * `orgs/{org}/repos/{repo}`. Required.
+   *
+   * @generated from field: string parent = 1;
+   */
+  parent: string;
+
+  /**
+   * The candidate Cedar text. Required.
+   *
+   * @generated from field: string text = 2;
+   */
+  text: string;
+
+  /**
+   * Trunk positions to replay, inclusive; 0 for the first or the last.
+   *
+   * @generated from field: uint64 since = 3;
+   */
+  since: bigint;
+
+  /**
+   * @generated from field: uint64 until = 4;
+   */
+  until: bigint;
+};
+
+/**
+ * Describes the message rill.v1.SimulatePolicyRequest.
+ * Use `create(SimulatePolicyRequestSchema)` to create a new message.
+ */
+export const SimulatePolicyRequestSchema: GenMessage<SimulatePolicyRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 9);
+
+/**
+ * @generated from message rill.v1.SimulatedLanding
+ */
+export type SimulatedLanding = Message<"rill.v1.SimulatedLanding"> & {
+  /**
+   * `…/trunk/positions/{n}`.
+   *
+   * @generated from field: string landing = 1;
+   */
+  landing: string;
+
+  /**
+   * @generated from field: string change = 2;
+   */
+  change: string;
+
+  /**
+   * @generated from field: repeated string reasons = 3;
+   */
+  reasons: string[];
+};
+
+/**
+ * Describes the message rill.v1.SimulatedLanding.
+ * Use `create(SimulatedLandingSchema)` to create a new message.
+ */
+export const SimulatedLandingSchema: GenMessage<SimulatedLanding> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 10);
+
+/**
+ * @generated from message rill.v1.SimulatePolicyResponse
+ */
+export type SimulatePolicyResponse = Message<"rill.v1.SimulatePolicyResponse"> & {
+  /**
+   * Landings replayed (those with a recorded decision).
+   *
+   * @generated from field: uint32 replayed = 1;
+   */
+  replayed: number;
+
+  /**
+   * Landings in range without a recorded decision.
+   *
+   * @generated from field: uint32 unrecorded = 2;
+   */
+  unrecorded: number;
+
+  /**
+   * Still allowed under the candidate.
+   *
+   * @generated from field: uint32 allowed = 3;
+   */
+  allowed: number;
+
+  /**
+   * Allowed then, blocked under the candidate.
+   *
+   * @generated from field: repeated rill.v1.SimulatedLanding blocked = 4;
+   */
+  blocked: SimulatedLanding[];
+
+  /**
+   * Landings that could have landed with no human vote: under the policy
+   * recorded, and under the candidate.
+   *
+   * @generated from field: uint32 agent_only_before = 5;
+   */
+  agentOnlyBefore: number;
+
+  /**
+   * @generated from field: uint32 agent_only_after = 6;
+   */
+  agentOnlyAfter: number;
+};
+
+/**
+ * Describes the message rill.v1.SimulatePolicyResponse.
+ * Use `create(SimulatePolicyResponseSchema)` to create a new message.
+ */
+export const SimulatePolicyResponseSchema: GenMessage<SimulatePolicyResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 11);
+
+/**
+ * @generated from message rill.v1.GetGuardrailsRequest
+ */
+export type GetGuardrailsRequest = Message<"rill.v1.GetGuardrailsRequest"> & {
+  /**
+   * `orgs/{org}`. Required.
+   *
+   * @generated from field: string org = 1;
+   */
+  org: string;
+};
+
+/**
+ * Describes the message rill.v1.GetGuardrailsRequest.
+ * Use `create(GetGuardrailsRequestSchema)` to create a new message.
+ */
+export const GetGuardrailsRequestSchema: GenMessage<GetGuardrailsRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 12);
+
+/**
+ * @generated from message rill.v1.GetGuardrailsResponse
+ */
+export type GetGuardrailsResponse = Message<"rill.v1.GetGuardrailsResponse"> & {
+  /**
+   * @generated from field: string text = 1;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message rill.v1.GetGuardrailsResponse.
+ * Use `create(GetGuardrailsResponseSchema)` to create a new message.
+ */
+export const GetGuardrailsResponseSchema: GenMessage<GetGuardrailsResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 13);
+
+/**
+ * @generated from message rill.v1.UpdateGuardrailsRequest
+ */
+export type UpdateGuardrailsRequest = Message<"rill.v1.UpdateGuardrailsRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * `orgs/{org}`. Required.
+   *
+   * @generated from field: string org = 2;
+   */
+  org: string;
+
+  /**
+   * Cedar `forbid` rules, each with an `@id` starting `org_`; empty
+   * removes them.
+   *
+   * @generated from field: string text = 3;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message rill.v1.UpdateGuardrailsRequest.
+ * Use `create(UpdateGuardrailsRequestSchema)` to create a new message.
+ */
+export const UpdateGuardrailsRequestSchema: GenMessage<UpdateGuardrailsRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 14);
+
+/**
+ * @generated from message rill.v1.UpdateGuardrailsResponse
+ */
+export type UpdateGuardrailsResponse = Message<"rill.v1.UpdateGuardrailsResponse"> & {
+  /**
+   * @generated from field: string text = 1;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message rill.v1.UpdateGuardrailsResponse.
+ * Use `create(UpdateGuardrailsResponseSchema)` to create a new message.
+ */
+export const UpdateGuardrailsResponseSchema: GenMessage<UpdateGuardrailsResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_policy, 15);
+
+/**
  * Repository policies.
  *
  * @generated from service rill.v1.PolicyService
@@ -177,6 +512,57 @@ export const PolicyService: GenService<{
     methodKind: "unary";
     input: typeof UpdatePolicyRequestSchema;
     output: typeof UpdatePolicyResponseSchema;
+  },
+  /**
+   * The submit rules in force: trunk's `.rill/policy/*.cedar`, else the
+   * stored policy, else the default, with the org's guardrails after them.
+   *
+   * @generated from rpc rill.v1.PolicyService.GetEffectivePolicy
+   */
+  getEffectivePolicy: {
+    methodKind: "unary";
+    input: typeof GetEffectivePolicyRequestSchema;
+    output: typeof GetEffectivePolicyResponseSchema;
+  },
+  /**
+   * Why a landing was allowed: the policy and the decision recorded.
+   *
+   * @generated from rpc rill.v1.PolicyService.ExplainLanding
+   */
+  explainLanding: {
+    methodKind: "unary";
+    input: typeof ExplainLandingRequestSchema;
+    output: typeof ExplainLandingResponseSchema;
+  },
+  /**
+   * Replay recorded landings under a candidate policy.
+   *
+   * @generated from rpc rill.v1.PolicyService.SimulatePolicy
+   */
+  simulatePolicy: {
+    methodKind: "unary";
+    input: typeof SimulatePolicyRequestSchema;
+    output: typeof SimulatePolicyResponseSchema;
+  },
+  /**
+   * An org's guardrails: forbid rules above every repository's policy.
+   *
+   * @generated from rpc rill.v1.PolicyService.GetGuardrails
+   */
+  getGuardrails: {
+    methodKind: "unary";
+    input: typeof GetGuardrailsRequestSchema;
+    output: typeof GetGuardrailsResponseSchema;
+  },
+  /**
+   * Replace an org's guardrails (org administrators).
+   *
+   * @generated from rpc rill.v1.PolicyService.UpdateGuardrails
+   */
+  updateGuardrails: {
+    methodKind: "unary";
+    input: typeof UpdateGuardrailsRequestSchema;
+    output: typeof UpdateGuardrailsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_rill_v1_policy, 0);

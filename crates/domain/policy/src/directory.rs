@@ -1,4 +1,4 @@
-//! Who people are, as review needs to know: their teams (for ownership)
+//! Who people are, as review needs to know (and the org's guardrails): their teams (for ownership)
 //! and who sponsors an agent and how it reviews (for reviewer
 //! independence).
 
@@ -30,6 +30,12 @@ pub struct Person {
 #[async_trait]
 pub trait Directory: Send + Sync {
     async fn person(&self, principal: &Principal) -> Result<Person>;
+
+    /// The org's guardrails: `forbid` rules above every repository's
+    /// submit policy.
+    async fn guardrails(&self) -> Result<Option<String>> {
+        Ok(None)
+    }
 }
 
 /// A directory that knows nobody: no teams, no sponsors.

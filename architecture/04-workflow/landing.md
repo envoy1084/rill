@@ -452,4 +452,4 @@ step.
 * [rill-api/src/services/review/mod.rs](../../crates/server/api/src/services/review/mod.rs) (`request_land`, `get_land_status`), [common.rs](../../crates/server/api/src/services/common.rs) (`ticket_status`), [repo/land_queue.rs](../../crates/foundation/store/src/repo/land_queue.rs), [state/repo_build.rs](../../crates/server/runtime/src/state/repo_build.rs), [workers/repo_tasks.rs](../../crates/server/runtime/src/workers/repo_tasks.rs)
 
 ---
-← Previous: [Review agents](review-agents.md) · [Index](../index.md) · Next: [Post-land verification](post-land-verification.md) →
+← Previous: [Human attention](attention.md) · [Index](../index.md) · Next: [Post-land verification](post-land-verification.md) →

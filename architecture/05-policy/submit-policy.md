@@ -43,7 +43,7 @@ any label by name without the schema listing them.
 | Entity | Attributes |
 | --- | --- |
 | `Rill::Principal` | `kind`, `name` |
-| `Rill::Change` | `risk`, `author_kind`, `intent_kind` (or `none`), `unresolved_threads`, `unresolved_blocking_threads`, `touches_sensitive`, `has_agent_resolution`, `label_names: Set<String>`, `owner_sets`, `owner_sets_missing`, `owners_covered` ([code owners](../04-workflow/ownership.md)), `intent_approved`, `intent_in_scope`, `intent_agent_quorum` ([intents](../04-workflow/intents.md)), `independent_agent_approvals`, `min_agent_trust` ([review agents](../04-workflow/review-agents.md#independence)); tags of type `VoteSummary` |
+| `Rill::Change` | `risk`, `author_kind`, `intent_kind` (or `none`), `unresolved_threads`, `unresolved_blocking_threads`, `touches_sensitive`, `has_agent_resolution`, `label_names: Set<String>`, `owner_sets`, `owner_sets_missing`, `owners_covered` ([code owners](../04-workflow/ownership.md)), `intent_approved`, `intent_in_scope`, `intent_agent_quorum` ([intents](../04-workflow/intents.md)), `independent_agent_approvals`, `min_agent_trust` ([review agents](../04-workflow/review-agents.md#independence)), `files`, `lines`, `stack_depth`, `author_model`, `author_sponsor` (provenance, `""` when none), `weekend`, `hour` (UTC, when the facts were taken), `trunk_state` (`green`, `red`, `fixing`, `guarded`), `frozen`; tags of type `VoteSummary` |
 | `Rill::VoteSummary` | the eight `VoteSummary` counters, as `Long` |
 
 [`entities.rs`](../../crates/domain/policy/src/submit/entities.rs) builds
@@ -53,18 +53,22 @@ against the schema, and uses an empty context.
 ## Default policy
 
 [`DEFAULT_POLICY`](../../crates/domain/policy/src/submit/default_policy.rs)
-applies when a repository has no stored submit policy. Each rule has an
-`@id`:
+applies when a repository has neither policy files nor a stored policy. It
+is shaped for agents to review most changes. "Independent" means
+`independent_agent_approvals`, and a human's `Review` vote can stand in at
+every class:
 
 | Rule | Effect | Condition |
 | --- | --- | --- |
 | `block_review_veto` | forbid | `Review.min <= -2` |
 | `block_unresolved_bug_or_security` | forbid | `unresolved_blocking_threads > 0` |
 | `block_uncovered_owners` | forbid | `owner_sets_missing > 0` and risk not `trivial`/`low` |
-| `land_trivial_or_low` | permit | risk `trivial`/`low` and `Verified.max >= 1` |
-| `land_normal_human_review` | permit | risk `normal` and `Review.human_max >= 2` |
-| `land_normal_agent_review_with_owner` | permit | risk `normal`, `independent_agent_approvals >= 2` and `Owner.human_max >= 1` |
-| `land_sensitive_or_critical` | permit | risk `sensitive`/`critical`, `Owner.human_max >= 1` and `Review.human_max >= 2` |
+| `land_trivial` | permit | `trivial`, `Verified`, and 1 independent or `Review.human_max >= 1` |
+| `land_low` | permit | `low`, `Verified`, and 2 independent or `Review.human_max >= 1` |
+| `land_normal_human_review` | permit | `normal` and `Review.human_max >= 2` |
+| `land_normal_agent_review` | permit | `normal`, `Verified`, independent ≥ max(2, `intent_agent_quorum`), and `intent_in_scope` or `Owner.human_max >= 1` |
+| `land_sensitive_agent_review` | permit | `sensitive`, `Verified`, 1 independent, `Owner.human_max >= 1` |
+| `land_sensitive_or_critical` | permit | `sensitive`/`critical`, `Owner.human_max >= 1` and `Review.human_max >= 2` |
 
 ## Loading and evaluation
 
@@ -92,48 +96,78 @@ server:
   evaluate as the caller via `evaluate_for`. `RequestLand` fails with
   `FAILED_PRECONDITION` and the joined reasons when the policy denies.
 
-## Storage and hot swap
+## Where the rules come from
 
-[`state/policy.rs`](../../crates/server/runtime/src/state/policy.rs) stores two
-documents per repository as JSON `StoredPolicy { text, updated_at,
-updated_by }` under `misc/<repo>/policy:<name>`:
+[`effective_submit`](../../crates/server/runtime/src/state/policy.rs) builds
+the policy a repository uses from the first of these that exists:
 
-| Policy name | Text |
-| --- | --- |
-| `<repo>/submit` | Cedar |
-| `<repo>/risk` | JSON `RiskConfig` |
+1. **Trunk's `.rill/policy/*.cedar` files**, in name order. They are under
+   `.rill/`, so changing them takes `owner` and is critical risk. Each
+   file is linted at commit: it must compile, and it may not use an id
+   starting `org_`. A change to them is evaluated under the rules already
+   on trunk, because review reads trunk. If the files do not compile
+   together, they are ignored with an error logged.
+2. **The stored `submit` policy** (`UpdatePolicy`, repository owners).
+3. **The default.**
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant A as AdminService
-    participant S as misc keyspace
-    participant R as RepoContext
-    C->>A: UpdatePolicy(name, text)
-    A->>A: permit().admin(), policy::validate
-    A->>S: store StoredPolicy
-    A->>R: reload_policy()
-    R->>R: build_review, ArcSwap store
-```
+The org's **guardrails** are appended to whichever source applies. They
+are Cedar `forbid` rules, each `@id("org_…")`, kept in the org's identity
+settings and set by org administrators
+([`UpdateGuardrails`](../../crates/server/api/src/services/policy/guardrails.rs)).
+Because a `forbid` always wins, no repository rule can override a
+guardrail.
 
-* `UpdatePolicy` requires `admin()`. `policy::validate` fully parses the text
-  (Cedar validation, or JSON parse plus glob compilation). Failure is
-  `INVALID_ARGUMENT`, and nothing is stored.
-* `reload_policy` rebuilds the `ReviewService` from `effective_submit` (stored
-  or `default_rules()`) and `effective_risk` (stored or `ServerConfig.risk`),
-  then swaps it into the `ArcSwap`. In-flight requests finish on the old
-  `Arc`. Review event subscribers are unaffected because the broadcast sender
-  is shared.
-* `GetPolicy` requires `read`. With nothing stored, it returns the default
-  text, attributed to the lander service principal at the repository's
-  `created_at`.
+The review service is rebuilt and hot-swapped (`ArcSwap`; in-flight
+requests finish on the old one) whenever:
+
+- a `PolicyChanged` event arrives: a stored policy changed, or the org's
+  guardrails did (announced to every repository of the org);
+- a landing touches `.rill/policy/`.
+
+`GetEffectivePolicy` returns the text in force, its source (`default`,
+`stored` or the file list, with `+ org guardrails`) and its BLAKE3
+digest. The text is kept under its digest (`policy-text:<hex>`).
+
+## Recorded decisions, `rill why` and simulation
+
+Every landing carries the digest of the policy that allowed it. The
+`landing-decisions` consumer
+([workers/decisions.rs](../../crates/server/runtime/src/workers/decisions.rs))
+re-evaluates that policy on the change's facts and stores the result
+(`landing-decision:<seq>`):
+
+- the principal;
+- `ChangeFacts` and `SubmitFacts`, with `at` set to the landing time;
+- the decision and the source.
+
+Two RPCs read these records:
+
+- **`ExplainLanding`** (`rill why trunk@N [--facts]`) returns them with the
+  policy text.
+- **`SimulatePolicy`** (`rill policy simulate --policy new.cedar [--since]
+  [--until]`) replays up to 10,000 recorded landings under a candidate
+  ([`simulate.rs`](../../crates/domain/policy/src/submit/simulate.rs)). It
+  reports:
+  - how many it replayed, and how many in range had no record;
+  - how many are still allowed;
+  - each one now blocked, with reasons;
+  - how many could have landed with no human vote, under the recorded
+    policy and under the candidate. Human votes are stripped, while
+    approved intents still count. This is the human-load measure.
+
+## Storage
+
+Stored policies are JSON `StoredPolicy { text, updated_at, updated_by }`
+under `misc/<repo>/policy:<name>` (`submit`: Cedar; `risk`: JSON
+`RiskConfig`).
+- `UpdatePolicy` requires `admin()` and validates fully before storing.
+- `GetPolicy` returns the default text when nothing is stored.
 
 ## Limitations
 
-* `.rill/submit.cedar` in the tree is not read. Policies come only from
-  `UpdatePolicy`.
-* `Provenance::sponsor` and `stack_depth` are not entity attributes, and no
-  default rule uses `author_kind`.
+* A recorded decision re-evaluates the landing's policy on facts taken
+  just after landing, not inside the landing transaction.
+* Policy files changed in the same batch as code are not landed alone.
 * Changing the policy does not re-evaluate existing reviews until their next
   vote, comment, version or refresh.
 * Vote values are not range-checked here against the label definitions.
@@ -147,7 +181,9 @@ sequenceDiagram
 * [`submit/policy.rs`](../../crates/domain/policy/src/submit/policy.rs): `SubmitPolicy`, `SubmitDecision`.
 * [`submit/tests.rs`](../../crates/domain/policy/src/submit/tests.rs): default-policy cases.
 * [`rill-review/src/evaluate.rs`](../../crates/domain/review/src/evaluate.rs): `evaluate_for`, `refresh_status`.
-* [`state/policy.rs`](../../crates/server/runtime/src/state/policy.rs), [`state/repo_context.rs`](../../crates/server/runtime/src/state/repo_context.rs): storage and `reload_policy`.
+* [`submit/guardrails.rs`](../../crates/domain/policy/src/submit/guardrails.rs), [`submit/simulate.rs`](../../crates/domain/policy/src/submit/simulate.rs): guardrails, replay.
+* [`state/policy.rs`](../../crates/server/runtime/src/state/policy.rs), [`state/decisions.rs`](../../crates/server/runtime/src/state/decisions.rs), [`state/repo_context.rs`](../../crates/server/runtime/src/state/repo_context.rs): sources, records and `reload_policy`.
+* [`services/policy/`](../../crates/server/api/src/services/policy/mod.rs): the RPCs.
 * [`services/admin/mod.rs`](../../crates/server/api/src/services/admin/mod.rs): `GetPolicy`, `UpdatePolicy`.
 
 ---

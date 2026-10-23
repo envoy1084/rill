@@ -76,9 +76,10 @@ async fn votes_cast_together_reach_the_status_they_add_up_to() {
             .child(&h.alice, root, &[(&format!("src/f{round}.rs"), "x\n")])
             .await;
         h.service.submit(&cid, &h.alice).await.unwrap();
-        // Two agent approvals and a human owner +1 together make the
-        // change landable; no two of them do.
+        // A verification, two agent approvals and a human owner +1
+        // together make the change landable; no three of them do.
         let votes = [
+            (h.bob.clone(), "Verified", 1),
             (h.agent_a.clone(), "Review", 1),
             (h.agent_b.clone(), "Review", 1),
             (h.bob.clone(), "Owner", 1),

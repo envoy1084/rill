@@ -36,6 +36,7 @@ const PROTOS: &[&str] = &[
     "rill/v1/identity.proto",
     "rill/v1/session.proto",
     "rill/v1/reviewers.proto",
+    "rill/v1/attention.proto",
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

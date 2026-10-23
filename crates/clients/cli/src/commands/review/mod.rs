@@ -1,8 +1,9 @@
 //! `rill submit`, `rill approve`, `rill reject`, `rill abandon` and
 //! `rill review`: show, list, vote, comment, reply, threads, resolve-thread,
-//! evaluate, request, runs.
+//! evaluate, request, runs, audits, audit, batch.
 
 mod args;
+pub mod attention;
 mod browse;
 mod dispatch;
 mod fleet;

@@ -41,6 +41,9 @@ pub struct OrgIdentitySettings {
     pub org: String,
     /// Models whose agents are refused (the model kill switch).
     pub blocked_models: Vec<String>,
+    /// Cedar `forbid` rules applied above every repository's submit policy.
+    #[serde(default)]
+    pub guardrails: Option<String>,
 }
 
 impl Record for OrgIdentitySettings {

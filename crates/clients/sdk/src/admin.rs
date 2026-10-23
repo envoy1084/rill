@@ -13,7 +13,7 @@ use crate::types::{Health, IssuedToken, OrgInfo, Policy, TokenRequest, WhoAmI};
 /// Instance-wide administrative operations; not scoped to a repository.
 #[derive(Clone, Debug)]
 pub struct AdminClient {
-    client: Client,
+    pub(crate) client: Client,
 }
 
 impl AdminClient {

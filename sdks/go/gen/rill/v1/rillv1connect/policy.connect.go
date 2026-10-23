@@ -43,6 +43,21 @@ const (
 	// PolicyServiceUpdatePolicyProcedure is the fully-qualified name of the PolicyService's
 	// UpdatePolicy RPC.
 	PolicyServiceUpdatePolicyProcedure = "/rill.v1.PolicyService/UpdatePolicy"
+	// PolicyServiceGetEffectivePolicyProcedure is the fully-qualified name of the PolicyService's
+	// GetEffectivePolicy RPC.
+	PolicyServiceGetEffectivePolicyProcedure = "/rill.v1.PolicyService/GetEffectivePolicy"
+	// PolicyServiceExplainLandingProcedure is the fully-qualified name of the PolicyService's
+	// ExplainLanding RPC.
+	PolicyServiceExplainLandingProcedure = "/rill.v1.PolicyService/ExplainLanding"
+	// PolicyServiceSimulatePolicyProcedure is the fully-qualified name of the PolicyService's
+	// SimulatePolicy RPC.
+	PolicyServiceSimulatePolicyProcedure = "/rill.v1.PolicyService/SimulatePolicy"
+	// PolicyServiceGetGuardrailsProcedure is the fully-qualified name of the PolicyService's
+	// GetGuardrails RPC.
+	PolicyServiceGetGuardrailsProcedure = "/rill.v1.PolicyService/GetGuardrails"
+	// PolicyServiceUpdateGuardrailsProcedure is the fully-qualified name of the PolicyService's
+	// UpdateGuardrails RPC.
+	PolicyServiceUpdateGuardrailsProcedure = "/rill.v1.PolicyService/UpdateGuardrails"
 )
 
 // PolicyServiceClient is a client for the rill.v1.PolicyService service.
@@ -51,6 +66,17 @@ type PolicyServiceClient interface {
 	GetPolicy(context.Context, *connect.Request[v1.GetPolicyRequest]) (*connect.Response[v1.GetPolicyResponse], error)
 	// Replace a policy's text (repository owners).
 	UpdatePolicy(context.Context, *connect.Request[v1.UpdatePolicyRequest]) (*connect.Response[v1.UpdatePolicyResponse], error)
+	// The submit rules in force: trunk's `.rill/policy/*.cedar`, else the
+	// stored policy, else the default, with the org's guardrails after them.
+	GetEffectivePolicy(context.Context, *connect.Request[v1.GetEffectivePolicyRequest]) (*connect.Response[v1.GetEffectivePolicyResponse], error)
+	// Why a landing was allowed: the policy and the decision recorded.
+	ExplainLanding(context.Context, *connect.Request[v1.ExplainLandingRequest]) (*connect.Response[v1.ExplainLandingResponse], error)
+	// Replay recorded landings under a candidate policy.
+	SimulatePolicy(context.Context, *connect.Request[v1.SimulatePolicyRequest]) (*connect.Response[v1.SimulatePolicyResponse], error)
+	// An org's guardrails: forbid rules above every repository's policy.
+	GetGuardrails(context.Context, *connect.Request[v1.GetGuardrailsRequest]) (*connect.Response[v1.GetGuardrailsResponse], error)
+	// Replace an org's guardrails (org administrators).
+	UpdateGuardrails(context.Context, *connect.Request[v1.UpdateGuardrailsRequest]) (*connect.Response[v1.UpdateGuardrailsResponse], error)
 }
 
 // NewPolicyServiceClient constructs a client for the rill.v1.PolicyService service. By default, it
@@ -76,13 +102,48 @@ func NewPolicyServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(policyServiceMethods.ByName("UpdatePolicy")),
 			connect.WithClientOptions(opts...),
 		),
+		getEffectivePolicy: connect.NewClient[v1.GetEffectivePolicyRequest, v1.GetEffectivePolicyResponse](
+			httpClient,
+			baseURL+PolicyServiceGetEffectivePolicyProcedure,
+			connect.WithSchema(policyServiceMethods.ByName("GetEffectivePolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		explainLanding: connect.NewClient[v1.ExplainLandingRequest, v1.ExplainLandingResponse](
+			httpClient,
+			baseURL+PolicyServiceExplainLandingProcedure,
+			connect.WithSchema(policyServiceMethods.ByName("ExplainLanding")),
+			connect.WithClientOptions(opts...),
+		),
+		simulatePolicy: connect.NewClient[v1.SimulatePolicyRequest, v1.SimulatePolicyResponse](
+			httpClient,
+			baseURL+PolicyServiceSimulatePolicyProcedure,
+			connect.WithSchema(policyServiceMethods.ByName("SimulatePolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		getGuardrails: connect.NewClient[v1.GetGuardrailsRequest, v1.GetGuardrailsResponse](
+			httpClient,
+			baseURL+PolicyServiceGetGuardrailsProcedure,
+			connect.WithSchema(policyServiceMethods.ByName("GetGuardrails")),
+			connect.WithClientOptions(opts...),
+		),
+		updateGuardrails: connect.NewClient[v1.UpdateGuardrailsRequest, v1.UpdateGuardrailsResponse](
+			httpClient,
+			baseURL+PolicyServiceUpdateGuardrailsProcedure,
+			connect.WithSchema(policyServiceMethods.ByName("UpdateGuardrails")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // policyServiceClient implements PolicyServiceClient.
 type policyServiceClient struct {
-	getPolicy    *connect.Client[v1.GetPolicyRequest, v1.GetPolicyResponse]
-	updatePolicy *connect.Client[v1.UpdatePolicyRequest, v1.UpdatePolicyResponse]
+	getPolicy          *connect.Client[v1.GetPolicyRequest, v1.GetPolicyResponse]
+	updatePolicy       *connect.Client[v1.UpdatePolicyRequest, v1.UpdatePolicyResponse]
+	getEffectivePolicy *connect.Client[v1.GetEffectivePolicyRequest, v1.GetEffectivePolicyResponse]
+	explainLanding     *connect.Client[v1.ExplainLandingRequest, v1.ExplainLandingResponse]
+	simulatePolicy     *connect.Client[v1.SimulatePolicyRequest, v1.SimulatePolicyResponse]
+	getGuardrails      *connect.Client[v1.GetGuardrailsRequest, v1.GetGuardrailsResponse]
+	updateGuardrails   *connect.Client[v1.UpdateGuardrailsRequest, v1.UpdateGuardrailsResponse]
 }
 
 // GetPolicy calls rill.v1.PolicyService.GetPolicy.
@@ -95,12 +156,48 @@ func (c *policyServiceClient) UpdatePolicy(ctx context.Context, req *connect.Req
 	return c.updatePolicy.CallUnary(ctx, req)
 }
 
+// GetEffectivePolicy calls rill.v1.PolicyService.GetEffectivePolicy.
+func (c *policyServiceClient) GetEffectivePolicy(ctx context.Context, req *connect.Request[v1.GetEffectivePolicyRequest]) (*connect.Response[v1.GetEffectivePolicyResponse], error) {
+	return c.getEffectivePolicy.CallUnary(ctx, req)
+}
+
+// ExplainLanding calls rill.v1.PolicyService.ExplainLanding.
+func (c *policyServiceClient) ExplainLanding(ctx context.Context, req *connect.Request[v1.ExplainLandingRequest]) (*connect.Response[v1.ExplainLandingResponse], error) {
+	return c.explainLanding.CallUnary(ctx, req)
+}
+
+// SimulatePolicy calls rill.v1.PolicyService.SimulatePolicy.
+func (c *policyServiceClient) SimulatePolicy(ctx context.Context, req *connect.Request[v1.SimulatePolicyRequest]) (*connect.Response[v1.SimulatePolicyResponse], error) {
+	return c.simulatePolicy.CallUnary(ctx, req)
+}
+
+// GetGuardrails calls rill.v1.PolicyService.GetGuardrails.
+func (c *policyServiceClient) GetGuardrails(ctx context.Context, req *connect.Request[v1.GetGuardrailsRequest]) (*connect.Response[v1.GetGuardrailsResponse], error) {
+	return c.getGuardrails.CallUnary(ctx, req)
+}
+
+// UpdateGuardrails calls rill.v1.PolicyService.UpdateGuardrails.
+func (c *policyServiceClient) UpdateGuardrails(ctx context.Context, req *connect.Request[v1.UpdateGuardrailsRequest]) (*connect.Response[v1.UpdateGuardrailsResponse], error) {
+	return c.updateGuardrails.CallUnary(ctx, req)
+}
+
 // PolicyServiceHandler is an implementation of the rill.v1.PolicyService service.
 type PolicyServiceHandler interface {
 	// A policy; the default text when it was never set.
 	GetPolicy(context.Context, *connect.Request[v1.GetPolicyRequest]) (*connect.Response[v1.GetPolicyResponse], error)
 	// Replace a policy's text (repository owners).
 	UpdatePolicy(context.Context, *connect.Request[v1.UpdatePolicyRequest]) (*connect.Response[v1.UpdatePolicyResponse], error)
+	// The submit rules in force: trunk's `.rill/policy/*.cedar`, else the
+	// stored policy, else the default, with the org's guardrails after them.
+	GetEffectivePolicy(context.Context, *connect.Request[v1.GetEffectivePolicyRequest]) (*connect.Response[v1.GetEffectivePolicyResponse], error)
+	// Why a landing was allowed: the policy and the decision recorded.
+	ExplainLanding(context.Context, *connect.Request[v1.ExplainLandingRequest]) (*connect.Response[v1.ExplainLandingResponse], error)
+	// Replay recorded landings under a candidate policy.
+	SimulatePolicy(context.Context, *connect.Request[v1.SimulatePolicyRequest]) (*connect.Response[v1.SimulatePolicyResponse], error)
+	// An org's guardrails: forbid rules above every repository's policy.
+	GetGuardrails(context.Context, *connect.Request[v1.GetGuardrailsRequest]) (*connect.Response[v1.GetGuardrailsResponse], error)
+	// Replace an org's guardrails (org administrators).
+	UpdateGuardrails(context.Context, *connect.Request[v1.UpdateGuardrailsRequest]) (*connect.Response[v1.UpdateGuardrailsResponse], error)
 }
 
 // NewPolicyServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -122,12 +219,52 @@ func NewPolicyServiceHandler(svc PolicyServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(policyServiceMethods.ByName("UpdatePolicy")),
 		connect.WithHandlerOptions(opts...),
 	)
+	policyServiceGetEffectivePolicyHandler := connect.NewUnaryHandler(
+		PolicyServiceGetEffectivePolicyProcedure,
+		svc.GetEffectivePolicy,
+		connect.WithSchema(policyServiceMethods.ByName("GetEffectivePolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	policyServiceExplainLandingHandler := connect.NewUnaryHandler(
+		PolicyServiceExplainLandingProcedure,
+		svc.ExplainLanding,
+		connect.WithSchema(policyServiceMethods.ByName("ExplainLanding")),
+		connect.WithHandlerOptions(opts...),
+	)
+	policyServiceSimulatePolicyHandler := connect.NewUnaryHandler(
+		PolicyServiceSimulatePolicyProcedure,
+		svc.SimulatePolicy,
+		connect.WithSchema(policyServiceMethods.ByName("SimulatePolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	policyServiceGetGuardrailsHandler := connect.NewUnaryHandler(
+		PolicyServiceGetGuardrailsProcedure,
+		svc.GetGuardrails,
+		connect.WithSchema(policyServiceMethods.ByName("GetGuardrails")),
+		connect.WithHandlerOptions(opts...),
+	)
+	policyServiceUpdateGuardrailsHandler := connect.NewUnaryHandler(
+		PolicyServiceUpdateGuardrailsProcedure,
+		svc.UpdateGuardrails,
+		connect.WithSchema(policyServiceMethods.ByName("UpdateGuardrails")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/rill.v1.PolicyService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PolicyServiceGetPolicyProcedure:
 			policyServiceGetPolicyHandler.ServeHTTP(w, r)
 		case PolicyServiceUpdatePolicyProcedure:
 			policyServiceUpdatePolicyHandler.ServeHTTP(w, r)
+		case PolicyServiceGetEffectivePolicyProcedure:
+			policyServiceGetEffectivePolicyHandler.ServeHTTP(w, r)
+		case PolicyServiceExplainLandingProcedure:
+			policyServiceExplainLandingHandler.ServeHTTP(w, r)
+		case PolicyServiceSimulatePolicyProcedure:
+			policyServiceSimulatePolicyHandler.ServeHTTP(w, r)
+		case PolicyServiceGetGuardrailsProcedure:
+			policyServiceGetGuardrailsHandler.ServeHTTP(w, r)
+		case PolicyServiceUpdateGuardrailsProcedure:
+			policyServiceUpdateGuardrailsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -143,4 +280,24 @@ func (UnimplementedPolicyServiceHandler) GetPolicy(context.Context, *connect.Req
 
 func (UnimplementedPolicyServiceHandler) UpdatePolicy(context.Context, *connect.Request[v1.UpdatePolicyRequest]) (*connect.Response[v1.UpdatePolicyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.PolicyService.UpdatePolicy is not implemented"))
+}
+
+func (UnimplementedPolicyServiceHandler) GetEffectivePolicy(context.Context, *connect.Request[v1.GetEffectivePolicyRequest]) (*connect.Response[v1.GetEffectivePolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.PolicyService.GetEffectivePolicy is not implemented"))
+}
+
+func (UnimplementedPolicyServiceHandler) ExplainLanding(context.Context, *connect.Request[v1.ExplainLandingRequest]) (*connect.Response[v1.ExplainLandingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.PolicyService.ExplainLanding is not implemented"))
+}
+
+func (UnimplementedPolicyServiceHandler) SimulatePolicy(context.Context, *connect.Request[v1.SimulatePolicyRequest]) (*connect.Response[v1.SimulatePolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.PolicyService.SimulatePolicy is not implemented"))
+}
+
+func (UnimplementedPolicyServiceHandler) GetGuardrails(context.Context, *connect.Request[v1.GetGuardrailsRequest]) (*connect.Response[v1.GetGuardrailsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.PolicyService.GetGuardrails is not implemented"))
+}
+
+func (UnimplementedPolicyServiceHandler) UpdateGuardrails(context.Context, *connect.Request[v1.UpdateGuardrailsRequest]) (*connect.Response[v1.UpdateGuardrailsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.PolicyService.UpdateGuardrails is not implemented"))
 }

@@ -28,16 +28,34 @@ when {
 };
 
 // ---- permits by risk class ----------------------------------------------
+//
+// Agents review most changes: "independent" approvals are agent Review
+// votes that are not the author's, not from its sponsor chain, from
+// distinct model families or prompts, and not from demoted reviewers.
+// A human's Review vote can stand in for them at every class.
 
-// Trivial and low-risk changes land on a passing verification alone.
-@id("land_trivial_or_low")
+// Trivial: a passing verification and one approval.
+@id("land_trivial")
 permit(principal, action == Rill::Action::"land", resource)
 when {
-    (resource.risk == "trivial" || resource.risk == "low")
+    resource.risk == "trivial"
     && resource.hasTag("Verified") && resource.getTag("Verified").max >= 1
+    && (resource.independent_agent_approvals >= 1
+        || (resource.hasTag("Review") && resource.getTag("Review").human_max >= 1))
 };
 
-// Normal changes need one human +2 on Review.
+// Low: a passing verification and two independent agent approvals, or a
+// human's.
+@id("land_low")
+permit(principal, action == Rill::Action::"land", resource)
+when {
+    resource.risk == "low"
+    && resource.hasTag("Verified") && resource.getTag("Verified").max >= 1
+    && (resource.independent_agent_approvals >= 2
+        || (resource.hasTag("Review") && resource.getTag("Review").human_max >= 1))
+};
+
+// Normal: one human +2 on Review ...
 @id("land_normal_human_review")
 permit(principal, action == Rill::Action::"land", resource)
 when {
@@ -45,16 +63,32 @@ when {
     && resource.hasTag("Review") && resource.getTag("Review").human_max >= 2
 };
 
-// ... or two independent agent approvals on Review plus a human owner's +1.
-@id("land_normal_agent_review_with_owner")
+// ... or a passing verification, two independent agent approvals (or the
+// intent's quorum, if larger), and either an approved intent the change
+// stays inside or a human owner's +1.
+@id("land_normal_agent_review")
 permit(principal, action == Rill::Action::"land", resource)
 when {
     resource.risk == "normal"
+    && resource.hasTag("Verified") && resource.getTag("Verified").max >= 1
     && resource.independent_agent_approvals >= 2
+    && resource.independent_agent_approvals >= resource.intent_agent_quorum
+    && (resource.intent_in_scope
+        || (resource.hasTag("Owner") && resource.getTag("Owner").human_max >= 1))
+};
+
+// Sensitive: a human owner's +1, a passing verification and an independent
+// agent review.
+@id("land_sensitive_agent_review")
+permit(principal, action == Rill::Action::"land", resource)
+when {
+    resource.risk == "sensitive"
+    && resource.hasTag("Verified") && resource.getTag("Verified").max >= 1
+    && resource.independent_agent_approvals >= 1
     && resource.hasTag("Owner") && resource.getTag("Owner").human_max >= 1
 };
 
-// Sensitive and critical changes need both a human owner and a human +2.
+// Sensitive and critical: a human owner and a human +2.
 @id("land_sensitive_or_critical")
 permit(principal, action == Rill::Action::"land", resource)
 when {

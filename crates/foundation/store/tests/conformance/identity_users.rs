@@ -305,6 +305,7 @@ async fn agents_and_workloads(name: &str, stores: &Stores) {
     let settings = OrgIdentitySettings {
         org: "acme".into(),
         blocked_models: vec!["model-x".into()],
+        guardrails: None,
     };
     identity.put_org_settings(&settings, &admin).await.unwrap();
     assert_eq!(

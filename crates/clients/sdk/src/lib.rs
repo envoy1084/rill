@@ -26,6 +26,7 @@
 
 pub mod access;
 pub mod admin;
+pub mod attention;
 pub mod audit;
 pub mod auth;
 mod cache_tier;
@@ -43,6 +44,7 @@ pub mod names;
 pub mod operations;
 mod ownership;
 mod paging;
+mod policy_code;
 pub mod protection;
 pub mod read_stats;
 pub mod repo;
@@ -59,6 +61,7 @@ pub mod workspace;
 
 pub use access::AccessClient;
 pub use admin::AdminClient;
+pub use attention::AttentionClient;
 pub use audit::AuditClient;
 pub use checks::ChecksClient;
 pub use client::Client;

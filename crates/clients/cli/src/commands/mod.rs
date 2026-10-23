@@ -28,6 +28,7 @@ pub mod log;
 pub mod man;
 pub mod org;
 pub mod owners;
+pub mod policy;
 pub mod protection;
 pub mod refs;
 pub mod release;

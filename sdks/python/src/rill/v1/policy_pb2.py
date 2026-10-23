@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from rill.v1 import types_pb2 as rill_dot_v1_dot_types__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14rill/v1/policy.proto\x12\x07rill.v1\x1a\x13rill/v1/types.proto\"\x96\x01\n\x06Policy\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n\x04text\x18\x02 \x01(\tR\x04text\x12\x1d\n\nupdated_at\x18\x03 \x01(\x03R\tupdatedAt\x12\x31\n\nupdated_by\x18\x04 \x01(\x0b\x32\x12.rill.v1.PrincipalR\tupdatedBy\x12\x12\n\x04\x65tag\x18\x05 \x01(\tR\x04\x65tag\"&\n\x10GetPolicyRequest\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\"<\n\x11GetPolicyResponse\x12\'\n\x06policy\x18\x01 \x01(\x0b\x32\x0f.rill.v1.PolicyR\x06policy\"q\n\x13UpdatePolicyRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\'\n\x06policy\x18\x02 \x01(\x0b\x32\x0f.rill.v1.PolicyR\x06policy\x12\x12\n\x04\x65tag\x18\x03 \x01(\tR\x04\x65tag\"?\n\x14UpdatePolicyResponse\x12\'\n\x06policy\x18\x01 \x01(\x0b\x32\x0f.rill.v1.PolicyR\x06policy2\xa0\x01\n\rPolicyService\x12\x42\n\tGetPolicy\x12\x19.rill.v1.GetPolicyRequest\x1a\x1a.rill.v1.GetPolicyResponse\x12K\n\x0cUpdatePolicy\x12\x1c.rill.v1.UpdatePolicyRequest\x1a\x1d.rill.v1.UpdatePolicyResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14rill/v1/policy.proto\x12\x07rill.v1\x1a\x13rill/v1/types.proto\"\x96\x01\n\x06Policy\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n\x04text\x18\x02 \x01(\tR\x04text\x12\x1d\n\nupdated_at\x18\x03 \x01(\x03R\tupdatedAt\x12\x31\n\nupdated_by\x18\x04 \x01(\x0b\x32\x12.rill.v1.PrincipalR\tupdatedBy\x12\x12\n\x04\x65tag\x18\x05 \x01(\tR\x04\x65tag\"&\n\x10GetPolicyRequest\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\"<\n\x11GetPolicyResponse\x12\'\n\x06policy\x18\x01 \x01(\x0b\x32\x0f.rill.v1.PolicyR\x06policy\"q\n\x13UpdatePolicyRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\'\n\x06policy\x18\x02 \x01(\x0b\x32\x0f.rill.v1.PolicyR\x06policy\x12\x12\n\x04\x65tag\x18\x03 \x01(\tR\x04\x65tag\"?\n\x14UpdatePolicyResponse\x12\'\n\x06policy\x18\x01 \x01(\x0b\x32\x0f.rill.v1.PolicyR\x06policy\"3\n\x19GetEffectivePolicyRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\"`\n\x1aGetEffectivePolicyResponse\x12\x12\n\x04text\x18\x01 \x01(\tR\x04text\x12\x16\n\x06source\x18\x02 \x01(\tR\x06source\x12\x16\n\x06\x64igest\x18\x03 \x01(\tR\x06\x64igest\"1\n\x15\x45xplainLandingRequest\x12\x18\n\x07landing\x18\x01 \x01(\tR\x07landing\"\xff\x01\n\x16\x45xplainLandingResponse\x12\x16\n\x06\x63hange\x18\x01 \x01(\tR\x06\x63hange\x12\x16\n\x06policy\x18\x02 \x01(\tR\x06policy\x12\x16\n\x06source\x18\x03 \x01(\tR\x06source\x12\x18\n\x07\x61llowed\x18\x04 \x01(\x08R\x07\x61llowed\x12)\n\x10matched_policies\x18\x05 \x03(\tR\x0fmatchedPolicies\x12\x18\n\x07reasons\x18\x06 \x03(\tR\x07reasons\x12\x1d\n\nfacts_json\x18\x07 \x01(\tR\tfactsJson\x12\x1f\n\x0bpolicy_text\x18\x08 \x01(\tR\npolicyText\"o\n\x15SimulatePolicyRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x12\n\x04text\x18\x02 \x01(\tR\x04text\x12\x14\n\x05since\x18\x03 \x01(\x04R\x05since\x12\x14\n\x05until\x18\x04 \x01(\x04R\x05until\"^\n\x10SimulatedLanding\x12\x18\n\x07landing\x18\x01 \x01(\tR\x07landing\x12\x16\n\x06\x63hange\x18\x02 \x01(\tR\x06\x63hange\x12\x18\n\x07reasons\x18\x03 \x03(\tR\x07reasons\"\xf9\x01\n\x16SimulatePolicyResponse\x12\x1a\n\x08replayed\x18\x01 \x01(\rR\x08replayed\x12\x1e\n\nunrecorded\x18\x02 \x01(\rR\nunrecorded\x12\x18\n\x07\x61llowed\x18\x03 \x01(\rR\x07\x61llowed\x12\x33\n\x07\x62locked\x18\x04 \x03(\x0b\x32\x19.rill.v1.SimulatedLandingR\x07\x62locked\x12*\n\x11\x61gent_only_before\x18\x05 \x01(\rR\x0f\x61gentOnlyBefore\x12(\n\x10\x61gent_only_after\x18\x06 \x01(\rR\x0e\x61gentOnlyAfter\"(\n\x14GetGuardrailsRequest\x12\x10\n\x03org\x18\x01 \x01(\tR\x03org\"+\n\x15GetGuardrailsResponse\x12\x12\n\x04text\x18\x01 \x01(\tR\x04text\"^\n\x17UpdateGuardrailsRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x10\n\x03org\x18\x02 \x01(\tR\x03org\x12\x12\n\x04text\x18\x03 \x01(\tR\x04text\".\n\x18UpdateGuardrailsResponse\x12\x12\n\x04text\x18\x01 \x01(\tR\x04text2\xce\x04\n\rPolicyService\x12\x42\n\tGetPolicy\x12\x19.rill.v1.GetPolicyRequest\x1a\x1a.rill.v1.GetPolicyResponse\x12K\n\x0cUpdatePolicy\x12\x1c.rill.v1.UpdatePolicyRequest\x1a\x1d.rill.v1.UpdatePolicyResponse\x12]\n\x12GetEffectivePolicy\x12\".rill.v1.GetEffectivePolicyRequest\x1a#.rill.v1.GetEffectivePolicyResponse\x12Q\n\x0e\x45xplainLanding\x12\x1e.rill.v1.ExplainLandingRequest\x1a\x1f.rill.v1.ExplainLandingResponse\x12Q\n\x0eSimulatePolicy\x12\x1e.rill.v1.SimulatePolicyRequest\x1a\x1f.rill.v1.SimulatePolicyResponse\x12N\n\rGetGuardrails\x12\x1d.rill.v1.GetGuardrailsRequest\x1a\x1e.rill.v1.GetGuardrailsResponse\x12W\n\x10UpdateGuardrails\x12 .rill.v1.UpdateGuardrailsRequest\x1a!.rill.v1.UpdateGuardrailsResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -42,6 +42,28 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_UPDATEPOLICYREQUEST']._serialized_end=422
   _globals['_UPDATEPOLICYRESPONSE']._serialized_start=424
   _globals['_UPDATEPOLICYRESPONSE']._serialized_end=487
-  _globals['_POLICYSERVICE']._serialized_start=490
-  _globals['_POLICYSERVICE']._serialized_end=650
+  _globals['_GETEFFECTIVEPOLICYREQUEST']._serialized_start=489
+  _globals['_GETEFFECTIVEPOLICYREQUEST']._serialized_end=540
+  _globals['_GETEFFECTIVEPOLICYRESPONSE']._serialized_start=542
+  _globals['_GETEFFECTIVEPOLICYRESPONSE']._serialized_end=638
+  _globals['_EXPLAINLANDINGREQUEST']._serialized_start=640
+  _globals['_EXPLAINLANDINGREQUEST']._serialized_end=689
+  _globals['_EXPLAINLANDINGRESPONSE']._serialized_start=692
+  _globals['_EXPLAINLANDINGRESPONSE']._serialized_end=947
+  _globals['_SIMULATEPOLICYREQUEST']._serialized_start=949
+  _globals['_SIMULATEPOLICYREQUEST']._serialized_end=1060
+  _globals['_SIMULATEDLANDING']._serialized_start=1062
+  _globals['_SIMULATEDLANDING']._serialized_end=1156
+  _globals['_SIMULATEPOLICYRESPONSE']._serialized_start=1159
+  _globals['_SIMULATEPOLICYRESPONSE']._serialized_end=1408
+  _globals['_GETGUARDRAILSREQUEST']._serialized_start=1410
+  _globals['_GETGUARDRAILSREQUEST']._serialized_end=1450
+  _globals['_GETGUARDRAILSRESPONSE']._serialized_start=1452
+  _globals['_GETGUARDRAILSRESPONSE']._serialized_end=1495
+  _globals['_UPDATEGUARDRAILSREQUEST']._serialized_start=1497
+  _globals['_UPDATEGUARDRAILSREQUEST']._serialized_end=1591
+  _globals['_UPDATEGUARDRAILSRESPONSE']._serialized_start=1593
+  _globals['_UPDATEGUARDRAILSRESPONSE']._serialized_end=1639
+  _globals['_POLICYSERVICE']._serialized_start=1642
+  _globals['_POLICYSERVICE']._serialized_end=2232
 # @@protoc_insertion_point(module_scope)

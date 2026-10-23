@@ -2,12 +2,12 @@
 
 use connectrpc::client::{ClientConfig, HttpClient};
 use rill_proto::rill::v1::{
-    AccessServiceClient, AdminServiceClient, AuditServiceClient, ChangeServiceClient,
-    ChecksServiceClient, ContentServiceClient, EventServiceClient, IdentityServiceClient,
-    IntentServiceClient, LandingServiceClient, OperationServiceClient, OrgServiceClient,
-    PolicyServiceClient, ProtectionServiceClient, RepoServiceClient, ReviewServiceClient,
-    ReviewerServiceClient, SecretServiceClient, SessionServiceClient, TrunkServiceClient,
-    WorkspaceServiceClient,
+    AccessServiceClient, AdminServiceClient, AttentionServiceClient, AuditServiceClient,
+    ChangeServiceClient, ChecksServiceClient, ContentServiceClient, EventServiceClient,
+    IdentityServiceClient, IntentServiceClient, LandingServiceClient, OperationServiceClient,
+    OrgServiceClient, PolicyServiceClient, ProtectionServiceClient, RepoServiceClient,
+    ReviewServiceClient, ReviewerServiceClient, SecretServiceClient, SessionServiceClient,
+    TrunkServiceClient, WorkspaceServiceClient,
 };
 
 use super::server::TestServer;
@@ -86,6 +86,7 @@ macro_rules! authed {
 authed!(
     AccessServiceClient,
     AdminServiceClient,
+    AttentionServiceClient,
     AuditServiceClient,
     ChangeServiceClient,
     ChecksServiceClient,
@@ -126,6 +127,7 @@ pub(crate) struct Clients {
     pub(crate) intents: IntentServiceClient<Svc>,
     pub(crate) reviewers: ReviewerServiceClient<Svc>,
     pub(crate) trunk: TrunkServiceClient<Svc>,
+    pub(crate) attention: AttentionServiceClient<Svc>,
 }
 
 pub(crate) async fn clients(server: &TestServer, token: Option<&str>) -> Clients {
@@ -153,7 +155,8 @@ pub(crate) async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
         secrets: SecretServiceClient::authed(channel.clone(), bearer.clone()),
         intents: IntentServiceClient::authed(channel.clone(), bearer.clone()),
         reviewers: ReviewerServiceClient::authed(channel.clone(), bearer.clone()),
-        trunk: TrunkServiceClient::authed(channel, bearer),
+        trunk: TrunkServiceClient::authed(channel.clone(), bearer.clone()),
+        attention: AttentionServiceClient::authed(channel, bearer),
     }
 }
 

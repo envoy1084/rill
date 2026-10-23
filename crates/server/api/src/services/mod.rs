@@ -3,6 +3,7 @@
 
 pub mod access;
 pub mod admin;
+pub mod attention;
 pub mod audit;
 pub mod budget;
 mod call;
@@ -34,6 +35,7 @@ pub mod workspace;
 
 pub use access::AccessSvc;
 pub use admin::AdminSvc;
+pub use attention::AttentionSvc;
 pub use audit::AuditSvc;
 pub use call::Call;
 pub use changes::ChangeSvc;

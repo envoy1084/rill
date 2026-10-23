@@ -274,6 +274,21 @@ async fn validate(opened: &Opened, cv: &ChangeVersion) -> Result<()> {
                     rill_policy::owners::OwnersFile::parse(t).map(|_| ())
                 })
                 .await?;
+            } else if path
+                .as_str()
+                .starts_with(rill_runtime::state::policy::POLICY_DIR)
+                && path.as_str().ends_with(".cedar")
+            {
+                lint_config(ctx, path, content, |t| {
+                    if t.contains(&format!("@id(\"{}", rill_policy::submit::GUARDRAIL_PREFIX)) {
+                        return Err(rill_policy::Error::PolicyValidation(format!(
+                            "ids starting {:?} are reserved for org guardrails",
+                            rill_policy::submit::GUARDRAIL_PREFIX
+                        )));
+                    }
+                    rill_policy::SubmitPolicy::from_source(t).map(|_| ())
+                })
+                .await?;
             } else if path.as_str() == rill_policy::reviewers::REVIEW_CONFIG {
                 lint_config(ctx, path, content, |t| {
                     rill_policy::reviewers::ReviewConfig::parse(t).map(|_| ())
@@ -285,7 +300,8 @@ async fn validate(opened: &Opened, cv: &ChangeVersion) -> Result<()> {
     Ok(())
 }
 
-/// Review configuration (`OWNERS.toml`, `.rill/review.toml`) must parse:
+/// Review configuration (`OWNERS.toml`, `.rill/review.toml`,
+/// `.rill/policy/*.cedar`) must parse:
 /// a bad file would quietly change who reviews what.
 async fn lint_config(
     ctx: &rill_runtime::state::RepoContext,

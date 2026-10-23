@@ -35,6 +35,12 @@ pub enum ReviewCmd {
     Request(RequestArgs),
     /// Agent review runs on a change.
     Runs(ChangeArg),
+    /// Landings sampled for a human audit, still waiting.
+    Audits,
+    /// Pass or fail an audit.
+    Audit(super::attention::AuditArgs),
+    /// Group an intent's changes by the edit they make; approve a group.
+    Batch(super::attention::BatchArgs),
 }
 
 /// `rill review request`.

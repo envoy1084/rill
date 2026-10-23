@@ -266,6 +266,7 @@ async fn a_workload_acts_as_its_agent_within_the_registered_scope() {
             &OrgIdentitySettings {
                 org: "default".into(),
                 blocked_models: vec!["model-a".into()],
+                guardrails: None,
             },
             &Principal::human("root"),
         )

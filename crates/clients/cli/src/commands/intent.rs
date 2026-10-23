@@ -37,6 +37,8 @@ pub enum IntentCmd {
     Revoke(IdArg),
     /// Whether a change inherits its intent's approval, and why not.
     Explain(super::intent_scope::ExplainArgs),
+    /// What happened under the intent on a day.
+    Digest(super::review::attention::DigestArgs),
 }
 
 /// A command taking an intent id.
@@ -211,6 +213,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IntentCmd) -> Result<()> {
         IntentCmd::Approve(args) => super::intent_scope::approve(ctx, args).await,
         IntentCmd::Revoke(args) => super::intent_scope::revoke(ctx, &args.id).await,
         IntentCmd::Explain(args) => super::intent_scope::explain(ctx, args).await,
+        IntentCmd::Digest(args) => super::review::attention::digest(ctx, args).await,
     }
 }
 
