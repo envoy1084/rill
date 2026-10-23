@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use rill_lander::Lander;
 use rill_types::{
-    ChangeId, ChangeVersionHash, GroupMode, Line, RefName, RepoPathBuf, ReviewState, ReviewStatus,
-    RiskClass,
+    ChangeId, ChangeVersionHash, GroupMode, LandStatus, Line, RefName, RepoPathBuf, ReviewState,
+    ReviewStatus, RiskClass,
 };
 
 use super::LandingSvc;
@@ -101,6 +101,54 @@ impl LandingSvc {
         opened.permit().read(&RepoPathBuf::root()).await?;
         let ticket = names::ticket_in(&opened.repo, name)?;
         Ok(pb::GetLandRequestResponse {
+            land_request: common::land_request(&opened.repo, ticket).await?.into(),
+        })
+    }
+
+    pub(super) async fn cancel_land_request_impl(
+        &self,
+        request: Call<pb::CancelLandRequestRequest>,
+    ) -> Result<pb::CancelLandRequestResponse> {
+        let name = request.get_ref().name.clone();
+        let opened = open_repo(&self.state, &request, &name).await?;
+        opened.permit().write_any().await?;
+        let ticket = names::ticket_in(&opened.repo, &name)?;
+        let record = opened
+            .repo
+            .repo
+            .land_request(ticket)
+            .await?
+            .ok_or_else(|| Error::not_found(format!("land request {ticket}")))?;
+        opened
+            .permit()
+            .owns_or_admin(&record.request.requester)
+            .await?;
+        if !matches!(record.status, LandStatus::Queued | LandStatus::Verifying) {
+            return Err(Error::precondition(format!(
+                "land request {ticket} is {} and can no longer be cancelled",
+                record.status.name()
+            )));
+        }
+        let who = opened.principal().to_string();
+        let reason = match request.get_ref().reason.as_str() {
+            "" => format!("cancelled by {who}"),
+            r => format!("cancelled by {who}: {r}"),
+        };
+        opened
+            .repo
+            .repo
+            .set_land_status(
+                ticket,
+                LandStatus::Ejected { reason },
+                None,
+                opened.principal(),
+            )
+            .await
+            .map_err(|e| match e {
+                rill_store::Error::Conflict(m) => Error::precondition(m),
+                other => other.into(),
+            })?;
+        Ok(pb::CancelLandRequestResponse {
             land_request: common::land_request(&opened.repo, ticket).await?.into(),
         })
     }

@@ -410,6 +410,26 @@ impl ReviewClient {
         required("get_land_request.land_request", resp.land_request)?.try_into()
     }
 
+    /// Take a land request that has not started landing out of the queue.
+    pub async fn cancel_land(&self, ticket: &str, reason: &str) -> Result<LandProgress> {
+        let name = match ticket.contains('/') {
+            true => ticket.to_string(),
+            false => format!("{}/landRequests/{ticket}", self.repo),
+        };
+        let request = pb::CancelLandRequestRequest {
+            request_id: crate::names::request_id(&OperationId::new()),
+            name,
+            reason: reason.to_string(),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (svc, request) = (self.landing(), request.clone());
+            async move { svc.cancel_land_request(request).await }
+        })
+        .await?
+        .into_owned();
+        required("cancel_land_request.land_request", resp.land_request)?.try_into()
+    }
+
     /// Events on one change's review.
     pub async fn watch(&self, change_id: ChangeId) -> Result<EventStream<ReviewEvent>> {
         let stream = self

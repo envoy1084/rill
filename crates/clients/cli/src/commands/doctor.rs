@@ -20,6 +20,24 @@ struct ServerCheck {
 
 /// Run `rill doctor`.
 pub async fn run(ctx: &mut Ctx<'_>) -> Result<()> {
+    let (server, dir, daemon) = gather(ctx).await?;
+    let value = report_json(&server, &dir, daemon.as_ref());
+    ctx.emit(value, |out| render(out, &server, &dir, daemon.as_ref()))
+}
+
+/// The doctor's report as JSON, for `rill bug-report`.
+pub(crate) async fn report(ctx: &mut Ctx<'_>) -> Result<serde_json::Value> {
+    let (server, dir, daemon) = gather(ctx).await?;
+    Ok(report_json(&server, &dir, daemon.as_ref()))
+}
+
+type Gathered = (
+    ServerCheck,
+    rill_daemon::DaemonDir,
+    Option<(dpb::GetDaemonResponse, Vec<dpb::Mount>)>,
+);
+
+async fn gather(ctx: &mut Ctx<'_>) -> Result<Gathered> {
     let server = check_server(ctx).await;
     let dir = ctx.daemon_dir()?;
     let daemon = match DaemonClient::connect(&dir).await {
@@ -33,8 +51,7 @@ pub async fn run(ctx: &mut Ctx<'_>) -> Result<()> {
         }
         Err(_) => None,
     };
-    let value = report_json(&server, &dir, daemon.as_ref());
-    ctx.emit(value, |out| render(out, &server, &dir, daemon.as_ref()))
+    Ok((server, dir, daemon))
 }
 
 async fn check_server(ctx: &mut Ctx<'_>) -> ServerCheck {

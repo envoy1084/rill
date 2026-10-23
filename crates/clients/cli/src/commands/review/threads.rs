@@ -12,7 +12,8 @@ use crate::context::Ctx;
 use crate::output::when;
 use crate::Result;
 
-pub(super) async fn comment(ctx: &mut Ctx<'_>, args: CommentArgs) -> Result<()> {
+/// Run `rill review comment` and `rill comment`.
+pub async fn comment(ctx: &mut Ctx<'_>, args: CommentArgs) -> Result<()> {
     let repo = ctx.repo()?;
     let id = change_ref(&args.change)?.id(&repo).await?;
     let anchor = match (&args.path, args.line) {

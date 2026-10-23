@@ -527,6 +527,112 @@ func (x *GetLandRequestResponse) GetLandRequest() *LandRequest {
 	return nil
 }
 
+type CancelLandRequestRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// `…/landRequests/{ticket}`. Required.
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Why, for the record.
+	Reason        string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelLandRequestRequest) Reset() {
+	*x = CancelLandRequestRequest{}
+	mi := &file_rill_v1_landing_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelLandRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelLandRequestRequest) ProtoMessage() {}
+
+func (x *CancelLandRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_landing_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelLandRequestRequest.ProtoReflect.Descriptor instead.
+func (*CancelLandRequestRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_landing_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CancelLandRequestRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *CancelLandRequestRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CancelLandRequestRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type CancelLandRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LandRequest   *LandRequest           `protobuf:"bytes,1,opt,name=land_request,json=landRequest,proto3" json:"land_request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelLandRequestResponse) Reset() {
+	*x = CancelLandRequestResponse{}
+	mi := &file_rill_v1_landing_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelLandRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelLandRequestResponse) ProtoMessage() {}
+
+func (x *CancelLandRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_landing_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelLandRequestResponse.ProtoReflect.Descriptor instead.
+func (*CancelLandRequestResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_landing_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CancelLandRequestResponse) GetLandRequest() *LandRequest {
+	if x != nil {
+		return x.LandRequest
+	}
+	return nil
+}
+
 type ListLandRequestsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// `orgs/{org}/repos/{repo}`. Required.
@@ -539,7 +645,7 @@ type ListLandRequestsRequest struct {
 
 func (x *ListLandRequestsRequest) Reset() {
 	*x = ListLandRequestsRequest{}
-	mi := &file_rill_v1_landing_proto_msgTypes[7]
+	mi := &file_rill_v1_landing_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +657,7 @@ func (x *ListLandRequestsRequest) String() string {
 func (*ListLandRequestsRequest) ProtoMessage() {}
 
 func (x *ListLandRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_landing_proto_msgTypes[7]
+	mi := &file_rill_v1_landing_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +670,7 @@ func (x *ListLandRequestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListLandRequestsRequest.ProtoReflect.Descriptor instead.
 func (*ListLandRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_landing_proto_rawDescGZIP(), []int{7}
+	return file_rill_v1_landing_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListLandRequestsRequest) GetParent() string {
@@ -598,7 +704,7 @@ type ListLandRequestsResponse struct {
 
 func (x *ListLandRequestsResponse) Reset() {
 	*x = ListLandRequestsResponse{}
-	mi := &file_rill_v1_landing_proto_msgTypes[8]
+	mi := &file_rill_v1_landing_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -610,7 +716,7 @@ func (x *ListLandRequestsResponse) String() string {
 func (*ListLandRequestsResponse) ProtoMessage() {}
 
 func (x *ListLandRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_landing_proto_msgTypes[8]
+	mi := &file_rill_v1_landing_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -623,7 +729,7 @@ func (x *ListLandRequestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListLandRequestsResponse.ProtoReflect.Descriptor instead.
 func (*ListLandRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_landing_proto_rawDescGZIP(), []int{8}
+	return file_rill_v1_landing_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListLandRequestsResponse) GetLandRequests() []*LandRequest {
@@ -682,6 +788,13 @@ const file_rill_v1_landing_proto_rawDesc = "" +
 	"\x15GetLandRequestRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"Q\n" +
 	"\x16GetLandRequestResponse\x127\n" +
+	"\fland_request\x18\x01 \x01(\v2\x14.rill.v1.LandRequestR\vlandRequest\"e\n" +
+	"\x18CancelLandRequestRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"T\n" +
+	"\x19CancelLandRequestResponse\x127\n" +
 	"\fland_request\x18\x01 \x01(\v2\x14.rill.v1.LandRequestR\vlandRequest\"m\n" +
 	"\x17ListLandRequestsRequest\x12\x16\n" +
 	"\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1b\n" +
@@ -698,12 +811,13 @@ const file_rill_v1_landing_proto_rawDesc = "" +
 	"\x14LAND_STATUS_REBASING\x10\x02\x12\x16\n" +
 	"\x12LAND_STATUS_LANDED\x10\x03\x12\x16\n" +
 	"\x12LAND_STATUS_FAILED\x10\x04\x12\x19\n" +
-	"\x15LAND_STATUS_CANCELLED\x10\x052\xdf\x02\n" +
+	"\x15LAND_STATUS_CANCELLED\x10\x052\xbb\x03\n" +
 	"\x0eLandingService\x12H\n" +
 	"\vRequestLand\x12\x1b.rill.v1.RequestLandRequest\x1a\x1c.rill.v1.RequestLandResponse\x12W\n" +
 	"\x10RequestLandStack\x12 .rill.v1.RequestLandStackRequest\x1a!.rill.v1.RequestLandStackResponse\x12Q\n" +
 	"\x0eGetLandRequest\x12\x1e.rill.v1.GetLandRequestRequest\x1a\x1f.rill.v1.GetLandRequestResponse\x12W\n" +
-	"\x10ListLandRequests\x12 .rill.v1.ListLandRequestsRequest\x1a!.rill.v1.ListLandRequestsResponseB\x8d\x01\n" +
+	"\x10ListLandRequests\x12 .rill.v1.ListLandRequestsRequest\x1a!.rill.v1.ListLandRequestsResponse\x12Z\n" +
+	"\x11CancelLandRequest\x12!.rill.v1.CancelLandRequestRequest\x1a\".rill.v1.CancelLandRequestResponseB\x8d\x01\n" +
 	"\vcom.rill.v1B\fLandingProtoP\x01Z3github.com/rill-vcs/rill/sdks/go/gen/rill/v1;rillv1\xa2\x02\x03RXX\xaa\x02\aRill.V1\xca\x02\aRill\\V1\xe2\x02\x13Rill\\V1\\GPBMetadata\xea\x02\bRill::V1b\x06proto3"
 
 var (
@@ -719,38 +833,43 @@ func file_rill_v1_landing_proto_rawDescGZIP() []byte {
 }
 
 var file_rill_v1_landing_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_rill_v1_landing_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_rill_v1_landing_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_rill_v1_landing_proto_goTypes = []any{
-	(LandStatus)(0),                  // 0: rill.v1.LandStatus
-	(*LandRequest)(nil),              // 1: rill.v1.LandRequest
-	(*RequestLandRequest)(nil),       // 2: rill.v1.RequestLandRequest
-	(*RequestLandResponse)(nil),      // 3: rill.v1.RequestLandResponse
-	(*RequestLandStackRequest)(nil),  // 4: rill.v1.RequestLandStackRequest
-	(*RequestLandStackResponse)(nil), // 5: rill.v1.RequestLandStackResponse
-	(*GetLandRequestRequest)(nil),    // 6: rill.v1.GetLandRequestRequest
-	(*GetLandRequestResponse)(nil),   // 7: rill.v1.GetLandRequestResponse
-	(*ListLandRequestsRequest)(nil),  // 8: rill.v1.ListLandRequestsRequest
-	(*ListLandRequestsResponse)(nil), // 9: rill.v1.ListLandRequestsResponse
+	(LandStatus)(0),                   // 0: rill.v1.LandStatus
+	(*LandRequest)(nil),               // 1: rill.v1.LandRequest
+	(*RequestLandRequest)(nil),        // 2: rill.v1.RequestLandRequest
+	(*RequestLandResponse)(nil),       // 3: rill.v1.RequestLandResponse
+	(*RequestLandStackRequest)(nil),   // 4: rill.v1.RequestLandStackRequest
+	(*RequestLandStackResponse)(nil),  // 5: rill.v1.RequestLandStackResponse
+	(*GetLandRequestRequest)(nil),     // 6: rill.v1.GetLandRequestRequest
+	(*GetLandRequestResponse)(nil),    // 7: rill.v1.GetLandRequestResponse
+	(*CancelLandRequestRequest)(nil),  // 8: rill.v1.CancelLandRequestRequest
+	(*CancelLandRequestResponse)(nil), // 9: rill.v1.CancelLandRequestResponse
+	(*ListLandRequestsRequest)(nil),   // 10: rill.v1.ListLandRequestsRequest
+	(*ListLandRequestsResponse)(nil),  // 11: rill.v1.ListLandRequestsResponse
 }
 var file_rill_v1_landing_proto_depIdxs = []int32{
-	0, // 0: rill.v1.LandRequest.status:type_name -> rill.v1.LandStatus
-	1, // 1: rill.v1.RequestLandResponse.land_request:type_name -> rill.v1.LandRequest
-	1, // 2: rill.v1.RequestLandStackResponse.land_requests:type_name -> rill.v1.LandRequest
-	1, // 3: rill.v1.GetLandRequestResponse.land_request:type_name -> rill.v1.LandRequest
-	1, // 4: rill.v1.ListLandRequestsResponse.land_requests:type_name -> rill.v1.LandRequest
-	2, // 5: rill.v1.LandingService.RequestLand:input_type -> rill.v1.RequestLandRequest
-	4, // 6: rill.v1.LandingService.RequestLandStack:input_type -> rill.v1.RequestLandStackRequest
-	6, // 7: rill.v1.LandingService.GetLandRequest:input_type -> rill.v1.GetLandRequestRequest
-	8, // 8: rill.v1.LandingService.ListLandRequests:input_type -> rill.v1.ListLandRequestsRequest
-	3, // 9: rill.v1.LandingService.RequestLand:output_type -> rill.v1.RequestLandResponse
-	5, // 10: rill.v1.LandingService.RequestLandStack:output_type -> rill.v1.RequestLandStackResponse
-	7, // 11: rill.v1.LandingService.GetLandRequest:output_type -> rill.v1.GetLandRequestResponse
-	9, // 12: rill.v1.LandingService.ListLandRequests:output_type -> rill.v1.ListLandRequestsResponse
-	9, // [9:13] is the sub-list for method output_type
-	5, // [5:9] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	0,  // 0: rill.v1.LandRequest.status:type_name -> rill.v1.LandStatus
+	1,  // 1: rill.v1.RequestLandResponse.land_request:type_name -> rill.v1.LandRequest
+	1,  // 2: rill.v1.RequestLandStackResponse.land_requests:type_name -> rill.v1.LandRequest
+	1,  // 3: rill.v1.GetLandRequestResponse.land_request:type_name -> rill.v1.LandRequest
+	1,  // 4: rill.v1.CancelLandRequestResponse.land_request:type_name -> rill.v1.LandRequest
+	1,  // 5: rill.v1.ListLandRequestsResponse.land_requests:type_name -> rill.v1.LandRequest
+	2,  // 6: rill.v1.LandingService.RequestLand:input_type -> rill.v1.RequestLandRequest
+	4,  // 7: rill.v1.LandingService.RequestLandStack:input_type -> rill.v1.RequestLandStackRequest
+	6,  // 8: rill.v1.LandingService.GetLandRequest:input_type -> rill.v1.GetLandRequestRequest
+	10, // 9: rill.v1.LandingService.ListLandRequests:input_type -> rill.v1.ListLandRequestsRequest
+	8,  // 10: rill.v1.LandingService.CancelLandRequest:input_type -> rill.v1.CancelLandRequestRequest
+	3,  // 11: rill.v1.LandingService.RequestLand:output_type -> rill.v1.RequestLandResponse
+	5,  // 12: rill.v1.LandingService.RequestLandStack:output_type -> rill.v1.RequestLandStackResponse
+	7,  // 13: rill.v1.LandingService.GetLandRequest:output_type -> rill.v1.GetLandRequestResponse
+	11, // 14: rill.v1.LandingService.ListLandRequests:output_type -> rill.v1.ListLandRequestsResponse
+	9,  // 15: rill.v1.LandingService.CancelLandRequest:output_type -> rill.v1.CancelLandRequestResponse
+	11, // [11:16] is the sub-list for method output_type
+	6,  // [6:11] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_landing_proto_init() }
@@ -765,7 +884,7 @@ func file_rill_v1_landing_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_landing_proto_rawDesc), len(file_rill_v1_landing_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

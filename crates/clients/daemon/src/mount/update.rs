@@ -91,16 +91,7 @@ impl Mount {
         let mut record = self.record();
         let (version, tree) = resolve_base(&self.repo, &onto).await?;
         if let Some(ws) = record.workspace {
-            // The local update must not fail because the server workspace
-            // could not follow; the next push rebuilds its snapshot anyway.
-            if let Err(e) = self
-                .repo
-                .workspaces()
-                .update_base(ws, version.map(Root::Version))
-                .await
-            {
-                tracing::warn!(workspace = %ws, error = %e, "workspace base not moved");
-            }
+            self.follow_on_server(ws, version).await;
         }
         let old = self.base();
         let upstream: BTreeMap<_, _> = diff_trees(&old, old.root(), tree, &record.sparse)
@@ -230,6 +221,31 @@ impl Mount {
             .await?;
         }
         Ok(report)
+    }
+
+    /// Move the server workspace onto `version` unless it is there
+    /// already (an undo put it there), so no needless operation lands on
+    /// its log. The local update never fails because the workspace could
+    /// not follow; the next push rebuilds its snapshot anyway.
+    async fn follow_on_server(
+        &self,
+        ws: rill_types::WorkspaceId,
+        version: Option<ChangeVersionHash>,
+    ) {
+        let workspaces = self.repo.workspaces();
+        let there = match workspaces.get(ws).await {
+            Ok(w) => match version {
+                Some(v) => w.base == v,
+                None => w.base.is_zero(),
+            },
+            Err(_) => false,
+        };
+        if there {
+            return;
+        }
+        if let Err(e) = workspaces.update_base(ws, version.map(Root::Version)).await {
+            tracing::warn!(workspace = %ws, error = %e, "workspace base not moved");
+        }
     }
 
     async fn bytes(&self, content: &ContentRef) -> Result<Bytes> {

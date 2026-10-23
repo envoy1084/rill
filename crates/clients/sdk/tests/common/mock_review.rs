@@ -182,6 +182,17 @@ impl LandingService for MockReview {
         }))
     }
 
+    async fn cancel_land_request(
+        &self,
+        _ctx: RequestContext,
+        _req: ServiceRequest<'_, pb::CancelLandRequestRequest>,
+    ) -> RpcResult<pb::CancelLandRequestResponse> {
+        Err(ConnectError::new(
+            connectrpc::ErrorCode::Unimplemented,
+            "not mocked",
+        ))
+    }
+
     async fn get_land_request(
         &self,
         ctx: RequestContext,

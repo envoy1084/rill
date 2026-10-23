@@ -5,6 +5,7 @@
 mod args;
 mod browse;
 mod dispatch;
+mod inbox;
 mod lifecycle;
 mod render;
 mod threads;
@@ -15,5 +16,7 @@ pub use args::{
     SubmitArgs, VoteArgs,
 };
 pub use dispatch::run;
+pub use inbox::inbox;
 pub use lifecycle::{abandon, approve, submit};
+pub use threads::comment;
 pub use working_change::change_or_working;

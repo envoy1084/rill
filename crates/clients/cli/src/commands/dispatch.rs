@@ -3,9 +3,9 @@
 use clap::CommandFactory;
 
 use super::{
-    access, admin, blame, change, checkout, daemon, diff, doctor, export, health, history,
-    identity, import, intent, land, log, org, refs, release, repo, review, session, show, stack,
-    status, watch, ws,
+    access, admin, blame, bug_report, change, checkout, clone, daemon, diff, doctor, export,
+    health, history, identity, import, intent, land, log, org, refs, release, repo, review,
+    session, show, stack, status, watch, ws,
 };
 use crate::cli::{Cli, Command};
 use crate::context::Ctx;
@@ -30,7 +30,13 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
     match command {
         Command::Repo(cmd) => repo::run(ctx, cmd).await,
         Command::Org(cmd) => org::run(ctx, cmd).await,
+        Command::Clone(args) => clone::run(ctx, args).await,
         Command::Checkout(args) => checkout::run(ctx, args).await,
+        Command::Commit(args) => change::commit_cmd(ctx, args).await,
+        Command::Redo => change::redo(ctx).await,
+        Command::Inbox => review::inbox(ctx).await,
+        Command::Comment(args) => review::comment(ctx, args).await,
+        Command::BugReport(args) => bug_report::run(ctx, args).await,
         Command::Daemon(cmd) => daemon::run(ctx, cmd).await,
         Command::Doctor => doctor::run(ctx).await,
         Command::Status(args) => status::status(ctx, args).await,

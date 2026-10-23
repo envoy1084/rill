@@ -17,6 +17,8 @@ service LandingService {
   rpc GetLandRequest(GetLandRequestRequest) returns (GetLandRequestResponse);
   // The requests still waiting, in serve order.
   rpc ListLandRequests(ListLandRequestsRequest) returns (ListLandRequestsResponse);
+  // Take a request that has not started landing out of the queue.
+  rpc CancelLandRequest(CancelLandRequestRequest) returns (CancelLandRequestResponse);
 }
 
 enum LandStatus {
@@ -80,6 +82,17 @@ message GetLandRequestRequest {
   string name = 1;
 }
 message GetLandRequestResponse {
+  LandRequest land_request = 1;
+}
+
+message CancelLandRequestRequest {
+  string request_id = 1;
+  // `…/landRequests/{ticket}`. Required.
+  string name = 2;
+  // Why, for the record.
+  string reason = 3;
+}
+message CancelLandRequestResponse {
   LandRequest land_request = 1;
 }
 

@@ -94,6 +94,22 @@ class GetLandRequestResponse(_message.Message):
     land_request: LandRequest
     def __init__(self, land_request: _Optional[_Union[LandRequest, _Mapping]] = ...) -> None: ...
 
+class CancelLandRequestRequest(_message.Message):
+    __slots__ = ("request_id", "name", "reason")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    name: str
+    reason: str
+    def __init__(self, request_id: _Optional[str] = ..., name: _Optional[str] = ..., reason: _Optional[str] = ...) -> None: ...
+
+class CancelLandRequestResponse(_message.Message):
+    __slots__ = ("land_request",)
+    LAND_REQUEST_FIELD_NUMBER: _ClassVar[int]
+    land_request: LandRequest
+    def __init__(self, land_request: _Optional[_Union[LandRequest, _Mapping]] = ...) -> None: ...
+
 class ListLandRequestsRequest(_message.Message):
     __slots__ = ("parent", "page_size", "page_token")
     PARENT_FIELD_NUMBER: _ClassVar[int]

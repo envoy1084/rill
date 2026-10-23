@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file rill/v1/landing.proto.
  */
 export const file_rill_v1_landing: GenFile = /*@__PURE__*/
-  fileDesc("ChVyaWxsL3YxL2xhbmRpbmcucHJvdG8SB3JpbGwudjEi0QIKC0xhbmRSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGdGlja2V0GAIgASgJEg4KBmNoYW5nZRgDIAEoCRIRCgljaGFuZ2VfaWQYBCABKAwSIwoGc3RhdHVzGAUgASgOMhMucmlsbC52MS5MYW5kU3RhdHVzEhQKDHJlcXVlc3RlZF9hdBgGIAEoAxIbCg50cnVua19wb3NpdGlvbhgHIAEoBEgAiAEBEhgKC2xhbmRlZF9oYXNoGAggASgMSAGIAQESEgoFZXJyb3IYCSABKAlIAogBARIbCg5xdWV1ZV9wb3NpdGlvbhgKIAEoDUgDiAEBEhMKBmV0YV9tcxgLIAEoBEgEiAEBQhEKD190cnVua19wb3NpdGlvbkIOCgxfbGFuZGVkX2hhc2hCCAoGX2Vycm9yQhEKD19xdWV1ZV9wb3NpdGlvbkIJCgdfZXRhX21zIkYKElJlcXVlc3RMYW5kUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBmNoYW5nZRgCIAEoCRIMCgRvbnRvGAMgASgJIkEKE1JlcXVlc3RMYW5kUmVzcG9uc2USKgoMbGFuZF9yZXF1ZXN0GAEgASgLMhQucmlsbC52MS5MYW5kUmVxdWVzdCJbChdSZXF1ZXN0TGFuZFN0YWNrUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBmNoYW5nZRgCIAEoCRIOCgZwcmVmaXgYAyABKAgSDAoEb250bxgEIAEoCSJHChhSZXF1ZXN0TGFuZFN0YWNrUmVzcG9uc2USKwoNbGFuZF9yZXF1ZXN0cxgBIAMoCzIULnJpbGwudjEuTGFuZFJlcXVlc3QiJQoVR2V0TGFuZFJlcXVlc3RSZXF1ZXN0EgwKBG5hbWUYASABKAkiRAoWR2V0TGFuZFJlcXVlc3RSZXNwb25zZRIqCgxsYW5kX3JlcXVlc3QYASABKAsyFC5yaWxsLnYxLkxhbmRSZXF1ZXN0IlAKF0xpc3RMYW5kUmVxdWVzdHNSZXF1ZXN0Eg4KBnBhcmVudBgBIAEoCRIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCSJgChhMaXN0TGFuZFJlcXVlc3RzUmVzcG9uc2USKwoNbGFuZF9yZXF1ZXN0cxgBIAMoCzIULnJpbGwudjEuTGFuZFJlcXVlc3QSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJKqYBCgpMYW5kU3RhdHVzEhsKF0xBTkRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASFgoSTEFORF9TVEFUVVNfUVVFVUVEEAESGAoUTEFORF9TVEFUVVNfUkVCQVNJTkcQAhIWChJMQU5EX1NUQVRVU19MQU5ERUQQAxIWChJMQU5EX1NUQVRVU19GQUlMRUQQBBIZChVMQU5EX1NUQVRVU19DQU5DRUxMRUQQBTLfAgoOTGFuZGluZ1NlcnZpY2USSAoLUmVxdWVzdExhbmQSGy5yaWxsLnYxLlJlcXVlc3RMYW5kUmVxdWVzdBocLnJpbGwudjEuUmVxdWVzdExhbmRSZXNwb25zZRJXChBSZXF1ZXN0TGFuZFN0YWNrEiAucmlsbC52MS5SZXF1ZXN0TGFuZFN0YWNrUmVxdWVzdBohLnJpbGwudjEuUmVxdWVzdExhbmRTdGFja1Jlc3BvbnNlElEKDkdldExhbmRSZXF1ZXN0Eh4ucmlsbC52MS5HZXRMYW5kUmVxdWVzdFJlcXVlc3QaHy5yaWxsLnYxLkdldExhbmRSZXF1ZXN0UmVzcG9uc2USVwoQTGlzdExhbmRSZXF1ZXN0cxIgLnJpbGwudjEuTGlzdExhbmRSZXF1ZXN0c1JlcXVlc3QaIS5yaWxsLnYxLkxpc3RMYW5kUmVxdWVzdHNSZXNwb25zZWIGcHJvdG8z");
+  fileDesc("ChVyaWxsL3YxL2xhbmRpbmcucHJvdG8SB3JpbGwudjEi0QIKC0xhbmRSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGdGlja2V0GAIgASgJEg4KBmNoYW5nZRgDIAEoCRIRCgljaGFuZ2VfaWQYBCABKAwSIwoGc3RhdHVzGAUgASgOMhMucmlsbC52MS5MYW5kU3RhdHVzEhQKDHJlcXVlc3RlZF9hdBgGIAEoAxIbCg50cnVua19wb3NpdGlvbhgHIAEoBEgAiAEBEhgKC2xhbmRlZF9oYXNoGAggASgMSAGIAQESEgoFZXJyb3IYCSABKAlIAogBARIbCg5xdWV1ZV9wb3NpdGlvbhgKIAEoDUgDiAEBEhMKBmV0YV9tcxgLIAEoBEgEiAEBQhEKD190cnVua19wb3NpdGlvbkIOCgxfbGFuZGVkX2hhc2hCCAoGX2Vycm9yQhEKD19xdWV1ZV9wb3NpdGlvbkIJCgdfZXRhX21zIkYKElJlcXVlc3RMYW5kUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBmNoYW5nZRgCIAEoCRIMCgRvbnRvGAMgASgJIkEKE1JlcXVlc3RMYW5kUmVzcG9uc2USKgoMbGFuZF9yZXF1ZXN0GAEgASgLMhQucmlsbC52MS5MYW5kUmVxdWVzdCJbChdSZXF1ZXN0TGFuZFN0YWNrUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBmNoYW5nZRgCIAEoCRIOCgZwcmVmaXgYAyABKAgSDAoEb250bxgEIAEoCSJHChhSZXF1ZXN0TGFuZFN0YWNrUmVzcG9uc2USKwoNbGFuZF9yZXF1ZXN0cxgBIAMoCzIULnJpbGwudjEuTGFuZFJlcXVlc3QiJQoVR2V0TGFuZFJlcXVlc3RSZXF1ZXN0EgwKBG5hbWUYASABKAkiRAoWR2V0TGFuZFJlcXVlc3RSZXNwb25zZRIqCgxsYW5kX3JlcXVlc3QYASABKAsyFC5yaWxsLnYxLkxhbmRSZXF1ZXN0IkwKGENhbmNlbExhbmRSZXF1ZXN0UmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGcmVhc29uGAMgASgJIkcKGUNhbmNlbExhbmRSZXF1ZXN0UmVzcG9uc2USKgoMbGFuZF9yZXF1ZXN0GAEgASgLMhQucmlsbC52MS5MYW5kUmVxdWVzdCJQChdMaXN0TGFuZFJlcXVlc3RzUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkiYAoYTGlzdExhbmRSZXF1ZXN0c1Jlc3BvbnNlEisKDWxhbmRfcmVxdWVzdHMYASADKAsyFC5yaWxsLnYxLkxhbmRSZXF1ZXN0EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSqmAQoKTGFuZFN0YXR1cxIbChdMQU5EX1NUQVRVU19VTlNQRUNJRklFRBAAEhYKEkxBTkRfU1RBVFVTX1FVRVVFRBABEhgKFExBTkRfU1RBVFVTX1JFQkFTSU5HEAISFgoSTEFORF9TVEFUVVNfTEFOREVEEAMSFgoSTEFORF9TVEFUVVNfRkFJTEVEEAQSGQoVTEFORF9TVEFUVVNfQ0FOQ0VMTEVEEAUyuwMKDkxhbmRpbmdTZXJ2aWNlEkgKC1JlcXVlc3RMYW5kEhsucmlsbC52MS5SZXF1ZXN0TGFuZFJlcXVlc3QaHC5yaWxsLnYxLlJlcXVlc3RMYW5kUmVzcG9uc2USVwoQUmVxdWVzdExhbmRTdGFjaxIgLnJpbGwudjEuUmVxdWVzdExhbmRTdGFja1JlcXVlc3QaIS5yaWxsLnYxLlJlcXVlc3RMYW5kU3RhY2tSZXNwb25zZRJRCg5HZXRMYW5kUmVxdWVzdBIeLnJpbGwudjEuR2V0TGFuZFJlcXVlc3RSZXF1ZXN0Gh8ucmlsbC52MS5HZXRMYW5kUmVxdWVzdFJlc3BvbnNlElcKEExpc3RMYW5kUmVxdWVzdHMSIC5yaWxsLnYxLkxpc3RMYW5kUmVxdWVzdHNSZXF1ZXN0GiEucmlsbC52MS5MaXN0TGFuZFJlcXVlc3RzUmVzcG9uc2USWgoRQ2FuY2VsTGFuZFJlcXVlc3QSIS5yaWxsLnYxLkNhbmNlbExhbmRSZXF1ZXN0UmVxdWVzdBoiLnJpbGwudjEuQ2FuY2VsTGFuZFJlcXVlc3RSZXNwb25zZWIGcHJvdG8z");
 
 /**
  * A request for a change to land.
@@ -241,6 +241,54 @@ export const GetLandRequestResponseSchema: GenMessage<GetLandRequestResponse> = 
   messageDesc(file_rill_v1_landing, 6);
 
 /**
+ * @generated from message rill.v1.CancelLandRequestRequest
+ */
+export type CancelLandRequestRequest = Message<"rill.v1.CancelLandRequestRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * `…/landRequests/{ticket}`. Required.
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * Why, for the record.
+   *
+   * @generated from field: string reason = 3;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message rill.v1.CancelLandRequestRequest.
+ * Use `create(CancelLandRequestRequestSchema)` to create a new message.
+ */
+export const CancelLandRequestRequestSchema: GenMessage<CancelLandRequestRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_landing, 7);
+
+/**
+ * @generated from message rill.v1.CancelLandRequestResponse
+ */
+export type CancelLandRequestResponse = Message<"rill.v1.CancelLandRequestResponse"> & {
+  /**
+   * @generated from field: rill.v1.LandRequest land_request = 1;
+   */
+  landRequest?: LandRequest | undefined;
+};
+
+/**
+ * Describes the message rill.v1.CancelLandRequestResponse.
+ * Use `create(CancelLandRequestResponseSchema)` to create a new message.
+ */
+export const CancelLandRequestResponseSchema: GenMessage<CancelLandRequestResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_landing, 8);
+
+/**
  * @generated from message rill.v1.ListLandRequestsRequest
  */
 export type ListLandRequestsRequest = Message<"rill.v1.ListLandRequestsRequest"> & {
@@ -267,7 +315,7 @@ export type ListLandRequestsRequest = Message<"rill.v1.ListLandRequestsRequest">
  * Use `create(ListLandRequestsRequestSchema)` to create a new message.
  */
 export const ListLandRequestsRequestSchema: GenMessage<ListLandRequestsRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_landing, 7);
+  messageDesc(file_rill_v1_landing, 9);
 
 /**
  * @generated from message rill.v1.ListLandRequestsResponse
@@ -289,7 +337,7 @@ export type ListLandRequestsResponse = Message<"rill.v1.ListLandRequestsResponse
  * Use `create(ListLandRequestsResponseSchema)` to create a new message.
  */
 export const ListLandRequestsResponseSchema: GenMessage<ListLandRequestsResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_landing, 8);
+  messageDesc(file_rill_v1_landing, 10);
 
 /**
  * @generated from enum rill.v1.LandStatus
@@ -378,6 +426,16 @@ export const LandingService: GenService<{
     methodKind: "unary";
     input: typeof ListLandRequestsRequestSchema;
     output: typeof ListLandRequestsResponseSchema;
+  },
+  /**
+   * Take a request that has not started landing out of the queue.
+   *
+   * @generated from rpc rill.v1.LandingService.CancelLandRequest
+   */
+  cancelLandRequest: {
+    methodKind: "unary";
+    input: typeof CancelLandRequestRequestSchema;
+    output: typeof CancelLandRequestResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_rill_v1_landing, 0);

@@ -50,6 +50,9 @@ const (
 	// LandingServiceListLandRequestsProcedure is the fully-qualified name of the LandingService's
 	// ListLandRequests RPC.
 	LandingServiceListLandRequestsProcedure = "/rill.v1.LandingService/ListLandRequests"
+	// LandingServiceCancelLandRequestProcedure is the fully-qualified name of the LandingService's
+	// CancelLandRequest RPC.
+	LandingServiceCancelLandRequestProcedure = "/rill.v1.LandingService/CancelLandRequest"
 )
 
 // LandingServiceClient is a client for the rill.v1.LandingService service.
@@ -63,6 +66,8 @@ type LandingServiceClient interface {
 	GetLandRequest(context.Context, *connect.Request[v1.GetLandRequestRequest]) (*connect.Response[v1.GetLandRequestResponse], error)
 	// The requests still waiting, in serve order.
 	ListLandRequests(context.Context, *connect.Request[v1.ListLandRequestsRequest]) (*connect.Response[v1.ListLandRequestsResponse], error)
+	// Take a request that has not started landing out of the queue.
+	CancelLandRequest(context.Context, *connect.Request[v1.CancelLandRequestRequest]) (*connect.Response[v1.CancelLandRequestResponse], error)
 }
 
 // NewLandingServiceClient constructs a client for the rill.v1.LandingService service. By default,
@@ -100,15 +105,22 @@ func NewLandingServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(landingServiceMethods.ByName("ListLandRequests")),
 			connect.WithClientOptions(opts...),
 		),
+		cancelLandRequest: connect.NewClient[v1.CancelLandRequestRequest, v1.CancelLandRequestResponse](
+			httpClient,
+			baseURL+LandingServiceCancelLandRequestProcedure,
+			connect.WithSchema(landingServiceMethods.ByName("CancelLandRequest")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // landingServiceClient implements LandingServiceClient.
 type landingServiceClient struct {
-	requestLand      *connect.Client[v1.RequestLandRequest, v1.RequestLandResponse]
-	requestLandStack *connect.Client[v1.RequestLandStackRequest, v1.RequestLandStackResponse]
-	getLandRequest   *connect.Client[v1.GetLandRequestRequest, v1.GetLandRequestResponse]
-	listLandRequests *connect.Client[v1.ListLandRequestsRequest, v1.ListLandRequestsResponse]
+	requestLand       *connect.Client[v1.RequestLandRequest, v1.RequestLandResponse]
+	requestLandStack  *connect.Client[v1.RequestLandStackRequest, v1.RequestLandStackResponse]
+	getLandRequest    *connect.Client[v1.GetLandRequestRequest, v1.GetLandRequestResponse]
+	listLandRequests  *connect.Client[v1.ListLandRequestsRequest, v1.ListLandRequestsResponse]
+	cancelLandRequest *connect.Client[v1.CancelLandRequestRequest, v1.CancelLandRequestResponse]
 }
 
 // RequestLand calls rill.v1.LandingService.RequestLand.
@@ -131,6 +143,11 @@ func (c *landingServiceClient) ListLandRequests(ctx context.Context, req *connec
 	return c.listLandRequests.CallUnary(ctx, req)
 }
 
+// CancelLandRequest calls rill.v1.LandingService.CancelLandRequest.
+func (c *landingServiceClient) CancelLandRequest(ctx context.Context, req *connect.Request[v1.CancelLandRequestRequest]) (*connect.Response[v1.CancelLandRequestResponse], error) {
+	return c.cancelLandRequest.CallUnary(ctx, req)
+}
+
 // LandingServiceHandler is an implementation of the rill.v1.LandingService service.
 type LandingServiceHandler interface {
 	// Ask for a change to land on trunk or a release.
@@ -142,6 +159,8 @@ type LandingServiceHandler interface {
 	GetLandRequest(context.Context, *connect.Request[v1.GetLandRequestRequest]) (*connect.Response[v1.GetLandRequestResponse], error)
 	// The requests still waiting, in serve order.
 	ListLandRequests(context.Context, *connect.Request[v1.ListLandRequestsRequest]) (*connect.Response[v1.ListLandRequestsResponse], error)
+	// Take a request that has not started landing out of the queue.
+	CancelLandRequest(context.Context, *connect.Request[v1.CancelLandRequestRequest]) (*connect.Response[v1.CancelLandRequestResponse], error)
 }
 
 // NewLandingServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -175,6 +194,12 @@ func NewLandingServiceHandler(svc LandingServiceHandler, opts ...connect.Handler
 		connect.WithSchema(landingServiceMethods.ByName("ListLandRequests")),
 		connect.WithHandlerOptions(opts...),
 	)
+	landingServiceCancelLandRequestHandler := connect.NewUnaryHandler(
+		LandingServiceCancelLandRequestProcedure,
+		svc.CancelLandRequest,
+		connect.WithSchema(landingServiceMethods.ByName("CancelLandRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/rill.v1.LandingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case LandingServiceRequestLandProcedure:
@@ -185,6 +210,8 @@ func NewLandingServiceHandler(svc LandingServiceHandler, opts ...connect.Handler
 			landingServiceGetLandRequestHandler.ServeHTTP(w, r)
 		case LandingServiceListLandRequestsProcedure:
 			landingServiceListLandRequestsHandler.ServeHTTP(w, r)
+		case LandingServiceCancelLandRequestProcedure:
+			landingServiceCancelLandRequestHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -208,4 +235,8 @@ func (UnimplementedLandingServiceHandler) GetLandRequest(context.Context, *conne
 
 func (UnimplementedLandingServiceHandler) ListLandRequests(context.Context, *connect.Request[v1.ListLandRequestsRequest]) (*connect.Response[v1.ListLandRequestsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.LandingService.ListLandRequests is not implemented"))
+}
+
+func (UnimplementedLandingServiceHandler) CancelLandRequest(context.Context, *connect.Request[v1.CancelLandRequestRequest]) (*connect.Response[v1.CancelLandRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.LandingService.CancelLandRequest is not implemented"))
 }

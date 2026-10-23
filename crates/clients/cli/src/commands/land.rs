@@ -19,7 +19,11 @@ use crate::Result;
 
 /// `rill land`.
 #[derive(Args, Debug)]
+#[command(args_conflicts_with_subcommands = true)]
 pub struct LandArgs {
+    /// `rill land cancel`.
+    #[command(subcommand)]
+    pub cmd: Option<LandCmd>,
     /// Change to land (default: the checkout's working change).
     pub change: Option<String>,
     /// Wait until the landing finishes.
@@ -35,6 +39,24 @@ pub struct LandArgs {
     /// Land on this release (`release/<name>`) instead of trunk.
     #[arg(long, value_name = "REF")]
     pub onto: Option<String>,
+}
+
+/// `rill land <subcommand>`.
+#[derive(clap::Subcommand, Debug)]
+pub enum LandCmd {
+    /// Take a land request out of the queue before it starts landing.
+    Cancel(CancelArgs),
+}
+
+/// `rill land cancel`.
+#[derive(Args, Debug)]
+pub struct CancelArgs {
+    /// A ticket, or a change whose request to cancel (default: the
+    /// checkout's working change).
+    pub target: Option<String>,
+    /// Why, for the record.
+    #[arg(long, short = 'm', default_value = "")]
+    pub reason: String,
 }
 
 /// `rill trunk landings`.
@@ -102,8 +124,37 @@ pub struct BisectArgs {
     pub target: String,
 }
 
+/// Run `rill land cancel`.
+async fn cancel(ctx: &mut Ctx<'_>, args: CancelArgs) -> Result<()> {
+    let repo = ctx.repo()?;
+    let ticket = match args.target.as_deref() {
+        Some(t) if !t.starts_with("ch_") && t.len() != 64 => t.to_string(),
+        other => {
+            let id = change_or_working(ctx, other, &repo).await?;
+            repo.trunk()
+                .queue()
+                .await?
+                .into_iter()
+                .find(|p| p.ticket.change_id == id)
+                .map(|p| p.ticket.id)
+                .ok_or_else(|| CliError::usage(format!("{id} has no land request waiting")))?
+        }
+    };
+    let progress = repo.reviews().cancel_land(&ticket, &args.reason).await?;
+    ctx.emit(json::land_progress(&progress), |out| {
+        out.line(format!(
+            "cancelled land request {} for {}",
+            out.id(&ticket),
+            out.id(&progress.ticket.change_id.to_string())
+        ))
+    })
+}
+
 /// Run `rill land`.
-pub async fn land(ctx: &mut Ctx<'_>, args: LandArgs) -> Result<()> {
+pub async fn land(ctx: &mut Ctx<'_>, mut args: LandArgs) -> Result<()> {
+    if let Some(LandCmd::Cancel(cancel_args)) = args.cmd.take() {
+        return cancel(ctx, cancel_args).await;
+    }
     let repo = ctx.repo()?;
     let id = change_or_working(ctx, args.change.as_deref(), &repo).await?;
     let ticket = match args.onto.as_deref() {

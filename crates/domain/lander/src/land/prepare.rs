@@ -93,7 +93,11 @@ impl Lander {
             self.eject(queued, reason.clone()).await;
             return Ok(Prepared::Dropped);
         }
-        self.set_status(queued, LandStatus::Landing).await;
+        // A request cancelled while it was verified is no longer queued;
+        // claiming it for landing fails then, and it is dropped.
+        if !self.set_status(queued, LandStatus::Landing).await {
+            return Ok(Prepared::Dropped);
+        }
         Ok(Prepared::Ready(Box::new(Candidate {
             queued: queued.clone(),
             version,

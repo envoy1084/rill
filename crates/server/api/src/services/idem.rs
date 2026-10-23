@@ -66,6 +66,7 @@ idempotent!(
     ResolveThreadRequest,
     UpdateStackRequest,
     AbandonChangeRequest,
+    CancelLandRequestRequest,
     RequestLandRequest,
     RequestLandStackRequest,
     ReportVerificationRequest,

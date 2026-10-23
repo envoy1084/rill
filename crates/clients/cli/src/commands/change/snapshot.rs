@@ -6,7 +6,7 @@ use rill_mcp::json;
 use rill_sdk::VersionResult;
 use serde_json::Value;
 
-use super::args::{AmendArgs, DescribeArgs, NewArgs};
+use super::args::{AmendArgs, CommitArgs, DescribeArgs, NewArgs};
 use super::render::print_version;
 use crate::context::{Ctx, TOOL_NAME};
 use crate::error::CliError;
@@ -88,6 +88,28 @@ pub async fn new(ctx: &mut Ctx<'_>, args: NewArgs) -> Result<()> {
         }
         Ok(())
     })
+}
+
+/// Run `rill commit`: record the working copy as the next version of the
+/// working change, starting one if there is none.
+pub async fn commit_cmd(ctx: &mut Ctx<'_>, args: CommitArgs) -> Result<()> {
+    if ctx.working_change().await?.is_none() {
+        return new(
+            ctx,
+            NewArgs {
+                message: args.message,
+                intent: args.intent,
+            },
+        )
+        .await;
+    }
+    amend(
+        ctx,
+        AmendArgs {
+            message: args.message,
+        },
+    )
+    .await
 }
 
 /// Run `rill describe`.

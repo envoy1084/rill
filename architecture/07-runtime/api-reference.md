@@ -4177,7 +4177,32 @@ Land requests and the landing queue.
 | `RequestLandStack` | [RequestLandStackRequest](#rill-v1-RequestLandStackRequest) | [RequestLandStackResponse](#rill-v1-RequestLandStackResponse) | Ask for a change's stack, from its lowest unlanded change up, to land as one ordered group. |
 | `GetLandRequest` | [GetLandRequestRequest](#rill-v1-GetLandRequestRequest) | [GetLandRequestResponse](#rill-v1-GetLandRequestResponse) | A land request, with its place in the queue or its outcome. |
 | `ListLandRequests` | [ListLandRequestsRequest](#rill-v1-ListLandRequestsRequest) | [ListLandRequestsResponse](#rill-v1-ListLandRequestsResponse) | The requests still waiting, in serve order. |
+| `CancelLandRequest` | [CancelLandRequestRequest](#rill-v1-CancelLandRequestRequest) | [CancelLandRequestResponse](#rill-v1-CancelLandRequestResponse) | Take a request that has not started landing out of the queue. |
 
+
+
+<a name="rill-v1-CancelLandRequestRequest"></a>
+
+### CancelLandRequestRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `name` | [string](#string) |  | `…/landRequests/{ticket}`. Required. |
+| `reason` | [string](#string) |  | Why, for the record. |
+
+
+<a name="rill-v1-CancelLandRequestResponse"></a>
+
+### CancelLandRequestResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `land_request` | [LandRequest](#rill-v1-LandRequest) |  |  |
 
 
 <a name="rill-v1-GetLandRequestRequest"></a>

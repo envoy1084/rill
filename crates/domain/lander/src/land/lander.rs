@@ -444,11 +444,13 @@ impl Lander {
     /// Record `status` for `queued`, fenced by the lease this lander holds.
     /// A lander that lost the lease records nothing; its successor serves
     /// the request.
-    pub(super) async fn set_status(&self, queued: &QueuedRequest, status: LandStatus) {
+    /// Record a status; false when it could not be (the lease is gone, or
+    /// the request changed meanwhile, as when its owner cancelled it).
+    pub(super) async fn set_status(&self, queued: &QueuedRequest, status: LandStatus) -> bool {
         let Some(lease) = self.held_lease().await else {
-            return;
+            return false;
         };
-        if let Err(e) = self
+        match self
             .repo
             .set_land_status(
                 queued.ticket,
@@ -458,7 +460,11 @@ impl Lander {
             )
             .await
         {
-            tracing::warn!(ticket = %queued.ticket, error = %e, "recording a land status failed");
+            Ok(_) => true,
+            Err(e) => {
+                tracing::warn!(ticket = %queued.ticket, error = %e, "recording a land status failed");
+                false
+            }
         }
     }
 }

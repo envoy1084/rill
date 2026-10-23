@@ -29,6 +29,9 @@ class LandingService(Protocol):
     async def list_land_requests(self, request: rill_dot_v1_dot_landing__pb2.ListLandRequestsRequest, ctx: RequestContext) -> rill_dot_v1_dot_landing__pb2.ListLandRequestsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def cancel_land_request(self, request: rill_dot_v1_dot_landing__pb2.CancelLandRequestRequest, ctx: RequestContext) -> rill_dot_v1_dot_landing__pb2.CancelLandRequestResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class LandingServiceASGIApplication(ConnectASGIApplication[LandingService]):
     def __init__(self, service: LandingService | AsyncGenerator[LandingService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None) -> None:
@@ -74,6 +77,16 @@ class LandingServiceASGIApplication(ConnectASGIApplication[LandingService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_land_requests,
+                ),
+                "/rill.v1.LandingService/CancelLandRequest": Endpoint.unary(
+                    method=MethodInfo(
+                        name="CancelLandRequest",
+                        service_name="rill.v1.LandingService",
+                        input=rill_dot_v1_dot_landing__pb2.CancelLandRequestRequest,
+                        output=rill_dot_v1_dot_landing__pb2.CancelLandRequestResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.cancel_land_request,
                 ),
             },
             interceptors=interceptors,
@@ -168,6 +181,26 @@ class LandingServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def cancel_land_request(
+        self,
+        request: rill_dot_v1_dot_landing__pb2.CancelLandRequestRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_landing__pb2.CancelLandRequestResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelLandRequest",
+                service_name="rill.v1.LandingService",
+                input=rill_dot_v1_dot_landing__pb2.CancelLandRequestRequest,
+                output=rill_dot_v1_dot_landing__pb2.CancelLandRequestResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 class LandingServiceSync(Protocol):
     def request_land(self, request: rill_dot_v1_dot_landing__pb2.RequestLandRequest, ctx: RequestContext) -> rill_dot_v1_dot_landing__pb2.RequestLandResponse:
@@ -177,6 +210,8 @@ class LandingServiceSync(Protocol):
     def get_land_request(self, request: rill_dot_v1_dot_landing__pb2.GetLandRequestRequest, ctx: RequestContext) -> rill_dot_v1_dot_landing__pb2.GetLandRequestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_land_requests(self, request: rill_dot_v1_dot_landing__pb2.ListLandRequestsRequest, ctx: RequestContext) -> rill_dot_v1_dot_landing__pb2.ListLandRequestsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def cancel_land_request(self, request: rill_dot_v1_dot_landing__pb2.CancelLandRequestRequest, ctx: RequestContext) -> rill_dot_v1_dot_landing__pb2.CancelLandRequestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -223,6 +258,16 @@ class LandingServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_land_requests,
+                ),
+                "/rill.v1.LandingService/CancelLandRequest": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="CancelLandRequest",
+                        service_name="rill.v1.LandingService",
+                        input=rill_dot_v1_dot_landing__pb2.CancelLandRequestRequest,
+                        output=rill_dot_v1_dot_landing__pb2.CancelLandRequestResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.cancel_land_request,
                 ),
             },
             interceptors=interceptors,
@@ -311,6 +356,26 @@ class LandingServiceClientSync(ConnectClientSync):
                 service_name="rill.v1.LandingService",
                 input=rill_dot_v1_dot_landing__pb2.ListLandRequestsRequest,
                 output=rill_dot_v1_dot_landing__pb2.ListLandRequestsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def cancel_land_request(
+        self,
+        request: rill_dot_v1_dot_landing__pb2.CancelLandRequestRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_landing__pb2.CancelLandRequestResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelLandRequest",
+                service_name="rill.v1.LandingService",
+                input=rill_dot_v1_dot_landing__pb2.CancelLandRequestRequest,
+                output=rill_dot_v1_dot_landing__pb2.CancelLandRequestResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

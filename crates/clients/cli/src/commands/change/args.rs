@@ -13,6 +13,18 @@ pub struct NewArgs {
     pub intent: Option<String>,
 }
 
+/// `rill commit`.
+#[derive(Args, Debug)]
+pub struct CommitArgs {
+    /// Message (default: keep the working change's, or write one in your
+    /// editor for the first commit).
+    #[arg(short, long)]
+    pub message: Option<String>,
+    /// Intent the change belongs to (first commit only).
+    #[arg(long)]
+    pub intent: Option<String>,
+}
+
 /// `rill describe`.
 #[derive(Args, Debug)]
 pub struct DescribeArgs {

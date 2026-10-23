@@ -63,6 +63,20 @@ impl LandingService for LandingSvc {
         Ok(Response::new(self.get_land_request_impl(request).await?))
     }
 
+    async fn cancel_land_request(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::CancelLandRequestRequest>,
+    ) -> GrpcResult<pb::CancelLandRequestResponse> {
+        let request = Call::new(ctx, request);
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(self.cancel_land_request_impl(r).await?))
+            })
+            .await?,
+        )
+    }
+
     async fn list_land_requests(
         &self,
         ctx: RequestContext,

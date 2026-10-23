@@ -7,8 +7,9 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    access, admin, blame, change, checkout, daemon, diff, health, history, identity, import,
-    intent, land, log, org, refs, release, repo, review, show, stack, status, watch, ws,
+    access, admin, blame, bug_report, change, checkout, clone, daemon, diff, health, history,
+    identity, import, intent, land, log, org, refs, release, repo, review, show, stack, status,
+    watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -96,6 +97,10 @@ pub enum Command {
     #[command(subcommand)]
     Org(org::OrgCmd),
 
+    /// Clone a repository into a directory named after it (lazily where
+    /// the platform allows).
+    Clone(clone::CloneArgs),
+
     /// Check out a repository into a directory, served by the daemon.
     Checkout(checkout::CheckoutArgs),
 
@@ -148,8 +153,23 @@ pub enum Command {
     /// Mark conflicted paths as resolved.
     Resolve(change::ResolveArgs),
 
+    /// Record the working copy as the next version of the working change.
+    Commit(change::CommitArgs),
+
     /// Undo the workspace's last operation and restore its base.
     Undo,
+
+    /// Redo what the last undo undid.
+    Redo,
+
+    /// Reviews waiting on you, and the state of your own.
+    Inbox,
+
+    /// Comment on a change (a new review thread).
+    Comment(review::CommentArgs),
+
+    /// Write a bug report file: versions, doctor, settings, daemon log.
+    BugReport(bug_report::BugReportArgs),
 
     /// The workspace's operation log.
     #[command(subcommand)]

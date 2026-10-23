@@ -66,3 +66,7 @@ required-features = ["testing"]
 [[test]]
 name = "cache_tier"
 required-features = ["testing"]
+
+[[test]]
+name = "land_cancel"
+required-features = ["testing"]

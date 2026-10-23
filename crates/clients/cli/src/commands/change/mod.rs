@@ -16,10 +16,10 @@ mod snapshot;
 mod sync;
 mod undo;
 
-pub use args::{AmendArgs, DescribeArgs, NewArgs, ResolveArgs, SyncArgs};
+pub use args::{AmendArgs, CommitArgs, DescribeArgs, NewArgs, ResolveArgs, SyncArgs};
 pub(crate) use render::conflicts_of;
 pub use resolve::{conflicts, resolve};
-pub use snapshot::{amend, describe, new};
+pub use snapshot::{amend, commit_cmd, describe, new};
 pub use sync::sync;
 pub(crate) use sync::update_checkout;
-pub use undo::undo;
+pub use undo::{redo, undo};
