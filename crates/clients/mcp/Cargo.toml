@@ -22,7 +22,6 @@ base64 = { workspace = true }
 bytes = { workspace = true }
 hex = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
 futures = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

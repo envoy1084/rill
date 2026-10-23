@@ -33,7 +33,6 @@ tracing = { workspace = true }
 dirs = { workspace = true }
 notify = { workspace = true }
 uuid = { workspace = true }
-hex = { workspace = true }
 libc = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -53,7 +52,3 @@ connectrpc-build = { workspace = true }
 buffa-codegen = { workspace = true }
 protox = { workspace = true }
 prost = { workspace = true }
-
-[package.metadata.cargo-machete]
-# Used by the generated code.
-ignored = ["serde_json"]

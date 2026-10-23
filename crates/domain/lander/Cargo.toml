@@ -34,3 +34,7 @@ gix-parallel = { workspace = true }
 proptest = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+
+[package.metadata.cargo-machete]
+# Enables gix-parallel's `parallel` feature for gix-attributes.
+ignored = ["gix-parallel"]
