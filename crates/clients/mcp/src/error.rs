@@ -15,6 +15,10 @@ pub enum ToolError {
     #[error("no repository: pass `repo` or set RILL_REPO")]
     NoRepo,
 
+    /// No change was named and the session has none.
+    #[error("no change: pass `change`, or start one with rill_edit")]
+    NoChange,
+
     /// The SDK or server failed.
     #[error(transparent)]
     Sdk(#[from] rill_sdk::Error),
@@ -35,6 +39,7 @@ impl ToolError {
         match self {
             ToolError::InvalidArgs(_) => "invalid_arguments".into(),
             ToolError::NoRepo => "no_repo".into(),
+            ToolError::NoChange => "no_change".into(),
             ToolError::Sdk(e) => sdk_code(e),
             ToolError::Other(_) => "error".into(),
         }
@@ -76,7 +81,7 @@ pub fn sdk_code(e: &rill_sdk::Error) -> String {
 /// Result alias for tool handlers.
 pub type ToolResult<T> = std::result::Result<T, ToolError>;
 
-/// Why the stdio server stopped.
+/// Why the server stopped.
 #[derive(Debug, Error)]
 pub enum Error {
     /// Reading or writing the transport failed.

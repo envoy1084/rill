@@ -7153,15 +7153,13 @@ name = "rill-mcp"
 version = "0.1.0"
 dependencies = [
  "axum",
- "buffa",
+ "base64 0.23.1",
  "bytes",
  "clap",
- "connectrpc",
  "futures",
- "globset",
  "hex",
  "http",
- "regex",
+ "reqwest",
  "rill-core",
  "rill-proto",
  "rill-sdk",
@@ -7171,6 +7169,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]
@@ -7465,19 +7464,29 @@ version = "3.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ceb42e9e47443cd83a834dea57b5816d35481417bae72ade5dc5615c59122e26"
 dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "bytes",
  "chrono",
  "futures",
+ "http",
+ "http-body",
+ "http-body-util",
  "indexmap 2.14.2",
  "libc",
  "pastey",
  "pin-project-lite",
+ "rand 0.10.3",
  "rmcp-macros",
  "schemars 1.2.3",
  "serde",
  "serde_json",
+ "sse-stream",
  "thiserror 2.0.21",
  "tokio",
+ "tokio-stream",
  "tokio-util",
+ "tower-service",
  "tracing",
  "uuid",
 ]
@@ -8334,6 +8343,19 @@ checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
 dependencies = [
  "base64ct",
  "der 0.7.10",
+]
+
+[[package]]
+name = "sse-stream"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c25ac7aff0abd1dbc474536e40416e1102c7dd9bfba0b9861c6d357f835dcfb4"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "http-body",
+ "http-body-util",
+ "pin-project-lite",
 ]
 
 [[package]]

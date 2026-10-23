@@ -1,9 +1,11 @@
 //! MCP server for Rill.
 //!
-//! `rill-mcp` exposes the SDK as Model Context Protocol tools so agents can
-//! read history, edit, review and land without a checkout. The protocol is
-//! the official Rust SDK, `rmcp`; [`server`] advertises the tools and
-//! dispatches calls.
+//! `rill-mcp` exposes Rill to agents over the Model Context Protocol, on
+//! stdio or streamable HTTP. The protocol is the official Rust SDK,
+//! `rmcp`. [`tools`] holds a dozen task-level tools (read, search, edit,
+//! check, commit, review, land) that remember the session's change, fit
+//! their output to a token budget and name the next step; [`resources`]
+//! makes files, diffs and reviews addressable and subscribable.
 //!
 //! [`json`] is the machine-readable rendering of SDK values. The CLI's
 //! `--json` output uses the same functions so agents see one schema
@@ -13,9 +15,12 @@
 
 pub mod config;
 pub mod error;
-pub mod grep;
+pub mod http;
 pub mod json;
+pub mod pool;
+pub mod resources;
 pub mod server;
+pub mod session;
 pub mod tools;
 
 pub use config::McpConfig;

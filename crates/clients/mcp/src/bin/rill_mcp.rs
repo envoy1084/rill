@@ -1,10 +1,11 @@
-//! `rill-mcp`: the MCP server binary. Speaks MCP on stdin/stdout; logs go
-//! to stderr so they never corrupt the protocol stream.
+//! `rill-mcp`: the MCP server binary. Speaks MCP on stdin/stdout, or
+//! streamable HTTP with `--http`; logs go to stderr so they never corrupt
+//! the stdio protocol stream.
 
 use clap::Parser;
 use rill_mcp::McpConfig;
 
-/// MCP server exposing a Rill repository to agents over stdio.
+/// MCP server exposing a Rill repository to agents over stdio or HTTP.
 #[derive(Parser, Debug)]
 #[command(name = "rill-mcp", version, about)]
 struct Flags {
@@ -19,6 +20,15 @@ struct Flags {
     /// Repository used when a tool call names none.
     #[arg(long, env = "RILL_REPO")]
     repo: Option<String>,
+
+    /// Serve streamable HTTP at this address (path /mcp) instead of stdio.
+    #[arg(long, value_name = "ADDR")]
+    http: Option<std::net::SocketAddr>,
+
+    /// Extra host names accepted in the Host header over HTTP (loopback
+    /// names always are).
+    #[arg(long = "allow-host", value_name = "HOST")]
+    allow_hosts: Vec<String>,
 
     /// Print the tool list as JSON and exit.
     #[arg(long)]
@@ -51,7 +61,17 @@ async fn main() -> std::process::ExitCode {
         token: flags.token,
         repo: flags.repo,
     };
-    match rill_mcp::run_stdio(config).await {
+    let served = match flags.http {
+        Some(addr) => match config.connect_lazy() {
+            Ok((client, repo)) => {
+                let ctx = rill_mcp::ToolContext::new(client, repo);
+                rill_mcp::http::run_http(ctx, addr, flags.allow_hosts).await
+            }
+            Err(e) => Err(e),
+        },
+        None => rill_mcp::run_stdio(config).await,
+    };
+    match served {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("rill-mcp: {e}");

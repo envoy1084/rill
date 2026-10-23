@@ -1,6 +1,6 @@
 [package]
 name = "rill-mcp"
-description = "MCP server exposing the Rill SDK to agents over stdio, plus the JSON encoding of SDK values shared with the CLI"
+description = "MCP server exposing Rill to agents over stdio and streamable HTTP, plus the JSON encoding of SDK values shared with the CLI"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,11 +16,11 @@ rmcp = { workspace = true }
 rill-sdk = { workspace = true }
 rill-types = { workspace = true }
 rill-core = { workspace = true }
+rill-proto = { workspace = true }
 serde_json = { workspace = true }
+base64 = { workspace = true }
 bytes = { workspace = true }
 hex = { workspace = true }
-regex = { workspace = true }
-globset = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 futures = { workspace = true }
@@ -28,12 +28,10 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 clap = { workspace = true }
+axum = { workspace = true }
+http = { workspace = true }
+tokio-util = { workspace = true }
 
 [dev-dependencies]
-axum = { workspace = true }
-buffa = { workspace = true }
-connectrpc = { workspace = true }
-futures = { workspace = true }
-http = { workspace = true }
-rill-proto = { workspace = true }
-tokio-stream = { workspace = true }
+rill-sdk = { workspace = true, features = ["testing"] }
+reqwest = { workspace = true }

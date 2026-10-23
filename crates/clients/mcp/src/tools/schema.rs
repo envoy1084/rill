@@ -18,6 +18,14 @@ impl Props {
         )
     }
 
+    /// Add the `change` property of tools that act on a change.
+    pub fn change(self) -> Self {
+        self.opt(
+            "change",
+            string("Change id (`ch_…`); defaults to the session's current change"),
+        )
+    }
+
     /// A required property.
     pub fn req(mut self, name: &str, schema: Value) -> Self {
         self.props.insert(name.to_string(), schema);

@@ -125,15 +125,16 @@ that order in a few places:
   through `RepoStore` directly and needs no server.
 - `rill-sdk` depends on `rill-proto` and `rill-core`, not on `rill-api`.
   It is a client of the wire surface, not of the server crate.
-- `rill-mcp` depends on `rill-sdk` (and `rill-types`, `rill-core`). It uses
-  `rill-proto` and `connectrpc` only as dev-dependencies for tests.
+- `rill-mcp` depends on `rill-sdk` (and `rill-types`, `rill-core`, and
+  `rill-proto` for verification-run messages). Its tests use the SDK's
+  `testing` dev server.
 - `rill-cache` depends on `rill-policy` (grant verification), `rill-store`
   (hash checks) and `rill-types`, not on `rill-api`: it talks to the origin
   only over the object protocol.
 - The binary crate `rill-cli` additionally links `rill-api` and
   `rill-runtime` (for `rill dev` and `rill api`), `rill-cache` (for `rill cache`), `rill-store` and `rill-git-import` (for
-  `rill import git`), and `rill-mcp` (shared JSON encoding, error codes,
-  grep helper). No library crate links those.
+  `rill import git`), and `rill-mcp` (shared JSON encoding and error
+  codes). No library crate links those.
 - The tooling crates `rill-sim` and `rill-load` link the server crates to
   reuse their wiring; they sit above every product crate and nothing depends on
   them. `rill-types` exposes its test strategies and clock overrides only

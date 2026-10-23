@@ -50,7 +50,6 @@ flowchart LR
   `ObjectStore` backend (memory, local files, S3) calls `object::verify`
   before writing and rejects a mismatch with `Error::HashMismatch`.
 - Serde types that go through postcard never use `skip_serializing_if`.
-  (The only uses in the workspace are JSON-RPC types in `rill-mcp`.)
 
 **Merge algebra**
 

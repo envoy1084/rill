@@ -1,137 +1,216 @@
 # MCP server
 
-`rill-mcp` serves the Model Context Protocol over stdio. It exposes the SDK
-as 27 tools, so an agent can read history, edit, review and land without a
-checkout. The protocol is the official Rust SDK,
-[`rmcp`](https://crates.io/crates/rmcp) (Apache-2.0, pinned): it handles
-framing, `initialize` and protocol-version negotiation, `ping`,
-notifications, cancellation and errors, and its transports would serve
-streamable HTTP as well as stdio. Rill implements only `ServerHandler`
-([`server.rs`](../../crates/clients/mcp/src/server.rs)): `get_info` (server
-name and version, the tools capability, and `instructions` covering `repo`,
-root syntax and provenance), `list_tools` and `call_tool`.
+`rill-mcp` serves the Model Context Protocol on stdio or streamable HTTP.
+Agents use it to read, edit, check, commit, review and land changes without
+a checkout. The protocol layer is the official Rust SDK,
+[`rmcp`](https://crates.io/crates/rmcp) (Apache-2.0, pinned). It handles
+framing, `initialize` and version negotiation, `ping`, cancellation,
+subscriptions and both transports. Rill implements only `ServerHandler`
+([`server.rs`](../../crates/clients/mcp/src/server.rs)).
+
+The tools are task-level, not one per RPC. There are thirteen of them, and
+each:
+
+- defaults to the session's current change;
+- fits its output to a token budget;
+- ends with a `next` step, so an agent can drive a change to trunk without
+  reading these docs.
 
 ```mermaid
 sequenceDiagram
     participant Ag as Agent
-    participant Rm as rmcp
+    participant Rm as rmcp (stdio / HTTP)
     participant Sv as McpServer
     participant Tl as tools::call
     participant Sdk as rill-sdk
-    Ag->>Rm: JSON-RPC over stdio
-    Rm->>Sv: list_tools / call_tool
+    Ag->>Rm: JSON-RPC
+    Rm->>Sv: call_tool / read_resource / subscribe
+    Sv->>Sv: client for the bearer token, session state
     Sv->>Tl: name, arguments
-    Tl->>Sdk: typed call
-    Sdk-->>Tl: value or rill_sdk::Error
-    Tl-->>Sv: Some(Ok) / Some(Err(ToolError)) / None
-    Sv-->>Rm: CallToolResult
+    Tl->>Sdk: typed calls
+    Sdk-->>Tl: values or rill_sdk::Error
+    Tl-->>Sv: JSON + next step, or ToolError
+    Sv-->>Rm: CallToolResult (stop hint after repeats)
     Rm-->>Ag: JSON-RPC reply
 ```
 
-`list_tools` advertises every `ToolDef` with its name, description and
-`inputSchema`. `call_tool` runs the tool: an unknown name is an
-`invalid_params` protocol error; on success the result carries `content`
-(the value as pretty JSON text) and `structuredContent` (the value); on
-failure it carries the text `error (<code>): <message>`,
-`structuredContent: {error: {code, message}}` and `isError: true`. Nothing
-an agent sends can stop the session; only a transport failure ends it.
+## The loop
 
-## Configuration
-
-The `rill-mcp` binary takes `--endpoint` (`RILL_ENDPOINT`), `--token`
-(`RILL_TOKEN`), `--repo` (`RILL_REPO`) and `--list-tools`, which prints the
-tool definitions as JSON and exits. Logs go to stderr at `warn` so they never
-corrupt stdout. `McpConfig::resolve` uses the endpoint flag, or else
-`ClientConfig::discover` ([sdk](sdk.md)). The connection is lazy, so
-`initialize` and `tools/list` work while the server is down.
-
-The MCP server does no authentication of its own. It acts as whatever
-principal the bearer token names ([capability tokens](../05-policy/capability-tokens.md)).
-`ToolContext::repo` takes the repository from the call's `repo` argument,
-then the configured default, and otherwise fails with `ToolError::NoRepo`.
-
-## Tools
-
-`tools/mod.rs` builds the list from each group's `definitions()` in a fixed
-order, and `call` tries the groups in that same order. `tools/schema.rs`
-builds each `inputSchema` as `type: object` with `additionalProperties:
-false`. `tools/args.rs` reads arguments with typed accessors. A missing or
-mistyped argument is `ToolError::InvalidArgs` naming the key.
-
-| Group (file) | Tools |
+| Tool | Does |
 | --- | --- |
-| repo (`repo.rs`) | `rill_repo_info`, `rill_list_dir`, `rill_read_file`, `rill_log`, `rill_blame`, `rill_diff`, `rill_grep` |
-| write (`write.rs`) | `rill_apply_edits`, `rill_create_change_from_edits`, `rill_rebase`, `rill_resolve` |
-| review (`review.rs`) | `rill_submit`, `rill_vote`, `rill_comment`, `rill_evaluate`, `rill_request_land`, `rill_land_status` |
-| lander (`lander.rs`) | `rill_trunk_status` |
-| intent (`intent.rs`) | `rill_intent_create`, `rill_intent_list`, `rill_intent_get`, `rill_intent_link`, `rill_intent_similar` |
-| workspace (`workspace.rs`) | `rill_workspace_create`, `rill_workspace_diff`, `rill_workspace_handoff` |
-| admin (`admin.rs`) | `rill_whoami` |
+| `rill_context` | Start here. Returns who you are, the repository, the trunk head and how many changes are landing, the session's change with its review status, the next step, and the workflow. |
+| `rill_read` | Reads by `mode`: `content` (line ranges), `list`, `history`, `blame` or `diff`, over a batch of `paths`. |
+| `rill_search` | Regex search (server `Grep`) with path, glob, case and context options. |
+| `rill_edit` | Applies `set`, `delete`, `patch` and `move` edits. With no current change it starts one on `base` (default trunk). Otherwise it amends the current change, keeping its earlier edits. |
+| `rill_check` | Reports conflicted paths and the verification runs of the current version, each failing step with the tail of its log. `wait_seconds` waits for running checks. |
+| `rill_commit` | Sets the final message, links an intent, and submits for review (by default). Returns the submit decision. It is idempotent once the change is submitted. |
+| `rill_review_status` | Reports status, votes on the current version, open threads, the policy decision and why. |
+| `rill_respond` | Runs `comment` (on the change, a file or lines), `reply`, `resolve`, `reopen` and `vote` actions in order. |
+| `rill_land` | Requests a landing and waits (`wait_seconds`, default 60). The outcome is `landed` (with the sequence number), `pending` (with a `ticket` to pass back), or `failed` (with the error and the step that fixes it). |
+| `rill_sync` | Rebases onto `onto` (default trunk). Conflicts are listed, not raised. |
+| `rill_conflicts` | Returns each conflicted path's `sides` and `bases` as content. A `null` side means that side deleted the file. |
+| `rill_resolve` | Sets merged content (or deletes) for conflicted paths. Returns what still conflicts. |
+| `rill_watch` | Long-polls review events: it returns once something happens, or after `timeout_seconds`. |
 
-Notes on the less obvious tools:
+`hints.rs` picks the next step from the change's state, in this order:
 
-- `rill_apply_edits` takes `edits` items `{op: set|delete|patch, path,
-  content?, kind?, unified?}`. With `change_id` it amends that change.
-  `rill_create_change_from_edits` follows the same path but never amends.
-- `rill_rebase` and `rill_resolve` take a `change_id` or a `version`.
-  `rill_resolve` takes `resolutions` with a path and either content or
-  delete.
-- `rill_comment` anchors to the change, a file (`path`) or a line range
-  (`line`, `end_line`).
-- `rill_diff` with `change_id` diffs that change's current version against
-  its first parent.
+1. conflicts;
+2. not submitted;
+3. landed, abandoned or landing;
+4. open threads;
+5. allowed to land;
+6. waiting on review, with the policy's reasons.
 
-## Provenance
+`rill_land` maps a failure message to the tool that fixes it: `rill_sync`
+for conflicts, `rill_check` for failing checks, and `rill_review_status`
+for policy.
 
-Writing tools accept optional `model`, `session` and `prompt_ref` strings.
-`tools::write::provenance` builds `Provenance {tool: "rill-mcp", model,
-session, prompt_ref}` from them. `sponsor` cannot be set from MCP.
+## Sessions and changes
+
+[`Session`](../../crates/clients/mcp/src/session.rs) holds:
+
+- the current change for each repository;
+- the repeat guard;
+- legacy resource subscriptions.
+
+`rill_edit` makes the change it creates current. A successful `rill_land`
+clears it. Every tool takes `change`, and `ToolContext::change` falls back
+to the session's change, or fails with `no_change`.
+
+Reads (`rill_read`, `rill_search`) see the session's change by default, so
+an agent reads its own edits. `at` picks another root.
+
+Over stdio a process is one session. Over HTTP each MCP session gets a
+fresh `Session` from the service factory. Clients on the stateless
+2026-07-28 protocol pass `change` and `repo` explicitly; every result
+returns the change id.
+
+## Budgets and loops
+
+[`budget.rs`](../../crates/clients/mcp/src/tools/budget.rs) handles output
+size. `max_tokens` (default 8000, at about 4 characters per token) caps a
+response. Tools add items until the budget is spent, always at least one,
+then return `truncated: true` and a `next_cursor` (`item.inner`, for
+example a path index and a line number). Passing the cursor back with the
+same arguments continues exactly where the last page stopped. `history`
+pages use the server's page token as the cursor instead.
+
+[`guard.rs`](../../crates/clients/mcp/src/tools/guard.rs) detects loops. It
+hashes the tool name and arguments of each failing call. On the third
+identical failure in a row, the error carries `stop`, which tells the agent
+to stop retrying and change its approach. Any success resets the count.
+
+## Resources
+
+[`resources/`](../../crates/clients/mcp/src/resources/uri.rs) exposes three
+URI templates. A `/` inside the repository or root segment is written
+`%2F`.
+
+| URI | Content |
+| --- | --- |
+| `rill://{repo}/files/{root}/{path}` | The file at a root: text, or base64 for binary |
+| `rill://{repo}/changes/{change}/diff` | `rill_read` diff JSON |
+| `rill://{repo}/changes/{change}/review` | `rill_review_status` JSON |
+
+`resources/list` returns the session's change resources. The diff and
+review resources send `notifications/resources/updated` on every review
+event of their change (`WatchReview`). Clients subscribe in one of two
+ways:
+
+- through 2026-07-28 `subscriptions/listen`: `accepted_subscription_filter`
+  keeps only watchable URIs;
+- through legacy `resources/subscribe`, where a task per URI, held in the
+  session, is aborted on `unsubscribe` or when the session ends.
+
+## Transports and auth
+
+- `rill-mcp` with no flags speaks stdio.
+- `rill-mcp --http ADDR` serves streamable HTTP at `/mcp` (axum with rmcp's
+  `StreamableHttpService` and `LocalSessionManager`), until Ctrl-C.
+- `Host` must be a loopback name unless it is added with `--allow-host`, to
+  guard against DNS rebinding.
+
+The server does no authentication of its own. It acts as the principal its
+token names ([capability tokens](../05-policy/capability-tokens.md)):
+
+- An HTTP request with `Authorization: Bearer <token>` acts as that token's
+  principal. `ClientPool` keeps one lazily connected `Client` per token, and
+  clears itself past 256 tokens.
+- Otherwise the server uses the configured `--token` (`RILL_TOKEN`) or the
+  SDK's discovered credentials.
+
+Other flags:
+
+- `--endpoint` (`RILL_ENDPOINT`), defaulting to `ClientConfig::discover`
+  ([sdk](sdk.md));
+- `--repo` (`RILL_REPO`);
+- `--list-tools`, which prints the tool schemas and exits.
+
+The connection is lazy, so `initialize` and `tools/list` work while the
+Rill server is down. Logs go to stderr.
+
+## Results and errors
+
+- A successful result carries the JSON as pretty text and as
+  `structuredContent`.
+- A failure carries `isError: true` and
+  `{error: {code, reason, message, missing, retry_after_ms, stop}}`.
+- An unknown tool is an `invalid_params` protocol error.
+
+`ToolError` has these variants:
+
+- `InvalidArgs` (`invalid_arguments`);
+- `NoRepo`;
+- `NoChange`;
+- `Sdk`, whose code comes from `sdk_code`: the snake_case gRPC code, or
+  the SDK variant name;
+- `Other`.
+
+Writes record `Provenance {tool: "rill-mcp", model, session, prompt_ref}`
+from the call's arguments. `sponsor` cannot be set from MCP.
 
 ## JSON encoding
 
 `json/*` is the one machine-readable rendering of SDK values, and
-`rill --json` uses it too ([cli](cli.md)). From `json/primitives.rs`:
+`rill --json` uses it too ([cli](cli.md)):
 
-- Hashes are lowercase hex. Ids use their display form (`ch_<hex>`).
+- Hashes are lowercase hex, and ids use their display form (`ch_<hex>`).
 - Timestamps are `{rfc3339, millis}`.
-- Fieldless enums are snake_case names (`InProgress` becomes `in_progress`).
-- File bytes are `{encoding: utf8, size, text}` when valid UTF-8, otherwise
-  `{encoding: hex, size, hex}`.
-- Pages are `{items, next_page_token}`. `None` is `null`.
+- Fieldless enums are snake_case names.
+- Bytes are `{encoding: utf8|hex, size, text|hex}`.
+- Pages are `{items, next_page_token}`.
 
-## Grep fallback
+Verification runs (`json/checks.rs`) and grep results (`json/search.rs`)
+are shared with `rill checks` and `rill grep`.
 
-`grep.rs` issues the `Grep` RPC, turning `path` into a `<dir>/**` glob. If
-the server answers `UNIMPLEMENTED`, it walks the tree with `list_dir` and
-`get_blob` and skips binary files. The walk is bounded by `GrepOptions`
-(2000 files, 32 MiB, 1000 matches). Both paths return the same shape:
-`{matches: [{path, line_no, line}], files_searched, truncated}`. See
-[search](../06-services/search.md).
+## Tests
 
-## Errors
+`tests/` drive real MCP sessions against an in-process dev server
+(`rill_sdk::testing::DevServer`):
 
-`ToolError` is `InvalidArgs`, `NoRepo`, `Sdk` or `Other`. `code()` gives
-`invalid_arguments`, `no_repo`, `error`, or for SDK errors `sdk_code`: the
-snake_case gRPC code (`not_found`, `failed_precondition`) or the SDK variant
-name (`transport`, `conflict`, `land_failed`). The crate-level `Error`
-(`Io`, `Config`, `Sdk`) is what ends `serve`.
+- `agent_loop.rs` runs read → edit → check → commit → review → land
+  through MCP alone;
+- `conflicts.rs` covers sync, conflicts and resolve;
+- `limits.rs` checks that paged reads join up, and the stop hint;
+- `resources.rs` covers listing, reading and update notifications;
+- `http.rs` runs a session over streamable HTTP.
 
 ## Limitations
 
-- No `resources` or `prompts`, and no streaming tools. `WatchReview` and the
-  `Watch*` RPCs are not exposed.
-- The loop handles one request at a time, in order.
-- No tools for workspace snapshot, undo or delete, or for revert and bisect.
-- `rill_intent_list` accepts `page_token`, but the server never returns one.
-- The `--endpoint` help text shows port 7420 as an example. The dev server
-  listens on 7470.
+- No `prompts`, and no task-augmented (long-running) tool calls;
+  `rill_land` and `rill_watch` block up to their timeouts instead.
+- File resources do not notify; only change resources do.
+- `rill_watch` streams from the moment it is called. Events between calls
+  are not replayed; `rill_review_status` has the full state.
+- Verification runs exist only once the lander verifies a change, so
+  `rill_check` before landing reports `none`.
 
 ## Code
 
-- [lib.rs](../../crates/clients/mcp/src/lib.rs), [bin/rill_mcp.rs](../../crates/clients/mcp/src/bin/rill_mcp.rs), [config.rs](../../crates/clients/mcp/src/config.rs), [error.rs](../../crates/clients/mcp/src/error.rs), [server.rs](../../crates/clients/mcp/src/server.rs)
-- [tools/mod.rs](../../crates/clients/mcp/src/tools/mod.rs), [tools/schema.rs](../../crates/clients/mcp/src/tools/schema.rs), [tools/args.rs](../../crates/clients/mcp/src/tools/args.rs), [tools/write.rs](../../crates/clients/mcp/src/tools/write.rs), [tools/repo.rs](../../crates/clients/mcp/src/tools/repo.rs), [tools/review.rs](../../crates/clients/mcp/src/tools/review.rs)
-- [grep.rs](../../crates/clients/mcp/src/grep.rs)
-- [json/mod.rs](../../crates/clients/mcp/src/json/mod.rs), [json/primitives.rs](../../crates/clients/mcp/src/json/primitives.rs), [json/history.rs](../../crates/clients/mcp/src/json/history.rs)
+- [lib.rs](../../crates/clients/mcp/src/lib.rs), [bin/rill_mcp.rs](../../crates/clients/mcp/src/bin/rill_mcp.rs), [server.rs](../../crates/clients/mcp/src/server.rs), [http.rs](../../crates/clients/mcp/src/http.rs), [session.rs](../../crates/clients/mcp/src/session.rs), [pool.rs](../../crates/clients/mcp/src/pool.rs), [config.rs](../../crates/clients/mcp/src/config.rs), [error.rs](../../crates/clients/mcp/src/error.rs)
+- [tools/dispatch.rs](../../crates/clients/mcp/src/tools/dispatch.rs), [tools/context.rs](../../crates/clients/mcp/src/tools/context.rs), [tools/budget.rs](../../crates/clients/mcp/src/tools/budget.rs), [tools/guard.rs](../../crates/clients/mcp/src/tools/guard.rs), [tools/hints.rs](../../crates/clients/mcp/src/tools/hints.rs), [tools/edit.rs](../../crates/clients/mcp/src/tools/edit.rs), [tools/read.rs](../../crates/clients/mcp/src/tools/read.rs), [tools/land.rs](../../crates/clients/mcp/src/tools/land.rs)
+- [resources/uri.rs](../../crates/clients/mcp/src/resources/uri.rs), [resources/read.rs](../../crates/clients/mcp/src/resources/read.rs), [resources/follow.rs](../../crates/clients/mcp/src/resources/follow.rs)
+- [json/mod.rs](../../crates/clients/mcp/src/json/mod.rs)
 
 ---
 ← Previous: [CLI](cli.md) · [Index](../index.md) · Next: [Development](../09-engineering/development.md) →

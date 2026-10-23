@@ -4,6 +4,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use clap::Args;
+use rill_mcp::json;
 use rill_proto::rill::v1 as pb;
 use rill_types::Timestamp;
 use serde_json::json as j;
@@ -63,60 +64,12 @@ pub struct ArtifactArgs {
     pub out: Option<PathBuf>,
 }
 
-fn state(value: i32) -> &'static str {
-    match rill_proto::convert::known::<pb::StepState>(value).unwrap_or(pb::StepState::Unspecified) {
-        pb::StepState::Queued => "queued",
-        pb::StepState::Running => "running",
-        pb::StepState::Passed => "passed",
-        pb::StepState::Failed => "failed",
-        pb::StepState::TimedOut => "timed out",
-        pb::StepState::Error => "error",
-        pb::StepState::Unaffected => "unaffected",
-        pb::StepState::NotGating => "not gating",
-        pb::StepState::Unspecified => "-",
-    }
-}
-
-fn status(run: &pb::VerifyRun) -> &'static str {
-    match run.green {
-        None => "running",
-        Some(true) => "green",
-        Some(false) => "red",
-    }
-}
-
-fn run_json(run: &pb::VerifyRun) -> serde_json::Value {
-    j!({
-        "id": run.id,
-        "version": hex::encode(&run.version),
-        "trunk": run.trunk,
-        "status": status(run),
-        "summary": run.summary,
-        "started_at": run.started_at,
-        "finished_at": run.finished_at,
-        "steps": run.steps.iter().map(|s| j!({
-            "index": s.index,
-            "name": s.name,
-            "shard": (s.shards > 0).then_some((s.shard, s.shards)),
-            "state": state(s.state.to_i32()),
-            "exit_code": s.exit_code,
-            "error": s.error,
-            "cached": s.cached,
-            "stdout_size": s.stdout_size,
-            "stderr_size": s.stderr_size,
-            "artifacts": s.artifacts.iter().map(|a| j!({"path": a.path, "size": a.size})).collect::<Vec<_>>(),
-            "worker": s.worker,
-            "duration_ms": s.duration_ms,
-        })).collect::<Vec<_>>(),
-    })
-}
-
 fn print_run(ctx: &mut Ctx<'_>, run: &pb::VerifyRun) -> Result<()> {
-    ctx.emit(run_json(run), |out| {
+    ctx.emit(json::verify_run(run), |out| {
         out.line(format!(
             "run {} {} ({}): {}",
             run.id,
-            status(run),
+            json::run_status(run),
             if run.trunk { "trunk" } else { "pre-land" },
             run.summary
         ))?;
@@ -126,7 +79,7 @@ fn print_run(ctx: &mut Ctx<'_>, run: &pb::VerifyRun) -> Result<()> {
                 0 => s.name.clone(),
                 n => format!("{} {}/{n}", s.name, s.shard),
             };
-            let mut what = state(s.state.to_i32()).to_string();
+            let mut what = json::step_state(s.state.to_i32()).to_string();
             if let Some(code) = s.exit_code.filter(|c| *c != 0) {
                 what.push_str(&format!(" ({code})"));
             }
@@ -163,7 +116,7 @@ pub async fn list(ctx: &mut Ctx<'_>, a: RunsArgs) -> Result<()> {
         .await?
         .items;
     ctx.emit(
-        j!({ "runs": runs.iter().map(run_json).collect::<Vec<_>>() }),
+        j!({ "runs": runs.iter().map(json::verify_run).collect::<Vec<_>>() }),
         |out| {
             let mut table =
                 Table::new(&["RUN", "STARTED", "STATUS", "STAGE", "VERSION", "SUMMARY"]);
@@ -171,7 +124,7 @@ pub async fn list(ctx: &mut Ctx<'_>, a: RunsArgs) -> Result<()> {
                 table.row(vec![
                     r.id.clone(),
                     when(&Timestamp::from_millis(r.started_at)),
-                    status(r).into(),
+                    json::run_status(r).into(),
                     if r.trunk { "trunk" } else { "pre-land" }.into(),
                     hex::encode(&r.version).chars().take(12).collect(),
                     r.summary.clone(),

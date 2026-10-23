@@ -285,8 +285,8 @@ size refilled over a minute ([identity](../05-policy/identity-and-auth.md)).
   after writing can be redone by a retry.
 * `MergeBaseResponse.bases` is repeated, but the server returns at most one
   base.
-* `rill.v1` is the only version. A missing RPC surfaces as `UNIMPLEMENTED`.
-  The only client that handles this is the `Grep` fallback in `rill-mcp`.
+* `rill.v1` is the only version. A missing RPC surfaces as `UNIMPLEMENTED`;
+  clients do not fall back.
 * A batch read error is reported as a missing frame, not as an error.
 * `PUT` stores any object kind after hash verification only. It does not run
   the existence checks of `commit_version`.

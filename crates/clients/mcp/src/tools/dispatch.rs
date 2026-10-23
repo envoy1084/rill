@@ -1,55 +1,59 @@
-//! The full tool list and routing of `tools/call` to each tool group.
+//! The tool list and routing of `tools/call`.
 
 use serde_json::Value;
 
 use super::args::Args;
-use super::{admin, intent, lander, repo, review, workspace, write};
+use super::{
+    check, commit, conflicts, edit, land, overview, read, resolve, respond, search, status, sync,
+    watch,
+};
 use super::{ToolContext, ToolDef};
 use crate::error::ToolResult;
 
-/// Every tool, in a stable order.
+/// Every tool, in the order an agent meets them.
 pub fn definitions() -> Vec<ToolDef> {
-    let mut all = Vec::new();
-    all.extend(repo::definitions());
-    all.extend(write::definitions());
-    all.extend(review::definitions());
-    all.extend(lander::definitions());
-    all.extend(intent::definitions());
-    all.extend(workspace::definitions());
-    all.extend(admin::definitions());
-    all
+    vec![
+        overview::definition(),
+        read::definition(),
+        search::definition(),
+        edit::definition(),
+        check::definition(),
+        commit::definition(),
+        status::definition(),
+        respond::definition(),
+        land::definition(),
+        sync::definition(),
+        conflicts::definition(),
+        resolve::definition(),
+        watch::definition(),
+    ]
 }
 
 /// Run a tool. `None` means no tool has that name.
 pub async fn call(ctx: &ToolContext, name: &str, arguments: Value) -> Option<ToolResult<Value>> {
+    if !definitions().iter().any(|d| d.name == name) {
+        return None;
+    }
     let args = match Args::new(arguments) {
         Ok(a) => a,
-        Err(e) => {
-            return definitions()
-                .iter()
-                .any(|d| d.name == name)
-                .then_some(Err(e))
-        }
+        Err(e) => return Some(Err(e)),
     };
-    if let Some(r) = repo::call(ctx, name, &args).await {
-        return Some(r);
-    }
-    if let Some(r) = write::call(ctx, name, &args).await {
-        return Some(r);
-    }
-    if let Some(r) = review::call(ctx, name, &args).await {
-        return Some(r);
-    }
-    if let Some(r) = lander::call(ctx, name, &args).await {
-        return Some(r);
-    }
-    if let Some(r) = intent::call(ctx, name, &args).await {
-        return Some(r);
-    }
-    if let Some(r) = workspace::call(ctx, name, &args).await {
-        return Some(r);
-    }
-    admin::call(ctx, name, &args).await
+    Some(match name {
+        "rill_context" => overview::call(ctx, &args).await,
+        "rill_read" => read::call(ctx, &args).await,
+        "rill_search" => search::call(ctx, &args).await,
+        "rill_edit" => edit::call(ctx, &args).await,
+        "rill_check" => check::call(ctx, &args).await,
+        "rill_commit" => commit::call(ctx, &args).await,
+        "rill_review_status" => status::call(ctx, &args).await,
+        "rill_respond" => respond::call(ctx, &args).await,
+        "rill_land" => land::call(ctx, &args).await,
+        "rill_sync" => sync::call(ctx, &args).await,
+        "rill_conflicts" => conflicts::call(ctx, &args).await,
+        "rill_resolve" => resolve::call(ctx, &args).await,
+        "rill_watch" => watch::call(ctx, &args).await,
+        _ => return None,
+    })
 }
 
 #[cfg(test)]

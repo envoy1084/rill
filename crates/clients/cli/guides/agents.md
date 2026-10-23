@@ -7,5 +7,10 @@ budgets and scopes.
     rill agent list
     rill admin kill --agent reviewer  # stop it and end its sessions
 
-Agents work through the MCP server (`rill-mcp`) or the SDKs. Every change
-records its provenance (tool, model, session), which `rill show` prints.
+Agents work through the MCP server or the SDKs. `rill-mcp` speaks MCP on
+stdio; `rill-mcp --http 127.0.0.1:7480` serves it at /mcp, where each
+caller may send its own bearer token. Agents start with `rill_context`,
+then edit, check, commit and land; every tool names the next step.
+
+Every change records its provenance (tool, model, session), which
+`rill show` prints.
