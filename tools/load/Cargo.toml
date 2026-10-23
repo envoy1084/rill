@@ -13,6 +13,9 @@ rill-types = { workspace = true }
 rill-proto = { workspace = true }
 futures = { workspace = true }
 rill-sdk = { workspace = true, features = ["testing"] }
+rill-daemon = { workspace = true }
+rill-cache = { workspace = true }
+tokio-util = { workspace = true }
 tokio = { workspace = true }
 bytes = { workspace = true }
 clap = { workspace = true }

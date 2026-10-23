@@ -13,6 +13,7 @@ use crate::error::{Error, Result};
 /// A dev server in this process; stops when dropped.
 pub struct DevServer {
     endpoint: String,
+    http: String,
     shutdown: CancellationToken,
 }
 
@@ -40,7 +41,7 @@ impl DevServer {
         let failed = |e: &dyn std::fmt::Display| Error::config(format!("dev server: {e}"));
         let any: SocketAddr = "127.0.0.1:0".parse().map_err(|e| failed(&e))?;
         let listeners = Listeners::bind(any, any).await.map_err(|e| failed(&e))?;
-        let (api, _) = listeners.addrs().map_err(|e| failed(&e))?;
+        let (api, http) = listeners.addrs().map_err(|e| failed(&e))?;
         let shutdown = CancellationToken::new();
         let state = rill_api::build_state(config, shutdown.clone())
             .await
@@ -53,6 +54,7 @@ impl DevServer {
         });
         Ok(DevServer {
             endpoint: format!("http://{api}"),
+            http: format!("http://{http}"),
             shutdown,
         })
     }
@@ -60,6 +62,12 @@ impl DevServer {
     /// The API endpoint, `http://127.0.0.1:<port>`.
     pub fn endpoint(&self) -> &str {
         &self.endpoint
+    }
+
+    /// The HTTP listener (`/o` objects, metrics), the origin a regional
+    /// cache reads from.
+    pub fn http(&self) -> &str {
+        &self.http
     }
 
     /// A client connected to the server.

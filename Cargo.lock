@@ -6492,6 +6492,8 @@ dependencies = [
  "prost-types 0.14.4",
  "rand 0.10.3",
  "reqwest",
+ "rill-cache",
+ "rill-daemon",
  "rill-proto",
  "rill-reapi-proto",
  "rill-sdk",
@@ -6499,6 +6501,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tokio-util",
  "tonic",
  "tracing-subscriber",
 ]

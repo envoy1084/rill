@@ -5,6 +5,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use futures::{StreamExt, TryStreamExt};
 use ignore::WalkBuilder;
 use rill_types::{RepoPath, RepoPathBuf};
 
@@ -38,14 +39,31 @@ pub(crate) async fn reconcile(
         files.extend(known_under(mount, &path).await?);
         files.insert(path);
     }
+    let results: Vec<Reconciled> =
+        futures::stream::iter(files.into_iter().filter(|p| !IgnoreRules::is_internal(p)))
+            .map(|path| {
+                let root = root.clone();
+                async move { reconcile_file(mount, rules, &root, path).await }
+            })
+            .buffer_unordered(PARALLEL)
+            .try_collect()
+            .await?;
     let mut change = Change::default();
-    for path in files {
-        if IgnoreRules::is_internal(&path) {
-            continue;
-        }
-        reconcile_file(mount, rules, &root, &path, &mut change).await?;
+    for r in results {
+        change.overlay.extend(r.overlay);
+        change.files.extend(r.file);
     }
     mount.write(change, None).await
+}
+
+/// Files read and hashed at once.
+const PARALLEL: usize = 16;
+
+/// What reconciling one file decided.
+#[derive(Default)]
+struct Reconciled {
+    overlay: Option<(RepoPathBuf, Option<(OverlayOp, bool)>)>,
+    file: Option<(RepoPathBuf, Option<crate::state::FileStat>)>,
 }
 
 /// Every non-ignored file under `dir`, as repository paths.
@@ -91,9 +109,10 @@ async fn reconcile_file(
     mount: &Mount,
     rules: &IgnoreRules,
     root: &Path,
-    path: &RepoPathBuf,
-    change: &mut Change,
-) -> Result<()> {
+    path: RepoPathBuf,
+) -> Result<Reconciled> {
+    let path = &path;
+    let mut out = Reconciled::default();
     let fs_path = to_fs_path(root, path);
     let found = {
         let fs_path = fs_path.clone();
@@ -109,16 +128,14 @@ async fn reconcile_file(
     } = found
     else {
         if current.is_some() {
-            change
-                .overlay
-                .push((path.clone(), Some((OverlayOp::Delete, conflict))));
+            out.overlay = Some((path.clone(), Some((OverlayOp::Delete, conflict))));
         }
-        change.files.push((path.clone(), None));
-        return Ok(());
+        out.file = Some((path.clone(), None));
+        return Ok(out);
     };
     let tracked = current.is_some() || entry.is_some();
     if !tracked && rules.ignored(path, false) {
-        return Ok(());
+        return Ok(out);
     }
     let cached = {
         let (id, path) = (mount.id(), path.clone());
@@ -128,7 +145,7 @@ async fn reconcile_file(
         cached.is_some_and(|c| c.size == size && c.mtime_ns == mtime_ns && c.kind == kind);
     if let (true, Some(c), Some(cur)) = (unchanged_stat, cached, current) {
         if c.digest == cur.digest && c.kind == cur.kind {
-            return Ok(());
+            return Ok(out);
         }
     }
     let (bytes, kind) = tokio::task::spawn_blocking(move || read_entry(&fs_path)).await??;
@@ -139,15 +156,15 @@ async fn reconcile_file(
         digest,
         kind,
     };
-    change.files.push((path.clone(), Some(stat)));
+    out.file = Some((path.clone(), Some(stat)));
     if current.is_some_and(|c| c.digest == digest && c.kind == kind) {
-        return Ok(());
+        return Ok(out);
     }
     let size = bytes.len() as u64;
     mount.shared.content.put_local(bytes).await?;
-    change.overlay.push((
+    out.overlay = Some((
         path.clone(),
         Some((OverlayOp::Set { digest, kind, size }, conflict)),
     ));
-    Ok(())
+    Ok(out)
 }
