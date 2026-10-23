@@ -102,7 +102,13 @@ operation, then updates onto the workspace's base.
 
 `rill resolve <paths>` (or `--all`) clears the conflict flag after the
 user edits the file; each file is parsed with `parse_materialized` first
-and refused while markers remain (`--force` skips the check). After
+and refused while markers remain (`--force` skips the check). The
+resolution, like any merge `rill sync` made, is a working-copy edit until
+`rill amend` records it in the working change. `rill submit` and
+`rill land` of the checkout's own working change refuse (exit 3) while a
+path is conflicted, while the change's recorded version has conflicts, or
+while it is recorded on another base than the checkout's: landing it then
+would re-create the conflicts the checkout already resolved. After
 `rill land --wait` lands the checkout's working change, the CLI updates
 onto trunk.
 

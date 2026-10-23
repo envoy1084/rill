@@ -157,6 +157,7 @@ pub async fn land(ctx: &mut Ctx<'_>, mut args: LandArgs) -> Result<()> {
     }
     let repo = ctx.repo()?;
     let id = change_or_working(ctx, args.change.as_deref(), &repo).await?;
+    crate::commands::review::ensure_recorded(ctx, &repo, id).await?;
     let ticket = match args.onto.as_deref() {
         Some(onto) => repo.reviews().request_land_onto(id, onto).await?,
         None => repo.reviews().request_land(id).await?,

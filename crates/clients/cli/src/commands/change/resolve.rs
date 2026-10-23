@@ -103,6 +103,8 @@ pub async fn resolve(ctx: &mut Ctx<'_>, args: ResolveArgs) -> Result<()> {
             out.line(format!("marked {} path(s) resolved", paths.len()))?;
             if remaining > 0 {
                 out.line(out.warn(&format!("{remaining} still conflicted")))?;
+            } else {
+                out.line(out.dim("record the resolution with `rill amend`"))?;
             }
             Ok(())
         },

@@ -28,6 +28,7 @@ fn parse_status(s: &str) -> Result<ReviewStatus> {
 pub async fn submit(ctx: &mut Ctx<'_>, args: SubmitArgs) -> Result<()> {
     let repo = ctx.repo()?;
     let id = change_or_working(ctx, args.change.as_deref(), &repo).await?;
+    super::working_change::ensure_recorded(ctx, &repo, id).await?;
     let state = repo.reviews().submit(id).await?;
     ctx.emit(json::review_state(&state), |out| {
         out.line(format!(

@@ -58,6 +58,18 @@ async fn stale_landing_reports_conflict_and_recovers() {
     assert_ne!(code, 0, "{out}");
     std::fs::write(alice.join("f.txt"), "one\nTWO-both\nthree\n").unwrap();
     server.json(&alice, &["resolve", "f.txt"]).await;
+    // The change is still recorded on the old base until amended; landing
+    // or submitting now would land the stale, conflicting version.
+    for cmd in [&["land", "--wait"][..], &["submit"][..]] {
+        let (code, out) = server.rill(&alice, cmd).await;
+        assert_eq!(code, 3, "{cmd:?}: {out}");
+    }
+    let queue = server.json(&alice, &["queue"]).await;
+    assert_eq!(
+        queue["land_requests"],
+        serde_json::json!([]),
+        "nothing was sent to land: {queue}"
+    );
     server.json(&alice, &["amend"]).await;
     approve(&server, &alice, &ours_id).await;
     let landed = server.json(&alice, &["land", "--wait"]).await;

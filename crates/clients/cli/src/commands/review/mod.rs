@@ -19,4 +19,4 @@ pub use dispatch::run;
 pub use inbox::inbox;
 pub use lifecycle::{abandon, approve, submit};
 pub use threads::comment;
-pub use working_change::change_or_working;
+pub use working_change::{change_or_working, ensure_recorded};
