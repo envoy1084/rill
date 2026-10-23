@@ -10,6 +10,8 @@ pub mod config;
 mod daemon;
 pub mod eager;
 pub mod error;
+#[cfg(unix)]
+mod fuse;
 pub mod mount;
 pub mod overlay;
 pub mod proto;

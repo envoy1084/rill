@@ -94,7 +94,9 @@ principals and instance administrators.
 * One process per cache. There is no consistent-hash ring across cache
   nodes, no prefetching and no admission filter.
 * There is no batch route. Clients fetch one object per request.
-* The SDK reads through gRPC (`ReadBlob`) and does not use a cache yet.
+* The SDK reads unchunked blobs through the cache when `RILL_CACHE_URL`
+  is set ([client daemon](../08-clients/daemon.md#regional-cache)); trees and
+  chunked blobs still come from the origin.
 * Revocation does not reach the cache: a grant stays usable until it
   expires.
 * Redactions reach it by polling the origin's `GET /redactions` every

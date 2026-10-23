@@ -84,6 +84,46 @@ writing a cookie file and waiting for its event, as Watchman does; if the
 watcher does not answer in five seconds, it rescans. An update holds the
 reconcile lock while it rewrites files.
 
+## Lazy and snapshot mounts (Linux)
+
+A FUSE view (`fuser`, pure-Rust mounting through `fusermount3`, eight
+worker threads) of the overlay over the base. Each kernel call runs its
+async work on the daemon's runtime from the worker that received it.
+
+* `lookup`, `getattr` and `readdir` read trees only: no content is
+  fetched to list or stat, so `find .` over a huge tree costs tree reads.
+  A directory listing is taken at `opendir` and served by offset.
+* Modification times are synthetic, derived from the content hash, so
+  the same content always shows the same mtime and build tools never
+  rebuild for a checkout or update that did not change a file. Files are
+  owned by the daemon's user; modes come from the file kind.
+* The first open of a file fetches it into the object cache; reads then
+  come from the cached file, and the kernel keeps its page cache across
+  opens (content never changes under a hash). Where the kernel supports
+  FUSE passthrough and lets the daemon register backing files, reads go
+  to the cached file without the daemon; otherwise the daemon serves them.
+* An open for writing copies the file to a private scratch file under
+  the daemon directory; a flush or close turns it into an overlay entry.
+  Create, unlink, rename (files and whole directories, in one
+  transaction), symlink, chmod (the executable bit) and truncate are
+  supported. Directories are not versioned: `mkdir` and `rmdir` live in
+  the view's memory, and a directory exists while it holds a file.
+* The marker `.rill/mount.json` is a synthesized, read-only file.
+* A mount left by a daemon that died (`ENOTCONN`) is detached before the
+  directory is mounted again.
+
+A snapshot mount (`rill checkout --snapshot`, for CI) is the same view of
+one version with no server workspace: writes stay in its overlay and are
+never pushed, and `rill daemon unmount` discards them.
+
+## Regional cache
+
+With `RILL_CACHE_URL` (or `ClientConfig::with_cache`), the SDK reads
+blobs through `rill-cache` (`GET /o/{repo}/blob/{hash}` with the read
+grant the listing returned and the caller's token), checks the hash, and
+falls back to `ReadBlob` on any failure. A CI host with a cold local cache
+then reads from the region instead of the origin.
+
 ## API
 
 `rill.daemon.v1.DaemonService` (`proto/rill/daemon/v1/daemon.proto`),
@@ -108,15 +148,17 @@ server keep their code and details; its own map to `NOT_FOUND`,
 
 ## Limitations
 
-* Only eager mounts exist yet; lazy (FUSE) and snapshot mounts are
-  refused as unsupported.
+* Lazy and snapshot mounts need Linux (macOS and Windows views are
+  phase 21). Chunked blobs and trees are not read through the regional
+  cache yet. Inodes are never forgotten while a view is mounted.
 * One daemon per user; a second writer to the same workspace is not
   detected, it only forces a full push.
 * Windows has no local socket yet.
 
 ## Code
 
-* [rill-daemon/src/](../../crates/clients/daemon/src/lib.rs): `cache/`, `overlay/`, `state/`, `view/`, `mount/`, `sync/`, `eager/`, `server/`, `client/`
+* [rill-daemon/src/](../../crates/clients/daemon/src/lib.rs): `cache/`, `overlay/`, `state/`, `view/`, `mount/`, `sync/`, `eager/`, `fuse/`, `server/`, `client/`
+* [rill-sdk/src/cache_tier.rs](../../crates/clients/sdk/src/cache_tier.rs)
 * [rill-cli/src/commands/daemon.rs](../../crates/clients/cli/src/commands/daemon.rs)
 
 ---

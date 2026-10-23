@@ -36,8 +36,10 @@ repository's trunk is the empty tree with no version. Unless
 `--no-workspace`, a server workspace is created on that version with the
 sparse profile (`--sparse` include prefixes). An eager mount then writes
 every base file inside the profile, 32 fetches in flight, recording each
-file's size, mtime and digest in its stat cache. `--lazy` asks for the
-Linux virtual filesystem.
+file's size, mtime and digest in its stat cache. `--lazy` mounts the
+Linux virtual filesystem instead, which fetches nothing up front, and
+`--snapshot` mounts one version read-only for CI (no workspace; writes
+stay local and are discarded by `rill daemon unmount`).
 
 ## Status (`rill status`, `rill diff`)
 

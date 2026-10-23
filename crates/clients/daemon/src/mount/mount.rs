@@ -53,6 +53,8 @@ pub struct Mount {
     pub(crate) watch: OnceLock<Arc<Watch>>,
     /// Content already on the server, by local digest.
     pub(crate) uploaded: moka::sync::Cache<ObjectHash, ContentRef>,
+    /// Keeps a lazy mount's view mounted.
+    pub(crate) view: Mutex<Option<Box<dyn Send>>>,
 }
 
 impl std::fmt::Debug for Mount {
@@ -93,6 +95,7 @@ impl Mount {
             cancel: CancellationToken::new(),
             watch: OnceLock::new(),
             uploaded: moka::sync::Cache::new(1 << 16),
+            view: Mutex::new(None),
         }
     }
 

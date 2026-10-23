@@ -28,6 +28,7 @@ pub mod access;
 pub mod admin;
 pub mod audit;
 pub mod auth;
+mod cache_tier;
 pub mod checks;
 pub mod client;
 pub mod config;

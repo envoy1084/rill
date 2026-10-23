@@ -144,11 +144,10 @@ impl Daemon {
                 spec.path.display()
             )));
         }
-        if spec.mode != MountMode::Eager {
-            return Err(Error::Unsupported(format!(
-                "{:?} mounts need the Linux virtual filesystem",
-                spec.mode
-            )));
+        if spec.mode != MountMode::Eager && !cfg!(target_os = "linux") {
+            return Err(Error::Unsupported(
+                "lazy and snapshot mounts need Linux; use an eager checkout".into(),
+            ));
         }
         let path = prepare_dir(&spec.path).await?;
         if self.find(&path).is_ok() {
@@ -212,8 +211,16 @@ impl Daemon {
                 None,
             )
             .await?;
-        let files = materialize(&mount).await?;
-        write_marker(&path, &record, &self.shared.config.dir).await?;
+        let files = if record.mode == MountMode::Eager {
+            let files = materialize(&mount).await?;
+            let marker = marker_json(&record, &self.shared.config.dir)?;
+            let at = path.join(MARKER);
+            tokio::task::spawn_blocking(move || crate::cache::write_atomically(&at, &marker))
+                .await??;
+            files
+        } else {
+            0
+        };
         self.start(&mount)?;
         self.mounts.write().insert(record.id.clone(), mount.clone());
         Ok((mount, files))
@@ -232,8 +239,16 @@ impl Daemon {
                 self.shared.content.cache().unpin(&d);
             }
         }
+        let view = mount.view.lock().take();
         let marker = record.path.join(MARKER);
-        let _ = tokio::task::spawn_blocking(move || std::fs::remove_file(marker)).await?;
+        let eager = record.mode == MountMode::Eager;
+        tokio::task::spawn_blocking(move || {
+            drop(view);
+            if eager {
+                let _ = std::fs::remove_file(marker);
+            }
+        })
+        .await?;
         Ok(())
     }
 
@@ -251,18 +266,31 @@ impl Daemon {
     }
 
     fn start(&self, mount: &Arc<Mount>) -> Result<()> {
-        if mount.mode() == MountMode::Eager {
-            let watch = Watch::start(mount)?;
-            let _ = mount.watch.set(watch);
+        match mount.mode() {
+            MountMode::Eager => {
+                let watch = Watch::start(mount)?;
+                let _ = mount.watch.set(watch);
+            }
+            MountMode::Lazy | MountMode::Snapshot => {
+                #[cfg(unix)]
+                {
+                    let marker = marker_json(&mount.record(), &self.shared.config.dir)?;
+                    let session = crate::fuse::start(mount, bytes::Bytes::from(marker))?;
+                    *mount.view.lock() = Some(session);
+                }
+            }
         }
         crate::sync::task::spawn(mount.clone());
         Ok(())
     }
 
-    /// Stop every mount's background work.
+    /// Stop every mount's background work and unmount every view.
     pub fn stop(&self) {
         for mount in self.mounts() {
             mount.cancel.cancel();
+            if let Some(view) = mount.view.lock().take() {
+                std::thread::spawn(move || drop(view));
+            }
         }
         self.shutdown.cancel();
     }
@@ -281,18 +309,12 @@ async fn prepare_dir(path: &Path) -> Result<PathBuf> {
     .await?
 }
 
-async fn write_marker(
-    root: &Path,
-    record: &MountRecord,
-    dir: &crate::config::DaemonDir,
-) -> Result<()> {
+fn marker_json(record: &MountRecord, dir: &crate::config::DaemonDir) -> Result<Vec<u8>> {
     let marker = Marker {
         mount: record.name(),
         daemon: dir.root().to_path_buf(),
         endpoint: record.endpoint.clone(),
         repo: record.repo.clone(),
     };
-    let text = serde_json::to_vec_pretty(&marker).map_err(|e| Error::Invalid(e.to_string()))?;
-    let path = root.join(MARKER);
-    tokio::task::spawn_blocking(move || crate::cache::write_atomically(&path, &text)).await?
+    serde_json::to_vec_pretty(&marker).map_err(|e| Error::Invalid(e.to_string()))
 }

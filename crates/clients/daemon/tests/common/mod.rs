@@ -91,6 +91,18 @@ impl Fixture {
 
     /// Check out `repo` at `version` into `name`; returns the mount name.
     pub async fn checkout(&self, repo: &str, version: ChangeVersionHash, name: &str) -> String {
+        self.checkout_as(repo, version, name, pb::MountMode::Eager)
+            .await
+    }
+
+    /// [`Fixture::checkout`] in a given mode.
+    pub async fn checkout_as(
+        &self,
+        repo: &str,
+        version: ChangeVersionHash,
+        name: &str,
+        mode: pb::MountMode,
+    ) -> String {
         let resp = self
             .rpc
             .create_mount(pb::CreateMountRequest {
@@ -98,12 +110,21 @@ impl Fixture {
                 endpoint: self.server.endpoint().to_string(),
                 repo: repo.into(),
                 revision: version.to_hex(),
-                mode: pb::MountMode::Eager.into(),
+                mode: mode.into(),
                 ..Default::default()
             })
             .await
             .unwrap();
         resp.mount.unwrap().name
+    }
+
+    pub async fn cache(&self) -> pb::CacheStats {
+        self.rpc
+            .get_daemon(pb::GetDaemonRequest::default())
+            .await
+            .unwrap()
+            .cache
+            .unwrap()
     }
 
     pub async fn status(&self, mount: &str) -> Vec<(String, pb::ChangeKind)> {

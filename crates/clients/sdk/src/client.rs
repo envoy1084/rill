@@ -233,6 +233,7 @@ pub struct Client {
     connection: Connection,
     headers: CallHeaders,
     grants: crate::grants::ReadGrants,
+    cache: Option<crate::cache_tier::CacheTier>,
 }
 
 impl std::fmt::Debug for Client {
@@ -254,6 +255,10 @@ impl Client {
             if let Some(workload) = config.workload.clone() {
                 let source = WorkloadSource::start(workload, connection.clone()).await?;
                 return Ok(Client {
+                    cache: config
+                        .cache_url
+                        .as_deref()
+                        .map(crate::cache_tier::CacheTier::new),
                     config,
                     connection,
                     headers: CallHeaders {
@@ -301,11 +306,25 @@ impl Client {
             seen: RelationsSeen::default(),
         };
         Ok(Client {
+            cache: config
+                .cache_url
+                .as_deref()
+                .map(crate::cache_tier::CacheTier::new),
             config,
             connection,
             headers,
             grants: Default::default(),
         })
+    }
+
+    /// The regional cache blobs are read through, if one is configured.
+    pub(crate) fn cache_tier(&self) -> Option<&crate::cache_tier::CacheTier> {
+        self.cache.as_ref()
+    }
+
+    /// The bearer token the next request would carry.
+    pub(crate) fn bearer(&self) -> Option<String> {
+        self.headers.source.as_ref().and_then(|s| s.token())
     }
 
     /// Connect using `RILL_ENDPOINT` and `RILL_TOKEN`.

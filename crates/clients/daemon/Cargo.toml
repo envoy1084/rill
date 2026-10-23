@@ -35,6 +35,13 @@ uuid = { workspace = true }
 hex = { workspace = true }
 libc = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+fuser = { workspace = true }
+
+# Compiled (never mounted) on macOS so the FUSE view builds and lints there.
+[target.'cfg(target_os = "macos")'.dependencies]
+fuser = { workspace = true, features = ["macos-no-mount"] }
+
 [dev-dependencies]
 rill-sdk = { workspace = true, features = ["testing"] }
 tempfile = { workspace = true }

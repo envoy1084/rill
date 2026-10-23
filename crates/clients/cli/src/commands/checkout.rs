@@ -27,8 +27,12 @@ pub struct CheckoutArgs {
     #[arg(long)]
     pub no_workspace: bool,
     /// Present files lazily through the virtual filesystem (Linux).
-    #[arg(long)]
+    #[arg(long, conflicts_with = "snapshot")]
     pub lazy: bool,
+    /// A read-only view of the revision for CI: writes stay in a scratch
+    /// overlay that is never synced (Linux; no workspace).
+    #[arg(long)]
+    pub snapshot: bool,
 }
 
 /// Run `rill checkout`.
@@ -40,10 +44,10 @@ pub async fn run(ctx: &mut Ctx<'_>, args: CheckoutArgs) -> Result<()> {
     };
     let endpoint = ctx.client_config()?.endpoint;
     let token = ctx.daemon_token();
-    let mode = if args.lazy {
-        dpb::MountMode::Lazy
-    } else {
-        dpb::MountMode::Eager
+    let mode = match (args.lazy, args.snapshot) {
+        (_, true) => dpb::MountMode::Snapshot,
+        (true, false) => dpb::MountMode::Lazy,
+        (false, false) => dpb::MountMode::Eager,
     };
     let created = ctx
         .daemon()

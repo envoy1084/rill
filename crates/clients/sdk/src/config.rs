@@ -11,6 +11,10 @@ use crate::error::{Error, Result};
 pub const ENDPOINT_ENV: &str = "RILL_ENDPOINT";
 /// Environment variable carrying the bearer token.
 pub const TOKEN_ENV: &str = "RILL_TOKEN";
+
+/// Environment variable naming a regional cache (`rill-cache`) to read
+/// blobs through.
+pub const CACHE_ENV: &str = "RILL_CACHE_URL";
 /// Environment variable naming a PEM file of CAs to trust beyond the
 /// system's.
 pub const CA_FILE_ENV: &str = "RILL_CA_FILE";
@@ -84,12 +88,16 @@ pub struct ClientConfig {
     pub user_agent: String,
     /// TLS settings for `https://` endpoints.
     pub tls: TlsOptions,
+    /// A regional cache (`http://host:port`) blobs are read through, with
+    /// the read grants listings return; the origin answers when it fails.
+    pub cache_url: Option<String>,
 }
 
 impl ClientConfig {
     /// Configuration for `endpoint` with no token and default tuning. TLS
     /// files come from `RILL_CA_FILE`, `RILL_CLIENT_CERT` and
-    /// `RILL_CLIENT_KEY` when set.
+    /// `RILL_CLIENT_KEY`, and the regional cache from `RILL_CACHE_URL`,
+    /// when set.
     pub fn new(endpoint: impl Into<String>) -> Self {
         ClientConfig {
             endpoint: endpoint.into(),
@@ -99,7 +107,14 @@ impl ClientConfig {
             timeout: Some(Duration::from_secs(30)),
             user_agent: default_user_agent(),
             tls: TlsOptions::from_env(),
+            cache_url: std::env::var(CACHE_ENV).ok().filter(|u| !u.is_empty()),
         }
+    }
+
+    /// Read blobs through the regional cache at `url`.
+    pub fn with_cache(mut self, url: impl Into<String>) -> Self {
+        self.cache_url = Some(url.into());
+        self
     }
 
     /// Set the TLS settings.

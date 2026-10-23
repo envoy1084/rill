@@ -22,6 +22,12 @@ pub enum DaemonCmd {
     Stop,
     /// The daemon's cache and mounts.
     Status,
+    /// Stop serving a checkout (a lazy one disappears; an eager one's
+    /// files stay).
+    Unmount {
+        /// The checkout directory.
+        dir: std::path::PathBuf,
+    },
 }
 
 /// Run `rill daemon`.
@@ -61,6 +67,31 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: DaemonCmd) -> Result<()> {
                 } else {
                     "no daemon running"
                 })
+            })
+        }
+        DaemonCmd::Unmount { dir } => {
+            let dir = if dir.is_absolute() {
+                dir
+            } else {
+                ctx.cwd().join(dir)
+            };
+            let daemon = ctx.daemon().await?;
+            let mount = daemon
+                .get_mount(dpb::GetMountRequest {
+                    path: dir.display().to_string(),
+                    ..Default::default()
+                })
+                .await?
+                .mount
+                .into_option()
+                .unwrap_or_default();
+            daemon
+                .delete_mount(dpb::DeleteMountRequest {
+                    name: mount.name.clone(),
+                })
+                .await?;
+            ctx.emit(j!({ "unmounted": mount.name, "dir": mount.path }), |out| {
+                out.line(format!("unmounted {}", mount.path))
             })
         }
         DaemonCmd::Status => {

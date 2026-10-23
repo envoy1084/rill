@@ -157,7 +157,9 @@ The SDK has no working copy: checkouts belong to the
 [client daemon](daemon.md), and agents without files edit through
 `apply_edits` or a workspace. `WorkspaceClient::snapshot_edits` records
 edits as a workspace's snapshot (the server builds the tree), and
-`Edit::Stored` names content already uploaded. The credential store is
+`Edit::Stored` names content already uploaded. With `cache_url`
+(`RILL_CACHE_URL`) `get_blob` reads unchunked blobs through the regional
+cache using the listing's read grant, falling back to the origin. The credential store is
 written through `files::write_atomic` (a `tempfile` in the same
 directory, fsynced, then persisted over the target).
 

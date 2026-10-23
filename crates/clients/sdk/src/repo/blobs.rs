@@ -18,6 +18,17 @@ impl RepoClient {
         if let ContentRef::Inline { bytes } = content {
             return Ok(bytes.clone());
         }
+        if let (ContentRef::Blob { hash, .. }, Some(tier)) = (content, self.client.cache_tier()) {
+            let grant = self.grants().for_hash(hash);
+            if !grant.is_empty() {
+                if let Some(bytes) = tier
+                    .blob(&self.repo, hash, &grant, self.client.bearer())
+                    .await
+                {
+                    return Ok(bytes);
+                }
+            }
+        }
         self.get_blob_range(content, None, None).await
     }
 

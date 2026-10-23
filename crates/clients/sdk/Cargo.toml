@@ -61,3 +61,7 @@ required-features = ["testing"]
 [[test]]
 name = "workspace_snapshots"
 required-features = ["testing"]
+
+[[test]]
+name = "cache_tier"
+required-features = ["testing"]
