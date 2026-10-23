@@ -1,5 +1,5 @@
 [toolchain]
 # An exact release, so toolchain updates are deliberate commits rather than
 # a silent rebuild of everything beside the old artifacts.
-channel = "1.96.0"
+channel = "1.99.0"
 components = ["rustfmt", "clippy"]
