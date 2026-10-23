@@ -19,6 +19,7 @@ pub struct Out<'w> {
     theme: Arc<Theme>,
     syntax: bool,
     syntax_theme: String,
+    links: bool,
 }
 
 impl<'w> Out<'w> {
@@ -30,6 +31,17 @@ impl<'w> Out<'w> {
             theme: Arc::new(Theme::default()),
             syntax: false,
             syntax_theme: super::diff::DEFAULT_SYNTAX_THEME.into(),
+            links: color && supports_hyperlinks::on(supports_hyperlinks::Stream::Stdout),
+        }
+    }
+
+    /// `text` as a terminal hyperlink to `url` where the terminal supports
+    /// them (OSC 8), plain otherwise.
+    pub fn link(&self, text: &str, url: &str) -> String {
+        if self.links {
+            format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
+        } else {
+            text.to_string()
         }
     }
 
@@ -111,7 +123,7 @@ impl<'w> Out<'w> {
 
     /// Render a table.
     pub fn table(&mut self, table: Table) -> std::io::Result<()> {
-        let text = table.render(self.color);
+        let text = table.render(self.color, self.width());
         if !text.is_empty() {
             self.line(text)?;
         }

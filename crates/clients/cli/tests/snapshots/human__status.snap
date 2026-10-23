@@ -1,0 +1,13 @@
+---
+source: crates/clients/cli/tests/human.rs
+expression: "shot(&server, &co, &dir, &[\"status\"]).await"
+---
+On look at trunk ([hash12])
+Working change ch_[id]
+3 edits not synced to the server yet
+
+Changes:
+  (`rill diff` to review, `rill amend` to record them)
+	deleted:    README.md
+	modified:   main.rs
+	new file:   notes.txt

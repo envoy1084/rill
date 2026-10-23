@@ -60,6 +60,19 @@ impl Server {
     /// Run `rill` with `args` (after the global `--endpoint`), returning
     /// the exit code and stdout.
     pub async fn rill(&self, cwd: &Path, args: &[&str]) -> (i32, String) {
+        let mut full = vec!["--no-color"];
+        full.extend_from_slice(args);
+        self.rill_with(cwd, &full).await
+    }
+
+    /// Like `rill` but with colour forced on.
+    pub async fn rill_colored(&self, cwd: &Path, args: &[&str]) -> (i32, String) {
+        let mut full = vec!["--color", "always"];
+        full.extend_from_slice(args);
+        self.rill_with(cwd, &full).await
+    }
+
+    async fn rill_with(&self, cwd: &Path, args: &[&str]) -> (i32, String) {
         let mut full = vec![
             "rill".to_string(),
             "--endpoint".to_string(),
@@ -68,7 +81,6 @@ impl Server {
             cwd.display().to_string(),
             "--daemon-dir".to_string(),
             self.daemon_dir.path().display().to_string(),
-            "--no-color".to_string(),
         ];
         full.extend(args.iter().map(|a| a.to_string()));
         let mut out = Vec::new();

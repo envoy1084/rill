@@ -13,23 +13,23 @@
 ```json
 {
   "server": {
-    "endpoint": "http://127.0.0.1:54076",
+    "endpoint": "http://127.0.0.1:56205",
     "reachable": true,
     "principal": "dev",
-    "latency_ms": 0.593,
+    "latency_ms": 0.478667,
     "error": null
   },
   "daemon": {
     "running": true,
-    "pid": 35680,
+    "pid": 39001,
     "version": "0.1.0",
-    "dir": "/var/folders/mq/zg4qxz3j5n5gyqg76sfhn59m0000gn/T/.tmpg5ctRm"
+    "dir": "/var/folders/mq/zg4qxz3j5n5gyqg76sfhn59m0000gn/T/.tmpLup9S3"
   },
   "cache": {
     "objects": 5,
     "bytes": 32,
     "budget_bytes": 1073741824,
-    "free_bytes": 160709701632,
+    "free_bytes": 158972321792,
     "evictions": 0
   },
   "tiers": {
@@ -52,10 +52,10 @@
   },
   "checkouts": [
     {
-      "path": "/private/var/folders/mq/zg4qxz3j5n5gyqg76sfhn59m0000gn/T/.tmpoK7WUc/everyday",
+      "path": "/private/var/folders/mq/zg4qxz3j5n5gyqg76sfhn59m0000gn/T/.tmpKGhxUw/everyday",
       "repo": "everyday",
       "view": "eager",
-      "base": "9606bac696cb4e1d6db5c6b06eab6128b9b5ca6bb63d21781786afbb131a2e03",
+      "base": "925f01461538871cd5164607365a7d7fea242cc53932690536afb26c7471cba9",
       "pending": 1,
       "last_sync_ms": null,
       "sync_error": null

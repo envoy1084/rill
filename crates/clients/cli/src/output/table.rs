@@ -29,16 +29,18 @@ impl Table {
         self.rows.is_empty()
     }
 
-    /// Render without a trailing newline. An empty table renders as an
-    /// empty string so callers can print a "nothing here" line instead.
-    pub fn render(&self, color: bool) -> String {
+    /// Render without a trailing newline, fitted to `width` columns. An
+    /// empty table renders as an empty string so callers can print a
+    /// "nothing here" line instead.
+    pub fn render(&self, color: bool, width: usize) -> String {
         if self.rows.is_empty() {
             return String::new();
         }
         let mut table = comfy_table::Table::new();
         table
             .load_style(presets::NOTHING)
-            .set_content_arrangement(ContentArrangement::Dynamic);
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_width(width.min(u16::MAX as usize) as u16);
         if color {
             table.enforce_styling();
         }
@@ -63,10 +65,10 @@ mod tests {
 
     #[test]
     fn renders_rows_and_nothing_when_empty() {
-        assert_eq!(Table::new(&["a"]).render(false), "");
+        assert_eq!(Table::new(&["a"]).render(false, 100), "");
         let mut t = Table::new(&["name", "n"]);
         t.row(vec!["x".into(), "1".into()]);
-        let text = t.render(false);
+        let text = t.render(false, 100);
         assert!(text.contains("name"));
         assert!(text.contains('x'));
     }

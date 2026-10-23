@@ -29,18 +29,19 @@ and neither `--no-color` nor `--json` is given.
 ## Commands
 
 Global options work in any position: `--endpoint`, `--token`, `--repo`,
-`--json`, `-C/--cwd`, `-v` (repeatable), `-q`, `--no-color`.
+`--json`, `-C/--cwd`, `--daemon-dir`, `-v` (repeatable), `-q`,
+`--color auto|always|never` (`--no-color`), `--no-pager`.
 
 | Group | Commands |
 | --- | --- |
 | Repositories | `repo list`, `repo create [--windows-safe]`, `repo show`; names are `org/name` or a name in the default org |
 | Orgs | `org list`, `org show <name>`, `org create <name> [--description]` |
-| Checkout | `checkout`, `status`, `diff` |
-| History | `log`, `blame`, `show`, `ls`, `cat`, `grep` |
-| Changes | `new`, `describe`, `amend`, `sync`, `conflicts` (list), `resolve <paths> \| --all`, `undo`, `op log`, `abandon` |
+| Checkout | `clone [--eager]`, `checkout [--lazy \| --snapshot]`, `status [-s]`, `diff [--stat \| --name-status] [-U N]` |
+| History | `log [--oneline] [--no-graph]`, `blame`, `show [--stat \| --name-status \| -s]`, `ls`, `cat`, `grep` |
+| Changes | `new`, `commit`, `describe`, `amend` (no `-m`: your editor), `sync`, `conflicts` (list), `resolve <paths> \| --all \| -i`, `undo`, `redo`, `op log`, `abandon` |
 | Stacks | `stack show`, `stack sync`, `stack submit`, `stack land [--prefix]` (one ordered group: all or nothing, or the longest landable prefix) |
-| Review | `submit`, `approve` / `reject` (the label's most or least, `Review` unless `--label`), `review show/list/vote/comment/threads/resolve-thread/evaluate` |
-| Landing | `land [--wait] [--timeout 300] [--no-sync] [--onto release/<name>]`, `queue` (requests waiting, with place and wait), `trunk` (status), `trunk health`, `trunk landings`, `trunk verify <seq>`, `trunk freeze [--reason]`, `trunk thaw`, `incidents [-n]`, `revert <seq>`, `revert --session/--model/--sponsor/--author/--intent [--since] [--until] [--apply]` (a preview without `--apply`), `bisect` |
+| Review | `submit`, `approve` / `reject` (the label's most or least, `Review` unless `--label`), `comment`, `inbox`, `review open` (full screen), `review show/list/vote/comment/threads/resolve-thread/evaluate` |
+| Landing | `land [--wait] [--timeout 300] [--no-sync] [--onto release/<name>]`, `land cancel [ticket \| change] [-m reason]`, `queue` (requests waiting, with place and wait), `trunk` (status), `trunk health`, `trunk landings`, `trunk verify <seq>`, `trunk freeze [--reason]`, `trunk thaw`, `incidents [-n]`, `revert <seq>`, `revert --session/--model/--sponsor/--author/--intent [--since] [--until] [--apply]` (a preview without `--apply`), `bisect` |
 | Releases | `release cut <name> [--at SEQ]` (repository owners), `release list`; land on one with `land --onto release/<name>` or `stack land --onto` |
 | Checks | `checks runs [--of-version]`, `checks run <id> [--watch]`, `checks log <run> <step> [--stderr] [--tail]`, `checks artifact <run> <step> <path> [-o]`, `checks nonhermetic`, `checks flaky [--min-score] [--limit]`, `checks history <target>`, `checks quarantine list/add/release` ([checks](../06-services/checks.md)) |
 | Intents | `intent create/list/show/update/link/similar` |
@@ -50,7 +51,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Services | `dev`, `api [--roles]`, `cache --origin --dir --max-bytes` ([cache tier](../07-runtime/cache.md)) |
 | Access | `access grant/revoke <subject> <relation> [path]`, `access list [--path] [--subject] [--relation]`, `access check <relation> [path] [--as]`, `access who <relation> [path]`, `access where <relation> [--as]` |
 | Admin | `admin policy get/set` (of the current repository), `admin health`, `admin idp add/list/remove` (OIDC, or SAML with `--saml-metadata`), `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session`, `admin trust add/list/remove` (workload issuers), `admin kill --agent/--session/--sponsor/--model`, `admin scim create/list/revoke`, `admin audit list/watch/seal/verify/export`, `admin protect redact/approve/redactions/release/rotate-key`, `admin secret set/list/delete` (the value from standard input or `--from-file`, never an argument) |
-| Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch; `--follow` keeps it following), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
+| Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch; `--follow` keeps it following), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>`, `help [topic \| command]` (guides: getting-started, checkouts, stacks, conflicts, agents, config), `doctor`, `bug-report [-o]`, `man -o <dir>` (hidden; for packagers) |
 
 Each group lives in `commands/<group>.rs`. `commands/parse.rs` holds the
 shared positional parsers: `root_arg` (defaults to trunk), `seq_arg` (`7` or
@@ -88,6 +89,44 @@ Behaviours worth knowing:
   `dev`, `api`, `login`, `logout` and `completions` connects first,
   exchanging the workload's JWT for an agent token
   (`Ctx::resolve_workload`).
+
+## Presentation
+
+The human output reads like git's, through one layer (`output/`):
+
+- **Theme** (`theme.rs`): one style per semantic role (added, conflict,
+  id, ref, author, date, hint, diff-add-word, graph-working, …), restyled
+  in `[color]` of `~/.config/rill/config.toml` with git's spec syntax
+  (`yellow bold`, `white on red`, `208`, `#ff8800`). Colour is on for a
+  terminal; `--color`, `--no-color`, `NO_COLOR`, `CLICOLOR_FORCE` and
+  `[color] ui` decide otherwise. Help and usage errors are coloured on a
+  terminal only.
+- **Pager** (`pager.rs`): `log`, `diff`, `show`, `blame`, `cat`, `grep` and
+  `help` page through `$RILL_PAGER`, `[core] pager`, `$PAGER`, else
+  `less` with `LESS=FRX`; `--no-pager` skips it; a reader that quits early
+  is not an error.
+- **Diffs** (`diff.rs`, `patch.rs`, `stat.rs`): file headers, hunks, the
+  changed words of an edited line singled out (`similar`), and code
+  coloured by language with delta-style line backgrounds (`syntect`;
+  `[diff] syntax`, `[diff] theme`); `--stat` and `--name-status`.
+- **History graph** (`graph.rs`): jj-style lanes following first parents:
+  `@` working change, `○` unlanded, `◆` trunk, `×` conflicted; the
+  checkout's unlanded stack is drawn on its own lane above trunk.
+- **Status** prints sections and hints like `git status`; file paths are
+  terminal hyperlinks (OSC 8) where supported. **Blame** colours lines by
+  age. Dates are relative (`3 hours ago`). Tables fit the width
+  (`$COLUMNS`, else the terminal's).
+- **Interaction** only on a terminal and never with `--json` or `-q`:
+  spinners (`indicatif`) for checkout, sync and `land --wait` (queue
+  position and ETA live); `$RILL_EDITOR`/`$VISUAL`/`$EDITOR` for a missing
+  message (`editor.rs`); prompts (`inquire`) for confirmations and
+  `resolve -i`; `review open` is a full-screen `ratatui` view whose key
+  handling is a pure state machine.
+- **Aliases** (`aliases.rs`): `[alias] lg = "log --oneline"`; built-ins win.
+
+`tests/human.rs` snapshots the human output of the everyday commands
+(plain and coloured) at a fixed width, beside the JSON schemas in
+`tests/schemas.rs`.
 
 ## Context resolution
 
@@ -180,7 +219,8 @@ the root `CancellationToken`. See
 
 - [lib.rs](../../crates/clients/cli/src/lib.rs), [cli.rs](../../crates/clients/cli/src/cli.rs), [context.rs](../../crates/clients/cli/src/context.rs), [error.rs](../../crates/clients/cli/src/error.rs), [exit.rs](../../crates/clients/cli/src/exit.rs)
 - [commands/mod.rs](../../crates/clients/cli/src/commands/mod.rs), [commands/parse.rs](../../crates/clients/cli/src/commands/parse.rs), [commands/change/mod.rs](../../crates/clients/cli/src/commands/change/mod.rs), [commands/import/](../../crates/clients/cli/src/commands/import/mod.rs), [commands/export.rs](../../crates/clients/cli/src/commands/export.rs)
-- [tests/schemas.rs](../../crates/clients/cli/tests/schemas.rs), [output/mod.rs](../../crates/clients/cli/src/output/mod.rs), [output/table.rs](../../crates/clients/cli/src/output/table.rs), [output/format.rs](../../crates/clients/cli/src/output/format.rs)
+- [tests/schemas.rs](../../crates/clients/cli/tests/schemas.rs), [tests/human.rs](../../crates/clients/cli/tests/human.rs), [output/mod.rs](../../crates/clients/cli/src/output/mod.rs), [output/theme.rs](../../crates/clients/cli/src/output/theme.rs), [output/diff.rs](../../crates/clients/cli/src/output/diff.rs), [output/graph.rs](../../crates/clients/cli/src/output/graph.rs), [output/pager.rs](../../crates/clients/cli/src/output/pager.rs), [settings.rs](../../crates/clients/cli/src/settings.rs), [aliases.rs](../../crates/clients/cli/src/aliases.rs)
+- [commands/review/browse/](../../crates/clients/cli/src/commands/review/browse/mod.rs), [commands/change/pick.rs](../../crates/clients/cli/src/commands/change/pick.rs), [commands/help.rs](../../crates/clients/cli/src/commands/help.rs), [guides/](../../crates/clients/cli/guides/getting-started.md)
 - [server/mod.rs](../../crates/clients/cli/src/server/mod.rs), [server/template.rs](../../crates/clients/cli/src/server/template.rs)
 - [bin/rill.rs](../../crates/clients/cli/src/bin/rill.rs)
 

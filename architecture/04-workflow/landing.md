@@ -50,6 +50,12 @@ accept one, any server can report its status, and they survive restarts:
   itself.
 * Finished requests stay queryable for `TERMINAL_RETENTION` (7 days) and
   are then swept.
+* `CancelLandRequest` (`rill land cancel`) lets the requester or an admin
+  eject a request still `Queued` or `Verifying`, with
+  `Ejected { reason: "cancelled by …" }`, unfenced but conditioned on the
+  record as read. The lander claims a request for landing by moving it
+  to `Landing`; when that write fails (the request was cancelled
+  meanwhile, or the lease is gone) the request is dropped, never landed.
 
 `Lander::run_forever` serves the queue while it holds the lease: it reads
 up to 256 pending requests, partitions and processes them, then waits for

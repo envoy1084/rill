@@ -50,19 +50,32 @@ pub fn ago(t: &Timestamp) -> String {
     ago_from(t, &Timestamp::now())
 }
 
-/// `s` without ANSI escape sequences.
+/// `s` without ANSI escape sequences: colours (CSI) and hyperlinks (OSC,
+/// ended by BEL or `ESC \`).
 pub fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars();
+    let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
-        if c == '\u{1b}' {
-            for c in chars.by_ref() {
-                if c.is_ascii_alphabetic() {
-                    break;
+        if c != '\u{1b}' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some(']') => {
+                while let Some(c) = chars.next() {
+                    if c == '\u{7}' || (c == '\u{1b}' && chars.next_if_eq(&'\\').is_some()) {
+                        break;
+                    }
                 }
             }
-        } else {
-            out.push(c);
+            Some('[') => {
+                for c in chars.by_ref() {
+                    if c.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+            _ => {}
         }
     }
     out
@@ -85,6 +98,13 @@ pub fn yes_no(v: bool) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn escapes_of_colours_and_links_are_stripped() {
+        let link = "\u{1b}]8;;file:///a\u{1b}\\a.rs\u{1b}]8;;\u{1b}\\";
+        assert_eq!(strip_ansi(&format!("\u{1b}[31m{link}\u{1b}[0m!")), "a.rs!");
+        assert_eq!(visible_width("\u{1b}[1mab\u{1b}[0m"), 2);
+    }
 
     #[test]
     fn relative_times_round_like_git() {

@@ -1,0 +1,27 @@
+---
+source: crates/clients/cli/tests/human.rs
+expression: "shot(&server, &co, &dir, &[\"diff\"]).await"
+---
+diff --rill a/README.md b/README.md
+deleted file
+--- a/README.md
++++ /dev/null
+@@ -1 +0,0 @@
+-# Look
+diff --rill a/main.rs b/main.rs
+--- a/main.rs
++++ b/main.rs
+@@ -1,4 +1,4 @@
+ fn main() {
+-    let x = 1;
+-    println!("{}", x);
++    let x = 2;
++    println!("value {}", x);
+ }
+diff --rill a/notes.txt b/notes.txt
+new file
+--- /dev/null
++++ b/notes.txt
+@@ -0,0 +1,2 @@
++notes
++more

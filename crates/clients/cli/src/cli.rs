@@ -7,9 +7,9 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    access, admin, blame, bug_report, change, checkout, clone, daemon, diff, health, history,
-    identity, import, intent, land, log, org, refs, release, repo, review, show, stack, status,
-    watch, ws,
+    access, admin, blame, bug_report, change, checkout, clone, daemon, diff, health, help, history,
+    identity, import, intent, land, log, man, org, refs, release, repo, review, show, stack,
+    status, watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -17,6 +17,7 @@ use crate::commands::{
 #[command(
     name = "rill",
     version,
+    disable_help_subcommand = true,
     about = "Rill: server-authoritative source control for humans and agents",
     propagate_version = true
 )]
@@ -170,6 +171,13 @@ pub enum Command {
 
     /// Write a bug report file: versions, doctor, settings, daemon log.
     BugReport(bug_report::BugReportArgs),
+
+    /// Guides (`rill help stacks`) or a command's help (`rill help land`).
+    Help(help::HelpArgs),
+
+    /// Write man pages for every command.
+    #[command(hide = true)]
+    Man(man::ManArgs),
 
     /// The workspace's operation log.
     #[command(subcommand)]

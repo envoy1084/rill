@@ -43,6 +43,7 @@ pub async fn status(ctx: &mut Ctx<'_>, args: StatusArgs) -> Result<()> {
         .await?;
     let changes: Vec<LocalChange> = rill_daemon::client::local_changes(&reply.changes);
     let meta = reply.mount.into_option().unwrap_or(mount);
+    let dir = ctx.find_checkout();
     let conflicts = changes
         .iter()
         .filter(|c| c.kind == ChangeKind::Conflict)
@@ -62,7 +63,7 @@ pub async fn status(ctx: &mut Ctx<'_>, args: StatusArgs) -> Result<()> {
             if args.short {
                 short(out, &changes)
             } else {
-                long(out, &meta, &changes)
+                long(out, &meta, &changes, dir.as_deref())
             }
         },
     )
@@ -87,7 +88,16 @@ fn short(out: &mut Out<'_>, changes: &[LocalChange]) -> std::io::Result<()> {
     Ok(())
 }
 
-fn long(out: &mut Out<'_>, meta: &dpb::Mount, changes: &[LocalChange]) -> std::io::Result<()> {
+fn long(
+    out: &mut Out<'_>,
+    meta: &dpb::Mount,
+    changes: &[LocalChange],
+    dir: Option<&std::path::Path>,
+) -> std::io::Result<()> {
+    let linked = |out: &Out<'_>, path: &rill_types::RepoPathBuf| match dir {
+        Some(d) => out.link(path.as_str(), &format!("file://{}/{}", d.display(), path)),
+        None => path.to_string(),
+    };
     let version = meta
         .base_version
         .get(..12)
@@ -141,8 +151,11 @@ fn long(out: &mut Out<'_>, meta: &dpb::Mount, changes: &[LocalChange]) -> std::i
                 ChangeKind::Deleted => ("deleted:", Role::Removed),
                 _ => ("modified:", Role::Modified),
             };
-            let painted = out.paint(role, &format!("{label:<12}{}", c.path));
-            out.line(format!("\t{painted}"))?;
+            let painted = out.paint(role, &format!("{label:<12}"));
+            out.line(format!(
+                "\t{painted}{}",
+                out.paint(role, &linked(out, &c.path))
+            ))?;
         }
     }
     if !conflicts.is_empty() {

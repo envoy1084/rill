@@ -172,6 +172,7 @@ fn pages(command: &Command) -> bool {
             | Command::Blame(_)
             | Command::Cat(_)
             | Command::Grep(_)
+            | Command::Help(_)
     )
 }
 
