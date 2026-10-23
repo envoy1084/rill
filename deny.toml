@@ -17,6 +17,9 @@ ignore = [
     { id = "RUSTSEC-2026-0173", reason = "build-time proc macro" },
     { id = "RUSTSEC-2024-0449", reason = "unmaintained, no known vulnerability" },
     { id = "RUSTSEC-2023-0089", reason = "not compiled for supported targets" },
+    # Unmaintained, no known vulnerability: bincode 1 via syntect only
+    # decodes the syntax and theme dumps compiled into the CLI.
+    { id = "RUSTSEC-2025-0141", reason = "decodes only bundled syntect dumps" },
 ]
 
 [licenses]
