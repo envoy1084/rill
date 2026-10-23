@@ -1,10 +1,9 @@
 //! Workspaces and their operation log.
 
-use rill_sdk::{NewChangeResult, UpdateBaseResult, WorkspaceOp};
+use rill_sdk::WorkspaceOp;
 use rill_types::{Operation, OperationKind, SparseProfile, Workspace};
 use serde_json::{json, Value};
 
-use super::history::change_version;
 use super::primitives::{hash, opt, principal, timestamp};
 
 /// A sparse profile.
@@ -75,26 +74,4 @@ pub fn operation(o: &Operation) -> Value {
 /// A workspace after a mutation.
 pub fn workspace_op(w: &WorkspaceOp) -> Value {
     json!({ "workspace": workspace(&w.workspace), "operation": operation(&w.operation) })
-}
-
-/// A change created from a workspace snapshot.
-pub fn new_change_result(r: &NewChangeResult) -> Value {
-    json!({
-        "change_id": r.change_id.to_string(),
-        "hash": hash(&r.hash),
-        "version": change_version(&r.version),
-        "operation": operation(&r.operation),
-    })
-}
-
-/// The result of moving a workspace's base.
-pub fn update_base_result(r: &UpdateBaseResult) -> Value {
-    json!({
-        "workspace": workspace(&r.workspace),
-        "operation": operation(&r.operation),
-        "rebased": r.rebased.as_ref().map(|(h, v)| json!({
-            "hash": hash(h),
-            "version": change_version(v),
-        })),
-    })
 }

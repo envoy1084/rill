@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use rill_sdk::Root;
-use rill_types::{RepoPathBuf, TrunkSeq};
+use rill_types::RepoPathBuf;
 use serde_json::{Map, Value};
 
 use crate::error::{ToolError, ToolResult};
@@ -141,23 +141,6 @@ impl Args {
         Ok(RepoPathBuf::new(self.str(key)?)?)
     }
 
-    /// A trunk sequence from an integer or `trunk@N` string.
-    pub fn seq(&self, key: &str) -> ToolResult<TrunkSeq> {
-        match self.get(key) {
-            Some(Value::Number(n)) => n
-                .as_u64()
-                .map(TrunkSeq)
-                .ok_or_else(|| ToolError::invalid(format!("`{key}` must be a sequence number"))),
-            Some(Value::String(s)) => s
-                .parse()
-                .map_err(|e| ToolError::invalid(format!("`{key}`: {e}"))),
-            Some(_) => Err(ToolError::invalid(format!(
-                "`{key}` must be a sequence number"
-            ))),
-            None => Err(ToolError::invalid(format!("`{key}` is required"))),
-        }
-    }
-
     /// An optional array of strings.
     pub fn opt_str_list(&self, key: &str) -> ToolResult<Vec<String>> {
         match self.get(key) {
@@ -208,12 +191,13 @@ fn kind_of(v: &Value) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rill_types::TrunkSeq;
     use serde_json::json;
 
     #[test]
     fn typed_accessors() {
         let a = Args::new(json!({
-            "s": "x", "n": 3, "b": true, "at": "trunk@4", "seq": 9,
+            "s": "x", "n": 3, "b": true, "at": "trunk@4",
             "paths": ["a", "b/c"], "nul": null
         }))
         .unwrap();
@@ -228,7 +212,6 @@ mod tests {
             Root::Seq(TrunkSeq(4))
         ));
         assert_eq!(a.root_or_trunk("nul").unwrap(), Root::trunk());
-        assert_eq!(a.seq("seq").unwrap(), TrunkSeq(9));
         assert_eq!(a.opt_paths("paths").unwrap().len(), 2);
         assert!(a.path_or_root("nul").unwrap().is_root());
     }

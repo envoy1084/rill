@@ -34,6 +34,4 @@ pub use review::{
     submit_decision, sync_result, thread,
 };
 pub use search::{grep_hit, grep_result};
-pub use workspace::{
-    new_change_result, operation, sparse_profile, update_base_result, workspace, workspace_op,
-};
+pub use workspace::{operation, sparse_profile, workspace, workspace_op};
