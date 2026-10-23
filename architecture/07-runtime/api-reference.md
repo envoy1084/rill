@@ -6445,6 +6445,8 @@ Workspaces and their operation logs.
 | `request_id` | [string](#string) |  |  |
 | `name` | [string](#string) |  | `…/workspaces/{workspace}`. Required. |
 | `tree_hash` | [bytes](#bytes) |  | Root tree of the working copy; its objects must already be uploaded. |
+| `edits` | [WorkspaceEdits](#rill-v1-WorkspaceEdits) |  | Edits the server applies to build the tree. |
+| `etag` | [string](#string) |  | The workspace's current etag; any when empty. |
 
 
 <a name="rill-v1-SnapshotWorkspaceResponse"></a>
@@ -6561,6 +6563,18 @@ Workspaces and their operation logs.
 | --- | --- | --- | --- |
 | `workspace` | [Workspace](#rill-v1-Workspace) |  |  |
 | `operation` | [WorkspaceOperation](#rill-v1-WorkspaceOperation) |  |  |
+
+
+<a name="rill-v1-WorkspaceEdits"></a>
+
+### WorkspaceEdits
+
+Edits to a workspace's working copy. Patches are not accepted.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `from_base` | [bool](#bool) |  | Apply to the base, replacing the snapshot, rather than to the current snapshot (the base when there is none). |
+| `edits` | [Edit](#rill-v1-Edit) | repeated |  |
 
 
 

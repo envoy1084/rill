@@ -578,8 +578,15 @@ type SnapshotWorkspaceRequest struct {
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	// `…/workspaces/{workspace}`. Required.
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	// Root tree of the working copy; its objects must already be uploaded.
-	TreeHash      []byte `protobuf:"bytes,3,opt,name=tree_hash,json=treeHash,proto3" json:"tree_hash,omitempty"`
+	// The new working copy. Required.
+	//
+	// Types that are valid to be assigned to Source:
+	//
+	//	*SnapshotWorkspaceRequest_TreeHash
+	//	*SnapshotWorkspaceRequest_Edits
+	Source isSnapshotWorkspaceRequest_Source `protobuf_oneof:"source"`
+	// The workspace's current etag; any when empty.
+	Etag          string `protobuf:"bytes,5,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -628,9 +635,107 @@ func (x *SnapshotWorkspaceRequest) GetName() string {
 	return ""
 }
 
+func (x *SnapshotWorkspaceRequest) GetSource() isSnapshotWorkspaceRequest_Source {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
 func (x *SnapshotWorkspaceRequest) GetTreeHash() []byte {
 	if x != nil {
-		return x.TreeHash
+		if x, ok := x.Source.(*SnapshotWorkspaceRequest_TreeHash); ok {
+			return x.TreeHash
+		}
+	}
+	return nil
+}
+
+func (x *SnapshotWorkspaceRequest) GetEdits() *WorkspaceEdits {
+	if x != nil {
+		if x, ok := x.Source.(*SnapshotWorkspaceRequest_Edits); ok {
+			return x.Edits
+		}
+	}
+	return nil
+}
+
+func (x *SnapshotWorkspaceRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+type isSnapshotWorkspaceRequest_Source interface {
+	isSnapshotWorkspaceRequest_Source()
+}
+
+type SnapshotWorkspaceRequest_TreeHash struct {
+	// Root tree of the working copy; its objects must already be uploaded.
+	TreeHash []byte `protobuf:"bytes,3,opt,name=tree_hash,json=treeHash,proto3,oneof"`
+}
+
+type SnapshotWorkspaceRequest_Edits struct {
+	// Edits the server applies to build the tree.
+	Edits *WorkspaceEdits `protobuf:"bytes,4,opt,name=edits,proto3,oneof"`
+}
+
+func (*SnapshotWorkspaceRequest_TreeHash) isSnapshotWorkspaceRequest_Source() {}
+
+func (*SnapshotWorkspaceRequest_Edits) isSnapshotWorkspaceRequest_Source() {}
+
+// Edits to a workspace's working copy. Patches are not accepted.
+type WorkspaceEdits struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Apply to the base, replacing the snapshot, rather than to the current
+	// snapshot (the base when there is none).
+	FromBase      bool    `protobuf:"varint,1,opt,name=from_base,json=fromBase,proto3" json:"from_base,omitempty"`
+	Edits         []*Edit `protobuf:"bytes,2,rep,name=edits,proto3" json:"edits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkspaceEdits) Reset() {
+	*x = WorkspaceEdits{}
+	mi := &file_rill_v1_workspace_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkspaceEdits) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkspaceEdits) ProtoMessage() {}
+
+func (x *WorkspaceEdits) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_workspace_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkspaceEdits.ProtoReflect.Descriptor instead.
+func (*WorkspaceEdits) Descriptor() ([]byte, []int) {
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *WorkspaceEdits) GetFromBase() bool {
+	if x != nil {
+		return x.FromBase
+	}
+	return false
+}
+
+func (x *WorkspaceEdits) GetEdits() []*Edit {
+	if x != nil {
+		return x.Edits
 	}
 	return nil
 }
@@ -644,7 +749,7 @@ type SnapshotWorkspaceResponse struct {
 
 func (x *SnapshotWorkspaceResponse) Reset() {
 	*x = SnapshotWorkspaceResponse{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[11]
+	mi := &file_rill_v1_workspace_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -656,7 +761,7 @@ func (x *SnapshotWorkspaceResponse) String() string {
 func (*SnapshotWorkspaceResponse) ProtoMessage() {}
 
 func (x *SnapshotWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[11]
+	mi := &file_rill_v1_workspace_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -669,7 +774,7 @@ func (x *SnapshotWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapshotWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*SnapshotWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{11}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SnapshotWorkspaceResponse) GetOperation() *WorkspaceOperation {
@@ -694,7 +799,7 @@ type StartChangeRequest struct {
 
 func (x *StartChangeRequest) Reset() {
 	*x = StartChangeRequest{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[12]
+	mi := &file_rill_v1_workspace_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -706,7 +811,7 @@ func (x *StartChangeRequest) String() string {
 func (*StartChangeRequest) ProtoMessage() {}
 
 func (x *StartChangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[12]
+	mi := &file_rill_v1_workspace_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -719,7 +824,7 @@ func (x *StartChangeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartChangeRequest.ProtoReflect.Descriptor instead.
 func (*StartChangeRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{12}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StartChangeRequest) GetRequestId() string {
@@ -770,7 +875,7 @@ type StartChangeResponse struct {
 
 func (x *StartChangeResponse) Reset() {
 	*x = StartChangeResponse{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[13]
+	mi := &file_rill_v1_workspace_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -782,7 +887,7 @@ func (x *StartChangeResponse) String() string {
 func (*StartChangeResponse) ProtoMessage() {}
 
 func (x *StartChangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[13]
+	mi := &file_rill_v1_workspace_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -795,7 +900,7 @@ func (x *StartChangeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartChangeResponse.ProtoReflect.Descriptor instead.
 func (*StartChangeResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{13}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *StartChangeResponse) GetChange() string {
@@ -839,7 +944,7 @@ type SyncWorkspaceRequest struct {
 
 func (x *SyncWorkspaceRequest) Reset() {
 	*x = SyncWorkspaceRequest{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[14]
+	mi := &file_rill_v1_workspace_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -851,7 +956,7 @@ func (x *SyncWorkspaceRequest) String() string {
 func (*SyncWorkspaceRequest) ProtoMessage() {}
 
 func (x *SyncWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[14]
+	mi := &file_rill_v1_workspace_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -864,7 +969,7 @@ func (x *SyncWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*SyncWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{14}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *SyncWorkspaceRequest) GetRequestId() string {
@@ -901,7 +1006,7 @@ type SyncWorkspaceResponse struct {
 
 func (x *SyncWorkspaceResponse) Reset() {
 	*x = SyncWorkspaceResponse{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[15]
+	mi := &file_rill_v1_workspace_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -913,7 +1018,7 @@ func (x *SyncWorkspaceResponse) String() string {
 func (*SyncWorkspaceResponse) ProtoMessage() {}
 
 func (x *SyncWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[15]
+	mi := &file_rill_v1_workspace_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -926,7 +1031,7 @@ func (x *SyncWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*SyncWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{15}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SyncWorkspaceResponse) GetWorkspace() *Workspace {
@@ -970,7 +1075,7 @@ type HandoffWorkspaceRequest struct {
 
 func (x *HandoffWorkspaceRequest) Reset() {
 	*x = HandoffWorkspaceRequest{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[16]
+	mi := &file_rill_v1_workspace_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -982,7 +1087,7 @@ func (x *HandoffWorkspaceRequest) String() string {
 func (*HandoffWorkspaceRequest) ProtoMessage() {}
 
 func (x *HandoffWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[16]
+	mi := &file_rill_v1_workspace_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -995,7 +1100,7 @@ func (x *HandoffWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*HandoffWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{16}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *HandoffWorkspaceRequest) GetRequestId() string {
@@ -1029,7 +1134,7 @@ type HandoffWorkspaceResponse struct {
 
 func (x *HandoffWorkspaceResponse) Reset() {
 	*x = HandoffWorkspaceResponse{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[17]
+	mi := &file_rill_v1_workspace_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1041,7 +1146,7 @@ func (x *HandoffWorkspaceResponse) String() string {
 func (*HandoffWorkspaceResponse) ProtoMessage() {}
 
 func (x *HandoffWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[17]
+	mi := &file_rill_v1_workspace_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1054,7 +1159,7 @@ func (x *HandoffWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*HandoffWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{17}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *HandoffWorkspaceResponse) GetWorkspace() *Workspace {
@@ -1083,7 +1188,7 @@ type UndoOperationRequest struct {
 
 func (x *UndoOperationRequest) Reset() {
 	*x = UndoOperationRequest{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[18]
+	mi := &file_rill_v1_workspace_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1095,7 +1200,7 @@ func (x *UndoOperationRequest) String() string {
 func (*UndoOperationRequest) ProtoMessage() {}
 
 func (x *UndoOperationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[18]
+	mi := &file_rill_v1_workspace_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1108,7 +1213,7 @@ func (x *UndoOperationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UndoOperationRequest.ProtoReflect.Descriptor instead.
 func (*UndoOperationRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{18}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UndoOperationRequest) GetRequestId() string {
@@ -1135,7 +1240,7 @@ type UndoOperationResponse struct {
 
 func (x *UndoOperationResponse) Reset() {
 	*x = UndoOperationResponse{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[19]
+	mi := &file_rill_v1_workspace_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1147,7 +1252,7 @@ func (x *UndoOperationResponse) String() string {
 func (*UndoOperationResponse) ProtoMessage() {}
 
 func (x *UndoOperationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[19]
+	mi := &file_rill_v1_workspace_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1160,7 +1265,7 @@ func (x *UndoOperationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UndoOperationResponse.ProtoReflect.Descriptor instead.
 func (*UndoOperationResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{19}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UndoOperationResponse) GetWorkspace() *Workspace {
@@ -1189,7 +1294,7 @@ type ListWorkspaceOperationsRequest struct {
 
 func (x *ListWorkspaceOperationsRequest) Reset() {
 	*x = ListWorkspaceOperationsRequest{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[20]
+	mi := &file_rill_v1_workspace_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1201,7 +1306,7 @@ func (x *ListWorkspaceOperationsRequest) String() string {
 func (*ListWorkspaceOperationsRequest) ProtoMessage() {}
 
 func (x *ListWorkspaceOperationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[20]
+	mi := &file_rill_v1_workspace_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1214,7 +1319,7 @@ func (x *ListWorkspaceOperationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkspaceOperationsRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkspaceOperationsRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{20}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListWorkspaceOperationsRequest) GetParent() string {
@@ -1249,7 +1354,7 @@ type ListWorkspaceOperationsResponse struct {
 
 func (x *ListWorkspaceOperationsResponse) Reset() {
 	*x = ListWorkspaceOperationsResponse{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[21]
+	mi := &file_rill_v1_workspace_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1261,7 +1366,7 @@ func (x *ListWorkspaceOperationsResponse) String() string {
 func (*ListWorkspaceOperationsResponse) ProtoMessage() {}
 
 func (x *ListWorkspaceOperationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[21]
+	mi := &file_rill_v1_workspace_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1274,7 +1379,7 @@ func (x *ListWorkspaceOperationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkspaceOperationsResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkspaceOperationsResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{21}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListWorkspaceOperationsResponse) GetOperations() []*WorkspaceOperation {
@@ -1304,7 +1409,7 @@ type DiffWorkspaceRequest struct {
 
 func (x *DiffWorkspaceRequest) Reset() {
 	*x = DiffWorkspaceRequest{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[22]
+	mi := &file_rill_v1_workspace_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1316,7 +1421,7 @@ func (x *DiffWorkspaceRequest) String() string {
 func (*DiffWorkspaceRequest) ProtoMessage() {}
 
 func (x *DiffWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[22]
+	mi := &file_rill_v1_workspace_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1329,7 +1434,7 @@ func (x *DiffWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiffWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*DiffWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{22}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DiffWorkspaceRequest) GetName() string {
@@ -1369,7 +1474,7 @@ type DiffWorkspaceResponse struct {
 
 func (x *DiffWorkspaceResponse) Reset() {
 	*x = DiffWorkspaceResponse{}
-	mi := &file_rill_v1_workspace_proto_msgTypes[23]
+	mi := &file_rill_v1_workspace_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1381,7 +1486,7 @@ func (x *DiffWorkspaceResponse) String() string {
 func (*DiffWorkspaceResponse) ProtoMessage() {}
 
 func (x *DiffWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_workspace_proto_msgTypes[23]
+	mi := &file_rill_v1_workspace_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1394,7 +1499,7 @@ func (x *DiffWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiffWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*DiffWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{23}
+	return file_rill_v1_workspace_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DiffWorkspaceResponse) GetFiles() []*FileDiff {
@@ -1408,7 +1513,7 @@ var File_rill_v1_workspace_proto protoreflect.FileDescriptor
 
 const file_rill_v1_workspace_proto_rawDesc = "" +
 	"\n" +
-	"\x17rill/v1/workspace.proto\x12\arill.v1\x1a\x13rill/v1/types.proto\"\x95\x01\n" +
+	"\x17rill/v1/workspace.proto\x12\arill.v1\x1a\x15rill/v1/changes.proto\x1a\x13rill/v1/types.proto\"\x95\x01\n" +
 	"\x16CreateWorkspaceRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
@@ -1446,12 +1551,18 @@ const file_rill_v1_workspace_proto_rawDesc = "" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
 	"\x04etag\x18\x03 \x01(\tR\x04etag\"\x19\n" +
-	"\x17DeleteWorkspaceResponse\"j\n" +
+	"\x17DeleteWorkspaceResponse\"\xbb\x01\n" +
 	"\x18SnapshotWorkspaceRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
-	"\ttree_hash\x18\x03 \x01(\fR\btreeHash\"V\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
+	"\ttree_hash\x18\x03 \x01(\fH\x00R\btreeHash\x12/\n" +
+	"\x05edits\x18\x04 \x01(\v2\x17.rill.v1.WorkspaceEditsH\x00R\x05edits\x12\x12\n" +
+	"\x04etag\x18\x05 \x01(\tR\x04etagB\b\n" +
+	"\x06source\"R\n" +
+	"\x0eWorkspaceEdits\x12\x1b\n" +
+	"\tfrom_base\x18\x01 \x01(\bR\bfromBase\x12#\n" +
+	"\x05edits\x18\x02 \x03(\v2\r.rill.v1.EditR\x05edits\"V\n" +
 	"\x19SnapshotWorkspaceResponse\x129\n" +
 	"\toperation\x18\x01 \x01(\v2\x1b.rill.v1.WorkspaceOperationR\toperation\"\xae\x01\n" +
 	"\x12StartChangeRequest\x12\x1d\n" +
@@ -1537,7 +1648,7 @@ func file_rill_v1_workspace_proto_rawDescGZIP() []byte {
 	return file_rill_v1_workspace_proto_rawDescData
 }
 
-var file_rill_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_rill_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_rill_v1_workspace_proto_goTypes = []any{
 	(*CreateWorkspaceRequest)(nil),          // 0: rill.v1.CreateWorkspaceRequest
 	(*CreateWorkspaceResponse)(nil),         // 1: rill.v1.CreateWorkspaceResponse
@@ -1550,83 +1661,87 @@ var file_rill_v1_workspace_proto_goTypes = []any{
 	(*DeleteWorkspaceRequest)(nil),          // 8: rill.v1.DeleteWorkspaceRequest
 	(*DeleteWorkspaceResponse)(nil),         // 9: rill.v1.DeleteWorkspaceResponse
 	(*SnapshotWorkspaceRequest)(nil),        // 10: rill.v1.SnapshotWorkspaceRequest
-	(*SnapshotWorkspaceResponse)(nil),       // 11: rill.v1.SnapshotWorkspaceResponse
-	(*StartChangeRequest)(nil),              // 12: rill.v1.StartChangeRequest
-	(*StartChangeResponse)(nil),             // 13: rill.v1.StartChangeResponse
-	(*SyncWorkspaceRequest)(nil),            // 14: rill.v1.SyncWorkspaceRequest
-	(*SyncWorkspaceResponse)(nil),           // 15: rill.v1.SyncWorkspaceResponse
-	(*HandoffWorkspaceRequest)(nil),         // 16: rill.v1.HandoffWorkspaceRequest
-	(*HandoffWorkspaceResponse)(nil),        // 17: rill.v1.HandoffWorkspaceResponse
-	(*UndoOperationRequest)(nil),            // 18: rill.v1.UndoOperationRequest
-	(*UndoOperationResponse)(nil),           // 19: rill.v1.UndoOperationResponse
-	(*ListWorkspaceOperationsRequest)(nil),  // 20: rill.v1.ListWorkspaceOperationsRequest
-	(*ListWorkspaceOperationsResponse)(nil), // 21: rill.v1.ListWorkspaceOperationsResponse
-	(*DiffWorkspaceRequest)(nil),            // 22: rill.v1.DiffWorkspaceRequest
-	(*DiffWorkspaceResponse)(nil),           // 23: rill.v1.DiffWorkspaceResponse
-	(*Workspace)(nil),                       // 24: rill.v1.Workspace
-	(*WorkspaceOperation)(nil),              // 25: rill.v1.WorkspaceOperation
-	(*Provenance)(nil),                      // 26: rill.v1.Provenance
-	(*ChangeInfo)(nil),                      // 27: rill.v1.ChangeInfo
-	(*ChangeVersion)(nil),                   // 28: rill.v1.ChangeVersion
-	(*Principal)(nil),                       // 29: rill.v1.Principal
-	(DiffFormat)(0),                         // 30: rill.v1.DiffFormat
-	(*FileDiff)(nil),                        // 31: rill.v1.FileDiff
+	(*WorkspaceEdits)(nil),                  // 11: rill.v1.WorkspaceEdits
+	(*SnapshotWorkspaceResponse)(nil),       // 12: rill.v1.SnapshotWorkspaceResponse
+	(*StartChangeRequest)(nil),              // 13: rill.v1.StartChangeRequest
+	(*StartChangeResponse)(nil),             // 14: rill.v1.StartChangeResponse
+	(*SyncWorkspaceRequest)(nil),            // 15: rill.v1.SyncWorkspaceRequest
+	(*SyncWorkspaceResponse)(nil),           // 16: rill.v1.SyncWorkspaceResponse
+	(*HandoffWorkspaceRequest)(nil),         // 17: rill.v1.HandoffWorkspaceRequest
+	(*HandoffWorkspaceResponse)(nil),        // 18: rill.v1.HandoffWorkspaceResponse
+	(*UndoOperationRequest)(nil),            // 19: rill.v1.UndoOperationRequest
+	(*UndoOperationResponse)(nil),           // 20: rill.v1.UndoOperationResponse
+	(*ListWorkspaceOperationsRequest)(nil),  // 21: rill.v1.ListWorkspaceOperationsRequest
+	(*ListWorkspaceOperationsResponse)(nil), // 22: rill.v1.ListWorkspaceOperationsResponse
+	(*DiffWorkspaceRequest)(nil),            // 23: rill.v1.DiffWorkspaceRequest
+	(*DiffWorkspaceResponse)(nil),           // 24: rill.v1.DiffWorkspaceResponse
+	(*Workspace)(nil),                       // 25: rill.v1.Workspace
+	(*WorkspaceOperation)(nil),              // 26: rill.v1.WorkspaceOperation
+	(*Edit)(nil),                            // 27: rill.v1.Edit
+	(*Provenance)(nil),                      // 28: rill.v1.Provenance
+	(*ChangeInfo)(nil),                      // 29: rill.v1.ChangeInfo
+	(*ChangeVersion)(nil),                   // 30: rill.v1.ChangeVersion
+	(*Principal)(nil),                       // 31: rill.v1.Principal
+	(DiffFormat)(0),                         // 32: rill.v1.DiffFormat
+	(*FileDiff)(nil),                        // 33: rill.v1.FileDiff
 }
 var file_rill_v1_workspace_proto_depIdxs = []int32{
-	24, // 0: rill.v1.CreateWorkspaceRequest.workspace:type_name -> rill.v1.Workspace
-	24, // 1: rill.v1.CreateWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
-	25, // 2: rill.v1.CreateWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
-	24, // 3: rill.v1.GetWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
-	24, // 4: rill.v1.ListWorkspacesResponse.workspaces:type_name -> rill.v1.Workspace
-	24, // 5: rill.v1.UpdateWorkspaceRequest.workspace:type_name -> rill.v1.Workspace
-	24, // 6: rill.v1.UpdateWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
-	25, // 7: rill.v1.UpdateWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
-	25, // 8: rill.v1.SnapshotWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
-	26, // 9: rill.v1.StartChangeRequest.provenance:type_name -> rill.v1.Provenance
-	27, // 10: rill.v1.StartChangeResponse.info:type_name -> rill.v1.ChangeInfo
-	28, // 11: rill.v1.StartChangeResponse.version:type_name -> rill.v1.ChangeVersion
-	25, // 12: rill.v1.StartChangeResponse.operation:type_name -> rill.v1.WorkspaceOperation
-	24, // 13: rill.v1.SyncWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
-	25, // 14: rill.v1.SyncWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
-	27, // 15: rill.v1.SyncWorkspaceResponse.info:type_name -> rill.v1.ChangeInfo
-	28, // 16: rill.v1.SyncWorkspaceResponse.version:type_name -> rill.v1.ChangeVersion
-	29, // 17: rill.v1.HandoffWorkspaceRequest.to:type_name -> rill.v1.Principal
-	24, // 18: rill.v1.HandoffWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
-	25, // 19: rill.v1.HandoffWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
-	24, // 20: rill.v1.UndoOperationResponse.workspace:type_name -> rill.v1.Workspace
-	25, // 21: rill.v1.UndoOperationResponse.operation:type_name -> rill.v1.WorkspaceOperation
-	25, // 22: rill.v1.ListWorkspaceOperationsResponse.operations:type_name -> rill.v1.WorkspaceOperation
-	30, // 23: rill.v1.DiffWorkspaceRequest.format:type_name -> rill.v1.DiffFormat
-	31, // 24: rill.v1.DiffWorkspaceResponse.files:type_name -> rill.v1.FileDiff
-	0,  // 25: rill.v1.WorkspaceService.CreateWorkspace:input_type -> rill.v1.CreateWorkspaceRequest
-	2,  // 26: rill.v1.WorkspaceService.GetWorkspace:input_type -> rill.v1.GetWorkspaceRequest
-	4,  // 27: rill.v1.WorkspaceService.ListWorkspaces:input_type -> rill.v1.ListWorkspacesRequest
-	6,  // 28: rill.v1.WorkspaceService.UpdateWorkspace:input_type -> rill.v1.UpdateWorkspaceRequest
-	8,  // 29: rill.v1.WorkspaceService.DeleteWorkspace:input_type -> rill.v1.DeleteWorkspaceRequest
-	10, // 30: rill.v1.WorkspaceService.SnapshotWorkspace:input_type -> rill.v1.SnapshotWorkspaceRequest
-	12, // 31: rill.v1.WorkspaceService.StartChange:input_type -> rill.v1.StartChangeRequest
-	14, // 32: rill.v1.WorkspaceService.SyncWorkspace:input_type -> rill.v1.SyncWorkspaceRequest
-	16, // 33: rill.v1.WorkspaceService.HandoffWorkspace:input_type -> rill.v1.HandoffWorkspaceRequest
-	18, // 34: rill.v1.WorkspaceService.UndoOperation:input_type -> rill.v1.UndoOperationRequest
-	20, // 35: rill.v1.WorkspaceService.ListWorkspaceOperations:input_type -> rill.v1.ListWorkspaceOperationsRequest
-	22, // 36: rill.v1.WorkspaceService.DiffWorkspace:input_type -> rill.v1.DiffWorkspaceRequest
-	1,  // 37: rill.v1.WorkspaceService.CreateWorkspace:output_type -> rill.v1.CreateWorkspaceResponse
-	3,  // 38: rill.v1.WorkspaceService.GetWorkspace:output_type -> rill.v1.GetWorkspaceResponse
-	5,  // 39: rill.v1.WorkspaceService.ListWorkspaces:output_type -> rill.v1.ListWorkspacesResponse
-	7,  // 40: rill.v1.WorkspaceService.UpdateWorkspace:output_type -> rill.v1.UpdateWorkspaceResponse
-	9,  // 41: rill.v1.WorkspaceService.DeleteWorkspace:output_type -> rill.v1.DeleteWorkspaceResponse
-	11, // 42: rill.v1.WorkspaceService.SnapshotWorkspace:output_type -> rill.v1.SnapshotWorkspaceResponse
-	13, // 43: rill.v1.WorkspaceService.StartChange:output_type -> rill.v1.StartChangeResponse
-	15, // 44: rill.v1.WorkspaceService.SyncWorkspace:output_type -> rill.v1.SyncWorkspaceResponse
-	17, // 45: rill.v1.WorkspaceService.HandoffWorkspace:output_type -> rill.v1.HandoffWorkspaceResponse
-	19, // 46: rill.v1.WorkspaceService.UndoOperation:output_type -> rill.v1.UndoOperationResponse
-	21, // 47: rill.v1.WorkspaceService.ListWorkspaceOperations:output_type -> rill.v1.ListWorkspaceOperationsResponse
-	23, // 48: rill.v1.WorkspaceService.DiffWorkspace:output_type -> rill.v1.DiffWorkspaceResponse
-	37, // [37:49] is the sub-list for method output_type
-	25, // [25:37] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	25, // 0: rill.v1.CreateWorkspaceRequest.workspace:type_name -> rill.v1.Workspace
+	25, // 1: rill.v1.CreateWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
+	26, // 2: rill.v1.CreateWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
+	25, // 3: rill.v1.GetWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
+	25, // 4: rill.v1.ListWorkspacesResponse.workspaces:type_name -> rill.v1.Workspace
+	25, // 5: rill.v1.UpdateWorkspaceRequest.workspace:type_name -> rill.v1.Workspace
+	25, // 6: rill.v1.UpdateWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
+	26, // 7: rill.v1.UpdateWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
+	11, // 8: rill.v1.SnapshotWorkspaceRequest.edits:type_name -> rill.v1.WorkspaceEdits
+	27, // 9: rill.v1.WorkspaceEdits.edits:type_name -> rill.v1.Edit
+	26, // 10: rill.v1.SnapshotWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
+	28, // 11: rill.v1.StartChangeRequest.provenance:type_name -> rill.v1.Provenance
+	29, // 12: rill.v1.StartChangeResponse.info:type_name -> rill.v1.ChangeInfo
+	30, // 13: rill.v1.StartChangeResponse.version:type_name -> rill.v1.ChangeVersion
+	26, // 14: rill.v1.StartChangeResponse.operation:type_name -> rill.v1.WorkspaceOperation
+	25, // 15: rill.v1.SyncWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
+	26, // 16: rill.v1.SyncWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
+	29, // 17: rill.v1.SyncWorkspaceResponse.info:type_name -> rill.v1.ChangeInfo
+	30, // 18: rill.v1.SyncWorkspaceResponse.version:type_name -> rill.v1.ChangeVersion
+	31, // 19: rill.v1.HandoffWorkspaceRequest.to:type_name -> rill.v1.Principal
+	25, // 20: rill.v1.HandoffWorkspaceResponse.workspace:type_name -> rill.v1.Workspace
+	26, // 21: rill.v1.HandoffWorkspaceResponse.operation:type_name -> rill.v1.WorkspaceOperation
+	25, // 22: rill.v1.UndoOperationResponse.workspace:type_name -> rill.v1.Workspace
+	26, // 23: rill.v1.UndoOperationResponse.operation:type_name -> rill.v1.WorkspaceOperation
+	26, // 24: rill.v1.ListWorkspaceOperationsResponse.operations:type_name -> rill.v1.WorkspaceOperation
+	32, // 25: rill.v1.DiffWorkspaceRequest.format:type_name -> rill.v1.DiffFormat
+	33, // 26: rill.v1.DiffWorkspaceResponse.files:type_name -> rill.v1.FileDiff
+	0,  // 27: rill.v1.WorkspaceService.CreateWorkspace:input_type -> rill.v1.CreateWorkspaceRequest
+	2,  // 28: rill.v1.WorkspaceService.GetWorkspace:input_type -> rill.v1.GetWorkspaceRequest
+	4,  // 29: rill.v1.WorkspaceService.ListWorkspaces:input_type -> rill.v1.ListWorkspacesRequest
+	6,  // 30: rill.v1.WorkspaceService.UpdateWorkspace:input_type -> rill.v1.UpdateWorkspaceRequest
+	8,  // 31: rill.v1.WorkspaceService.DeleteWorkspace:input_type -> rill.v1.DeleteWorkspaceRequest
+	10, // 32: rill.v1.WorkspaceService.SnapshotWorkspace:input_type -> rill.v1.SnapshotWorkspaceRequest
+	13, // 33: rill.v1.WorkspaceService.StartChange:input_type -> rill.v1.StartChangeRequest
+	15, // 34: rill.v1.WorkspaceService.SyncWorkspace:input_type -> rill.v1.SyncWorkspaceRequest
+	17, // 35: rill.v1.WorkspaceService.HandoffWorkspace:input_type -> rill.v1.HandoffWorkspaceRequest
+	19, // 36: rill.v1.WorkspaceService.UndoOperation:input_type -> rill.v1.UndoOperationRequest
+	21, // 37: rill.v1.WorkspaceService.ListWorkspaceOperations:input_type -> rill.v1.ListWorkspaceOperationsRequest
+	23, // 38: rill.v1.WorkspaceService.DiffWorkspace:input_type -> rill.v1.DiffWorkspaceRequest
+	1,  // 39: rill.v1.WorkspaceService.CreateWorkspace:output_type -> rill.v1.CreateWorkspaceResponse
+	3,  // 40: rill.v1.WorkspaceService.GetWorkspace:output_type -> rill.v1.GetWorkspaceResponse
+	5,  // 41: rill.v1.WorkspaceService.ListWorkspaces:output_type -> rill.v1.ListWorkspacesResponse
+	7,  // 42: rill.v1.WorkspaceService.UpdateWorkspace:output_type -> rill.v1.UpdateWorkspaceResponse
+	9,  // 43: rill.v1.WorkspaceService.DeleteWorkspace:output_type -> rill.v1.DeleteWorkspaceResponse
+	12, // 44: rill.v1.WorkspaceService.SnapshotWorkspace:output_type -> rill.v1.SnapshotWorkspaceResponse
+	14, // 45: rill.v1.WorkspaceService.StartChange:output_type -> rill.v1.StartChangeResponse
+	16, // 46: rill.v1.WorkspaceService.SyncWorkspace:output_type -> rill.v1.SyncWorkspaceResponse
+	18, // 47: rill.v1.WorkspaceService.HandoffWorkspace:output_type -> rill.v1.HandoffWorkspaceResponse
+	20, // 48: rill.v1.WorkspaceService.UndoOperation:output_type -> rill.v1.UndoOperationResponse
+	22, // 49: rill.v1.WorkspaceService.ListWorkspaceOperations:output_type -> rill.v1.ListWorkspaceOperationsResponse
+	24, // 50: rill.v1.WorkspaceService.DiffWorkspace:output_type -> rill.v1.DiffWorkspaceResponse
+	39, // [39:51] is the sub-list for method output_type
+	27, // [27:39] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_workspace_proto_init() }
@@ -1634,14 +1749,19 @@ func file_rill_v1_workspace_proto_init() {
 	if File_rill_v1_workspace_proto != nil {
 		return
 	}
+	file_rill_v1_changes_proto_init()
 	file_rill_v1_types_proto_init()
+	file_rill_v1_workspace_proto_msgTypes[10].OneofWrappers = []any{
+		(*SnapshotWorkspaceRequest_TreeHash)(nil),
+		(*SnapshotWorkspaceRequest_Edits)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_workspace_proto_rawDesc), len(file_rill_v1_workspace_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

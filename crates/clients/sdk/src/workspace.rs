@@ -7,28 +7,29 @@ use rill_types::{
     Operation, OperationId, Principal, RepoPathBuf, SparseProfile, TreeHash, Workspace, WorkspaceId,
 };
 
-use crate::client::Client;
 use crate::error::Result;
 use crate::names;
+use crate::repo::RepoClient;
 use crate::types::{
-    DiffFormat, FileDiff, NewChange, NewChangeResult, Page, Root, UpdateBaseResult,
+    DiffFormat, Edit, FileDiff, NewChange, NewChangeResult, Page, Root, UpdateBaseResult,
     WorkspaceFilter, WorkspaceOp,
 };
 
 /// Workspace operations on one repository.
 #[derive(Clone, Debug)]
 pub struct WorkspaceClient {
-    client: Client,
+    owner: RepoClient,
     repo: String,
 }
 
 impl WorkspaceClient {
-    pub(crate) fn new(client: Client, repo: String) -> Self {
-        WorkspaceClient { client, repo }
+    pub(crate) fn new(owner: RepoClient) -> Self {
+        let repo = owner.resource().to_string();
+        WorkspaceClient { owner, repo }
     }
 
     fn svc(&self) -> crate::client::WorkspaceSvc {
-        self.client.workspace_svc()
+        self.owner.client().workspace_svc()
     }
 
     fn name(&self, id: &WorkspaceId) -> String {
@@ -167,7 +168,45 @@ impl WorkspaceClient {
         let request = pb::SnapshotWorkspaceRequest {
             request_id: names::request_id(&op),
             name: self.name(&workspace),
-            tree_hash: hash_to_proto(&tree),
+            source: Some(pb::snapshot_workspace_request::Source::TreeHash(
+                hash_to_proto(&tree),
+            )),
+            etag: String::new(),
+        };
+        let resp = crate::client::retry_idempotent(|| {
+            let (svc, request) = (self.svc(), request.clone());
+            async move { svc.snapshot_workspace(request).await }
+        })
+        .await?
+        .into_owned();
+        Ok(required("snapshot_workspace.operation", resp.operation)?.try_into()?)
+    }
+
+    /// Record edits as the workspace's snapshot; the server builds the
+    /// tree. `from_base` applies them to the base, replacing the snapshot,
+    /// rather than to the current snapshot. `etag` makes it conditional on
+    /// the workspace not having changed. Patch edits are refused.
+    pub async fn snapshot_edits(
+        &self,
+        workspace: WorkspaceId,
+        edits: Vec<Edit>,
+        from_base: bool,
+        etag: Option<&str>,
+    ) -> Result<Operation> {
+        let mut wire = Vec::with_capacity(edits.len());
+        for edit in edits {
+            wire.push(self.owner.edit_to_proto(edit).await?);
+        }
+        let request = pb::SnapshotWorkspaceRequest {
+            request_id: names::request_id(&OperationId::new()),
+            name: self.name(&workspace),
+            source: Some(pb::snapshot_workspace_request::Source::Edits(
+                pb::WorkspaceEdits {
+                    from_base,
+                    edits: wire,
+                },
+            )),
+            etag: etag.unwrap_or_default().to_string(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());

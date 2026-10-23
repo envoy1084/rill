@@ -22,64 +22,67 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from rill.v1 import changes_pb2 as rill_dot_v1_dot_changes__pb2
 from rill.v1 import types_pb2 as rill_dot_v1_dot_types__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17rill/v1/workspace.proto\x12\x07rill.v1\x1a\x13rill/v1/types.proto\"\x95\x01\n\x16\x43reateWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x16\n\x06parent\x18\x02 \x01(\tR\x06parent\x12\x30\n\tworkspace\x18\x03 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x12\n\x04\x62\x61se\x18\x04 \x01(\tR\x04\x62\x61se\"\x86\x01\n\x17\x43reateWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\")\n\x13GetWorkspaceRequest\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\"H\n\x14GetWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\"\x83\x01\n\x15ListWorkspacesRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1b\n\tpage_size\x18\x02 \x01(\x05R\x08pageSize\x12\x1d\n\npage_token\x18\x03 \x01(\tR\tpageToken\x12\x16\n\x06\x66ilter\x18\x04 \x01(\tR\x06\x66ilter\"t\n\x16ListWorkspacesResponse\x12\x32\n\nworkspaces\x18\x01 \x03(\x0b\x32\x12.rill.v1.WorkspaceR\nworkspaces\x12&\n\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"}\n\x16UpdateWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x30\n\tworkspace\x18\x02 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x12\n\x04\x65tag\x18\x03 \x01(\tR\x04\x65tag\"\x86\x01\n\x17UpdateWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"_\n\x16\x44\x65leteWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n\x04\x65tag\x18\x03 \x01(\tR\x04\x65tag\"\x19\n\x17\x44\x65leteWorkspaceResponse\"j\n\x18SnapshotWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n\ttree_hash\x18\x03 \x01(\x0cR\x08treeHash\"V\n\x19SnapshotWorkspaceResponse\x12\x39\n\toperation\x18\x01 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"\xae\x01\n\x12StartChangeRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n\x07message\x18\x03 \x01(\tR\x07message\x12\x16\n\x06intent\x18\x04 \x01(\tR\x06intent\x12\x33\n\nprovenance\x18\x05 \x01(\x0b\x32\x13.rill.v1.ProvenanceR\nprovenance\"\xc3\x01\n\x13StartChangeResponse\x12\x16\n\x06\x63hange\x18\x01 \x01(\tR\x06\x63hange\x12\'\n\x04info\x18\x02 \x01(\x0b\x32\x13.rill.v1.ChangeInfoR\x04info\x12\x30\n\x07version\x18\x03 \x01(\x0b\x32\x16.rill.v1.ChangeVersionR\x07version\x12\x39\n\toperation\x18\x04 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"]\n\x14SyncWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n\x04\x62\x61se\x18\x03 \x01(\tR\x04\x62\x61se\"\xdf\x01\n\x15SyncWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\x12\'\n\x04info\x18\x03 \x01(\x0b\x32\x13.rill.v1.ChangeInfoR\x04info\x12\x30\n\x07version\x18\x04 \x01(\x0b\x32\x16.rill.v1.ChangeVersionR\x07version\"p\n\x17HandoffWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\"\n\x02to\x18\x03 \x01(\x0b\x32\x12.rill.v1.PrincipalR\x02to\"\x87\x01\n\x18HandoffWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"I\n\x14UndoOperationRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\"\x84\x01\n\x15UndoOperationResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"t\n\x1eListWorkspaceOperationsRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1b\n\tpage_size\x18\x02 \x01(\x05R\x08pageSize\x12\x1d\n\npage_token\x18\x03 \x01(\tR\tpageToken\"\x86\x01\n\x1fListWorkspaceOperationsResponse\x12;\n\noperations\x18\x01 \x03(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\noperations\x12&\n\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x92\x01\n\x14\x44iffWorkspaceRequest\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n\x05paths\x18\x02 \x03(\tR\x05paths\x12+\n\x06\x66ormat\x18\x03 \x01(\x0e\x32\x13.rill.v1.DiffFormatR\x06\x66ormat\x12#\n\rcontext_lines\x18\x04 \x01(\rR\x0c\x63ontextLines\"@\n\x15\x44iffWorkspaceResponse\x12\'\n\x05\x66iles\x18\x01 \x03(\x0b\x32\x11.rill.v1.FileDiffR\x05\x66iles2\x91\x08\n\x10WorkspaceService\x12T\n\x0f\x43reateWorkspace\x12\x1f.rill.v1.CreateWorkspaceRequest\x1a .rill.v1.CreateWorkspaceResponse\x12K\n\x0cGetWorkspace\x12\x1c.rill.v1.GetWorkspaceRequest\x1a\x1d.rill.v1.GetWorkspaceResponse\x12Q\n\x0eListWorkspaces\x12\x1e.rill.v1.ListWorkspacesRequest\x1a\x1f.rill.v1.ListWorkspacesResponse\x12T\n\x0fUpdateWorkspace\x12\x1f.rill.v1.UpdateWorkspaceRequest\x1a .rill.v1.UpdateWorkspaceResponse\x12T\n\x0f\x44\x65leteWorkspace\x12\x1f.rill.v1.DeleteWorkspaceRequest\x1a .rill.v1.DeleteWorkspaceResponse\x12Z\n\x11SnapshotWorkspace\x12!.rill.v1.SnapshotWorkspaceRequest\x1a\".rill.v1.SnapshotWorkspaceResponse\x12H\n\x0bStartChange\x12\x1b.rill.v1.StartChangeRequest\x1a\x1c.rill.v1.StartChangeResponse\x12N\n\rSyncWorkspace\x12\x1d.rill.v1.SyncWorkspaceRequest\x1a\x1e.rill.v1.SyncWorkspaceResponse\x12W\n\x10HandoffWorkspace\x12 .rill.v1.HandoffWorkspaceRequest\x1a!.rill.v1.HandoffWorkspaceResponse\x12N\n\rUndoOperation\x12\x1d.rill.v1.UndoOperationRequest\x1a\x1e.rill.v1.UndoOperationResponse\x12l\n\x17ListWorkspaceOperations\x12\'.rill.v1.ListWorkspaceOperationsRequest\x1a(.rill.v1.ListWorkspaceOperationsResponse\x12N\n\rDiffWorkspace\x12\x1d.rill.v1.DiffWorkspaceRequest\x1a\x1e.rill.v1.DiffWorkspaceResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17rill/v1/workspace.proto\x12\x07rill.v1\x1a\x15rill/v1/changes.proto\x1a\x13rill/v1/types.proto\"\x95\x01\n\x16\x43reateWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x16\n\x06parent\x18\x02 \x01(\tR\x06parent\x12\x30\n\tworkspace\x18\x03 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x12\n\x04\x62\x61se\x18\x04 \x01(\tR\x04\x62\x61se\"\x86\x01\n\x17\x43reateWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\")\n\x13GetWorkspaceRequest\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\"H\n\x14GetWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\"\x83\x01\n\x15ListWorkspacesRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1b\n\tpage_size\x18\x02 \x01(\x05R\x08pageSize\x12\x1d\n\npage_token\x18\x03 \x01(\tR\tpageToken\x12\x16\n\x06\x66ilter\x18\x04 \x01(\tR\x06\x66ilter\"t\n\x16ListWorkspacesResponse\x12\x32\n\nworkspaces\x18\x01 \x03(\x0b\x32\x12.rill.v1.WorkspaceR\nworkspaces\x12&\n\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"}\n\x16UpdateWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x30\n\tworkspace\x18\x02 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x12\n\x04\x65tag\x18\x03 \x01(\tR\x04\x65tag\"\x86\x01\n\x17UpdateWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"_\n\x16\x44\x65leteWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n\x04\x65tag\x18\x03 \x01(\tR\x04\x65tag\"\x19\n\x17\x44\x65leteWorkspaceResponse\"\xbb\x01\n\x18SnapshotWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n\ttree_hash\x18\x03 \x01(\x0cH\x00R\x08treeHash\x12/\n\x05\x65\x64its\x18\x04 \x01(\x0b\x32\x17.rill.v1.WorkspaceEditsH\x00R\x05\x65\x64its\x12\x12\n\x04\x65tag\x18\x05 \x01(\tR\x04\x65tagB\x08\n\x06source\"R\n\x0eWorkspaceEdits\x12\x1b\n\tfrom_base\x18\x01 \x01(\x08R\x08\x66romBase\x12#\n\x05\x65\x64its\x18\x02 \x03(\x0b\x32\r.rill.v1.EditR\x05\x65\x64its\"V\n\x19SnapshotWorkspaceResponse\x12\x39\n\toperation\x18\x01 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"\xae\x01\n\x12StartChangeRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n\x07message\x18\x03 \x01(\tR\x07message\x12\x16\n\x06intent\x18\x04 \x01(\tR\x06intent\x12\x33\n\nprovenance\x18\x05 \x01(\x0b\x32\x13.rill.v1.ProvenanceR\nprovenance\"\xc3\x01\n\x13StartChangeResponse\x12\x16\n\x06\x63hange\x18\x01 \x01(\tR\x06\x63hange\x12\'\n\x04info\x18\x02 \x01(\x0b\x32\x13.rill.v1.ChangeInfoR\x04info\x12\x30\n\x07version\x18\x03 \x01(\x0b\x32\x16.rill.v1.ChangeVersionR\x07version\x12\x39\n\toperation\x18\x04 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"]\n\x14SyncWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n\x04\x62\x61se\x18\x03 \x01(\tR\x04\x62\x61se\"\xdf\x01\n\x15SyncWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\x12\'\n\x04info\x18\x03 \x01(\x0b\x32\x13.rill.v1.ChangeInfoR\x04info\x12\x30\n\x07version\x18\x04 \x01(\x0b\x32\x16.rill.v1.ChangeVersionR\x07version\"p\n\x17HandoffWorkspaceRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\"\n\x02to\x18\x03 \x01(\x0b\x32\x12.rill.v1.PrincipalR\x02to\"\x87\x01\n\x18HandoffWorkspaceResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"I\n\x14UndoOperationRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\"\x84\x01\n\x15UndoOperationResponse\x12\x30\n\tworkspace\x18\x01 \x01(\x0b\x32\x12.rill.v1.WorkspaceR\tworkspace\x12\x39\n\toperation\x18\x02 \x01(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\toperation\"t\n\x1eListWorkspaceOperationsRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1b\n\tpage_size\x18\x02 \x01(\x05R\x08pageSize\x12\x1d\n\npage_token\x18\x03 \x01(\tR\tpageToken\"\x86\x01\n\x1fListWorkspaceOperationsResponse\x12;\n\noperations\x18\x01 \x03(\x0b\x32\x1b.rill.v1.WorkspaceOperationR\noperations\x12&\n\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x92\x01\n\x14\x44iffWorkspaceRequest\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n\x05paths\x18\x02 \x03(\tR\x05paths\x12+\n\x06\x66ormat\x18\x03 \x01(\x0e\x32\x13.rill.v1.DiffFormatR\x06\x66ormat\x12#\n\rcontext_lines\x18\x04 \x01(\rR\x0c\x63ontextLines\"@\n\x15\x44iffWorkspaceResponse\x12\'\n\x05\x66iles\x18\x01 \x03(\x0b\x32\x11.rill.v1.FileDiffR\x05\x66iles2\x91\x08\n\x10WorkspaceService\x12T\n\x0f\x43reateWorkspace\x12\x1f.rill.v1.CreateWorkspaceRequest\x1a .rill.v1.CreateWorkspaceResponse\x12K\n\x0cGetWorkspace\x12\x1c.rill.v1.GetWorkspaceRequest\x1a\x1d.rill.v1.GetWorkspaceResponse\x12Q\n\x0eListWorkspaces\x12\x1e.rill.v1.ListWorkspacesRequest\x1a\x1f.rill.v1.ListWorkspacesResponse\x12T\n\x0fUpdateWorkspace\x12\x1f.rill.v1.UpdateWorkspaceRequest\x1a .rill.v1.UpdateWorkspaceResponse\x12T\n\x0f\x44\x65leteWorkspace\x12\x1f.rill.v1.DeleteWorkspaceRequest\x1a .rill.v1.DeleteWorkspaceResponse\x12Z\n\x11SnapshotWorkspace\x12!.rill.v1.SnapshotWorkspaceRequest\x1a\".rill.v1.SnapshotWorkspaceResponse\x12H\n\x0bStartChange\x12\x1b.rill.v1.StartChangeRequest\x1a\x1c.rill.v1.StartChangeResponse\x12N\n\rSyncWorkspace\x12\x1d.rill.v1.SyncWorkspaceRequest\x1a\x1e.rill.v1.SyncWorkspaceResponse\x12W\n\x10HandoffWorkspace\x12 .rill.v1.HandoffWorkspaceRequest\x1a!.rill.v1.HandoffWorkspaceResponse\x12N\n\rUndoOperation\x12\x1d.rill.v1.UndoOperationRequest\x1a\x1e.rill.v1.UndoOperationResponse\x12l\n\x17ListWorkspaceOperations\x12\'.rill.v1.ListWorkspaceOperationsRequest\x1a(.rill.v1.ListWorkspaceOperationsResponse\x12N\n\rDiffWorkspace\x12\x1d.rill.v1.DiffWorkspaceRequest\x1a\x1e.rill.v1.DiffWorkspaceResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'rill.v1.workspace_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_CREATEWORKSPACEREQUEST']._serialized_start=58
-  _globals['_CREATEWORKSPACEREQUEST']._serialized_end=207
-  _globals['_CREATEWORKSPACERESPONSE']._serialized_start=210
-  _globals['_CREATEWORKSPACERESPONSE']._serialized_end=344
-  _globals['_GETWORKSPACEREQUEST']._serialized_start=346
-  _globals['_GETWORKSPACEREQUEST']._serialized_end=387
-  _globals['_GETWORKSPACERESPONSE']._serialized_start=389
-  _globals['_GETWORKSPACERESPONSE']._serialized_end=461
-  _globals['_LISTWORKSPACESREQUEST']._serialized_start=464
-  _globals['_LISTWORKSPACESREQUEST']._serialized_end=595
-  _globals['_LISTWORKSPACESRESPONSE']._serialized_start=597
-  _globals['_LISTWORKSPACESRESPONSE']._serialized_end=713
-  _globals['_UPDATEWORKSPACEREQUEST']._serialized_start=715
-  _globals['_UPDATEWORKSPACEREQUEST']._serialized_end=840
-  _globals['_UPDATEWORKSPACERESPONSE']._serialized_start=843
-  _globals['_UPDATEWORKSPACERESPONSE']._serialized_end=977
-  _globals['_DELETEWORKSPACEREQUEST']._serialized_start=979
-  _globals['_DELETEWORKSPACEREQUEST']._serialized_end=1074
-  _globals['_DELETEWORKSPACERESPONSE']._serialized_start=1076
-  _globals['_DELETEWORKSPACERESPONSE']._serialized_end=1101
-  _globals['_SNAPSHOTWORKSPACEREQUEST']._serialized_start=1103
-  _globals['_SNAPSHOTWORKSPACEREQUEST']._serialized_end=1209
-  _globals['_SNAPSHOTWORKSPACERESPONSE']._serialized_start=1211
-  _globals['_SNAPSHOTWORKSPACERESPONSE']._serialized_end=1297
-  _globals['_STARTCHANGEREQUEST']._serialized_start=1300
-  _globals['_STARTCHANGEREQUEST']._serialized_end=1474
-  _globals['_STARTCHANGERESPONSE']._serialized_start=1477
-  _globals['_STARTCHANGERESPONSE']._serialized_end=1672
-  _globals['_SYNCWORKSPACEREQUEST']._serialized_start=1674
-  _globals['_SYNCWORKSPACEREQUEST']._serialized_end=1767
-  _globals['_SYNCWORKSPACERESPONSE']._serialized_start=1770
-  _globals['_SYNCWORKSPACERESPONSE']._serialized_end=1993
-  _globals['_HANDOFFWORKSPACEREQUEST']._serialized_start=1995
-  _globals['_HANDOFFWORKSPACEREQUEST']._serialized_end=2107
-  _globals['_HANDOFFWORKSPACERESPONSE']._serialized_start=2110
-  _globals['_HANDOFFWORKSPACERESPONSE']._serialized_end=2245
-  _globals['_UNDOOPERATIONREQUEST']._serialized_start=2247
-  _globals['_UNDOOPERATIONREQUEST']._serialized_end=2320
-  _globals['_UNDOOPERATIONRESPONSE']._serialized_start=2323
-  _globals['_UNDOOPERATIONRESPONSE']._serialized_end=2455
-  _globals['_LISTWORKSPACEOPERATIONSREQUEST']._serialized_start=2457
-  _globals['_LISTWORKSPACEOPERATIONSREQUEST']._serialized_end=2573
-  _globals['_LISTWORKSPACEOPERATIONSRESPONSE']._serialized_start=2576
-  _globals['_LISTWORKSPACEOPERATIONSRESPONSE']._serialized_end=2710
-  _globals['_DIFFWORKSPACEREQUEST']._serialized_start=2713
-  _globals['_DIFFWORKSPACEREQUEST']._serialized_end=2859
-  _globals['_DIFFWORKSPACERESPONSE']._serialized_start=2861
-  _globals['_DIFFWORKSPACERESPONSE']._serialized_end=2925
-  _globals['_WORKSPACESERVICE']._serialized_start=2928
-  _globals['_WORKSPACESERVICE']._serialized_end=3969
+  _globals['_CREATEWORKSPACEREQUEST']._serialized_start=81
+  _globals['_CREATEWORKSPACEREQUEST']._serialized_end=230
+  _globals['_CREATEWORKSPACERESPONSE']._serialized_start=233
+  _globals['_CREATEWORKSPACERESPONSE']._serialized_end=367
+  _globals['_GETWORKSPACEREQUEST']._serialized_start=369
+  _globals['_GETWORKSPACEREQUEST']._serialized_end=410
+  _globals['_GETWORKSPACERESPONSE']._serialized_start=412
+  _globals['_GETWORKSPACERESPONSE']._serialized_end=484
+  _globals['_LISTWORKSPACESREQUEST']._serialized_start=487
+  _globals['_LISTWORKSPACESREQUEST']._serialized_end=618
+  _globals['_LISTWORKSPACESRESPONSE']._serialized_start=620
+  _globals['_LISTWORKSPACESRESPONSE']._serialized_end=736
+  _globals['_UPDATEWORKSPACEREQUEST']._serialized_start=738
+  _globals['_UPDATEWORKSPACEREQUEST']._serialized_end=863
+  _globals['_UPDATEWORKSPACERESPONSE']._serialized_start=866
+  _globals['_UPDATEWORKSPACERESPONSE']._serialized_end=1000
+  _globals['_DELETEWORKSPACEREQUEST']._serialized_start=1002
+  _globals['_DELETEWORKSPACEREQUEST']._serialized_end=1097
+  _globals['_DELETEWORKSPACERESPONSE']._serialized_start=1099
+  _globals['_DELETEWORKSPACERESPONSE']._serialized_end=1124
+  _globals['_SNAPSHOTWORKSPACEREQUEST']._serialized_start=1127
+  _globals['_SNAPSHOTWORKSPACEREQUEST']._serialized_end=1314
+  _globals['_WORKSPACEEDITS']._serialized_start=1316
+  _globals['_WORKSPACEEDITS']._serialized_end=1398
+  _globals['_SNAPSHOTWORKSPACERESPONSE']._serialized_start=1400
+  _globals['_SNAPSHOTWORKSPACERESPONSE']._serialized_end=1486
+  _globals['_STARTCHANGEREQUEST']._serialized_start=1489
+  _globals['_STARTCHANGEREQUEST']._serialized_end=1663
+  _globals['_STARTCHANGERESPONSE']._serialized_start=1666
+  _globals['_STARTCHANGERESPONSE']._serialized_end=1861
+  _globals['_SYNCWORKSPACEREQUEST']._serialized_start=1863
+  _globals['_SYNCWORKSPACEREQUEST']._serialized_end=1956
+  _globals['_SYNCWORKSPACERESPONSE']._serialized_start=1959
+  _globals['_SYNCWORKSPACERESPONSE']._serialized_end=2182
+  _globals['_HANDOFFWORKSPACEREQUEST']._serialized_start=2184
+  _globals['_HANDOFFWORKSPACEREQUEST']._serialized_end=2296
+  _globals['_HANDOFFWORKSPACERESPONSE']._serialized_start=2299
+  _globals['_HANDOFFWORKSPACERESPONSE']._serialized_end=2434
+  _globals['_UNDOOPERATIONREQUEST']._serialized_start=2436
+  _globals['_UNDOOPERATIONREQUEST']._serialized_end=2509
+  _globals['_UNDOOPERATIONRESPONSE']._serialized_start=2512
+  _globals['_UNDOOPERATIONRESPONSE']._serialized_end=2644
+  _globals['_LISTWORKSPACEOPERATIONSREQUEST']._serialized_start=2646
+  _globals['_LISTWORKSPACEOPERATIONSREQUEST']._serialized_end=2762
+  _globals['_LISTWORKSPACEOPERATIONSRESPONSE']._serialized_start=2765
+  _globals['_LISTWORKSPACEOPERATIONSRESPONSE']._serialized_end=2899
+  _globals['_DIFFWORKSPACEREQUEST']._serialized_start=2902
+  _globals['_DIFFWORKSPACEREQUEST']._serialized_end=3048
+  _globals['_DIFFWORKSPACERESPONSE']._serialized_start=3050
+  _globals['_DIFFWORKSPACERESPONSE']._serialized_end=3114
+  _globals['_WORKSPACESERVICE']._serialized_start=3117
+  _globals['_WORKSPACESERVICE']._serialized_end=4158
 # @@protoc_insertion_point(module_scope)

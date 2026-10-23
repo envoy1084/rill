@@ -285,10 +285,27 @@ async fn edit_base(
     }
 }
 
-async fn set_content(
+pub(crate) async fn set_content(
     objects: &dyn rill_store::ObjectStore,
     set: pb::SetContent,
 ) -> Result<FileChange> {
+    let copy_from = match set.copy_from.clone().into_option() {
+        Some(c) => Some(rill_types::objects::change::CopySource::try_from(c)?),
+        None => None,
+    };
+    let (content, kind) = stored_content(objects, set).await?;
+    Ok(FileChange::Set {
+        content,
+        kind,
+        copy_from,
+    })
+}
+
+/// The content and kind a `SetContent` names, checked to exist.
+pub(crate) async fn stored_content(
+    objects: &dyn rill_store::ObjectStore,
+    set: pb::SetContent,
+) -> Result<(ContentRef, FileKind)> {
     let content = ContentRef::try_from(
         set.content
             .into_option()
@@ -305,15 +322,7 @@ async fn set_content(
     };
     let kind = rill_proto::convert::file_kind_from_proto("set_content.kind", set.kind)
         .unwrap_or(FileKind::Regular);
-    let copy_from = match set.copy_from.into_option() {
-        Some(c) => Some(rill_types::objects::change::CopySource::try_from(c)?),
-        None => None,
-    };
-    Ok(FileChange::Set {
-        content,
-        kind,
-        copy_from,
-    })
+    Ok((content, kind))
 }
 
 fn merge_provenance(target: &mut Provenance, previous: &Provenance) {

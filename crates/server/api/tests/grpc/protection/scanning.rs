@@ -110,7 +110,10 @@ async fn a_planted_secret_is_blocked_at_every_write() {
         .snapshot_workspace(pb::SnapshotWorkspaceRequest {
             request_id: String::new(),
             name: ws.name.clone(),
-            tree_hash: Bytes::copy_from_slice(tree.as_bytes()),
+            source: Some(pb::snapshot_workspace_request::Source::TreeHash(
+                Bytes::copy_from_slice(tree.as_bytes()),
+            )),
+            etag: String::new(),
         })
         .await
         .unwrap();

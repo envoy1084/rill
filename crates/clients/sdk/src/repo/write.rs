@@ -95,11 +95,19 @@ impl RepoClient {
         VersionResult::from_parts(resp.info.into_option(), resp.version.into_option())
     }
 
-    async fn edit_to_proto(&self, edit: Edit) -> Result<pb::Edit> {
+    pub(crate) async fn edit_to_proto(&self, edit: Edit) -> Result<pb::Edit> {
         let (path, op) = match edit {
             Edit::Set { path, bytes, kind } => (
                 path,
                 pb::edit::Op::SetContent(stored_set(self, bytes, kind).await?),
+            ),
+            Edit::Stored {
+                path,
+                content,
+                kind,
+            } => (
+                path,
+                pb::edit::Op::SetContent(crate::types::set_content_proto(content, kind)),
             ),
             Edit::Delete { path } => (path, pb::edit::Op::Delete(true)),
             Edit::Patch { path, unified } => (path, pb::edit::Op::Patch(unified)),

@@ -63,7 +63,7 @@ needs `write(root)`. Every other mutating RPC loads the record through
 | RPC | `OperationKind` | Effect |
 | --- | --- | --- |
 | `CreateWorkspace` | `Create` | `base` resolved from the optional `RootSpec` (trunk head when absent, `ZERO` when the repo is empty; a tree hash is `InvalidArgument`). Fresh `working_change`. |
-| `SnapshotWorkspace` | `Snapshot { tree }` | Sets `snapshot`. The tree must already be stored, else `FailedPrecondition`. |
+| `SnapshotWorkspace` | `Snapshot { tree }` | Sets `snapshot`, either to a stored tree (else `FailedPrecondition`) or to a tree the server builds from `edits` (content set or deleted per path, each needing `write(path)`; patches are `InvalidArgument`). Edits apply to the current snapshot (the base when there is none), or to the base with `from_base`. An `etag` makes it conditional; the client daemon syncs this way. |
 | `StartChange` | `NewChange { change, base }` | See below. |
 | `SyncWorkspace` | `Rebase { from, to }` | See below. |
 | `UpdateWorkspace` | `SetSparse { profile }` | Replaces `sparse`. |
@@ -125,7 +125,7 @@ history.
 
 * `UndoOperation` sees only the latest 1000 operations. Undoing a `Handoff`
   returns the workspace to its previous owner.
-* `SnapshotWorkspace` checks that the root tree exists. It does not check that the
+* `SnapshotWorkspace` with a tree hash checks that the root tree exists. It does not check that the
   tree's blobs exist or that the tree respects the sparse profile. The
   server never filters a snapshot or a `StartChange` diff by profile.
 * `DeleteWorkspace` removes only the record. The operation log and index

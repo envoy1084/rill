@@ -1,17 +1,21 @@
 //! Snapshots, turning them into change versions, moving the base and
 //! diffing the working copy.
 
+use pb::snapshot_workspace_request::Source;
+use rill_core::tree::Edit as TreeEdit;
+use rill_core::TreeBuilder;
 use rill_core::{diff_trees, rebase};
 use rill_proto::rill::v1 as pb;
 use rill_store::ObjectStoreExt;
-use rill_types::{ChangeId, Encodable, OperationKind, Timestamp};
+use rill_types::{ChangeId, Encodable, OperationKind, Timestamp, TreeHash};
 
 use super::oplog::{
-    base_of, base_root, commit_with_operation, operation, operation_proto, response_pair,
+    base_of, base_root, check_etag, commit_with_operation, operation, operation_proto,
+    response_pair,
 };
 use super::WorkspaceSvc;
-use crate::services::changes::version_from_diff;
-use crate::services::common::{self, open_repo, provenance};
+use crate::services::changes::{stored_content, version_from_diff};
+use crate::services::common::{self, open_repo, path, provenance, Opened};
 use crate::services::diff::{file_diffs, DiffOptions};
 use crate::services::{names, Call};
 use rill_runtime::error::{Error, Result};
@@ -24,11 +28,27 @@ impl WorkspaceSvc {
         let opened = open_repo(&self.state, &request, &request.get_ref().name).await?;
         let req = request.into_inner();
         let before = self.load_mut(&opened, &req.name).await?;
+        check_etag(&before, &req.etag)?;
         let mut ws = before.clone();
-        let tree = common::hash("tree_hash", &req.tree_hash)?;
-        opened.repo.trees.get_tree(&tree).await.map_err(|_| {
-            Error::MissingObjects(format!("snapshot tree {tree} has not been uploaded"))
-        })?;
+        let tree = match req.source {
+            Some(Source::TreeHash(hash)) => {
+                let tree = common::hash("tree_hash", &hash)?;
+                opened.repo.trees.get_tree(&tree).await.map_err(|_| {
+                    Error::MissingObjects(format!("snapshot tree {tree} has not been uploaded"))
+                })?;
+                tree
+            }
+            Some(Source::Edits(edits)) => {
+                let base = base_root(&opened, &ws).await?;
+                let start = if edits.from_base {
+                    base
+                } else {
+                    ws.snapshot.or(base)
+                };
+                build_snapshot(&opened, edits.edits, start).await?
+            }
+            None => return Err(Error::invalid("a snapshot needs a tree hash or edits")),
+        };
         ws.snapshot = Some(tree);
         let op = self
             .record(
@@ -167,4 +187,43 @@ impl WorkspaceSvc {
         let (files, _) = file_diffs(&opened.repo, base_root, ws.snapshot, None, &options).await?;
         Ok(pb::DiffWorkspaceResponse { files })
     }
+}
+
+/// Apply snapshot edits to `start` (the empty tree when `None`).
+async fn build_snapshot(
+    opened: &Opened,
+    edits: Vec<pb::Edit>,
+    start: Option<TreeHash>,
+) -> Result<TreeHash> {
+    if edits.len() > rill_types::limits::MAX_FILES_PER_CHANGE {
+        return Err(Error::invalid(format!(
+            "{} edits; the limit is {}",
+            edits.len(),
+            rill_types::limits::MAX_FILES_PER_CHANGE
+        )));
+    }
+    let objects = opened.repo.repo.objects();
+    let mut builder = TreeBuilder::new();
+    for edit in edits {
+        let path = path("edits.path", &edit.path)?;
+        if path.is_root() {
+            return Err(Error::invalid("an edit cannot target the repository root"));
+        }
+        opened.permit().write(&path).await?;
+        let edit = match edit.op {
+            Some(pb::edit::Op::SetContent(set)) => {
+                let (content, kind) = stored_content(objects.as_ref(), set).await?;
+                TreeEdit::Set(content, kind)
+            }
+            Some(pb::edit::Op::Delete(_)) => TreeEdit::Delete,
+            Some(pb::edit::Op::Patch(_)) => {
+                return Err(Error::invalid(format!(
+                    "{path:?}: snapshots take content, not patches"
+                )))
+            }
+            None => return Err(Error::invalid(format!("edit for {path:?} has no op"))),
+        };
+        builder.edit(&path, edit);
+    }
+    Ok(builder.build(&opened.repo.trees, start).await?)
 }

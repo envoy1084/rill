@@ -7,6 +7,7 @@ syntax = "proto3";
 
 package rill.v1;
 
+import "rill/v1/changes.proto";
 import "rill/v1/types.proto";
 
 // Workspaces and their operation logs.
@@ -97,8 +98,22 @@ message SnapshotWorkspaceRequest {
   string request_id = 1;
   // `…/workspaces/{workspace}`. Required.
   string name = 2;
-  // Root tree of the working copy; its objects must already be uploaded.
-  bytes tree_hash = 3;
+  // The new working copy. Required.
+  oneof source {
+    // Root tree of the working copy; its objects must already be uploaded.
+    bytes tree_hash = 3;
+    // Edits the server applies to build the tree.
+    WorkspaceEdits edits = 4;
+  }
+  // The workspace's current etag; any when empty.
+  string etag = 5;
+}
+// Edits to a workspace's working copy. Patches are not accepted.
+message WorkspaceEdits {
+  // Apply to the base, replacing the snapshot, rather than to the current
+  // snapshot (the base when there is none).
+  bool from_base = 1;
+  repeated Edit edits = 2;
 }
 message SnapshotWorkspaceResponse {
   WorkspaceOperation operation = 1;

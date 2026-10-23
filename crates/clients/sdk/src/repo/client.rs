@@ -48,7 +48,7 @@ impl RepoClient {
 
     /// Workspaces in this repository.
     pub fn workspaces(&self) -> WorkspaceClient {
-        WorkspaceClient::new(self.client.clone(), self.resource.clone())
+        WorkspaceClient::new(self.clone())
     }
 
     /// Reviews in this repository.

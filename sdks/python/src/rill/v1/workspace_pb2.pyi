@@ -1,3 +1,4 @@
+from rill.v1 import changes_pb2 as _changes_pb2
 from rill.v1 import types_pb2 as _types_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
@@ -92,14 +93,26 @@ class DeleteWorkspaceResponse(_message.Message):
     def __init__(self) -> None: ...
 
 class SnapshotWorkspaceRequest(_message.Message):
-    __slots__ = ("request_id", "name", "tree_hash")
+    __slots__ = ("request_id", "name", "tree_hash", "edits", "etag")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     TREE_HASH_FIELD_NUMBER: _ClassVar[int]
+    EDITS_FIELD_NUMBER: _ClassVar[int]
+    ETAG_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     name: str
     tree_hash: bytes
-    def __init__(self, request_id: _Optional[str] = ..., name: _Optional[str] = ..., tree_hash: _Optional[bytes] = ...) -> None: ...
+    edits: WorkspaceEdits
+    etag: str
+    def __init__(self, request_id: _Optional[str] = ..., name: _Optional[str] = ..., tree_hash: _Optional[bytes] = ..., edits: _Optional[_Union[WorkspaceEdits, _Mapping]] = ..., etag: _Optional[str] = ...) -> None: ...
+
+class WorkspaceEdits(_message.Message):
+    __slots__ = ("from_base", "edits")
+    FROM_BASE_FIELD_NUMBER: _ClassVar[int]
+    EDITS_FIELD_NUMBER: _ClassVar[int]
+    from_base: bool
+    edits: _containers.RepeatedCompositeFieldContainer[_changes_pb2.Edit]
+    def __init__(self, from_base: _Optional[bool] = ..., edits: _Optional[_Iterable[_Union[_changes_pb2.Edit, _Mapping]]] = ...) -> None: ...
 
 class SnapshotWorkspaceResponse(_message.Message):
     __slots__ = ("operation",)

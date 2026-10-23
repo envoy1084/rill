@@ -10,6 +10,8 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { Edit } from "./changes_pb.js";
+import { file_rill_v1_changes } from "./changes_pb.js";
 import type { ChangeInfo, ChangeVersion, DiffFormat, FileDiff, Principal, Provenance, Workspace, WorkspaceOperation } from "./types_pb.js";
 import { file_rill_v1_types } from "./types_pb.js";
 import type { Message } from "@bufbuild/protobuf";
@@ -18,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file rill/v1/workspace.proto.
  */
 export const file_rill_v1_workspace: GenFile = /*@__PURE__*/
-  fileDesc("ChdyaWxsL3YxL3dvcmtzcGFjZS5wcm90bxIHcmlsbC52MSJxChZDcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGcGFyZW50GAIgASgJEiUKCXdvcmtzcGFjZRgDIAEoCzISLnJpbGwudjEuV29ya3NwYWNlEgwKBGJhc2UYBCABKAkicAoXQ3JlYXRlV29ya3NwYWNlUmVzcG9uc2USJQoJd29ya3NwYWNlGAEgASgLMhIucmlsbC52MS5Xb3Jrc3BhY2USLgoJb3BlcmF0aW9uGAIgASgLMhsucmlsbC52MS5Xb3Jrc3BhY2VPcGVyYXRpb24iIwoTR2V0V29ya3NwYWNlUmVxdWVzdBIMCgRuYW1lGAEgASgJIj0KFEdldFdvcmtzcGFjZVJlc3BvbnNlEiUKCXdvcmtzcGFjZRgBIAEoCzISLnJpbGwudjEuV29ya3NwYWNlIl4KFUxpc3RXb3Jrc3BhY2VzUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSDgoGZmlsdGVyGAQgASgJIlkKFkxpc3RXb3Jrc3BhY2VzUmVzcG9uc2USJgoKd29ya3NwYWNlcxgBIAMoCzISLnJpbGwudjEuV29ya3NwYWNlEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSJhChZVcGRhdGVXb3Jrc3BhY2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSJQoJd29ya3NwYWNlGAIgASgLMhIucmlsbC52MS5Xb3Jrc3BhY2USDAoEZXRhZxgDIAEoCSJwChdVcGRhdGVXb3Jrc3BhY2VSZXNwb25zZRIlCgl3b3Jrc3BhY2UYASABKAsyEi5yaWxsLnYxLldvcmtzcGFjZRIuCglvcGVyYXRpb24YAiABKAsyGy5yaWxsLnYxLldvcmtzcGFjZU9wZXJhdGlvbiJIChZEZWxldGVXb3Jrc3BhY2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRldGFnGAMgASgJIhkKF0RlbGV0ZVdvcmtzcGFjZVJlc3BvbnNlIk8KGFNuYXBzaG90V29ya3NwYWNlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkSEQoJdHJlZV9oYXNoGAMgASgMIksKGVNuYXBzaG90V29ya3NwYWNlUmVzcG9uc2USLgoJb3BlcmF0aW9uGAEgASgLMhsucmlsbC52MS5Xb3Jrc3BhY2VPcGVyYXRpb24igAEKElN0YXJ0Q2hhbmdlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkSDwoHbWVzc2FnZRgDIAEoCRIOCgZpbnRlbnQYBCABKAkSJwoKcHJvdmVuYW5jZRgFIAEoCzITLnJpbGwudjEuUHJvdmVuYW5jZSKhAQoTU3RhcnRDaGFuZ2VSZXNwb25zZRIOCgZjaGFuZ2UYASABKAkSIQoEaW5mbxgCIAEoCzITLnJpbGwudjEuQ2hhbmdlSW5mbxInCgd2ZXJzaW9uGAMgASgLMhYucmlsbC52MS5DaGFuZ2VWZXJzaW9uEi4KCW9wZXJhdGlvbhgEIAEoCzIbLnJpbGwudjEuV29ya3NwYWNlT3BlcmF0aW9uIkYKFFN5bmNXb3Jrc3BhY2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRiYXNlGAMgASgJIroBChVTeW5jV29ya3NwYWNlUmVzcG9uc2USJQoJd29ya3NwYWNlGAEgASgLMhIucmlsbC52MS5Xb3Jrc3BhY2USLgoJb3BlcmF0aW9uGAIgASgLMhsucmlsbC52MS5Xb3Jrc3BhY2VPcGVyYXRpb24SIQoEaW5mbxgDIAEoCzITLnJpbGwudjEuQ2hhbmdlSW5mbxInCgd2ZXJzaW9uGAQgASgLMhYucmlsbC52MS5DaGFuZ2VWZXJzaW9uIlsKF0hhbmRvZmZXb3Jrc3BhY2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIeCgJ0bxgDIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsInEKGEhhbmRvZmZXb3Jrc3BhY2VSZXNwb25zZRIlCgl3b3Jrc3BhY2UYASABKAsyEi5yaWxsLnYxLldvcmtzcGFjZRIuCglvcGVyYXRpb24YAiABKAsyGy5yaWxsLnYxLldvcmtzcGFjZU9wZXJhdGlvbiI4ChRVbmRvT3BlcmF0aW9uUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkibgoVVW5kb09wZXJhdGlvblJlc3BvbnNlEiUKCXdvcmtzcGFjZRgBIAEoCzISLnJpbGwudjEuV29ya3NwYWNlEi4KCW9wZXJhdGlvbhgCIAEoCzIbLnJpbGwudjEuV29ya3NwYWNlT3BlcmF0aW9uIlcKHkxpc3RXb3Jrc3BhY2VPcGVyYXRpb25zUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkiawofTGlzdFdvcmtzcGFjZU9wZXJhdGlvbnNSZXNwb25zZRIvCgpvcGVyYXRpb25zGAEgAygLMhsucmlsbC52MS5Xb3Jrc3BhY2VPcGVyYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIm8KFERpZmZXb3Jrc3BhY2VSZXF1ZXN0EgwKBG5hbWUYASABKAkSDQoFcGF0aHMYAiADKAkSIwoGZm9ybWF0GAMgASgOMhMucmlsbC52MS5EaWZmRm9ybWF0EhUKDWNvbnRleHRfbGluZXMYBCABKA0iOQoVRGlmZldvcmtzcGFjZVJlc3BvbnNlEiAKBWZpbGVzGAEgAygLMhEucmlsbC52MS5GaWxlRGlmZjKRCAoQV29ya3NwYWNlU2VydmljZRJUCg9DcmVhdGVXb3Jrc3BhY2USHy5yaWxsLnYxLkNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QaIC5yaWxsLnYxLkNyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlEksKDEdldFdvcmtzcGFjZRIcLnJpbGwudjEuR2V0V29ya3NwYWNlUmVxdWVzdBodLnJpbGwudjEuR2V0V29ya3NwYWNlUmVzcG9uc2USUQoOTGlzdFdvcmtzcGFjZXMSHi5yaWxsLnYxLkxpc3RXb3Jrc3BhY2VzUmVxdWVzdBofLnJpbGwudjEuTGlzdFdvcmtzcGFjZXNSZXNwb25zZRJUCg9VcGRhdGVXb3Jrc3BhY2USHy5yaWxsLnYxLlVwZGF0ZVdvcmtzcGFjZVJlcXVlc3QaIC5yaWxsLnYxLlVwZGF0ZVdvcmtzcGFjZVJlc3BvbnNlElQKD0RlbGV0ZVdvcmtzcGFjZRIfLnJpbGwudjEuRGVsZXRlV29ya3NwYWNlUmVxdWVzdBogLnJpbGwudjEuRGVsZXRlV29ya3NwYWNlUmVzcG9uc2USWgoRU25hcHNob3RXb3Jrc3BhY2USIS5yaWxsLnYxLlNuYXBzaG90V29ya3NwYWNlUmVxdWVzdBoiLnJpbGwudjEuU25hcHNob3RXb3Jrc3BhY2VSZXNwb25zZRJICgtTdGFydENoYW5nZRIbLnJpbGwudjEuU3RhcnRDaGFuZ2VSZXF1ZXN0GhwucmlsbC52MS5TdGFydENoYW5nZVJlc3BvbnNlEk4KDVN5bmNXb3Jrc3BhY2USHS5yaWxsLnYxLlN5bmNXb3Jrc3BhY2VSZXF1ZXN0Gh4ucmlsbC52MS5TeW5jV29ya3NwYWNlUmVzcG9uc2USVwoQSGFuZG9mZldvcmtzcGFjZRIgLnJpbGwudjEuSGFuZG9mZldvcmtzcGFjZVJlcXVlc3QaIS5yaWxsLnYxLkhhbmRvZmZXb3Jrc3BhY2VSZXNwb25zZRJOCg1VbmRvT3BlcmF0aW9uEh0ucmlsbC52MS5VbmRvT3BlcmF0aW9uUmVxdWVzdBoeLnJpbGwudjEuVW5kb09wZXJhdGlvblJlc3BvbnNlEmwKF0xpc3RXb3Jrc3BhY2VPcGVyYXRpb25zEicucmlsbC52MS5MaXN0V29ya3NwYWNlT3BlcmF0aW9uc1JlcXVlc3QaKC5yaWxsLnYxLkxpc3RXb3Jrc3BhY2VPcGVyYXRpb25zUmVzcG9uc2USTgoNRGlmZldvcmtzcGFjZRIdLnJpbGwudjEuRGlmZldvcmtzcGFjZVJlcXVlc3QaHi5yaWxsLnYxLkRpZmZXb3Jrc3BhY2VSZXNwb25zZWIGcHJvdG8z", [file_rill_v1_types]);
+  fileDesc("ChdyaWxsL3YxL3dvcmtzcGFjZS5wcm90bxIHcmlsbC52MSJxChZDcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGcGFyZW50GAIgASgJEiUKCXdvcmtzcGFjZRgDIAEoCzISLnJpbGwudjEuV29ya3NwYWNlEgwKBGJhc2UYBCABKAkicAoXQ3JlYXRlV29ya3NwYWNlUmVzcG9uc2USJQoJd29ya3NwYWNlGAEgASgLMhIucmlsbC52MS5Xb3Jrc3BhY2USLgoJb3BlcmF0aW9uGAIgASgLMhsucmlsbC52MS5Xb3Jrc3BhY2VPcGVyYXRpb24iIwoTR2V0V29ya3NwYWNlUmVxdWVzdBIMCgRuYW1lGAEgASgJIj0KFEdldFdvcmtzcGFjZVJlc3BvbnNlEiUKCXdvcmtzcGFjZRgBIAEoCzISLnJpbGwudjEuV29ya3NwYWNlIl4KFUxpc3RXb3Jrc3BhY2VzUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSDgoGZmlsdGVyGAQgASgJIlkKFkxpc3RXb3Jrc3BhY2VzUmVzcG9uc2USJgoKd29ya3NwYWNlcxgBIAMoCzISLnJpbGwudjEuV29ya3NwYWNlEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSJhChZVcGRhdGVXb3Jrc3BhY2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSJQoJd29ya3NwYWNlGAIgASgLMhIucmlsbC52MS5Xb3Jrc3BhY2USDAoEZXRhZxgDIAEoCSJwChdVcGRhdGVXb3Jrc3BhY2VSZXNwb25zZRIlCgl3b3Jrc3BhY2UYASABKAsyEi5yaWxsLnYxLldvcmtzcGFjZRIuCglvcGVyYXRpb24YAiABKAsyGy5yaWxsLnYxLldvcmtzcGFjZU9wZXJhdGlvbiJIChZEZWxldGVXb3Jrc3BhY2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRldGFnGAMgASgJIhkKF0RlbGV0ZVdvcmtzcGFjZVJlc3BvbnNlIpMBChhTbmFwc2hvdFdvcmtzcGFjZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKCXRyZWVfaGFzaBgDIAEoDEgAEigKBWVkaXRzGAQgASgLMhcucmlsbC52MS5Xb3Jrc3BhY2VFZGl0c0gAEgwKBGV0YWcYBSABKAlCCAoGc291cmNlIkEKDldvcmtzcGFjZUVkaXRzEhEKCWZyb21fYmFzZRgBIAEoCBIcCgVlZGl0cxgCIAMoCzINLnJpbGwudjEuRWRpdCJLChlTbmFwc2hvdFdvcmtzcGFjZVJlc3BvbnNlEi4KCW9wZXJhdGlvbhgBIAEoCzIbLnJpbGwudjEuV29ya3NwYWNlT3BlcmF0aW9uIoABChJTdGFydENoYW5nZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB21lc3NhZ2UYAyABKAkSDgoGaW50ZW50GAQgASgJEicKCnByb3ZlbmFuY2UYBSABKAsyEy5yaWxsLnYxLlByb3ZlbmFuY2UioQEKE1N0YXJ0Q2hhbmdlUmVzcG9uc2USDgoGY2hhbmdlGAEgASgJEiEKBGluZm8YAiABKAsyEy5yaWxsLnYxLkNoYW5nZUluZm8SJwoHdmVyc2lvbhgDIAEoCzIWLnJpbGwudjEuQ2hhbmdlVmVyc2lvbhIuCglvcGVyYXRpb24YBCABKAsyGy5yaWxsLnYxLldvcmtzcGFjZU9wZXJhdGlvbiJGChRTeW5jV29ya3NwYWNlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEYmFzZRgDIAEoCSK6AQoVU3luY1dvcmtzcGFjZVJlc3BvbnNlEiUKCXdvcmtzcGFjZRgBIAEoCzISLnJpbGwudjEuV29ya3NwYWNlEi4KCW9wZXJhdGlvbhgCIAEoCzIbLnJpbGwudjEuV29ya3NwYWNlT3BlcmF0aW9uEiEKBGluZm8YAyABKAsyEy5yaWxsLnYxLkNoYW5nZUluZm8SJwoHdmVyc2lvbhgEIAEoCzIWLnJpbGwudjEuQ2hhbmdlVmVyc2lvbiJbChdIYW5kb2ZmV29ya3NwYWNlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkSHgoCdG8YAyABKAsyEi5yaWxsLnYxLlByaW5jaXBhbCJxChhIYW5kb2ZmV29ya3NwYWNlUmVzcG9uc2USJQoJd29ya3NwYWNlGAEgASgLMhIucmlsbC52MS5Xb3Jrc3BhY2USLgoJb3BlcmF0aW9uGAIgASgLMhsucmlsbC52MS5Xb3Jrc3BhY2VPcGVyYXRpb24iOAoUVW5kb09wZXJhdGlvblJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIm4KFVVuZG9PcGVyYXRpb25SZXNwb25zZRIlCgl3b3Jrc3BhY2UYASABKAsyEi5yaWxsLnYxLldvcmtzcGFjZRIuCglvcGVyYXRpb24YAiABKAsyGy5yaWxsLnYxLldvcmtzcGFjZU9wZXJhdGlvbiJXCh5MaXN0V29ya3NwYWNlT3BlcmF0aW9uc1JlcXVlc3QSDgoGcGFyZW50GAEgASgJEhEKCXBhZ2Vfc2l6ZRgCIAEoBRISCgpwYWdlX3Rva2VuGAMgASgJImsKH0xpc3RXb3Jrc3BhY2VPcGVyYXRpb25zUmVzcG9uc2USLwoKb3BlcmF0aW9ucxgBIAMoCzIbLnJpbGwudjEuV29ya3NwYWNlT3BlcmF0aW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSJvChREaWZmV29ya3NwYWNlUmVxdWVzdBIMCgRuYW1lGAEgASgJEg0KBXBhdGhzGAIgAygJEiMKBmZvcm1hdBgDIAEoDjITLnJpbGwudjEuRGlmZkZvcm1hdBIVCg1jb250ZXh0X2xpbmVzGAQgASgNIjkKFURpZmZXb3Jrc3BhY2VSZXNwb25zZRIgCgVmaWxlcxgBIAMoCzIRLnJpbGwudjEuRmlsZURpZmYykQgKEFdvcmtzcGFjZVNlcnZpY2USVAoPQ3JlYXRlV29ya3NwYWNlEh8ucmlsbC52MS5DcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0GiAucmlsbC52MS5DcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRJLCgxHZXRXb3Jrc3BhY2USHC5yaWxsLnYxLkdldFdvcmtzcGFjZVJlcXVlc3QaHS5yaWxsLnYxLkdldFdvcmtzcGFjZVJlc3BvbnNlElEKDkxpc3RXb3Jrc3BhY2VzEh4ucmlsbC52MS5MaXN0V29ya3NwYWNlc1JlcXVlc3QaHy5yaWxsLnYxLkxpc3RXb3Jrc3BhY2VzUmVzcG9uc2USVAoPVXBkYXRlV29ya3NwYWNlEh8ucmlsbC52MS5VcGRhdGVXb3Jrc3BhY2VSZXF1ZXN0GiAucmlsbC52MS5VcGRhdGVXb3Jrc3BhY2VSZXNwb25zZRJUCg9EZWxldGVXb3Jrc3BhY2USHy5yaWxsLnYxLkRlbGV0ZVdvcmtzcGFjZVJlcXVlc3QaIC5yaWxsLnYxLkRlbGV0ZVdvcmtzcGFjZVJlc3BvbnNlEloKEVNuYXBzaG90V29ya3NwYWNlEiEucmlsbC52MS5TbmFwc2hvdFdvcmtzcGFjZVJlcXVlc3QaIi5yaWxsLnYxLlNuYXBzaG90V29ya3NwYWNlUmVzcG9uc2USSAoLU3RhcnRDaGFuZ2USGy5yaWxsLnYxLlN0YXJ0Q2hhbmdlUmVxdWVzdBocLnJpbGwudjEuU3RhcnRDaGFuZ2VSZXNwb25zZRJOCg1TeW5jV29ya3NwYWNlEh0ucmlsbC52MS5TeW5jV29ya3NwYWNlUmVxdWVzdBoeLnJpbGwudjEuU3luY1dvcmtzcGFjZVJlc3BvbnNlElcKEEhhbmRvZmZXb3Jrc3BhY2USIC5yaWxsLnYxLkhhbmRvZmZXb3Jrc3BhY2VSZXF1ZXN0GiEucmlsbC52MS5IYW5kb2ZmV29ya3NwYWNlUmVzcG9uc2USTgoNVW5kb09wZXJhdGlvbhIdLnJpbGwudjEuVW5kb09wZXJhdGlvblJlcXVlc3QaHi5yaWxsLnYxLlVuZG9PcGVyYXRpb25SZXNwb25zZRJsChdMaXN0V29ya3NwYWNlT3BlcmF0aW9ucxInLnJpbGwudjEuTGlzdFdvcmtzcGFjZU9wZXJhdGlvbnNSZXF1ZXN0GigucmlsbC52MS5MaXN0V29ya3NwYWNlT3BlcmF0aW9uc1Jlc3BvbnNlEk4KDURpZmZXb3Jrc3BhY2USHS5yaWxsLnYxLkRpZmZXb3Jrc3BhY2VSZXF1ZXN0Gh4ucmlsbC52MS5EaWZmV29ya3NwYWNlUmVzcG9uc2ViBnByb3RvMw", [file_rill_v1_changes, file_rill_v1_types]);
 
 /**
  * @generated from message rill.v1.CreateWorkspaceRequest
@@ -288,11 +290,34 @@ export type SnapshotWorkspaceRequest = Message<"rill.v1.SnapshotWorkspaceRequest
   name: string;
 
   /**
-   * Root tree of the working copy; its objects must already be uploaded.
+   * The new working copy. Required.
    *
-   * @generated from field: bytes tree_hash = 3;
+   * @generated from oneof rill.v1.SnapshotWorkspaceRequest.source
    */
-  treeHash: Uint8Array;
+  source: {
+    /**
+     * Root tree of the working copy; its objects must already be uploaded.
+     *
+     * @generated from field: bytes tree_hash = 3;
+     */
+    value: Uint8Array;
+    case: "treeHash";
+  } | {
+    /**
+     * Edits the server applies to build the tree.
+     *
+     * @generated from field: rill.v1.WorkspaceEdits edits = 4;
+     */
+    value: WorkspaceEdits;
+    case: "edits";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * The workspace's current etag; any when empty.
+   *
+   * @generated from field: string etag = 5;
+   */
+  etag: string;
 };
 
 /**
@@ -301,6 +326,33 @@ export type SnapshotWorkspaceRequest = Message<"rill.v1.SnapshotWorkspaceRequest
  */
 export const SnapshotWorkspaceRequestSchema: GenMessage<SnapshotWorkspaceRequest> = /*@__PURE__*/
   messageDesc(file_rill_v1_workspace, 10);
+
+/**
+ * Edits to a workspace's working copy. Patches are not accepted.
+ *
+ * @generated from message rill.v1.WorkspaceEdits
+ */
+export type WorkspaceEdits = Message<"rill.v1.WorkspaceEdits"> & {
+  /**
+   * Apply to the base, replacing the snapshot, rather than to the current
+   * snapshot (the base when there is none).
+   *
+   * @generated from field: bool from_base = 1;
+   */
+  fromBase: boolean;
+
+  /**
+   * @generated from field: repeated rill.v1.Edit edits = 2;
+   */
+  edits: Edit[];
+};
+
+/**
+ * Describes the message rill.v1.WorkspaceEdits.
+ * Use `create(WorkspaceEditsSchema)` to create a new message.
+ */
+export const WorkspaceEditsSchema: GenMessage<WorkspaceEdits> = /*@__PURE__*/
+  messageDesc(file_rill_v1_workspace, 11);
 
 /**
  * @generated from message rill.v1.SnapshotWorkspaceResponse
@@ -317,7 +369,7 @@ export type SnapshotWorkspaceResponse = Message<"rill.v1.SnapshotWorkspaceRespon
  * Use `create(SnapshotWorkspaceResponseSchema)` to create a new message.
  */
 export const SnapshotWorkspaceResponseSchema: GenMessage<SnapshotWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 11);
+  messageDesc(file_rill_v1_workspace, 12);
 
 /**
  * @generated from message rill.v1.StartChangeRequest
@@ -358,7 +410,7 @@ export type StartChangeRequest = Message<"rill.v1.StartChangeRequest"> & {
  * Use `create(StartChangeRequestSchema)` to create a new message.
  */
 export const StartChangeRequestSchema: GenMessage<StartChangeRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 12);
+  messageDesc(file_rill_v1_workspace, 13);
 
 /**
  * @generated from message rill.v1.StartChangeResponse
@@ -392,7 +444,7 @@ export type StartChangeResponse = Message<"rill.v1.StartChangeResponse"> & {
  * Use `create(StartChangeResponseSchema)` to create a new message.
  */
 export const StartChangeResponseSchema: GenMessage<StartChangeResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 13);
+  messageDesc(file_rill_v1_workspace, 14);
 
 /**
  * @generated from message rill.v1.SyncWorkspaceRequest
@@ -423,7 +475,7 @@ export type SyncWorkspaceRequest = Message<"rill.v1.SyncWorkspaceRequest"> & {
  * Use `create(SyncWorkspaceRequestSchema)` to create a new message.
  */
 export const SyncWorkspaceRequestSchema: GenMessage<SyncWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 14);
+  messageDesc(file_rill_v1_workspace, 15);
 
 /**
  * @generated from message rill.v1.SyncWorkspaceResponse
@@ -457,7 +509,7 @@ export type SyncWorkspaceResponse = Message<"rill.v1.SyncWorkspaceResponse"> & {
  * Use `create(SyncWorkspaceResponseSchema)` to create a new message.
  */
 export const SyncWorkspaceResponseSchema: GenMessage<SyncWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 15);
+  messageDesc(file_rill_v1_workspace, 16);
 
 /**
  * @generated from message rill.v1.HandoffWorkspaceRequest
@@ -488,7 +540,7 @@ export type HandoffWorkspaceRequest = Message<"rill.v1.HandoffWorkspaceRequest">
  * Use `create(HandoffWorkspaceRequestSchema)` to create a new message.
  */
 export const HandoffWorkspaceRequestSchema: GenMessage<HandoffWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 16);
+  messageDesc(file_rill_v1_workspace, 17);
 
 /**
  * @generated from message rill.v1.HandoffWorkspaceResponse
@@ -510,7 +562,7 @@ export type HandoffWorkspaceResponse = Message<"rill.v1.HandoffWorkspaceResponse
  * Use `create(HandoffWorkspaceResponseSchema)` to create a new message.
  */
 export const HandoffWorkspaceResponseSchema: GenMessage<HandoffWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 17);
+  messageDesc(file_rill_v1_workspace, 18);
 
 /**
  * @generated from message rill.v1.UndoOperationRequest
@@ -535,7 +587,7 @@ export type UndoOperationRequest = Message<"rill.v1.UndoOperationRequest"> & {
  * Use `create(UndoOperationRequestSchema)` to create a new message.
  */
 export const UndoOperationRequestSchema: GenMessage<UndoOperationRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 18);
+  messageDesc(file_rill_v1_workspace, 19);
 
 /**
  * @generated from message rill.v1.UndoOperationResponse
@@ -557,7 +609,7 @@ export type UndoOperationResponse = Message<"rill.v1.UndoOperationResponse"> & {
  * Use `create(UndoOperationResponseSchema)` to create a new message.
  */
 export const UndoOperationResponseSchema: GenMessage<UndoOperationResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 19);
+  messageDesc(file_rill_v1_workspace, 20);
 
 /**
  * @generated from message rill.v1.ListWorkspaceOperationsRequest
@@ -586,7 +638,7 @@ export type ListWorkspaceOperationsRequest = Message<"rill.v1.ListWorkspaceOpera
  * Use `create(ListWorkspaceOperationsRequestSchema)` to create a new message.
  */
 export const ListWorkspaceOperationsRequestSchema: GenMessage<ListWorkspaceOperationsRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 20);
+  messageDesc(file_rill_v1_workspace, 21);
 
 /**
  * @generated from message rill.v1.ListWorkspaceOperationsResponse
@@ -610,7 +662,7 @@ export type ListWorkspaceOperationsResponse = Message<"rill.v1.ListWorkspaceOper
  * Use `create(ListWorkspaceOperationsResponseSchema)` to create a new message.
  */
 export const ListWorkspaceOperationsResponseSchema: GenMessage<ListWorkspaceOperationsResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 21);
+  messageDesc(file_rill_v1_workspace, 22);
 
 /**
  * @generated from message rill.v1.DiffWorkspaceRequest
@@ -644,7 +696,7 @@ export type DiffWorkspaceRequest = Message<"rill.v1.DiffWorkspaceRequest"> & {
  * Use `create(DiffWorkspaceRequestSchema)` to create a new message.
  */
 export const DiffWorkspaceRequestSchema: GenMessage<DiffWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 22);
+  messageDesc(file_rill_v1_workspace, 23);
 
 /**
  * @generated from message rill.v1.DiffWorkspaceResponse
@@ -661,7 +713,7 @@ export type DiffWorkspaceResponse = Message<"rill.v1.DiffWorkspaceResponse"> & {
  * Use `create(DiffWorkspaceResponseSchema)` to create a new message.
  */
 export const DiffWorkspaceResponseSchema: GenMessage<DiffWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_workspace, 23);
+  messageDesc(file_rill_v1_workspace, 24);
 
 /**
  * Workspaces and their operation logs.

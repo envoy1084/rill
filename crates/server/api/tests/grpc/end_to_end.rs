@@ -300,7 +300,8 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
         .snapshot_workspace(pb::SnapshotWorkspaceRequest {
             request_id: String::new(),
             name: ws.name.clone(),
-            tree_hash,
+            source: Some(pb::snapshot_workspace_request::Source::TreeHash(tree_hash)),
+            etag: String::new(),
         })
         .await
         .unwrap();

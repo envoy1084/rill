@@ -60,3 +60,7 @@ async-trait = { workspace = true }
 [[test]]
 name = "conformance"
 required-features = ["testing"]
+
+[[test]]
+name = "workspace_snapshots"
+required-features = ["testing"]

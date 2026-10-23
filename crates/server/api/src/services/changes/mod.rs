@@ -12,4 +12,5 @@ mod write;
 
 pub use commit::{commit_version, commit_version_with, CommitExtras};
 pub use service::ChangeSvc;
+pub(crate) use write::stored_content;
 pub use write::version_from_diff;

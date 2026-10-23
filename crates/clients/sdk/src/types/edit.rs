@@ -48,6 +48,15 @@ pub enum Edit {
         /// File kind.
         kind: FileKind,
     },
+    /// Replace or create the path with content already stored.
+    Stored {
+        /// The path.
+        path: RepoPathBuf,
+        /// The stored content.
+        content: ContentRef,
+        /// File kind.
+        kind: FileKind,
+    },
     /// Remove the path.
     Delete {
         /// The path.
@@ -80,7 +89,10 @@ impl Edit {
     /// The edited path.
     pub fn path(&self) -> &RepoPathBuf {
         match self {
-            Edit::Set { path, .. } | Edit::Delete { path } | Edit::Patch { path, .. } => path,
+            Edit::Set { path, .. }
+            | Edit::Stored { path, .. }
+            | Edit::Delete { path }
+            | Edit::Patch { path, .. } => path,
         }
     }
 }
