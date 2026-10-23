@@ -9,7 +9,7 @@ use rill_sdk::{RepoClient, Root};
 use rill_types::{ChangeId, ChangeInfo};
 use serde_json::json as j;
 
-use crate::commands::history::log_row;
+use crate::commands::log::log_row;
 use crate::commands::{change_ref, root_arg};
 use crate::context::Ctx;
 use crate::error::CliError;

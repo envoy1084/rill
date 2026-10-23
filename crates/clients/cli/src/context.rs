@@ -54,7 +54,9 @@ impl<'w> Ctx<'w> {
         let theme = Arc::new(Theme::with_overrides(&settings.color.roles));
         Ctx {
             opts,
-            out: Out::new(writer, color).with_theme(theme),
+            out: Out::new(writer, color)
+                .with_theme(theme)
+                .with_syntax(settings.diff.syntax, settings.diff.theme.clone()),
             settings,
             cwd,
             checkout: None,

@@ -1,18 +1,14 @@
-//! `rill status` and `rill diff`.
+//! `rill status`: the checkout's local changes, git-style.
 
 use clap::Args;
 use rill_daemon::proto as dpb;
-use rill_daemon::{ChangeKind as LocalChangeKind, LocalChange};
+use rill_daemon::{ChangeKind, LocalChange};
 use rill_mcp::json;
-use rill_sdk::{DiffFormat, DiffOptions, RepoClient, Root};
 use rill_types::RepoPathBuf;
-use rill_types::Tree;
 use serde_json::{json as j, Value};
 
-use crate::commands::root_arg;
 use crate::context::Ctx;
-use crate::error::CliError;
-use crate::output::Out;
+use crate::output::{Out, Role};
 use crate::Result;
 
 /// `rill status`.
@@ -20,38 +16,17 @@ use crate::Result;
 pub struct StatusArgs {
     /// Only paths under these prefixes.
     pub paths: Vec<String>,
+    /// One line per path with a status letter, like `git status --short`.
+    #[arg(long, short = 's')]
+    pub short: bool,
 }
 
-/// `rill diff`.
-#[derive(Args, Debug)]
-pub struct DiffArgs {
-    /// Base root (default: the checkout's base, or trunk with --target).
-    #[arg(long, value_name = "ROOT")]
-    pub base: Option<String>,
-    /// Diff this root against the base on the server instead of local edits.
-    #[arg(long, value_name = "ROOT")]
-    pub target: Option<String>,
-    /// Context lines around each hunk.
-    #[arg(long, default_value_t = 3)]
-    pub context: u32,
-    /// Only these paths or prefixes.
-    pub paths: Vec<String>,
-}
-
-fn parse_paths(paths: &[String]) -> Result<Vec<RepoPathBuf>> {
+/// Paths given on the command line, checked.
+pub(crate) fn parse_paths(paths: &[String]) -> Result<Vec<RepoPathBuf>> {
     paths
         .iter()
         .map(|p| RepoPathBuf::new(p).map_err(Into::into))
         .collect()
-}
-
-fn kind_letter(kind: LocalChangeKind) -> &'static str {
-    match kind {
-        LocalChangeKind::Added => "A",
-        LocalChangeKind::Modified => "M",
-        LocalChangeKind::Deleted => "D",
-        LocalChangeKind::Conflict => "C",
-    }
 }
 
 /// Run `rill status`.
@@ -70,7 +45,7 @@ pub async fn status(ctx: &mut Ctx<'_>, args: StatusArgs) -> Result<()> {
     let meta = reply.mount.into_option().unwrap_or(mount);
     let conflicts = changes
         .iter()
-        .filter(|c| c.kind == LocalChangeKind::Conflict)
+        .filter(|c| c.kind == ChangeKind::Conflict)
         .count();
     ctx.emit(
         j!({
@@ -84,228 +59,109 @@ pub async fn status(ctx: &mut Ctx<'_>, args: StatusArgs) -> Result<()> {
             "conflicts": conflicts,
         }),
         |out| {
-            out.line(format!(
-                "{} at {}{}",
-                out.bold(&meta.repo),
-                meta.base,
-                meta.base_version
-                    .get(..12)
-                    .map(|h| format!(" ({h})"))
-                    .unwrap_or_default()
-            ))?;
-            if !meta.working_change.is_empty() {
-                out.line(format!("working change {}", out.id(&meta.working_change)))?;
+            if args.short {
+                short(out, &changes)
+            } else {
+                long(out, &meta, &changes)
             }
-            if changes.is_empty() {
-                return out.line(out.dim("no local changes"));
-            }
-            for c in &changes {
-                let letter = kind_letter(c.kind);
-                let styled = match c.kind {
-                    LocalChangeKind::Added => out.good(letter),
-                    LocalChangeKind::Modified => out.warn(letter),
-                    LocalChangeKind::Deleted => out.bad(letter),
-                    LocalChangeKind::Conflict => out.bad(letter),
-                };
-                let suffix = if c.kind == LocalChangeKind::Conflict {
-                    out.bad("  (conflict markers; edit then `rill resolve`)")
-                } else {
-                    String::new()
-                };
-                out.line(format!("{styled} {}{suffix}", c.path))?;
-            }
-            if conflicts > 0 {
-                out.line(out.bad(&format!("{conflicts} conflicted path(s)")))?;
-            }
-            Ok(())
         },
     )
 }
 
-/// Run `rill diff`.
-pub async fn diff(ctx: &mut Ctx<'_>, args: DiffArgs) -> Result<()> {
-    let paths = parse_paths(&args.paths)?;
-    if let Some(target) = &args.target {
-        return server_diff(ctx, args.base.as_deref(), target, paths, args.context).await;
+/// The letter and role of a change kind.
+pub(crate) fn letter(kind: ChangeKind) -> (&'static str, Role) {
+    match kind {
+        ChangeKind::Added => ("A", Role::Added),
+        ChangeKind::Modified => ("M", Role::Modified),
+        ChangeKind::Deleted => ("D", Role::Removed),
+        ChangeKind::Conflict => ("C", Role::Conflict),
     }
-    if ctx.find_checkout().is_none() {
-        return Err(CliError::usage(
-            "not inside a checkout: pass --target <root> to diff two points in history",
-        ));
+}
+
+fn short(out: &mut Out<'_>, changes: &[LocalChange]) -> std::io::Result<()> {
+    for c in changes {
+        let (l, role) = letter(c.kind);
+        let painted = out.paint(role, l);
+        out.line(format!("{painted} {}", c.path))?;
     }
-    local_diff(ctx, args.base.as_deref(), paths, args.context).await
+    Ok(())
 }
 
-async fn server_diff(
-    ctx: &mut Ctx<'_>,
-    base: Option<&str>,
-    target: &str,
-    paths: Vec<RepoPathBuf>,
-    context: u32,
-) -> Result<()> {
-    let base = root_arg(base)?;
-    let target = root_arg(Some(target))?;
-    let repo = ctx.repo()?;
-    let format = if ctx.json() {
-        DiffFormat::Structured
+fn long(out: &mut Out<'_>, meta: &dpb::Mount, changes: &[LocalChange]) -> std::io::Result<()> {
+    let version = meta
+        .base_version
+        .get(..12)
+        .map(|h| format!(" ({})", out.paint(Role::Id, h)))
+        .unwrap_or_default();
+    out.line(format!(
+        "On {} at {}{version}",
+        out.paint(Role::Bold, &meta.repo),
+        out.paint(Role::Ref, &meta.base)
+    ))?;
+    if meta.working_change.is_empty() {
+        out.line("No working change yet")?;
     } else {
-        DiffFormat::Unified
-    };
-    let result = repo
-        .diff_with(
-            &base,
-            &target,
-            DiffOptions {
-                paths,
-                format,
-                context_lines: context,
-                limit: 0,
-            },
-        )
-        .await?;
-    let mut value = json::diff_result(&result);
-    value["base"] = Value::String(base.to_string());
-    value["target"] = Value::String(target.to_string());
-    ctx.emit(value, |out| {
-        for f in &result.files {
-            print_file_header(out, f.path.as_str(), f.is_added(), f.is_deleted(), f.binary)?;
-            if let Some(text) = &f.unified {
-                out.raw(text.as_bytes())?;
-            }
-        }
-        if result.truncated {
-            out.line(out.warn("(diff truncated by the server)"))?;
-        }
-        Ok(())
-    })
-}
-
-fn print_file_header(
-    out: &mut Out<'_>,
-    path: &str,
-    added: bool,
-    deleted: bool,
-    binary: bool,
-) -> std::io::Result<()> {
-    let tag = if added {
-        out.good("added")
-    } else if deleted {
-        out.bad("deleted")
-    } else {
-        out.warn("modified")
-    };
-    let note = if binary { " (binary)" } else { "" };
-    out.line(format!("{} {path}{note}", out.bold(&tag)))
-}
-
-/// One locally edited file rendered as a unified diff against the base.
-struct LocalFileDiff {
-    path: RepoPathBuf,
-    kind: LocalChangeKind,
-    binary: bool,
-    unified: Vec<u8>,
-}
-
-async fn local_diff(
-    ctx: &mut Ctx<'_>,
-    base: Option<&str>,
-    prefixes: Vec<RepoPathBuf>,
-    context: u32,
-) -> Result<()> {
-    let dir = ctx.require_checkout_dir()?;
-    let mount = ctx.mount().await?;
-    let base = match base {
-        Some(b) => root_arg(Some(b))?,
-        None if mount.base_version.is_empty() => Root::Tree(Tree::empty_hash()),
-        None => Root::Version(mount.base_version.parse()?),
-    };
-    let reply = ctx
-        .daemon()
-        .await?
-        .get_status(dpb::GetStatusRequest {
-            name: mount.name.clone(),
-            prefixes: prefixes.iter().map(|p| p.as_str().to_string()).collect(),
-        })
-        .await?;
-    let changes = rill_daemon::client::local_changes(&reply.changes);
-    let repo = ctx.repo()?;
-    let mut files = Vec::with_capacity(changes.len());
-    for change in &changes {
-        files.push(diff_one(&repo, &dir, &base, change, context).await?);
+        out.line(format!(
+            "Working change {}",
+            out.paint(Role::Id, &meta.working_change)
+        ))?;
     }
-    ctx.emit(
-        j!({
-            "base": base.to_string(),
-            "files": files.iter().map(|f| j!({
-                "path": f.path.as_str(),
-                "status": json::enum_name(&f.kind),
-                "binary": f.binary,
-                "unified": String::from_utf8_lossy(&f.unified),
-            })).collect::<Vec<_>>(),
-        }),
-        |out| {
-            if files.is_empty() {
-                return out.line(out.dim("no local changes"));
-            }
-            for f in &files {
-                print_file_header(
-                    out,
-                    f.path.as_str(),
-                    f.kind == LocalChangeKind::Added,
-                    f.kind == LocalChangeKind::Deleted,
-                    f.binary,
-                )?;
-                out.raw(&f.unified)?;
-            }
-            Ok(())
-        },
-    )
-}
-
-async fn diff_one(
-    repo: &RepoClient,
-    dir: &std::path::Path,
-    base: &Root,
-    change: &LocalChange,
-    context: u32,
-) -> Result<LocalFileDiff> {
-    let before = match change.kind {
-        LocalChangeKind::Added => Vec::new(),
-        _ => repo
-            .read_file(base, change.path.as_path())
-            .await
-            .map(|b| b.to_vec())
-            .or_else(|e| {
-                if e.is_not_found() {
-                    Ok(Vec::new())
-                } else {
-                    Err(e)
-                }
-            })?,
-    };
-    let after = match change.kind {
-        LocalChangeKind::Deleted => Vec::new(),
-        _ => {
-            let mut fs_path = dir.to_path_buf();
-            fs_path.extend(change.path.components());
-            tokio::task::spawn_blocking(move || std::fs::read(fs_path))
-                .await
-                .map_err(|e| CliError::Other(anyhow::anyhow!("read task failed: {e}")))??
+    if !meta.sync_error.is_empty() {
+        let line = format!("Sync to the server is failing: {}", meta.sync_error);
+        let painted = out.paint(Role::Warning, &line);
+        out.line(painted)?;
+    } else if meta.pending > 0 {
+        let line = format!(
+            "{} edit{} not synced to the server yet",
+            meta.pending,
+            if meta.pending == 1 { "" } else { "s" }
+        );
+        let painted = out.paint(Role::Dim, &line);
+        out.line(painted)?;
+    }
+    let (edits, conflicts): (Vec<&LocalChange>, Vec<&LocalChange>) =
+        changes.iter().partition(|c| c.kind != ChangeKind::Conflict);
+    if changes.is_empty() {
+        out.blank()?;
+        return out.line("Nothing to record; the working copy matches its base.");
+    }
+    if !edits.is_empty() {
+        out.blank()?;
+        out.line("Changes:")?;
+        let hint = if meta.working_change.is_empty() {
+            "  (`rill diff` to review, `rill new -m <message>` to record them)"
+        } else {
+            "  (`rill diff` to review, `rill amend` to record them)"
+        };
+        let painted = out.paint(Role::Hint, hint);
+        out.line(painted)?;
+        for c in &edits {
+            let (label, role) = match c.kind {
+                ChangeKind::Added => ("new file:", Role::Added),
+                ChangeKind::Deleted => ("deleted:", Role::Removed),
+                _ => ("modified:", Role::Modified),
+            };
+            let painted = out.paint(role, &format!("{label:<12}{}", c.path));
+            out.line(format!("\t{painted}"))?;
         }
-    };
-    let binary = rill_core::diff::is_binary(&before) || rill_core::diff::is_binary(&after);
-    let unified = if binary {
-        Vec::new()
-    } else {
-        let hunks = rill_core::diff::diff_lines_with_context(&before, &after, context as usize);
-        rill_core::diff::to_unified(change.path.as_str(), &hunks)
-    };
-    Ok(LocalFileDiff {
-        path: change.path.clone(),
-        kind: change.kind,
-        binary,
-        unified,
-    })
+    }
+    if !conflicts.is_empty() {
+        out.blank()?;
+        out.line("Conflicts:")?;
+        let painted = out.paint(
+            Role::Hint,
+            "  (edit the markers, then `rill resolve <path>`)",
+        );
+        out.line(painted)?;
+        for c in &conflicts {
+            let painted = out.paint(
+                Role::Conflict,
+                &format!("{:<12}{}", "both changed:", c.path),
+            );
+            out.line(format!("\t{painted}"))?;
+        }
+    }
+    Ok(())
 }
 
 /// `{"path", "kind"}` of one local change.

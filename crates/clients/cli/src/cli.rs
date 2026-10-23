@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    access, admin, change, checkout, daemon, health, history, identity, import, intent, land, org,
-    refs, release, repo, review, stack, status, watch, ws,
+    access, admin, blame, change, checkout, daemon, diff, health, history, identity, import,
+    intent, land, log, org, refs, release, repo, review, show, stack, status, watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -110,16 +110,16 @@ pub enum Command {
     Status(status::StatusArgs),
 
     /// Differences: local edits, or two points in history.
-    Diff(status::DiffArgs),
+    Diff(diff::DiffArgs),
 
     /// Walk history.
-    Log(history::LogArgs),
+    Log(log::LogArgs),
 
     /// Line-by-line attribution of a file.
-    Blame(history::BlameArgs),
+    Blame(blame::BlameArgs),
 
     /// Show a change version and its files.
-    Show(history::ShowArgs),
+    Show(show::ShowArgs),
 
     /// List a directory at a root.
     Ls(history::LsArgs),

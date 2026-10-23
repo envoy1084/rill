@@ -5,13 +5,18 @@
 //! as-is; otherwise the human rendering goes through [`Out`], which owns
 //! the writer and the colour decision.
 
-mod format;
+pub mod diff;
+pub mod format;
+pub mod graph;
 pub mod pager;
+pub mod patch;
+pub mod stat;
 mod table;
 pub mod theme;
 mod writer;
 
-pub use format::{short, when, yes_no};
+pub use format::{ago, ago_from, short, strip_ansi, visible_width, when, yes_no};
+pub use patch::{FileStatus, PatchFile, PatchMode};
 pub use table::Table;
 pub use theme::{Role, Theme};
 pub use writer::Out;

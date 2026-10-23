@@ -3,8 +3,9 @@
 use clap::CommandFactory;
 
 use super::{
-    access, admin, change, checkout, daemon, doctor, export, health, history, identity, import,
-    intent, land, org, refs, release, repo, review, session, stack, status, watch, ws,
+    access, admin, blame, change, checkout, daemon, diff, doctor, export, health, history,
+    identity, import, intent, land, log, org, refs, release, repo, review, session, show, stack,
+    status, watch, ws,
 };
 use crate::cli::{Cli, Command};
 use crate::context::Ctx;
@@ -33,10 +34,10 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Daemon(cmd) => daemon::run(ctx, cmd).await,
         Command::Doctor => doctor::run(ctx).await,
         Command::Status(args) => status::status(ctx, args).await,
-        Command::Diff(args) => status::diff(ctx, args).await,
-        Command::Log(args) => history::log(ctx, args).await,
-        Command::Blame(args) => history::blame(ctx, args).await,
-        Command::Show(args) => history::show(ctx, args).await,
+        Command::Diff(args) => diff::diff(ctx, args).await,
+        Command::Log(args) => log::log(ctx, args).await,
+        Command::Blame(args) => blame::blame(ctx, args).await,
+        Command::Show(args) => show::show(ctx, args).await,
         Command::Ls(args) => history::ls(ctx, args).await,
         Command::Cat(args) => history::cat(ctx, args).await,
         Command::Grep(args) => history::grep(ctx, args).await,

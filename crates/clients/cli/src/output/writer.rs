@@ -17,6 +17,8 @@ pub struct Out<'w> {
     writer: &'w mut dyn Write,
     color: bool,
     theme: Arc<Theme>,
+    syntax: bool,
+    syntax_theme: String,
 }
 
 impl<'w> Out<'w> {
@@ -26,7 +28,33 @@ impl<'w> Out<'w> {
             writer,
             color,
             theme: Arc::new(Theme::default()),
+            syntax: false,
+            syntax_theme: super::diff::DEFAULT_SYNTAX_THEME.into(),
         }
+    }
+
+    /// Colour code in diffs by language, with the named syntax theme.
+    pub fn with_syntax(mut self, on: bool, theme: Option<String>) -> Self {
+        self.syntax = on;
+        if let Some(t) = theme {
+            self.syntax_theme = t;
+        }
+        self
+    }
+
+    /// The colour theme.
+    pub fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    /// Whether diffs colour code by language.
+    pub fn syntax(&self) -> bool {
+        self.syntax
+    }
+
+    /// The syntax colouring theme's name.
+    pub fn syntax_theme(&self) -> &str {
+        &self.syntax_theme
     }
 
     /// Use `theme` for every role.

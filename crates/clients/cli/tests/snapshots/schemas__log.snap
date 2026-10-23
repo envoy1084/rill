@@ -39,6 +39,7 @@ expression: doc
         "trunk_seq": 1
       }
     ],
-    "next_page_token": null
+    "next_page_token": null,
+    "stack": []
   }
 }

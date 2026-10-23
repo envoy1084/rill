@@ -12,6 +12,7 @@
 //!
 //! [diff]
 //! syntax = true          # syntax highlighting in diffs
+//! theme = "base16-ocean.dark"
 //!
 //! [alias]
 //! st = "status"
@@ -65,11 +66,16 @@ pub struct CoreSettings {
 pub struct DiffSettings {
     /// Syntax highlighting in diffs.
     pub syntax: bool,
+    /// The syntax theme (`base16-ocean.dark`, `InspiredGitHub`, …).
+    pub theme: Option<String>,
 }
 
 impl Default for DiffSettings {
     fn default() -> Self {
-        DiffSettings { syntax: true }
+        DiffSettings {
+            syntax: true,
+            theme: None,
+        }
     }
 }
 

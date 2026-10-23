@@ -145,7 +145,7 @@ async fn create_checkout_land_and_sync() {
     let text = server.ok(&co, &["log"]).await;
     assert!(text.contains("second change"));
     let text = server.ok(&co, &["status"]).await;
-    assert!(text.contains("working change"));
+    assert!(text.contains("Working change"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

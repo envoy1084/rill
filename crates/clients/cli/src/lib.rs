@@ -93,8 +93,10 @@ fn prepare(
                 };
                 let _ = out.write_all(text.as_bytes());
                 let _ = out.flush();
-            } else {
+            } else if std::io::IsTerminal::is_terminal(&std::io::stderr()) {
                 eprint!("{}", e.render().ansi());
+            } else {
+                eprint!("{}", e.render());
             }
             Err(code)
         }
