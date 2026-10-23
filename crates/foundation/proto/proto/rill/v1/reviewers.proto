@@ -1,0 +1,269 @@
+// The reviewer fleet: agents that review changes and resolve conflicts,
+// run outside the server by `rill-review-runner` or any client.
+//
+// Changes are routed to reviewers by the repository's
+// `.rill/review.toml`; each reviewer has its own queue. A runner leases
+// the next job for the agent it signs in as, reviews the packet, and
+// reports structured findings and a vote, which the server checks before
+// posting them as that agent.
+syntax = "proto3";
+
+package rill.v1;
+
+import "rill/v1/identity.proto";
+import "rill/v1/types.proto";
+
+// Leasing and finishing review and resolve jobs.
+service ReviewerService {
+  // Lease the calling reviewer's next review job in a repository. Waits up
+  // to `wait_ms` for one; the response has no lease when none came.
+  rpc LeaseReviewJob(LeaseReviewJobRequest) returns (LeaseReviewJobResponse);
+  // Extend a review or resolve lease.
+  rpc RenewReviewLease(RenewReviewLeaseRequest) returns (RenewReviewLeaseResponse);
+  // Report a review: findings become threads and the vote is cast, after
+  // checking the reviewer's maximum vote, the findings' paths and that the
+  // reviewed version is still current.
+  rpc CompleteReviewJob(CompleteReviewJobRequest) returns (CompleteReviewJobResponse);
+  // Give a review or resolve job up, to retry later or for good.
+  rpc FailReviewJob(FailReviewJobRequest) returns (FailReviewJobResponse);
+  // Queue reviews of a change's current version now.
+  rpc RequestReview(RequestReviewRequest) returns (RequestReviewResponse);
+  // A change's review runs, newest first.
+  rpc ListReviewRuns(ListReviewRunsRequest) returns (ListReviewRunsResponse);
+  // Lease the calling resolver's next conflict to resolve.
+  rpc LeaseResolveJob(LeaseResolveJobRequest) returns (LeaseResolveJobResponse);
+  // Report a resolve job: the version the resolver stored, or that it
+  // declined.
+  rpc CompleteResolveJob(CompleteResolveJobRequest) returns (CompleteResolveJobResponse);
+  // Reviewers' track records in a repository and the trust they earn.
+  rpc ListReviewerStats(ListReviewerStatsRequest) returns (ListReviewerStatsResponse);
+  // Clear a reviewer's record and lift its demotion (repository owners).
+  rpc ReinstateReviewer(ReinstateReviewerRequest) returns (ReinstateReviewerResponse);
+}
+
+message LeaseReviewJobRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  // How long to wait for a job, in milliseconds (at most 30000).
+  uint32 wait_ms = 2;
+}
+message LeaseReviewJobResponse {
+  // Opaque; empty when no job was waiting.
+  bytes lease = 1;
+  int64 lease_until = 2;
+  ReviewJob job = 3;
+}
+
+// What a reviewer is asked to review.
+message ReviewJob {
+  // `…/changes/{change}`.
+  string change = 1;
+  // The version to review.
+  string version = 2;
+  // Why it was queued: `submitted`, `new version`, `requested by …`.
+  string reason = 3;
+  ReviewerProfile profile = 4;
+  // The prompt file's text on trunk; empty when it does not exist.
+  string prompt = 5;
+  ReviewPacket packet = 6;
+}
+
+// The change as a reviewer sees it, within the server's context budget.
+message ReviewPacket {
+  string description = 1;
+  Principal author = 2;
+  // "trivial", "low", "normal", "sensitive" or "critical".
+  string risk = 3;
+  string intent_title = 4;
+  string intent_body = 5;
+  repeated ReviewFile files = 6;
+  // Diffs were dropped to fit the budget.
+  bool truncated = 7;
+}
+
+message ReviewFile {
+  string path = 1;
+  // Unified diff against the first parent; empty for binary, oversized
+  // or dropped files.
+  string unified = 2;
+  bool added = 3;
+  bool deleted = 4;
+}
+
+// One observation a reviewer reports.
+message ReviewFinding {
+  // A touched path; empty for a change-level finding.
+  string path = 1;
+  // One-based inclusive lines in the reviewed version; 0 for the whole
+  // file.
+  uint32 start_line = 2;
+  uint32 end_line = 3;
+  CommentCategory category = 4;
+  // 0-100.
+  uint32 confidence = 5;
+  string body = 6;
+}
+
+message RenewReviewLeaseRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  bytes lease = 2;
+}
+message RenewReviewLeaseResponse {
+  bytes lease = 1;
+  int64 lease_until = 2;
+}
+
+message CompleteReviewJobRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  bytes lease = 3;
+  repeated ReviewFinding findings = 4;
+  // The `Review` vote, within the reviewer's maximum; 0 casts none.
+  int32 vote = 5;
+  string summary = 6;
+  // The model that ran, as the runner reports it.
+  string model = 7;
+}
+message CompleteReviewJobResponse {
+  ReviewRun run = 1;
+}
+
+message FailReviewJobRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  bytes lease = 3;
+  string error = 4;
+  // Try again later; otherwise the job ends now.
+  bool retry = 5;
+}
+message FailReviewJobResponse {}
+
+message RequestReviewRequest {
+  string request_id = 1;
+  // `…/changes/{change}`. Required.
+  string change = 2;
+  // Reviewer agents to ask; empty routes by `.rill/review.toml`.
+  repeated string reviewers = 3;
+}
+message RequestReviewResponse {
+  repeated ReviewRun runs = 1;
+}
+
+message ListReviewRunsRequest {
+  // `…/changes/{change}`. Required.
+  string change = 1;
+}
+message ListReviewRunsResponse {
+  repeated ReviewRun runs = 1;
+}
+
+enum ReviewRunStatus {
+  REVIEW_RUN_STATUS_UNSPECIFIED = 0;
+  REVIEW_RUN_STATUS_QUEUED = 1;
+  REVIEW_RUN_STATUS_DONE = 2;
+  REVIEW_RUN_STATUS_FAILED = 3;
+  // The change had a new version before the result came.
+  REVIEW_RUN_STATUS_STALE = 4;
+  // Not run: the reviewer's daily budget was spent or it is not usable.
+  REVIEW_RUN_STATUS_SKIPPED = 5;
+}
+
+// One reviewer's run (or one resolve) on one version of a change.
+message ReviewRun {
+  // `agent:<name>`.
+  string reviewer = 1;
+  string version = 2;
+  string reason = 3;
+  ReviewRunStatus status = 4;
+  int64 queued_at = 5;
+  int64 finished_at = 6;
+  // Findings posted.
+  uint32 findings = 7;
+  // The vote cast; 0 for none.
+  int32 vote = 8;
+  string model = 9;
+  // The summary, or why it failed or was skipped.
+  string detail = 10;
+  // "review" or "resolve".
+  string kind = 11;
+}
+
+message LeaseResolveJobRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+  uint32 wait_ms = 2;
+}
+message LeaseResolveJobResponse {
+  bytes lease = 1;
+  int64 lease_until = 2;
+  ResolveJob job = 3;
+}
+
+// A conflicted version to resolve.
+message ResolveJob {
+  // `…/changes/{change}`.
+  string change = 1;
+  string version = 2;
+  // The conflicted paths.
+  repeated string paths = 3;
+  // The prompt file's text on trunk, when the resolver has one.
+  string prompt = 4;
+}
+
+message CompleteResolveJobRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  bytes lease = 3;
+  // The version the resolver stored with `ResolveConflicts`; empty when
+  // it declined.
+  string resolved_version = 4;
+  string rationale = 5;
+}
+message CompleteResolveJobResponse {
+  ReviewRun run = 1;
+}
+
+// One reviewer's record in a repository.
+message ReviewerStats {
+  // `agent:<name>`.
+  string reviewer = 1;
+  // Permille: the mean of Beta(good + 1, bad + 1).
+  uint32 trust = 2;
+  uint32 outcomes = 3;
+  // Approved changes that landed.
+  uint64 approvals = 4;
+  // Of those, reverted, blamed for a red trunk or failed in audit.
+  uint64 escapes = 5;
+  // Blocking findings the author fixed.
+  uint64 blocks = 6;
+  // Blocking findings resolved without a change.
+  uint64 dismissed = 7;
+  // Routed nothing; its approvals do not count.
+  bool demoted = 8;
+  // Why it was demoted or reinstated last, and when.
+  string note = 9;
+  int64 since = 10;
+}
+
+message ListReviewerStatsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 1;
+}
+message ListReviewerStatsResponse {
+  repeated ReviewerStats reviewers = 1;
+}
+
+message ReinstateReviewerRequest {
+  string request_id = 1;
+  // `orgs/{org}/repos/{repo}`. Required.
+  string parent = 2;
+  // `agent:<name>` or the name.
+  string reviewer = 3;
+}
+message ReinstateReviewerResponse {
+  ReviewerStats stats = 1;
+}

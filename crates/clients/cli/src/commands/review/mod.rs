@@ -1,10 +1,11 @@
 //! `rill submit`, `rill approve`, `rill reject`, `rill abandon` and
 //! `rill review`: show, list, vote, comment, reply, threads, resolve-thread,
-//! evaluate.
+//! evaluate, request, runs.
 
 mod args;
 mod browse;
 mod dispatch;
+mod fleet;
 mod inbox;
 mod lifecycle;
 mod render;

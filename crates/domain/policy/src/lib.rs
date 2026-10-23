@@ -18,6 +18,7 @@ pub mod identity;
 pub mod intents;
 pub mod owners;
 pub mod rebac;
+pub mod reviewers;
 pub mod risk;
 pub mod secrets;
 pub mod signing;

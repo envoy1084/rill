@@ -15,6 +15,8 @@ mod schema;
 mod tests;
 
 pub use default_policy::{default_policy, DEFAULT_POLICY};
-pub use facts::{owner_coverage, SubmitFacts, VoteSummary, OWNER_LABEL};
+pub use facts::{
+    independence, owner_coverage, SubmitFacts, VoteSummary, OWNER_LABEL, REVIEW_LABEL,
+};
 pub use policy::{SubmitDecision, SubmitPolicy};
 pub use schema::{schema, SCHEMA_SRC};

@@ -21,6 +21,7 @@ revisions, pages, filters, etags, request ids, errors) are in
 - [ProtectionService](#rill-v1-ProtectionService)
 - [RepoService](#rill-v1-RepoService)
 - [ReviewService](#rill-v1-ReviewService)
+- [ReviewerService](#rill-v1-ReviewerService)
 - [SecretService](#rill-v1-SecretService)
 - [SessionService](#rill-v1-SessionService)
 - [TrunkService](#rill-v1-TrunkService)
@@ -3306,6 +3307,7 @@ Identities, tokens and the organization's sign-in setup.
 | `budgets` | [AgentBudgets](#rill-v1-AgentBudgets) |  |  |
 | `workloads` | [WorkloadBinding](#rill-v1-WorkloadBinding) | repeated |  |
 | `expires_at` | [int64](#int64) | optional |  |
+| `reviewer` | [ReviewerProfile](#rill-v1-ReviewerProfile) |  | Set when the agent reviews changes. |
 
 
 <a name="rill-v1-Capability"></a>
@@ -3741,6 +3743,21 @@ A capability the caller's token grants, as a human-readable summary.
 | --- | --- | --- | --- |
 | `issuers` | [WorkloadIssuerSpec](#rill-v1-WorkloadIssuerSpec) | repeated |  |
 | `next_page_token` | [string](#string) |  |  |
+
+
+<a name="rill-v1-ReviewerProfile"></a>
+
+### ReviewerProfile
+
+How an agent reviews.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `model_family` | [string](#string) |  | The model's family (`claude`, …); a quorum needs different families or prompts. |
+| `model` | [string](#string) |  |  |
+| `prompt` | [string](#string) |  | Its prompt's repository path; default `.rill/reviewers/<name>/prompt.md`. |
+| `max_vote` | [int32](#int32) |  | The largest `Review` vote it may cast, either way (1 or 2). |
+| `runs_per_day` | [uint64](#uint64) | optional |  |
 
 
 <a name="rill-v1-RevokeSessionRequest"></a>
@@ -5780,6 +5797,416 @@ One owner set's state for a change.
 | `new_version` | [bytes](#bytes) |  |  |
 | `land_update` | [LandRequest](#rill-v1-LandRequest) |  |  |
 
+
+
+
+## rill/v1/reviewers.proto
+
+The reviewer fleet: agents that review changes and resolve conflicts,
+run outside the server by `rill-review-runner` or any client.
+
+Changes are routed to reviewers by the repository's
+`.rill/review.toml`; each reviewer has its own queue. A runner leases
+the next job for the agent it signs in as, reviews the packet, and
+reports structured findings and a vote, which the server checks before
+posting them as that agent.
+
+<a name="rill-v1-ReviewerService"></a>
+
+### ReviewerService
+
+Leasing and finishing review and resolve jobs.
+
+| Method | Request | Response | Description |
+| --- | --- | --- | --- |
+| `LeaseReviewJob` | [LeaseReviewJobRequest](#rill-v1-LeaseReviewJobRequest) | [LeaseReviewJobResponse](#rill-v1-LeaseReviewJobResponse) | Lease the calling reviewer's next review job in a repository. Waits up to `wait_ms` for one; the response has no lease when none came. |
+| `RenewReviewLease` | [RenewReviewLeaseRequest](#rill-v1-RenewReviewLeaseRequest) | [RenewReviewLeaseResponse](#rill-v1-RenewReviewLeaseResponse) | Extend a review or resolve lease. |
+| `CompleteReviewJob` | [CompleteReviewJobRequest](#rill-v1-CompleteReviewJobRequest) | [CompleteReviewJobResponse](#rill-v1-CompleteReviewJobResponse) | Report a review: findings become threads and the vote is cast, after checking the reviewer's maximum vote, the findings' paths and that the reviewed version is still current. |
+| `FailReviewJob` | [FailReviewJobRequest](#rill-v1-FailReviewJobRequest) | [FailReviewJobResponse](#rill-v1-FailReviewJobResponse) | Give a review or resolve job up, to retry later or for good. |
+| `RequestReview` | [RequestReviewRequest](#rill-v1-RequestReviewRequest) | [RequestReviewResponse](#rill-v1-RequestReviewResponse) | Queue reviews of a change's current version now. |
+| `ListReviewRuns` | [ListReviewRunsRequest](#rill-v1-ListReviewRunsRequest) | [ListReviewRunsResponse](#rill-v1-ListReviewRunsResponse) | A change's review runs, newest first. |
+| `LeaseResolveJob` | [LeaseResolveJobRequest](#rill-v1-LeaseResolveJobRequest) | [LeaseResolveJobResponse](#rill-v1-LeaseResolveJobResponse) | Lease the calling resolver's next conflict to resolve. |
+| `CompleteResolveJob` | [CompleteResolveJobRequest](#rill-v1-CompleteResolveJobRequest) | [CompleteResolveJobResponse](#rill-v1-CompleteResolveJobResponse) | Report a resolve job: the version the resolver stored, or that it declined. |
+| `ListReviewerStats` | [ListReviewerStatsRequest](#rill-v1-ListReviewerStatsRequest) | [ListReviewerStatsResponse](#rill-v1-ListReviewerStatsResponse) | Reviewers' track records in a repository and the trust they earn. |
+| `ReinstateReviewer` | [ReinstateReviewerRequest](#rill-v1-ReinstateReviewerRequest) | [ReinstateReviewerResponse](#rill-v1-ReinstateReviewerResponse) | Clear a reviewer's record and lift its demotion (repository owners). |
+
+
+
+<a name="rill-v1-CompleteResolveJobRequest"></a>
+
+### CompleteResolveJobRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `lease` | [bytes](#bytes) |  |  |
+| `resolved_version` | [string](#string) |  | The version the resolver stored with `ResolveConflicts`; empty when it declined. |
+| `rationale` | [string](#string) |  |  |
+
+
+<a name="rill-v1-CompleteResolveJobResponse"></a>
+
+### CompleteResolveJobResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `run` | [ReviewRun](#rill-v1-ReviewRun) |  |  |
+
+
+<a name="rill-v1-CompleteReviewJobRequest"></a>
+
+### CompleteReviewJobRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `lease` | [bytes](#bytes) |  |  |
+| `findings` | [ReviewFinding](#rill-v1-ReviewFinding) | repeated |  |
+| `vote` | [int32](#int32) |  | The `Review` vote, within the reviewer's maximum; 0 casts none. |
+| `summary` | [string](#string) |  |  |
+| `model` | [string](#string) |  | The model that ran, as the runner reports it. |
+
+
+<a name="rill-v1-CompleteReviewJobResponse"></a>
+
+### CompleteReviewJobResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `run` | [ReviewRun](#rill-v1-ReviewRun) |  |  |
+
+
+<a name="rill-v1-FailReviewJobRequest"></a>
+
+### FailReviewJobRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `lease` | [bytes](#bytes) |  |  |
+| `error` | [string](#string) |  |  |
+| `retry` | [bool](#bool) |  | Try again later; otherwise the job ends now. |
+
+
+<a name="rill-v1-FailReviewJobResponse"></a>
+
+### FailReviewJobResponse
+
+
+
+
+<a name="rill-v1-LeaseResolveJobRequest"></a>
+
+### LeaseResolveJobRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `wait_ms` | [uint32](#uint32) |  |  |
+
+
+<a name="rill-v1-LeaseResolveJobResponse"></a>
+
+### LeaseResolveJobResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `lease` | [bytes](#bytes) |  |  |
+| `lease_until` | [int64](#int64) |  |  |
+| `job` | [ResolveJob](#rill-v1-ResolveJob) |  |  |
+
+
+<a name="rill-v1-LeaseReviewJobRequest"></a>
+
+### LeaseReviewJobRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `wait_ms` | [uint32](#uint32) |  | How long to wait for a job, in milliseconds (at most 30000). |
+
+
+<a name="rill-v1-LeaseReviewJobResponse"></a>
+
+### LeaseReviewJobResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `lease` | [bytes](#bytes) |  | Opaque; empty when no job was waiting. |
+| `lease_until` | [int64](#int64) |  |  |
+| `job` | [ReviewJob](#rill-v1-ReviewJob) |  |  |
+
+
+<a name="rill-v1-ListReviewRunsRequest"></a>
+
+### ListReviewRunsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `change` | [string](#string) |  | `…/changes/{change}`. Required. |
+
+
+<a name="rill-v1-ListReviewRunsResponse"></a>
+
+### ListReviewRunsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `runs` | [ReviewRun](#rill-v1-ReviewRun) | repeated |  |
+
+
+<a name="rill-v1-ListReviewerStatsRequest"></a>
+
+### ListReviewerStatsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+
+
+<a name="rill-v1-ListReviewerStatsResponse"></a>
+
+### ListReviewerStatsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `reviewers` | [ReviewerStats](#rill-v1-ReviewerStats) | repeated |  |
+
+
+<a name="rill-v1-ReinstateReviewerRequest"></a>
+
+### ReinstateReviewerRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `reviewer` | [string](#string) |  | `agent:<name>` or the name. |
+
+
+<a name="rill-v1-ReinstateReviewerResponse"></a>
+
+### ReinstateReviewerResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `stats` | [ReviewerStats](#rill-v1-ReviewerStats) |  |  |
+
+
+<a name="rill-v1-RenewReviewLeaseRequest"></a>
+
+### RenewReviewLeaseRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `parent` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `lease` | [bytes](#bytes) |  |  |
+
+
+<a name="rill-v1-RenewReviewLeaseResponse"></a>
+
+### RenewReviewLeaseResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `lease` | [bytes](#bytes) |  |  |
+| `lease_until` | [int64](#int64) |  |  |
+
+
+<a name="rill-v1-RequestReviewRequest"></a>
+
+### RequestReviewRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `change` | [string](#string) |  | `…/changes/{change}`. Required. |
+| `reviewers` | [string](#string) | repeated | Reviewer agents to ask; empty routes by `.rill/review.toml`. |
+
+
+<a name="rill-v1-RequestReviewResponse"></a>
+
+### RequestReviewResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `runs` | [ReviewRun](#rill-v1-ReviewRun) | repeated |  |
+
+
+<a name="rill-v1-ResolveJob"></a>
+
+### ResolveJob
+
+A conflicted version to resolve.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `change` | [string](#string) |  | `…/changes/{change}`. |
+| `version` | [string](#string) |  |  |
+| `paths` | [string](#string) | repeated | The conflicted paths. |
+| `prompt` | [string](#string) |  | The prompt file's text on trunk, when the resolver has one. |
+
+
+<a name="rill-v1-ReviewFile"></a>
+
+### ReviewFile
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `path` | [string](#string) |  |  |
+| `unified` | [string](#string) |  | Unified diff against the first parent; empty for binary, oversized or dropped files. |
+| `added` | [bool](#bool) |  |  |
+| `deleted` | [bool](#bool) |  |  |
+
+
+<a name="rill-v1-ReviewFinding"></a>
+
+### ReviewFinding
+
+One observation a reviewer reports.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `path` | [string](#string) |  | A touched path; empty for a change-level finding. |
+| `start_line` | [uint32](#uint32) |  | One-based inclusive lines in the reviewed version; 0 for the whole file. |
+| `end_line` | [uint32](#uint32) |  |  |
+| `category` | [CommentCategory](#rill-v1-CommentCategory) |  |  |
+| `confidence` | [uint32](#uint32) |  | 0-100. |
+| `body` | [string](#string) |  |  |
+
+
+<a name="rill-v1-ReviewJob"></a>
+
+### ReviewJob
+
+What a reviewer is asked to review.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `change` | [string](#string) |  | `…/changes/{change}`. |
+| `version` | [string](#string) |  | The version to review. |
+| `reason` | [string](#string) |  | Why it was queued: `submitted`, `new version`, `requested by …`. |
+| `profile` | [ReviewerProfile](#rill-v1-ReviewerProfile) |  |  |
+| `prompt` | [string](#string) |  | The prompt file's text on trunk; empty when it does not exist. |
+| `packet` | [ReviewPacket](#rill-v1-ReviewPacket) |  |  |
+
+
+<a name="rill-v1-ReviewPacket"></a>
+
+### ReviewPacket
+
+The change as a reviewer sees it, within the server's context budget.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `description` | [string](#string) |  |  |
+| `author` | [Principal](#rill-v1-Principal) |  |  |
+| `risk` | [string](#string) |  | "trivial", "low", "normal", "sensitive" or "critical". |
+| `intent_title` | [string](#string) |  |  |
+| `intent_body` | [string](#string) |  |  |
+| `files` | [ReviewFile](#rill-v1-ReviewFile) | repeated |  |
+| `truncated` | [bool](#bool) |  | Diffs were dropped to fit the budget. |
+
+
+<a name="rill-v1-ReviewRun"></a>
+
+### ReviewRun
+
+One reviewer's run (or one resolve) on one version of a change.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `reviewer` | [string](#string) |  | `agent:<name>`. |
+| `version` | [string](#string) |  |  |
+| `reason` | [string](#string) |  |  |
+| `status` | [ReviewRunStatus](#rill-v1-ReviewRunStatus) |  |  |
+| `queued_at` | [int64](#int64) |  |  |
+| `finished_at` | [int64](#int64) |  |  |
+| `findings` | [uint32](#uint32) |  | Findings posted. |
+| `vote` | [int32](#int32) |  | The vote cast; 0 for none. |
+| `model` | [string](#string) |  |  |
+| `detail` | [string](#string) |  | The summary, or why it failed or was skipped. |
+| `kind` | [string](#string) |  | "review" or "resolve". |
+
+
+<a name="rill-v1-ReviewerStats"></a>
+
+### ReviewerStats
+
+One reviewer's record in a repository.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `reviewer` | [string](#string) |  | `agent:<name>`. |
+| `trust` | [uint32](#uint32) |  | Permille: the mean of Beta(good + 1, bad + 1). |
+| `outcomes` | [uint32](#uint32) |  |  |
+| `approvals` | [uint64](#uint64) |  | Approved changes that landed. |
+| `escapes` | [uint64](#uint64) |  | Of those, reverted, blamed for a red trunk or failed in audit. |
+| `blocks` | [uint64](#uint64) |  | Blocking findings the author fixed. |
+| `dismissed` | [uint64](#uint64) |  | Blocking findings resolved without a change. |
+| `demoted` | [bool](#bool) |  | Routed nothing; its approvals do not count. |
+| `note` | [string](#string) |  | Why it was demoted or reinstated last, and when. |
+| `since` | [int64](#int64) |  |  |
+
+
+
+<a name="rill-v1-ReviewRunStatus"></a>
+
+### ReviewRunStatus
+
+
+
+| Name | Number | Description |
+| --- | --- | --- |
+| `REVIEW_RUN_STATUS_UNSPECIFIED` | 0 |  |
+| `REVIEW_RUN_STATUS_QUEUED` | 1 |  |
+| `REVIEW_RUN_STATUS_DONE` | 2 |  |
+| `REVIEW_RUN_STATUS_FAILED` | 3 |  |
+| `REVIEW_RUN_STATUS_STALE` | 4 | The change had a new version before the result came. |
+| `REVIEW_RUN_STATUS_SKIPPED` | 5 | Not run: the reviewer's daily budget was spent or it is not usable. |
 
 
 

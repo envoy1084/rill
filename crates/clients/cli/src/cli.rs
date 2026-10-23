@@ -246,6 +246,9 @@ pub enum Command {
     /// Code owners: who owns a path, and a change's standing with them.
     #[command(subcommand)]
     Owners(crate::commands::owners::OwnersCmd),
+    /// Agent reviewers' track records: trust, demotion, reinstating.
+    #[command(subcommand)]
+    Reviewer(crate::commands::reviewer::ReviewerCmd),
 
     /// Releases: cut and list.
     #[command(subcommand)]

@@ -179,3 +179,26 @@ async fn a_job_for_later_waits_until_its_time() {
     );
     assert_eq!(queue.stats().await.unwrap().pending(), 1, "but stored");
 }
+
+#[tokio::test]
+async fn a_claim_handed_back_is_checked_against_its_queue_and_job() {
+    let repo = repo().await;
+    let queue = Queue::new(repo.clone(), "review:a");
+    let other = Queue::new(repo.clone(), "review:b");
+    queue
+        .push(JobSpec::new("t", "k", b"one".to_vec()))
+        .await
+        .unwrap();
+    let claim = queue.claim("a").await.unwrap().unwrap();
+    let kept: rill_jobs::Claim =
+        serde_json::from_slice(&serde_json::to_vec(&claim).unwrap()).unwrap();
+    queue.verify(&kept).unwrap();
+    assert!(matches!(other.verify(&kept), Err(Error::Foreign(_))));
+    let mut forged = kept.clone();
+    forged.job.payload = b"two".to_vec();
+    assert!(matches!(queue.verify(&forged), Err(Error::Foreign(_))));
+    let mut forged = kept.clone();
+    forged.holder = "b".into();
+    assert!(matches!(queue.verify(&forged), Err(Error::Foreign(_))));
+    queue.complete(&kept).await.unwrap();
+}

@@ -17,6 +17,7 @@ flowchart LR
     Repo --> WS[WorkspaceClient]
     Repo --> Rv[ReviewClient]
     Repo --> In[IntentClient]
+    Repo --> Rf[ReviewerClient]
     Repo --> La[TrunkClient]
     Repo --> Ck[ChecksClient]
     Repo --> Op[OperationClient]

@@ -13,7 +13,8 @@ use rill_proto::rill::v1::{
     ChecksServiceClient, ContentServiceClient, EventServiceClient, IdentityServiceClient,
     IntentServiceClient, LandingServiceClient, OperationServiceClient, OrgServiceClient,
     PolicyServiceClient, ProtectionServiceClient, RepoServiceClient, ReviewServiceClient,
-    SecretServiceClient, SessionServiceClient, TrunkServiceClient, WorkspaceServiceClient,
+    ReviewerServiceClient, SecretServiceClient, SessionServiceClient, TrunkServiceClient,
+    WorkspaceServiceClient,
 };
 
 use crate::access::AccessClient;
@@ -199,6 +200,8 @@ pub type WorkspaceSvc = WorkspaceServiceClient<Transport>;
 pub type ReviewSvc = ReviewServiceClient<Transport>;
 /// Generated intent client over the SDK transport.
 pub type IntentSvc = IntentServiceClient<Transport>;
+/// Generated reviewer-fleet client over the SDK transport.
+pub type ReviewerSvc = ReviewerServiceClient<Transport>;
 /// Generated landing client over the SDK transport.
 pub type LandingSvc = LandingServiceClient<Transport>;
 /// Generated trunk client over the SDK transport.
@@ -479,6 +482,11 @@ impl Client {
     /// A fresh generated intent client.
     pub fn intent_svc(&self) -> IntentSvc {
         IntentServiceClient::new(self.transport(), self.call_config())
+    }
+
+    /// A fresh generated reviewer-fleet client.
+    pub fn reviewer_svc(&self) -> ReviewerSvc {
+        ReviewerServiceClient::new(self.transport(), self.call_config())
     }
 
     /// A fresh generated landing client.

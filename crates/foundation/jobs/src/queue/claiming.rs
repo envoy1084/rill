@@ -62,6 +62,26 @@ impl Queue {
         })
     }
 
+    /// Check a claim its holder kept and handed back (it serializes): its
+    /// keys are this queue's for its job, and the lease record it expects
+    /// names the same job and holder. Whether it still holds is left to the
+    /// fenced write that uses it.
+    pub fn verify(&self, claim: &Claim) -> Result<()> {
+        let keys = self.repo.keys();
+        let id = *claim.job.id.as_bytes();
+        let foreign = || Error::Foreign(self.name.clone());
+        if claim.leased_key != keys.job_leased(&self.name, &id)
+            || claim.token_key != keys.job_token(&self.name, &id)
+        {
+            return Err(foreign());
+        }
+        let leased: Leased = decode_record(&claim.leased_value).map_err(|_| foreign())?;
+        if leased.job != claim.job || leased.holder != claim.holder || leased.token != claim.token {
+            return Err(foreign());
+        }
+        Ok(())
+    }
+
     /// Finish `claim`'s job.
     pub async fn complete(&self, claim: &Claim) -> Result<()> {
         self.commit_claimed(claim, self.complete_tx(claim)).await

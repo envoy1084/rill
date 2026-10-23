@@ -11,7 +11,8 @@
 //! * [`stacks`]: chains of dependent changes.
 //! * [`facts`] and [`evaluate`]: building policy facts and deciding
 //!   whether a change may land.
-//! * [`agents`]: reviewer fan-out and the resolver interface.
+//! * [`agents`]: the reviewer fleet's context, result checks and run
+//!   records.
 
 pub mod agents;
 mod content;
@@ -29,10 +30,7 @@ pub mod votes;
 #[cfg(test)]
 pub(crate) mod testing;
 
-pub use agents::{
-    Budget, Finding, HeuristicReviewer, PoolConfig, PoolReport, Resolver, ReviewContext, Reviewer,
-    ReviewerPool,
-};
+pub use agents::{Budget, Finding, ReviewContext, ReviewResult, ReviewRun, RunKind, RunStatus};
 pub use error::{Error, Result};
 pub use lifecycle::VersionRelation;
 pub use service::{ReviewEvent, ReviewService};

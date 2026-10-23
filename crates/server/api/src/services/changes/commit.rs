@@ -270,26 +270,33 @@ async fn validate(opened: &Opened, cv: &ChangeVersion) -> Result<()> {
                 check_copy_source(ctx, source).await?;
             }
             if path.file_name() == Some(rill_policy::owners::OWNERS_FILE) {
-                lint_owners(ctx, path, content).await?;
+                lint_config(ctx, path, content, |t| {
+                    rill_policy::owners::OwnersFile::parse(t).map(|_| ())
+                })
+                .await?;
+            } else if path.as_str() == rill_policy::reviewers::REVIEW_CONFIG {
+                lint_config(ctx, path, content, |t| {
+                    rill_policy::reviewers::ReviewConfig::parse(t).map(|_| ())
+                })
+                .await?;
             }
         }
     }
     Ok(())
 }
 
-/// An `OWNERS.toml` must parse: a bad one would leave its directory's
-/// review to the parent's owners without anyone noticing.
-async fn lint_owners(
+/// Review configuration (`OWNERS.toml`, `.rill/review.toml`) must parse:
+/// a bad file would quietly change who reviews what.
+async fn lint_config(
     ctx: &rill_runtime::state::RepoContext,
     path: &rill_types::RepoPath,
     content: &rill_types::ContentRef,
+    parse: impl Fn(&str) -> rill_policy::Result<()>,
 ) -> Result<()> {
     let bytes = rill_core::read_content(ctx.repo.objects().as_ref(), content).await?;
     let text =
         std::str::from_utf8(&bytes).map_err(|_| Error::invalid(format!("{path} is not UTF-8")))?;
-    rill_policy::owners::OwnersFile::parse(text)
-        .map(|_| ())
-        .map_err(|e| Error::invalid(format!("{path}: {e}")))
+    parse(text).map_err(|e| Error::invalid(format!("{path}: {e}")))
 }
 
 /// A copy source must name a file that exists in the version it cites.

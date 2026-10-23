@@ -35,6 +35,14 @@ fn agent_approvals(n: u32) -> VoteSummary {
     }
 }
 
+/// Facts at `risk` with `n` independent agent approvals on Review.
+fn reviewed_by_agents(risk: RiskClass, n: u32) -> SubmitFacts {
+    SubmitFacts {
+        independent_agent_approvals: n,
+        ..SubmitFacts::new(risk).with_label("Review", agent_approvals(n))
+    }
+}
+
 fn verified() -> VoteSummary {
     VoteSummary {
         max: 1,
@@ -101,11 +109,7 @@ fn normal_needs_human_plus_two() {
 
 #[test]
 fn normal_accepts_two_agents_plus_human_owner() {
-    let d = eval(
-        SubmitFacts::new(RiskClass::Normal)
-            .with_label("Review", agent_approvals(2))
-            .with_label("Owner", human_review(1)),
-    );
+    let d = eval(reviewed_by_agents(RiskClass::Normal, 2).with_label("Owner", human_review(1)));
     assert!(d.allowed, "{:?}", d.reasons);
     assert_eq!(
         d.matched_policies,
@@ -113,15 +117,19 @@ fn normal_accepts_two_agents_plus_human_owner() {
     );
 
     // One agent is not enough.
-    let d = eval(
-        SubmitFacts::new(RiskClass::Normal)
-            .with_label("Review", agent_approvals(1))
-            .with_label("Owner", human_review(1)),
-    );
+    let d = eval(reviewed_by_agents(RiskClass::Normal, 1).with_label("Owner", human_review(1)));
     assert!(!d.allowed);
 
     // Two agents without an owner is not enough.
-    let d = eval(SubmitFacts::new(RiskClass::Normal).with_label("Review", agent_approvals(2)));
+    let d = eval(reviewed_by_agents(RiskClass::Normal, 2));
+    assert!(!d.allowed);
+
+    // Two agent approvals that are not independent are not enough.
+    let d = eval(
+        SubmitFacts::new(RiskClass::Normal)
+            .with_label("Review", agent_approvals(2))
+            .with_label("Owner", human_review(1)),
+    );
     assert!(!d.allowed);
 
     // An agent "owner" vote does not count.
@@ -338,7 +346,7 @@ fn a_policy_can_require_every_touched_owner_set() {
         ann.to_string(),
         Person {
             teams: vec!["billing".into()],
-            sponsor: None,
+            ..Person::default()
         },
     );
     let v = ObjectHash::digest(rill_types::ObjectKind::Derived, b"v");

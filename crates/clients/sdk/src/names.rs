@@ -63,6 +63,14 @@ pub fn version_hash(name: &str) -> Result<ChangeVersionHash> {
     Ok(parts[2].parse()?)
 }
 
+/// The change id a change name ends with.
+pub fn change_id(name: &str) -> Result<ChangeId> {
+    let parts = names::CHANGE
+        .parse(name)
+        .map_err(|e| Error::config(e.to_string()))?;
+    Ok(parts[2].parse()?)
+}
+
 /// The short name (`release/1.0`) of a ref resource name.
 pub fn ref_short(name: &str) -> Result<RefName> {
     let parts = names::REF

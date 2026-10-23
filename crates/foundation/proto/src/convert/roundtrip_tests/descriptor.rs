@@ -31,6 +31,7 @@ fn descriptor_set_declares_every_service() {
             "ProtectionService",
             "RepoService",
             "ReviewService",
+            "ReviewerService",
             "SecretService",
             "SessionService",
             "TrunkService",

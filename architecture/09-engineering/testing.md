@@ -153,8 +153,13 @@ round trips in `src/convert/roundtrip_tests/`.
   reported as such, markers are refused by `resolve`, and the checkout
   syncs after landing (`rill-cli/tests/cli/landing.rs`).
 - **Review**: vote thresholds (human +2, or agents plus owner), vote carry-over
-  on trivial rebase, thread re-anchoring and blocking, stack validation, the
-  heuristic reviewer, and review context.
+  on trivial rebase, thread re-anchoring and blocking, stack validation,
+  reviewer results posted only on the version reviewed, and review context.
+- **Reviewer fleet**: routing, leases only for the agent's own queue,
+  results over the reviewer's limits refused, independence of agent
+  approvals, resolver dispatch (`rill-api/tests/grpc/access/reviewers.rs`);
+  the runner's loops on a dev server and the Claude backend against
+  recorded answers (`rill-review-runner/tests/runner`).
 - **Landing**: empty trunk, independent changes in one run, rebase of a
   change behind trunk, a conflict returned to its owner, a red verifier,
   post-land bisect, a green batch, revert, auto-revert after grace, and

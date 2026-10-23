@@ -90,6 +90,27 @@ impl RepoStore {
         Ok(())
     }
 
+    /// [`RepoStore::set_misc`] that writes only while the value is still
+    /// `expected` (`None`: absent); a conflict error otherwise.
+    pub async fn set_misc_cas(
+        &self,
+        name: &str,
+        expected: Option<Bytes>,
+        value: Bytes,
+    ) -> Result<()> {
+        let expected = match expected {
+            Some(old) => Some(self.seal_row(old).await?),
+            None => None,
+        };
+        let row = self.seal_row(value).await?;
+        let key = self.keys().misc(name);
+        let tx = crate::meta::Transaction::new()
+            .expect(key.clone(), expected)
+            .set(key, row);
+        self.meta().transact(tx).await?;
+        Ok(())
+    }
+
     /// [`RepoStore::set_misc`] that writes only while `lease` holds and the
     /// value is still `expected` (`None`: absent): a compare-and-swap.
     pub async fn set_misc_if(

@@ -59,6 +59,12 @@ namespace Rill {
         "intent_approved": Bool,
         "intent_in_scope": Bool,
         "intent_agent_quorum": Long,
+        // Positive agent Review votes independent of the author: not the
+        // author, outside its sponsor chain, distinct model family or prompt.
+        "independent_agent_approvals": Long,
+        // The lowest trust (permille, from reviewers' track records) among
+        // those approvals; 0 when there are none.
+        "min_agent_trust": Long,
         // Names of the labels present as tags, for `.contains` checks.
         "label_names": Set<String>,
     } tags VoteSummary;

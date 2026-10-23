@@ -234,6 +234,7 @@ async fn agents_and_workloads(name: &str, stores: &Stores) {
         created_by: admin.clone(),
         created_at: Timestamp::from_millis(1),
         updated_at: Timestamp::from_millis(1),
+        reviewer: None,
     };
     // A user and an agent may share a name; two agents may not.
     identity.create_agent(&agent, &admin).await.unwrap();

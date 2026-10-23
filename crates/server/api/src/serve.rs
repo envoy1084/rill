@@ -22,7 +22,7 @@ use rill_reapi_proto::remoteworker::operation_queue_server::OperationQueueServer
 use crate::services::{
     AccessSvc, AdminSvc, AuditSvc, ChangeSvc, ChecksSvc, ContentSvc, EventSvc, ExecSvc,
     IdentitySvc, IntentSvc, LandingSvc, OperationSvc, OrgSvc, PolicySvc, ProtectionSvc, RepoSvc,
-    ReviewSvc, SecretSvc, SessionSvc, TrunkSvc, WorkspaceSvc,
+    ReviewSvc, ReviewerSvc, SecretSvc, SessionSvc, TrunkSvc, WorkspaceSvc,
 };
 use rill_runtime::error::{Error, Result};
 use rill_runtime::state::AppState;
@@ -178,6 +178,7 @@ fn connect_service(state: &Arc<AppState>) -> Result<(ConnectRpcService, Arc<Stat
         .add_service(Arc::new(WorkspaceSvc::new(state.clone())))
         .add_service(Arc::new(ReviewSvc::new(state.clone())))
         .add_service(Arc::new(IntentSvc::new(state.clone())))
+        .add_service(Arc::new(ReviewerSvc::new(state.clone())))
         .add_service(Arc::new(LandingSvc::new(state.clone())))
         .add_service(Arc::new(TrunkSvc::new(state.clone())))
         .add_service(Arc::new(OperationSvc::new(state.clone())))

@@ -105,6 +105,7 @@ async fn a_kubernetes_service_account_acts_as_its_agent() {
                     claims: Default::default(),
                 }],
                 expires_at: None,
+                reviewer: None.into(),
             })
             .into(),
         })

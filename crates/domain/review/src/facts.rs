@@ -68,6 +68,7 @@ impl ReviewService {
                 slot.insert(self.directory.person(person).await?);
             }
         }
+        self.fill_trust(&mut facts).await?;
         Ok(facts)
     }
 

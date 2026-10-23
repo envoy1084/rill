@@ -14,6 +14,16 @@ impl ReviewService {
         Ok(self.derive.get::<RootTree>(version).await?)
     }
 
+    /// Bytes of the file at `path` on trunk's head, or `None` when absent
+    /// or the repository is empty.
+    pub async fn trunk_file(&self, path: &RepoPath) -> Result<Option<Bytes>> {
+        let Some((_, head)) = self.repo.trunk_head().await? else {
+            return Ok(None);
+        };
+        let root = self.root_of(&head).await?;
+        self.file_at(root, path).await
+    }
+
     /// Bytes of the file at `path` under `root`, or `None` when absent.
     pub(crate) async fn file_at(&self, root: TreeHash, path: &RepoPath) -> Result<Option<Bytes>> {
         match file_state(self.derive.trees(), Some(root), path).await? {

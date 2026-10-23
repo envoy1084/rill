@@ -7,10 +7,13 @@ use rill_types::{LabelVote, PrincipalKind, ReviewState, RiskClass, Timestamp};
 use serde::{Deserialize, Serialize};
 
 use crate::owners::{coverage, Approver, SetCoverage};
+use crate::reviewers::{independent_approvals, Independence};
 use crate::risk::ChangeFacts;
 
 /// The label whose approvals count toward owner sets.
 pub const OWNER_LABEL: &str = "Owner";
+/// The label reviewers vote on.
+pub const REVIEW_LABEL: &str = "Review";
 
 /// Aggregated votes on one label for the current version of a change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -98,6 +101,16 @@ pub fn owner_coverage(state: &ReviewState, change: &ChangeFacts) -> Vec<SetCover
     )
 }
 
+/// Which agents' positive `Review` votes on the current version are
+/// independent of the author.
+pub fn independence(state: &ReviewState, change: &ChangeFacts) -> Independence {
+    independent_approvals(
+        state.current_votes().filter(|v| v.label == REVIEW_LABEL),
+        &change.author,
+        &change.people,
+    )
+}
+
 /// What the review state contributes to a submit decision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubmitFacts {
@@ -115,6 +128,10 @@ pub struct SubmitFacts {
     pub owner_sets: u32,
     /// Ids of the touched owner sets that lack their required approvals.
     pub missing_owner_sets: Vec<String>,
+    /// Agents approving on `Review` independently of the author.
+    pub independent_agent_approvals: u32,
+    /// The lowest trust (permille) among them; 0 when none.
+    pub min_agent_trust: u16,
 }
 
 impl SubmitFacts {
@@ -128,6 +145,8 @@ impl SubmitFacts {
             touches_sensitive: false,
             owner_sets: 0,
             missing_owner_sets: Vec::new(),
+            independent_agent_approvals: 0,
+            min_agent_trust: 0,
         }
     }
 
@@ -161,6 +180,7 @@ impl SubmitFacts {
             })
             .count();
         let sets = owner_coverage(state, change);
+        let independent = independence(state, change);
         SubmitFacts {
             risk: state.risk,
             labels,
@@ -173,6 +193,8 @@ impl SubmitFacts {
                 .filter(|s| !s.covered)
                 .map(|s| s.set.id.clone())
                 .collect(),
+            independent_agent_approvals: independent.count(),
+            min_agent_trust: independent.min_trust,
         }
     }
 

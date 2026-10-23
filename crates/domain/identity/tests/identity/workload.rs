@@ -38,6 +38,7 @@ fn agent(name: &str, issuer: &str, subject: &str) -> AgentRecord {
         created_by: admin(),
         created_at: Timestamp::now(),
         updated_at: Timestamp::now(),
+        reviewer: None,
     }
 }
 

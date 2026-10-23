@@ -61,6 +61,12 @@ impl RepoClient {
         IntentClient::new(self.client.clone(), self.resource.clone())
     }
 
+    /// The reviewer fleet: jobs for reviewer and resolver agents, review
+    /// requests and runs.
+    pub fn reviewers(&self) -> crate::reviewers::ReviewerClient {
+        crate::reviewers::ReviewerClient::new(self.client.clone(), self.resource.clone())
+    }
+
     /// Trunk status, verification, healing and reverts.
     pub fn trunk(&self) -> TrunkClient {
         TrunkClient::new(self.client.clone(), self.resource.clone())

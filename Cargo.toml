@@ -36,6 +36,7 @@ rill-sdk = { path = "crates/clients/sdk" }
 rill-daemon = { path = "crates/clients/daemon" }
 rill-git-import = { path = "crates/domain/git-import" }
 rill-mcp = { path = "crates/clients/mcp" }
+rill-review-runner = { path = "crates/clients/review-runner" }
 rill-identity = { path = "crates/domain/identity" }
 
 # Serialization and hashing

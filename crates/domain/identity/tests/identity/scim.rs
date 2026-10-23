@@ -158,6 +158,7 @@ async fn deprovisioning_ends_sessions_and_suspends_sponsored_agents() {
                 created_by: Principal::human("bob"),
                 created_at: now,
                 updated_at: now,
+                reviewer: None,
             },
             &Principal::human("bob"),
         )

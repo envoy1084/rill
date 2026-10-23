@@ -59,6 +59,22 @@ pub struct RegisterArgs {
     /// Actions it may run on remote execution per day.
     #[arg(long)]
     pub executions_per_day: Option<u64>,
+    /// Make it a reviewer running this model family (`claude`, …).
+    #[arg(long, requires = "reviewer_model")]
+    pub reviewer_family: Option<String>,
+    /// The model the reviewer runs.
+    #[arg(long, requires = "reviewer_family")]
+    pub reviewer_model: Option<String>,
+    /// Its prompt's repository path (default
+    /// `.rill/reviewers/<name>/prompt.md`).
+    #[arg(long, requires = "reviewer_family")]
+    pub reviewer_prompt: Option<String>,
+    /// The largest `Review` vote it may cast, either way.
+    #[arg(long, default_value_t = 1, requires = "reviewer_family")]
+    pub max_vote: i32,
+    /// Reviews it may run per day in a repository.
+    #[arg(long, requires = "reviewer_family")]
+    pub reviews_per_day: Option<u64>,
     /// The organization.
     #[command(flatten)]
     pub org: OrgArg,
@@ -137,6 +153,10 @@ fn agent_json(a: &pb::Agent) -> serde_json::Value {
         "org": spec.org, "name": spec.name, "sponsor": spec.sponsor, "status": a.status,
         "repos": spec.repos, "paths": spec.paths, "models": spec.models,
         "workloads": spec.workloads.iter().map(|w| format!("{}={}", w.issuer, w.subject)).collect::<Vec<_>>(),
+        "reviewer": spec.reviewer.as_option().map(|r| json!({
+            "model_family": r.model_family, "model": r.model, "prompt": r.prompt,
+            "max_vote": r.max_vote, "runs_per_day": r.runs_per_day,
+        })),
     })
 }
 
@@ -145,6 +165,7 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
     let client = ctx.client()?;
     let agent = match cmd {
         AgentCmd::Register(a) => {
+            let a = *a;
             let workloads = a
                 .workloads
                 .iter()
@@ -178,6 +199,16 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                     .into(),
                     workloads,
                     expires_at: None,
+                    reviewer: a
+                        .reviewer_family
+                        .map(|family| pb::ReviewerProfile {
+                            model_family: family,
+                            model: a.reviewer_model.unwrap_or_default(),
+                            prompt: a.reviewer_prompt.unwrap_or_default(),
+                            max_vote: a.max_vote,
+                            runs_per_day: a.reviews_per_day,
+                        })
+                        .into(),
                 })
                 .await?
         }

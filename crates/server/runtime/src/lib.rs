@@ -6,6 +6,7 @@
 //! * [`config`]: configuration file and environment overrides;
 //! * [`state`]: shared state and lazily built per-repository contexts;
 //! * [`workers`]: background tasks;
+//! * [`fleet`]: the reviewer fleet's queues;
 //! * [`identity`]: token keys, revocations and callers as this server sees them;
 //! * [`audit`]: the audit log's projection, seals and denials;
 //! * [`secrets`], [`quarantine`], [`writes`]: checks every stored version passes;
@@ -16,6 +17,7 @@ pub mod audit;
 pub mod config;
 pub mod error;
 pub mod exec;
+pub mod fleet;
 pub mod identity;
 pub mod quarantine;
 pub mod rate;
@@ -29,7 +31,9 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-pub use config::{AuthConfig, Roles, ServerConfig, ShutdownConfig, StorageConfig, TlsConfig};
+pub use config::{
+    AuthConfig, Roles, ServerConfig, ShutdownConfig, StaticToken, StorageConfig, TlsConfig,
+};
 pub use error::{Error, Result};
 pub use state::{AppState, RepoContext};
 

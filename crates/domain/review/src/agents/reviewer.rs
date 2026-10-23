@@ -1,15 +1,11 @@
-//! The reviewer interface: what a reviewing agent sees and what it says.
+//! What a reviewing agent sees and what it says.
 
-use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use rill_core::{BlameLine, Hunk};
 use rill_types::objects::review::CommentCategory;
 use rill_types::{ChangeId, ChangeVersion, ChangeVersionHash, Intent, RepoPathBuf};
-
-use crate::error::Result;
 
 /// One file's change as a reviewer sees it.
 #[derive(Debug, Clone)]
@@ -24,27 +20,6 @@ pub struct FileDiff {
     pub after: Option<Bytes>,
     /// Line hunks between the two, empty when either side is unavailable.
     pub hunks: Vec<Hunk>,
-}
-
-impl FileDiff {
-    /// Lines added by this diff, without terminators.
-    pub fn added_lines(&self) -> impl Iterator<Item = (u32, &[u8])> {
-        self.hunks.iter().flat_map(|h| {
-            let mut new_no = h.new_start;
-            h.lines.iter().filter_map(move |l| match l.tag {
-                rill_core::LineTag::Removed => None,
-                rill_core::LineTag::Context => {
-                    new_no += 1;
-                    None
-                }
-                rill_core::LineTag::Added => {
-                    let no = new_no;
-                    new_no += 1;
-                    Some((no, rill_core::diff::line_content(&l.text)))
-                }
-            })
-        })
-    }
 }
 
 /// Blame of one line that the change touches, taken from the parent version.
@@ -161,15 +136,4 @@ impl Finding {
             body: body.into(),
         }
     }
-}
-
-/// A reviewing agent: given a context, produce findings.
-#[async_trait]
-pub trait Reviewer: Send + Sync {
-    /// Stable name; the reviewer votes and comments as `agent:<name>`.
-    fn name(&self) -> &str;
-
-    /// Review the change. The context is shared across the pool's
-    /// reviewers, hence the `Arc`.
-    async fn review(&self, ctx: Arc<ReviewContext>) -> Result<Vec<Finding>>;
 }

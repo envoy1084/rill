@@ -100,6 +100,7 @@ fn spec(name: &str, sponsor: &str, issuer: &str) -> pb::AgentSpec {
             claims: Default::default(),
         }],
         expires_at: None,
+        reviewer: None.into(),
     }
 }
 

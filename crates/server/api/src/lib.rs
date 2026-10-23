@@ -26,7 +26,7 @@ use tokio_util::sync::CancellationToken;
 
 pub use rill_runtime::{
     build_state, AppState, AuthConfig, Error, RepoContext, Result, Roles, ServerConfig,
-    ShutdownConfig, StorageConfig, TlsConfig,
+    ShutdownConfig, StaticToken, StorageConfig, TlsConfig,
 };
 pub use serve::{serve_with_state, Listeners};
 pub use shutdown::serve_until;

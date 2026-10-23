@@ -1099,10 +1099,12 @@ type AgentSpec struct {
 	// Path prefixes; empty for every path.
 	Paths []string `protobuf:"bytes,6,rep,name=paths,proto3" json:"paths,omitempty"`
 	// Models it may run as; empty for any.
-	Models        []string           `protobuf:"bytes,7,rep,name=models,proto3" json:"models,omitempty"`
-	Budgets       *AgentBudgets      `protobuf:"bytes,8,opt,name=budgets,proto3" json:"budgets,omitempty"`
-	Workloads     []*WorkloadBinding `protobuf:"bytes,9,rep,name=workloads,proto3" json:"workloads,omitempty"`
-	ExpiresAt     *int64             `protobuf:"varint,10,opt,name=expires_at,json=expiresAt,proto3,oneof" json:"expires_at,omitempty"`
+	Models    []string           `protobuf:"bytes,7,rep,name=models,proto3" json:"models,omitempty"`
+	Budgets   *AgentBudgets      `protobuf:"bytes,8,opt,name=budgets,proto3" json:"budgets,omitempty"`
+	Workloads []*WorkloadBinding `protobuf:"bytes,9,rep,name=workloads,proto3" json:"workloads,omitempty"`
+	ExpiresAt *int64             `protobuf:"varint,10,opt,name=expires_at,json=expiresAt,proto3,oneof" json:"expires_at,omitempty"`
+	// Set when the agent reviews changes.
+	Reviewer      *ReviewerProfile `protobuf:"bytes,11,opt,name=reviewer,proto3" json:"reviewer,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1207,6 +1209,94 @@ func (x *AgentSpec) GetExpiresAt() int64 {
 	return 0
 }
 
+func (x *AgentSpec) GetReviewer() *ReviewerProfile {
+	if x != nil {
+		return x.Reviewer
+	}
+	return nil
+}
+
+// How an agent reviews.
+type ReviewerProfile struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The model's family (`claude`, …); a quorum needs different families
+	// or prompts.
+	ModelFamily string `protobuf:"bytes,1,opt,name=model_family,json=modelFamily,proto3" json:"model_family,omitempty"`
+	Model       string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	// Its prompt's repository path; default `.rill/reviewers/<name>/prompt.md`.
+	Prompt string `protobuf:"bytes,3,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	// The largest `Review` vote it may cast, either way (1 or 2).
+	MaxVote       int32   `protobuf:"varint,4,opt,name=max_vote,json=maxVote,proto3" json:"max_vote,omitempty"`
+	RunsPerDay    *uint64 `protobuf:"varint,5,opt,name=runs_per_day,json=runsPerDay,proto3,oneof" json:"runs_per_day,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewerProfile) Reset() {
+	*x = ReviewerProfile{}
+	mi := &file_rill_v1_identity_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewerProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewerProfile) ProtoMessage() {}
+
+func (x *ReviewerProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_identity_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewerProfile.ProtoReflect.Descriptor instead.
+func (*ReviewerProfile) Descriptor() ([]byte, []int) {
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ReviewerProfile) GetModelFamily() string {
+	if x != nil {
+		return x.ModelFamily
+	}
+	return ""
+}
+
+func (x *ReviewerProfile) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *ReviewerProfile) GetPrompt() string {
+	if x != nil {
+		return x.Prompt
+	}
+	return ""
+}
+
+func (x *ReviewerProfile) GetMaxVote() int32 {
+	if x != nil {
+		return x.MaxVote
+	}
+	return 0
+}
+
+func (x *ReviewerProfile) GetRunsPerDay() uint64 {
+	if x != nil && x.RunsPerDay != nil {
+		return *x.RunsPerDay
+	}
+	return 0
+}
+
 type Agent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// `orgs/{org}/agents/{agent}`. Output only.
@@ -1226,7 +1316,7 @@ type Agent struct {
 
 func (x *Agent) Reset() {
 	*x = Agent{}
-	mi := &file_rill_v1_identity_proto_msgTypes[17]
+	mi := &file_rill_v1_identity_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1238,7 +1328,7 @@ func (x *Agent) String() string {
 func (*Agent) ProtoMessage() {}
 
 func (x *Agent) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[17]
+	mi := &file_rill_v1_identity_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1251,7 +1341,7 @@ func (x *Agent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Agent.ProtoReflect.Descriptor instead.
 func (*Agent) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{17}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Agent) GetName() string {
@@ -1323,7 +1413,7 @@ type CreateAgentRequest struct {
 
 func (x *CreateAgentRequest) Reset() {
 	*x = CreateAgentRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[18]
+	mi := &file_rill_v1_identity_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1335,7 +1425,7 @@ func (x *CreateAgentRequest) String() string {
 func (*CreateAgentRequest) ProtoMessage() {}
 
 func (x *CreateAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[18]
+	mi := &file_rill_v1_identity_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1348,7 +1438,7 @@ func (x *CreateAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAgentRequest.ProtoReflect.Descriptor instead.
 func (*CreateAgentRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{18}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CreateAgentRequest) GetRequestId() string {
@@ -1381,7 +1471,7 @@ type CreateAgentResponse struct {
 
 func (x *CreateAgentResponse) Reset() {
 	*x = CreateAgentResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[19]
+	mi := &file_rill_v1_identity_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1393,7 +1483,7 @@ func (x *CreateAgentResponse) String() string {
 func (*CreateAgentResponse) ProtoMessage() {}
 
 func (x *CreateAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[19]
+	mi := &file_rill_v1_identity_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1406,7 +1496,7 @@ func (x *CreateAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAgentResponse.ProtoReflect.Descriptor instead.
 func (*CreateAgentResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{19}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CreateAgentResponse) GetAgent() *Agent {
@@ -1426,7 +1516,7 @@ type GetAgentRequest struct {
 
 func (x *GetAgentRequest) Reset() {
 	*x = GetAgentRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[20]
+	mi := &file_rill_v1_identity_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1438,7 +1528,7 @@ func (x *GetAgentRequest) String() string {
 func (*GetAgentRequest) ProtoMessage() {}
 
 func (x *GetAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[20]
+	mi := &file_rill_v1_identity_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1451,7 +1541,7 @@ func (x *GetAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentRequest.ProtoReflect.Descriptor instead.
 func (*GetAgentRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{20}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetAgentRequest) GetName() string {
@@ -1470,7 +1560,7 @@ type GetAgentResponse struct {
 
 func (x *GetAgentResponse) Reset() {
 	*x = GetAgentResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[21]
+	mi := &file_rill_v1_identity_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1482,7 +1572,7 @@ func (x *GetAgentResponse) String() string {
 func (*GetAgentResponse) ProtoMessage() {}
 
 func (x *GetAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[21]
+	mi := &file_rill_v1_identity_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1495,7 +1585,7 @@ func (x *GetAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentResponse.ProtoReflect.Descriptor instead.
 func (*GetAgentResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{21}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetAgentResponse) GetAgent() *Agent {
@@ -1519,7 +1609,7 @@ type ListAgentsRequest struct {
 
 func (x *ListAgentsRequest) Reset() {
 	*x = ListAgentsRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[22]
+	mi := &file_rill_v1_identity_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1531,7 +1621,7 @@ func (x *ListAgentsRequest) String() string {
 func (*ListAgentsRequest) ProtoMessage() {}
 
 func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[22]
+	mi := &file_rill_v1_identity_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1544,7 +1634,7 @@ func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentsRequest.ProtoReflect.Descriptor instead.
 func (*ListAgentsRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{22}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ListAgentsRequest) GetParent() string {
@@ -1585,7 +1675,7 @@ type ListAgentsResponse struct {
 
 func (x *ListAgentsResponse) Reset() {
 	*x = ListAgentsResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[23]
+	mi := &file_rill_v1_identity_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1597,7 +1687,7 @@ func (x *ListAgentsResponse) String() string {
 func (*ListAgentsResponse) ProtoMessage() {}
 
 func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[23]
+	mi := &file_rill_v1_identity_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1610,7 +1700,7 @@ func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentsResponse.ProtoReflect.Descriptor instead.
 func (*ListAgentsResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{23}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ListAgentsResponse) GetAgents() []*Agent {
@@ -1644,7 +1734,7 @@ type UpdateAgentRequest struct {
 
 func (x *UpdateAgentRequest) Reset() {
 	*x = UpdateAgentRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[24]
+	mi := &file_rill_v1_identity_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1656,7 +1746,7 @@ func (x *UpdateAgentRequest) String() string {
 func (*UpdateAgentRequest) ProtoMessage() {}
 
 func (x *UpdateAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[24]
+	mi := &file_rill_v1_identity_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1669,7 +1759,7 @@ func (x *UpdateAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAgentRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAgentRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{24}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *UpdateAgentRequest) GetRequestId() string {
@@ -1709,7 +1799,7 @@ type UpdateAgentResponse struct {
 
 func (x *UpdateAgentResponse) Reset() {
 	*x = UpdateAgentResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[25]
+	mi := &file_rill_v1_identity_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1721,7 +1811,7 @@ func (x *UpdateAgentResponse) String() string {
 func (*UpdateAgentResponse) ProtoMessage() {}
 
 func (x *UpdateAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[25]
+	mi := &file_rill_v1_identity_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1734,7 +1824,7 @@ func (x *UpdateAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAgentResponse.ProtoReflect.Descriptor instead.
 func (*UpdateAgentResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{25}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *UpdateAgentResponse) GetAgent() *Agent {
@@ -1764,7 +1854,7 @@ type WorkloadIssuerSpec struct {
 
 func (x *WorkloadIssuerSpec) Reset() {
 	*x = WorkloadIssuerSpec{}
-	mi := &file_rill_v1_identity_proto_msgTypes[26]
+	mi := &file_rill_v1_identity_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1776,7 +1866,7 @@ func (x *WorkloadIssuerSpec) String() string {
 func (*WorkloadIssuerSpec) ProtoMessage() {}
 
 func (x *WorkloadIssuerSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[26]
+	mi := &file_rill_v1_identity_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1789,7 +1879,7 @@ func (x *WorkloadIssuerSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkloadIssuerSpec.ProtoReflect.Descriptor instead.
 func (*WorkloadIssuerSpec) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{26}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *WorkloadIssuerSpec) GetResourceName() string {
@@ -1898,7 +1988,7 @@ type UpdateWorkloadIssuerRequest struct {
 
 func (x *UpdateWorkloadIssuerRequest) Reset() {
 	*x = UpdateWorkloadIssuerRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[27]
+	mi := &file_rill_v1_identity_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1910,7 +2000,7 @@ func (x *UpdateWorkloadIssuerRequest) String() string {
 func (*UpdateWorkloadIssuerRequest) ProtoMessage() {}
 
 func (x *UpdateWorkloadIssuerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[27]
+	mi := &file_rill_v1_identity_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1923,7 +2013,7 @@ func (x *UpdateWorkloadIssuerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateWorkloadIssuerRequest.ProtoReflect.Descriptor instead.
 func (*UpdateWorkloadIssuerRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{27}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *UpdateWorkloadIssuerRequest) GetRequestId() string {
@@ -1956,7 +2046,7 @@ type UpdateWorkloadIssuerResponse struct {
 
 func (x *UpdateWorkloadIssuerResponse) Reset() {
 	*x = UpdateWorkloadIssuerResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[28]
+	mi := &file_rill_v1_identity_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1968,7 +2058,7 @@ func (x *UpdateWorkloadIssuerResponse) String() string {
 func (*UpdateWorkloadIssuerResponse) ProtoMessage() {}
 
 func (x *UpdateWorkloadIssuerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[28]
+	mi := &file_rill_v1_identity_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1981,7 +2071,7 @@ func (x *UpdateWorkloadIssuerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateWorkloadIssuerResponse.ProtoReflect.Descriptor instead.
 func (*UpdateWorkloadIssuerResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{28}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *UpdateWorkloadIssuerResponse) GetIssuer() *WorkloadIssuerSpec {
@@ -2003,7 +2093,7 @@ type ListWorkloadIssuersRequest struct {
 
 func (x *ListWorkloadIssuersRequest) Reset() {
 	*x = ListWorkloadIssuersRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[29]
+	mi := &file_rill_v1_identity_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2015,7 +2105,7 @@ func (x *ListWorkloadIssuersRequest) String() string {
 func (*ListWorkloadIssuersRequest) ProtoMessage() {}
 
 func (x *ListWorkloadIssuersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[29]
+	mi := &file_rill_v1_identity_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2028,7 +2118,7 @@ func (x *ListWorkloadIssuersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkloadIssuersRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkloadIssuersRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{29}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListWorkloadIssuersRequest) GetParent() string {
@@ -2062,7 +2152,7 @@ type ListWorkloadIssuersResponse struct {
 
 func (x *ListWorkloadIssuersResponse) Reset() {
 	*x = ListWorkloadIssuersResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[30]
+	mi := &file_rill_v1_identity_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2074,7 +2164,7 @@ func (x *ListWorkloadIssuersResponse) String() string {
 func (*ListWorkloadIssuersResponse) ProtoMessage() {}
 
 func (x *ListWorkloadIssuersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[30]
+	mi := &file_rill_v1_identity_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2087,7 +2177,7 @@ func (x *ListWorkloadIssuersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorkloadIssuersResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkloadIssuersResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{30}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListWorkloadIssuersResponse) GetIssuers() []*WorkloadIssuerSpec {
@@ -2115,7 +2205,7 @@ type DeleteWorkloadIssuerRequest struct {
 
 func (x *DeleteWorkloadIssuerRequest) Reset() {
 	*x = DeleteWorkloadIssuerRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[31]
+	mi := &file_rill_v1_identity_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2127,7 +2217,7 @@ func (x *DeleteWorkloadIssuerRequest) String() string {
 func (*DeleteWorkloadIssuerRequest) ProtoMessage() {}
 
 func (x *DeleteWorkloadIssuerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[31]
+	mi := &file_rill_v1_identity_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2140,7 +2230,7 @@ func (x *DeleteWorkloadIssuerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteWorkloadIssuerRequest.ProtoReflect.Descriptor instead.
 func (*DeleteWorkloadIssuerRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{31}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DeleteWorkloadIssuerRequest) GetRequestId() string {
@@ -2165,7 +2255,7 @@ type DeleteWorkloadIssuerResponse struct {
 
 func (x *DeleteWorkloadIssuerResponse) Reset() {
 	*x = DeleteWorkloadIssuerResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[32]
+	mi := &file_rill_v1_identity_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2177,7 +2267,7 @@ func (x *DeleteWorkloadIssuerResponse) String() string {
 func (*DeleteWorkloadIssuerResponse) ProtoMessage() {}
 
 func (x *DeleteWorkloadIssuerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[32]
+	mi := &file_rill_v1_identity_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2190,7 +2280,7 @@ func (x *DeleteWorkloadIssuerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteWorkloadIssuerResponse.ProtoReflect.Descriptor instead.
 func (*DeleteWorkloadIssuerResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{32}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{33}
 }
 
 type IdentityProviderSpec struct {
@@ -2222,7 +2312,7 @@ type IdentityProviderSpec struct {
 
 func (x *IdentityProviderSpec) Reset() {
 	*x = IdentityProviderSpec{}
-	mi := &file_rill_v1_identity_proto_msgTypes[33]
+	mi := &file_rill_v1_identity_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2234,7 +2324,7 @@ func (x *IdentityProviderSpec) String() string {
 func (*IdentityProviderSpec) ProtoMessage() {}
 
 func (x *IdentityProviderSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[33]
+	mi := &file_rill_v1_identity_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2247,7 +2337,7 @@ func (x *IdentityProviderSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdentityProviderSpec.ProtoReflect.Descriptor instead.
 func (*IdentityProviderSpec) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{33}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *IdentityProviderSpec) GetOrg() string {
@@ -2357,7 +2447,7 @@ type IdentityProviderInfo struct {
 
 func (x *IdentityProviderInfo) Reset() {
 	*x = IdentityProviderInfo{}
-	mi := &file_rill_v1_identity_proto_msgTypes[34]
+	mi := &file_rill_v1_identity_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2369,7 +2459,7 @@ func (x *IdentityProviderInfo) String() string {
 func (*IdentityProviderInfo) ProtoMessage() {}
 
 func (x *IdentityProviderInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[34]
+	mi := &file_rill_v1_identity_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2382,7 +2472,7 @@ func (x *IdentityProviderInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdentityProviderInfo.ProtoReflect.Descriptor instead.
 func (*IdentityProviderInfo) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{34}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *IdentityProviderInfo) GetResourceName() string {
@@ -2493,7 +2583,7 @@ type GetIdentityProviderRequest struct {
 
 func (x *GetIdentityProviderRequest) Reset() {
 	*x = GetIdentityProviderRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[35]
+	mi := &file_rill_v1_identity_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2505,7 +2595,7 @@ func (x *GetIdentityProviderRequest) String() string {
 func (*GetIdentityProviderRequest) ProtoMessage() {}
 
 func (x *GetIdentityProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[35]
+	mi := &file_rill_v1_identity_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2518,7 +2608,7 @@ func (x *GetIdentityProviderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIdentityProviderRequest.ProtoReflect.Descriptor instead.
 func (*GetIdentityProviderRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{35}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetIdentityProviderRequest) GetName() string {
@@ -2537,7 +2627,7 @@ type GetIdentityProviderResponse struct {
 
 func (x *GetIdentityProviderResponse) Reset() {
 	*x = GetIdentityProviderResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[36]
+	mi := &file_rill_v1_identity_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2549,7 +2639,7 @@ func (x *GetIdentityProviderResponse) String() string {
 func (*GetIdentityProviderResponse) ProtoMessage() {}
 
 func (x *GetIdentityProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[36]
+	mi := &file_rill_v1_identity_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2562,7 +2652,7 @@ func (x *GetIdentityProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIdentityProviderResponse.ProtoReflect.Descriptor instead.
 func (*GetIdentityProviderResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{36}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetIdentityProviderResponse) GetProvider() *IdentityProviderInfo {
@@ -2585,7 +2675,7 @@ type UpdateIdentityProviderRequest struct {
 
 func (x *UpdateIdentityProviderRequest) Reset() {
 	*x = UpdateIdentityProviderRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[37]
+	mi := &file_rill_v1_identity_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2597,7 +2687,7 @@ func (x *UpdateIdentityProviderRequest) String() string {
 func (*UpdateIdentityProviderRequest) ProtoMessage() {}
 
 func (x *UpdateIdentityProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[37]
+	mi := &file_rill_v1_identity_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2610,7 +2700,7 @@ func (x *UpdateIdentityProviderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIdentityProviderRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIdentityProviderRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{37}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *UpdateIdentityProviderRequest) GetRequestId() string {
@@ -2643,7 +2733,7 @@ type UpdateIdentityProviderResponse struct {
 
 func (x *UpdateIdentityProviderResponse) Reset() {
 	*x = UpdateIdentityProviderResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[38]
+	mi := &file_rill_v1_identity_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2655,7 +2745,7 @@ func (x *UpdateIdentityProviderResponse) String() string {
 func (*UpdateIdentityProviderResponse) ProtoMessage() {}
 
 func (x *UpdateIdentityProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[38]
+	mi := &file_rill_v1_identity_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2668,7 +2758,7 @@ func (x *UpdateIdentityProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIdentityProviderResponse.ProtoReflect.Descriptor instead.
 func (*UpdateIdentityProviderResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{38}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *UpdateIdentityProviderResponse) GetProvider() *IdentityProviderInfo {
@@ -2690,7 +2780,7 @@ type ListIdentityProvidersRequest struct {
 
 func (x *ListIdentityProvidersRequest) Reset() {
 	*x = ListIdentityProvidersRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[39]
+	mi := &file_rill_v1_identity_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2702,7 +2792,7 @@ func (x *ListIdentityProvidersRequest) String() string {
 func (*ListIdentityProvidersRequest) ProtoMessage() {}
 
 func (x *ListIdentityProvidersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[39]
+	mi := &file_rill_v1_identity_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2715,7 +2805,7 @@ func (x *ListIdentityProvidersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIdentityProvidersRequest.ProtoReflect.Descriptor instead.
 func (*ListIdentityProvidersRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{39}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ListIdentityProvidersRequest) GetParent() string {
@@ -2749,7 +2839,7 @@ type ListIdentityProvidersResponse struct {
 
 func (x *ListIdentityProvidersResponse) Reset() {
 	*x = ListIdentityProvidersResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[40]
+	mi := &file_rill_v1_identity_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2761,7 +2851,7 @@ func (x *ListIdentityProvidersResponse) String() string {
 func (*ListIdentityProvidersResponse) ProtoMessage() {}
 
 func (x *ListIdentityProvidersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[40]
+	mi := &file_rill_v1_identity_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2774,7 +2864,7 @@ func (x *ListIdentityProvidersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIdentityProvidersResponse.ProtoReflect.Descriptor instead.
 func (*ListIdentityProvidersResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{40}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ListIdentityProvidersResponse) GetProviders() []*IdentityProviderInfo {
@@ -2802,7 +2892,7 @@ type DeleteIdentityProviderRequest struct {
 
 func (x *DeleteIdentityProviderRequest) Reset() {
 	*x = DeleteIdentityProviderRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[41]
+	mi := &file_rill_v1_identity_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2814,7 +2904,7 @@ func (x *DeleteIdentityProviderRequest) String() string {
 func (*DeleteIdentityProviderRequest) ProtoMessage() {}
 
 func (x *DeleteIdentityProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[41]
+	mi := &file_rill_v1_identity_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2827,7 +2917,7 @@ func (x *DeleteIdentityProviderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteIdentityProviderRequest.ProtoReflect.Descriptor instead.
 func (*DeleteIdentityProviderRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{41}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *DeleteIdentityProviderRequest) GetRequestId() string {
@@ -2852,7 +2942,7 @@ type DeleteIdentityProviderResponse struct {
 
 func (x *DeleteIdentityProviderResponse) Reset() {
 	*x = DeleteIdentityProviderResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[42]
+	mi := &file_rill_v1_identity_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2864,7 +2954,7 @@ func (x *DeleteIdentityProviderResponse) String() string {
 func (*DeleteIdentityProviderResponse) ProtoMessage() {}
 
 func (x *DeleteIdentityProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[42]
+	mi := &file_rill_v1_identity_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2877,7 +2967,7 @@ func (x *DeleteIdentityProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteIdentityProviderResponse.ProtoReflect.Descriptor instead.
 func (*DeleteIdentityProviderResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{42}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{43}
 }
 
 type User struct {
@@ -2905,7 +2995,7 @@ type User struct {
 
 func (x *User) Reset() {
 	*x = User{}
-	mi := &file_rill_v1_identity_proto_msgTypes[43]
+	mi := &file_rill_v1_identity_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2917,7 +3007,7 @@ func (x *User) String() string {
 func (*User) ProtoMessage() {}
 
 func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[43]
+	mi := &file_rill_v1_identity_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2930,7 +3020,7 @@ func (x *User) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User.ProtoReflect.Descriptor instead.
 func (*User) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{43}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *User) GetName() string {
@@ -3031,7 +3121,7 @@ type ListUsersRequest struct {
 
 func (x *ListUsersRequest) Reset() {
 	*x = ListUsersRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[44]
+	mi := &file_rill_v1_identity_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3043,7 +3133,7 @@ func (x *ListUsersRequest) String() string {
 func (*ListUsersRequest) ProtoMessage() {}
 
 func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[44]
+	mi := &file_rill_v1_identity_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3056,7 +3146,7 @@ func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListUsersRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{44}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ListUsersRequest) GetParent() string {
@@ -3097,7 +3187,7 @@ type ListUsersResponse struct {
 
 func (x *ListUsersResponse) Reset() {
 	*x = ListUsersResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[45]
+	mi := &file_rill_v1_identity_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3109,7 +3199,7 @@ func (x *ListUsersResponse) String() string {
 func (*ListUsersResponse) ProtoMessage() {}
 
 func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[45]
+	mi := &file_rill_v1_identity_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3122,7 +3212,7 @@ func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListUsersResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{45}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ListUsersResponse) GetUsers() []*User {
@@ -3154,7 +3244,7 @@ type UpdateUserRequest struct {
 
 func (x *UpdateUserRequest) Reset() {
 	*x = UpdateUserRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[46]
+	mi := &file_rill_v1_identity_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3166,7 +3256,7 @@ func (x *UpdateUserRequest) String() string {
 func (*UpdateUserRequest) ProtoMessage() {}
 
 func (x *UpdateUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[46]
+	mi := &file_rill_v1_identity_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3179,7 +3269,7 @@ func (x *UpdateUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{46}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *UpdateUserRequest) GetRequestId() string {
@@ -3219,7 +3309,7 @@ type UpdateUserResponse struct {
 
 func (x *UpdateUserResponse) Reset() {
 	*x = UpdateUserResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[47]
+	mi := &file_rill_v1_identity_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3231,7 +3321,7 @@ func (x *UpdateUserResponse) String() string {
 func (*UpdateUserResponse) ProtoMessage() {}
 
 func (x *UpdateUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[47]
+	mi := &file_rill_v1_identity_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3244,7 +3334,7 @@ func (x *UpdateUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{47}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *UpdateUserResponse) GetUser() *User {
@@ -3269,7 +3359,7 @@ type RevokeTokenRequest struct {
 
 func (x *RevokeTokenRequest) Reset() {
 	*x = RevokeTokenRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[48]
+	mi := &file_rill_v1_identity_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3281,7 +3371,7 @@ func (x *RevokeTokenRequest) String() string {
 func (*RevokeTokenRequest) ProtoMessage() {}
 
 func (x *RevokeTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[48]
+	mi := &file_rill_v1_identity_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3294,7 +3384,7 @@ func (x *RevokeTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeTokenRequest.ProtoReflect.Descriptor instead.
 func (*RevokeTokenRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{48}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *RevokeTokenRequest) GetRequestId() string {
@@ -3363,7 +3453,7 @@ type RevokeTokenResponse struct {
 
 func (x *RevokeTokenResponse) Reset() {
 	*x = RevokeTokenResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[49]
+	mi := &file_rill_v1_identity_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3375,7 +3465,7 @@ func (x *RevokeTokenResponse) String() string {
 func (*RevokeTokenResponse) ProtoMessage() {}
 
 func (x *RevokeTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[49]
+	mi := &file_rill_v1_identity_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3388,7 +3478,7 @@ func (x *RevokeTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeTokenResponse.ProtoReflect.Descriptor instead.
 func (*RevokeTokenResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{49}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *RevokeTokenResponse) GetTokenId() string {
@@ -3409,7 +3499,7 @@ type RevokeSessionRequest struct {
 
 func (x *RevokeSessionRequest) Reset() {
 	*x = RevokeSessionRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[50]
+	mi := &file_rill_v1_identity_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3421,7 +3511,7 @@ func (x *RevokeSessionRequest) String() string {
 func (*RevokeSessionRequest) ProtoMessage() {}
 
 func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[50]
+	mi := &file_rill_v1_identity_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3434,7 +3524,7 @@ func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionRequest.ProtoReflect.Descriptor instead.
 func (*RevokeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{50}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *RevokeSessionRequest) GetRequestId() string {
@@ -3459,7 +3549,7 @@ type RevokeSessionResponse struct {
 
 func (x *RevokeSessionResponse) Reset() {
 	*x = RevokeSessionResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[51]
+	mi := &file_rill_v1_identity_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3471,7 +3561,7 @@ func (x *RevokeSessionResponse) String() string {
 func (*RevokeSessionResponse) ProtoMessage() {}
 
 func (x *RevokeSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[51]
+	mi := &file_rill_v1_identity_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3484,7 +3574,7 @@ func (x *RevokeSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionResponse.ProtoReflect.Descriptor instead.
 func (*RevokeSessionResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{51}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{52}
 }
 
 type RotateTokenKeysRequest struct {
@@ -3496,7 +3586,7 @@ type RotateTokenKeysRequest struct {
 
 func (x *RotateTokenKeysRequest) Reset() {
 	*x = RotateTokenKeysRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[52]
+	mi := &file_rill_v1_identity_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3508,7 +3598,7 @@ func (x *RotateTokenKeysRequest) String() string {
 func (*RotateTokenKeysRequest) ProtoMessage() {}
 
 func (x *RotateTokenKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[52]
+	mi := &file_rill_v1_identity_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3521,7 +3611,7 @@ func (x *RotateTokenKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateTokenKeysRequest.ProtoReflect.Descriptor instead.
 func (*RotateTokenKeysRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{52}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *RotateTokenKeysRequest) GetRequestId() string {
@@ -3542,7 +3632,7 @@ type RotateTokenKeysResponse struct {
 
 func (x *RotateTokenKeysResponse) Reset() {
 	*x = RotateTokenKeysResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[53]
+	mi := &file_rill_v1_identity_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3554,7 +3644,7 @@ func (x *RotateTokenKeysResponse) String() string {
 func (*RotateTokenKeysResponse) ProtoMessage() {}
 
 func (x *RotateTokenKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[53]
+	mi := &file_rill_v1_identity_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3567,7 +3657,7 @@ func (x *RotateTokenKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateTokenKeysResponse.ProtoReflect.Descriptor instead.
 func (*RotateTokenKeysResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{53}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *RotateTokenKeysResponse) GetKeyId() uint32 {
@@ -3592,7 +3682,7 @@ type ListTokenKeysRequest struct {
 
 func (x *ListTokenKeysRequest) Reset() {
 	*x = ListTokenKeysRequest{}
-	mi := &file_rill_v1_identity_proto_msgTypes[54]
+	mi := &file_rill_v1_identity_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3604,7 +3694,7 @@ func (x *ListTokenKeysRequest) String() string {
 func (*ListTokenKeysRequest) ProtoMessage() {}
 
 func (x *ListTokenKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[54]
+	mi := &file_rill_v1_identity_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3617,7 +3707,7 @@ func (x *ListTokenKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTokenKeysRequest.ProtoReflect.Descriptor instead.
 func (*ListTokenKeysRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{54}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{55}
 }
 
 type TokenKey struct {
@@ -3637,7 +3727,7 @@ type TokenKey struct {
 
 func (x *TokenKey) Reset() {
 	*x = TokenKey{}
-	mi := &file_rill_v1_identity_proto_msgTypes[55]
+	mi := &file_rill_v1_identity_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3649,7 +3739,7 @@ func (x *TokenKey) String() string {
 func (*TokenKey) ProtoMessage() {}
 
 func (x *TokenKey) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[55]
+	mi := &file_rill_v1_identity_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3662,7 +3752,7 @@ func (x *TokenKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenKey.ProtoReflect.Descriptor instead.
 func (*TokenKey) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{55}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *TokenKey) GetId() uint32 {
@@ -3723,7 +3813,7 @@ type ListTokenKeysResponse struct {
 
 func (x *ListTokenKeysResponse) Reset() {
 	*x = ListTokenKeysResponse{}
-	mi := &file_rill_v1_identity_proto_msgTypes[56]
+	mi := &file_rill_v1_identity_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3735,7 +3825,7 @@ func (x *ListTokenKeysResponse) String() string {
 func (*ListTokenKeysResponse) ProtoMessage() {}
 
 func (x *ListTokenKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_identity_proto_msgTypes[56]
+	mi := &file_rill_v1_identity_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3748,7 +3838,7 @@ func (x *ListTokenKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTokenKeysResponse.ProtoReflect.Descriptor instead.
 func (*ListTokenKeysResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_identity_proto_rawDescGZIP(), []int{56}
+	return file_rill_v1_identity_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *ListTokenKeysResponse) GetKeys() []*TokenKey {
@@ -3864,7 +3954,7 @@ const file_rill_v1_identity_proto_rawDesc = "" +
 	"\x06claims\x18\x03 \x03(\v2$.rill.v1.WorkloadBinding.ClaimsEntryR\x06claims\x1a9\n" +
 	"\vClaimsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc5\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfb\x02\n" +
 	"\tAgentSpec\x12\x10\n" +
 	"\x03org\x18\x01 \x01(\tR\x03org\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -3877,8 +3967,17 @@ const file_rill_v1_identity_proto_rawDesc = "" +
 	"\tworkloads\x18\t \x03(\v2\x18.rill.v1.WorkloadBindingR\tworkloads\x12\"\n" +
 	"\n" +
 	"expires_at\x18\n" +
-	" \x01(\x03H\x00R\texpiresAt\x88\x01\x01B\r\n" +
-	"\v_expires_at\"\x92\x02\n" +
+	" \x01(\x03H\x00R\texpiresAt\x88\x01\x01\x124\n" +
+	"\breviewer\x18\v \x01(\v2\x18.rill.v1.ReviewerProfileR\breviewerB\r\n" +
+	"\v_expires_at\"\xb5\x01\n" +
+	"\x0fReviewerProfile\x12!\n" +
+	"\fmodel_family\x18\x01 \x01(\tR\vmodelFamily\x12\x14\n" +
+	"\x05model\x18\x02 \x01(\tR\x05model\x12\x16\n" +
+	"\x06prompt\x18\x03 \x01(\tR\x06prompt\x12\x19\n" +
+	"\bmax_vote\x18\x04 \x01(\x05R\amaxVote\x12%\n" +
+	"\fruns_per_day\x18\x05 \x01(\x04H\x00R\n" +
+	"runsPerDay\x88\x01\x01B\x0f\n" +
+	"\r_runs_per_day\"\x92\x02\n" +
 	"\x05Agent\x12\x12\n" +
 	"\x04name\x18\a \x01(\tR\x04name\x12\x12\n" +
 	"\x04etag\x18\b \x01(\tR\x04etag\x12&\n" +
@@ -4130,7 +4229,7 @@ func file_rill_v1_identity_proto_rawDescGZIP() []byte {
 	return file_rill_v1_identity_proto_rawDescData
 }
 
-var file_rill_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 58)
+var file_rill_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 59)
 var file_rill_v1_identity_proto_goTypes = []any{
 	(*GetCallerRequest)(nil),               // 0: rill.v1.GetCallerRequest
 	(*Capability)(nil),                     // 1: rill.v1.Capability
@@ -4149,135 +4248,137 @@ var file_rill_v1_identity_proto_goTypes = []any{
 	(*AgentBudgets)(nil),                   // 14: rill.v1.AgentBudgets
 	(*WorkloadBinding)(nil),                // 15: rill.v1.WorkloadBinding
 	(*AgentSpec)(nil),                      // 16: rill.v1.AgentSpec
-	(*Agent)(nil),                          // 17: rill.v1.Agent
-	(*CreateAgentRequest)(nil),             // 18: rill.v1.CreateAgentRequest
-	(*CreateAgentResponse)(nil),            // 19: rill.v1.CreateAgentResponse
-	(*GetAgentRequest)(nil),                // 20: rill.v1.GetAgentRequest
-	(*GetAgentResponse)(nil),               // 21: rill.v1.GetAgentResponse
-	(*ListAgentsRequest)(nil),              // 22: rill.v1.ListAgentsRequest
-	(*ListAgentsResponse)(nil),             // 23: rill.v1.ListAgentsResponse
-	(*UpdateAgentRequest)(nil),             // 24: rill.v1.UpdateAgentRequest
-	(*UpdateAgentResponse)(nil),            // 25: rill.v1.UpdateAgentResponse
-	(*WorkloadIssuerSpec)(nil),             // 26: rill.v1.WorkloadIssuerSpec
-	(*UpdateWorkloadIssuerRequest)(nil),    // 27: rill.v1.UpdateWorkloadIssuerRequest
-	(*UpdateWorkloadIssuerResponse)(nil),   // 28: rill.v1.UpdateWorkloadIssuerResponse
-	(*ListWorkloadIssuersRequest)(nil),     // 29: rill.v1.ListWorkloadIssuersRequest
-	(*ListWorkloadIssuersResponse)(nil),    // 30: rill.v1.ListWorkloadIssuersResponse
-	(*DeleteWorkloadIssuerRequest)(nil),    // 31: rill.v1.DeleteWorkloadIssuerRequest
-	(*DeleteWorkloadIssuerResponse)(nil),   // 32: rill.v1.DeleteWorkloadIssuerResponse
-	(*IdentityProviderSpec)(nil),           // 33: rill.v1.IdentityProviderSpec
-	(*IdentityProviderInfo)(nil),           // 34: rill.v1.IdentityProviderInfo
-	(*GetIdentityProviderRequest)(nil),     // 35: rill.v1.GetIdentityProviderRequest
-	(*GetIdentityProviderResponse)(nil),    // 36: rill.v1.GetIdentityProviderResponse
-	(*UpdateIdentityProviderRequest)(nil),  // 37: rill.v1.UpdateIdentityProviderRequest
-	(*UpdateIdentityProviderResponse)(nil), // 38: rill.v1.UpdateIdentityProviderResponse
-	(*ListIdentityProvidersRequest)(nil),   // 39: rill.v1.ListIdentityProvidersRequest
-	(*ListIdentityProvidersResponse)(nil),  // 40: rill.v1.ListIdentityProvidersResponse
-	(*DeleteIdentityProviderRequest)(nil),  // 41: rill.v1.DeleteIdentityProviderRequest
-	(*DeleteIdentityProviderResponse)(nil), // 42: rill.v1.DeleteIdentityProviderResponse
-	(*User)(nil),                           // 43: rill.v1.User
-	(*ListUsersRequest)(nil),               // 44: rill.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),              // 45: rill.v1.ListUsersResponse
-	(*UpdateUserRequest)(nil),              // 46: rill.v1.UpdateUserRequest
-	(*UpdateUserResponse)(nil),             // 47: rill.v1.UpdateUserResponse
-	(*RevokeTokenRequest)(nil),             // 48: rill.v1.RevokeTokenRequest
-	(*RevokeTokenResponse)(nil),            // 49: rill.v1.RevokeTokenResponse
-	(*RevokeSessionRequest)(nil),           // 50: rill.v1.RevokeSessionRequest
-	(*RevokeSessionResponse)(nil),          // 51: rill.v1.RevokeSessionResponse
-	(*RotateTokenKeysRequest)(nil),         // 52: rill.v1.RotateTokenKeysRequest
-	(*RotateTokenKeysResponse)(nil),        // 53: rill.v1.RotateTokenKeysResponse
-	(*ListTokenKeysRequest)(nil),           // 54: rill.v1.ListTokenKeysRequest
-	(*TokenKey)(nil),                       // 55: rill.v1.TokenKey
-	(*ListTokenKeysResponse)(nil),          // 56: rill.v1.ListTokenKeysResponse
-	nil,                                    // 57: rill.v1.WorkloadBinding.ClaimsEntry
-	(*Principal)(nil),                      // 58: rill.v1.Principal
-	(*fieldmaskpb.FieldMask)(nil),          // 59: google.protobuf.FieldMask
+	(*ReviewerProfile)(nil),                // 17: rill.v1.ReviewerProfile
+	(*Agent)(nil),                          // 18: rill.v1.Agent
+	(*CreateAgentRequest)(nil),             // 19: rill.v1.CreateAgentRequest
+	(*CreateAgentResponse)(nil),            // 20: rill.v1.CreateAgentResponse
+	(*GetAgentRequest)(nil),                // 21: rill.v1.GetAgentRequest
+	(*GetAgentResponse)(nil),               // 22: rill.v1.GetAgentResponse
+	(*ListAgentsRequest)(nil),              // 23: rill.v1.ListAgentsRequest
+	(*ListAgentsResponse)(nil),             // 24: rill.v1.ListAgentsResponse
+	(*UpdateAgentRequest)(nil),             // 25: rill.v1.UpdateAgentRequest
+	(*UpdateAgentResponse)(nil),            // 26: rill.v1.UpdateAgentResponse
+	(*WorkloadIssuerSpec)(nil),             // 27: rill.v1.WorkloadIssuerSpec
+	(*UpdateWorkloadIssuerRequest)(nil),    // 28: rill.v1.UpdateWorkloadIssuerRequest
+	(*UpdateWorkloadIssuerResponse)(nil),   // 29: rill.v1.UpdateWorkloadIssuerResponse
+	(*ListWorkloadIssuersRequest)(nil),     // 30: rill.v1.ListWorkloadIssuersRequest
+	(*ListWorkloadIssuersResponse)(nil),    // 31: rill.v1.ListWorkloadIssuersResponse
+	(*DeleteWorkloadIssuerRequest)(nil),    // 32: rill.v1.DeleteWorkloadIssuerRequest
+	(*DeleteWorkloadIssuerResponse)(nil),   // 33: rill.v1.DeleteWorkloadIssuerResponse
+	(*IdentityProviderSpec)(nil),           // 34: rill.v1.IdentityProviderSpec
+	(*IdentityProviderInfo)(nil),           // 35: rill.v1.IdentityProviderInfo
+	(*GetIdentityProviderRequest)(nil),     // 36: rill.v1.GetIdentityProviderRequest
+	(*GetIdentityProviderResponse)(nil),    // 37: rill.v1.GetIdentityProviderResponse
+	(*UpdateIdentityProviderRequest)(nil),  // 38: rill.v1.UpdateIdentityProviderRequest
+	(*UpdateIdentityProviderResponse)(nil), // 39: rill.v1.UpdateIdentityProviderResponse
+	(*ListIdentityProvidersRequest)(nil),   // 40: rill.v1.ListIdentityProvidersRequest
+	(*ListIdentityProvidersResponse)(nil),  // 41: rill.v1.ListIdentityProvidersResponse
+	(*DeleteIdentityProviderRequest)(nil),  // 42: rill.v1.DeleteIdentityProviderRequest
+	(*DeleteIdentityProviderResponse)(nil), // 43: rill.v1.DeleteIdentityProviderResponse
+	(*User)(nil),                           // 44: rill.v1.User
+	(*ListUsersRequest)(nil),               // 45: rill.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),              // 46: rill.v1.ListUsersResponse
+	(*UpdateUserRequest)(nil),              // 47: rill.v1.UpdateUserRequest
+	(*UpdateUserResponse)(nil),             // 48: rill.v1.UpdateUserResponse
+	(*RevokeTokenRequest)(nil),             // 49: rill.v1.RevokeTokenRequest
+	(*RevokeTokenResponse)(nil),            // 50: rill.v1.RevokeTokenResponse
+	(*RevokeSessionRequest)(nil),           // 51: rill.v1.RevokeSessionRequest
+	(*RevokeSessionResponse)(nil),          // 52: rill.v1.RevokeSessionResponse
+	(*RotateTokenKeysRequest)(nil),         // 53: rill.v1.RotateTokenKeysRequest
+	(*RotateTokenKeysResponse)(nil),        // 54: rill.v1.RotateTokenKeysResponse
+	(*ListTokenKeysRequest)(nil),           // 55: rill.v1.ListTokenKeysRequest
+	(*TokenKey)(nil),                       // 56: rill.v1.TokenKey
+	(*ListTokenKeysResponse)(nil),          // 57: rill.v1.ListTokenKeysResponse
+	nil,                                    // 58: rill.v1.WorkloadBinding.ClaimsEntry
+	(*Principal)(nil),                      // 59: rill.v1.Principal
+	(*fieldmaskpb.FieldMask)(nil),          // 60: google.protobuf.FieldMask
 }
 var file_rill_v1_identity_proto_depIdxs = []int32{
-	58, // 0: rill.v1.GetCallerResponse.principal:type_name -> rill.v1.Principal
+	59, // 0: rill.v1.GetCallerResponse.principal:type_name -> rill.v1.Principal
 	1,  // 1: rill.v1.GetCallerResponse.capabilities:type_name -> rill.v1.Capability
 	1,  // 2: rill.v1.IssueTokenRequest.capabilities:type_name -> rill.v1.Capability
-	58, // 3: rill.v1.IssueTokenRequest.for_principal:type_name -> rill.v1.Principal
-	58, // 4: rill.v1.ScimCredential.created_by:type_name -> rill.v1.Principal
+	59, // 3: rill.v1.IssueTokenRequest.for_principal:type_name -> rill.v1.Principal
+	59, // 4: rill.v1.ScimCredential.created_by:type_name -> rill.v1.Principal
 	5,  // 5: rill.v1.CreateScimCredentialResponse.credential:type_name -> rill.v1.ScimCredential
 	5,  // 6: rill.v1.ListScimCredentialsResponse.credentials:type_name -> rill.v1.ScimCredential
-	57, // 7: rill.v1.WorkloadBinding.claims:type_name -> rill.v1.WorkloadBinding.ClaimsEntry
+	58, // 7: rill.v1.WorkloadBinding.claims:type_name -> rill.v1.WorkloadBinding.ClaimsEntry
 	14, // 8: rill.v1.AgentSpec.budgets:type_name -> rill.v1.AgentBudgets
 	15, // 9: rill.v1.AgentSpec.workloads:type_name -> rill.v1.WorkloadBinding
-	16, // 10: rill.v1.Agent.spec:type_name -> rill.v1.AgentSpec
-	58, // 11: rill.v1.Agent.principal:type_name -> rill.v1.Principal
-	58, // 12: rill.v1.Agent.created_by:type_name -> rill.v1.Principal
-	16, // 13: rill.v1.CreateAgentRequest.agent:type_name -> rill.v1.AgentSpec
-	17, // 14: rill.v1.CreateAgentResponse.agent:type_name -> rill.v1.Agent
-	17, // 15: rill.v1.GetAgentResponse.agent:type_name -> rill.v1.Agent
-	17, // 16: rill.v1.ListAgentsResponse.agents:type_name -> rill.v1.Agent
-	17, // 17: rill.v1.UpdateAgentRequest.agent:type_name -> rill.v1.Agent
-	59, // 18: rill.v1.UpdateAgentRequest.update_mask:type_name -> google.protobuf.FieldMask
-	17, // 19: rill.v1.UpdateAgentResponse.agent:type_name -> rill.v1.Agent
-	26, // 20: rill.v1.UpdateWorkloadIssuerRequest.issuer:type_name -> rill.v1.WorkloadIssuerSpec
-	26, // 21: rill.v1.UpdateWorkloadIssuerResponse.issuer:type_name -> rill.v1.WorkloadIssuerSpec
-	26, // 22: rill.v1.ListWorkloadIssuersResponse.issuers:type_name -> rill.v1.WorkloadIssuerSpec
-	34, // 23: rill.v1.GetIdentityProviderResponse.provider:type_name -> rill.v1.IdentityProviderInfo
-	33, // 24: rill.v1.UpdateIdentityProviderRequest.provider:type_name -> rill.v1.IdentityProviderSpec
-	34, // 25: rill.v1.UpdateIdentityProviderResponse.provider:type_name -> rill.v1.IdentityProviderInfo
-	34, // 26: rill.v1.ListIdentityProvidersResponse.providers:type_name -> rill.v1.IdentityProviderInfo
-	58, // 27: rill.v1.User.principal:type_name -> rill.v1.Principal
-	43, // 28: rill.v1.ListUsersResponse.users:type_name -> rill.v1.User
-	43, // 29: rill.v1.UpdateUserRequest.user:type_name -> rill.v1.User
-	59, // 30: rill.v1.UpdateUserRequest.update_mask:type_name -> google.protobuf.FieldMask
-	43, // 31: rill.v1.UpdateUserResponse.user:type_name -> rill.v1.User
-	55, // 32: rill.v1.ListTokenKeysResponse.keys:type_name -> rill.v1.TokenKey
-	0,  // 33: rill.v1.IdentityService.GetCaller:input_type -> rill.v1.GetCallerRequest
-	3,  // 34: rill.v1.IdentityService.IssueToken:input_type -> rill.v1.IssueTokenRequest
-	48, // 35: rill.v1.IdentityService.RevokeToken:input_type -> rill.v1.RevokeTokenRequest
-	50, // 36: rill.v1.IdentityService.RevokeSession:input_type -> rill.v1.RevokeSessionRequest
-	52, // 37: rill.v1.IdentityService.RotateTokenKeys:input_type -> rill.v1.RotateTokenKeysRequest
-	54, // 38: rill.v1.IdentityService.ListTokenKeys:input_type -> rill.v1.ListTokenKeysRequest
-	35, // 39: rill.v1.IdentityService.GetIdentityProvider:input_type -> rill.v1.GetIdentityProviderRequest
-	39, // 40: rill.v1.IdentityService.ListIdentityProviders:input_type -> rill.v1.ListIdentityProvidersRequest
-	37, // 41: rill.v1.IdentityService.UpdateIdentityProvider:input_type -> rill.v1.UpdateIdentityProviderRequest
-	41, // 42: rill.v1.IdentityService.DeleteIdentityProvider:input_type -> rill.v1.DeleteIdentityProviderRequest
-	44, // 43: rill.v1.IdentityService.ListUsers:input_type -> rill.v1.ListUsersRequest
-	46, // 44: rill.v1.IdentityService.UpdateUser:input_type -> rill.v1.UpdateUserRequest
-	18, // 45: rill.v1.IdentityService.CreateAgent:input_type -> rill.v1.CreateAgentRequest
-	20, // 46: rill.v1.IdentityService.GetAgent:input_type -> rill.v1.GetAgentRequest
-	22, // 47: rill.v1.IdentityService.ListAgents:input_type -> rill.v1.ListAgentsRequest
-	24, // 48: rill.v1.IdentityService.UpdateAgent:input_type -> rill.v1.UpdateAgentRequest
-	29, // 49: rill.v1.IdentityService.ListWorkloadIssuers:input_type -> rill.v1.ListWorkloadIssuersRequest
-	27, // 50: rill.v1.IdentityService.UpdateWorkloadIssuer:input_type -> rill.v1.UpdateWorkloadIssuerRequest
-	31, // 51: rill.v1.IdentityService.DeleteWorkloadIssuer:input_type -> rill.v1.DeleteWorkloadIssuerRequest
-	12, // 52: rill.v1.IdentityService.KillSwitch:input_type -> rill.v1.KillSwitchRequest
-	6,  // 53: rill.v1.IdentityService.CreateScimCredential:input_type -> rill.v1.CreateScimCredentialRequest
-	8,  // 54: rill.v1.IdentityService.ListScimCredentials:input_type -> rill.v1.ListScimCredentialsRequest
-	10, // 55: rill.v1.IdentityService.DeleteScimCredential:input_type -> rill.v1.DeleteScimCredentialRequest
-	2,  // 56: rill.v1.IdentityService.GetCaller:output_type -> rill.v1.GetCallerResponse
-	4,  // 57: rill.v1.IdentityService.IssueToken:output_type -> rill.v1.IssueTokenResponse
-	49, // 58: rill.v1.IdentityService.RevokeToken:output_type -> rill.v1.RevokeTokenResponse
-	51, // 59: rill.v1.IdentityService.RevokeSession:output_type -> rill.v1.RevokeSessionResponse
-	53, // 60: rill.v1.IdentityService.RotateTokenKeys:output_type -> rill.v1.RotateTokenKeysResponse
-	56, // 61: rill.v1.IdentityService.ListTokenKeys:output_type -> rill.v1.ListTokenKeysResponse
-	36, // 62: rill.v1.IdentityService.GetIdentityProvider:output_type -> rill.v1.GetIdentityProviderResponse
-	40, // 63: rill.v1.IdentityService.ListIdentityProviders:output_type -> rill.v1.ListIdentityProvidersResponse
-	38, // 64: rill.v1.IdentityService.UpdateIdentityProvider:output_type -> rill.v1.UpdateIdentityProviderResponse
-	42, // 65: rill.v1.IdentityService.DeleteIdentityProvider:output_type -> rill.v1.DeleteIdentityProviderResponse
-	45, // 66: rill.v1.IdentityService.ListUsers:output_type -> rill.v1.ListUsersResponse
-	47, // 67: rill.v1.IdentityService.UpdateUser:output_type -> rill.v1.UpdateUserResponse
-	19, // 68: rill.v1.IdentityService.CreateAgent:output_type -> rill.v1.CreateAgentResponse
-	21, // 69: rill.v1.IdentityService.GetAgent:output_type -> rill.v1.GetAgentResponse
-	23, // 70: rill.v1.IdentityService.ListAgents:output_type -> rill.v1.ListAgentsResponse
-	25, // 71: rill.v1.IdentityService.UpdateAgent:output_type -> rill.v1.UpdateAgentResponse
-	30, // 72: rill.v1.IdentityService.ListWorkloadIssuers:output_type -> rill.v1.ListWorkloadIssuersResponse
-	28, // 73: rill.v1.IdentityService.UpdateWorkloadIssuer:output_type -> rill.v1.UpdateWorkloadIssuerResponse
-	32, // 74: rill.v1.IdentityService.DeleteWorkloadIssuer:output_type -> rill.v1.DeleteWorkloadIssuerResponse
-	13, // 75: rill.v1.IdentityService.KillSwitch:output_type -> rill.v1.KillSwitchResponse
-	7,  // 76: rill.v1.IdentityService.CreateScimCredential:output_type -> rill.v1.CreateScimCredentialResponse
-	9,  // 77: rill.v1.IdentityService.ListScimCredentials:output_type -> rill.v1.ListScimCredentialsResponse
-	11, // 78: rill.v1.IdentityService.DeleteScimCredential:output_type -> rill.v1.DeleteScimCredentialResponse
-	56, // [56:79] is the sub-list for method output_type
-	33, // [33:56] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	17, // 10: rill.v1.AgentSpec.reviewer:type_name -> rill.v1.ReviewerProfile
+	16, // 11: rill.v1.Agent.spec:type_name -> rill.v1.AgentSpec
+	59, // 12: rill.v1.Agent.principal:type_name -> rill.v1.Principal
+	59, // 13: rill.v1.Agent.created_by:type_name -> rill.v1.Principal
+	16, // 14: rill.v1.CreateAgentRequest.agent:type_name -> rill.v1.AgentSpec
+	18, // 15: rill.v1.CreateAgentResponse.agent:type_name -> rill.v1.Agent
+	18, // 16: rill.v1.GetAgentResponse.agent:type_name -> rill.v1.Agent
+	18, // 17: rill.v1.ListAgentsResponse.agents:type_name -> rill.v1.Agent
+	18, // 18: rill.v1.UpdateAgentRequest.agent:type_name -> rill.v1.Agent
+	60, // 19: rill.v1.UpdateAgentRequest.update_mask:type_name -> google.protobuf.FieldMask
+	18, // 20: rill.v1.UpdateAgentResponse.agent:type_name -> rill.v1.Agent
+	27, // 21: rill.v1.UpdateWorkloadIssuerRequest.issuer:type_name -> rill.v1.WorkloadIssuerSpec
+	27, // 22: rill.v1.UpdateWorkloadIssuerResponse.issuer:type_name -> rill.v1.WorkloadIssuerSpec
+	27, // 23: rill.v1.ListWorkloadIssuersResponse.issuers:type_name -> rill.v1.WorkloadIssuerSpec
+	35, // 24: rill.v1.GetIdentityProviderResponse.provider:type_name -> rill.v1.IdentityProviderInfo
+	34, // 25: rill.v1.UpdateIdentityProviderRequest.provider:type_name -> rill.v1.IdentityProviderSpec
+	35, // 26: rill.v1.UpdateIdentityProviderResponse.provider:type_name -> rill.v1.IdentityProviderInfo
+	35, // 27: rill.v1.ListIdentityProvidersResponse.providers:type_name -> rill.v1.IdentityProviderInfo
+	59, // 28: rill.v1.User.principal:type_name -> rill.v1.Principal
+	44, // 29: rill.v1.ListUsersResponse.users:type_name -> rill.v1.User
+	44, // 30: rill.v1.UpdateUserRequest.user:type_name -> rill.v1.User
+	60, // 31: rill.v1.UpdateUserRequest.update_mask:type_name -> google.protobuf.FieldMask
+	44, // 32: rill.v1.UpdateUserResponse.user:type_name -> rill.v1.User
+	56, // 33: rill.v1.ListTokenKeysResponse.keys:type_name -> rill.v1.TokenKey
+	0,  // 34: rill.v1.IdentityService.GetCaller:input_type -> rill.v1.GetCallerRequest
+	3,  // 35: rill.v1.IdentityService.IssueToken:input_type -> rill.v1.IssueTokenRequest
+	49, // 36: rill.v1.IdentityService.RevokeToken:input_type -> rill.v1.RevokeTokenRequest
+	51, // 37: rill.v1.IdentityService.RevokeSession:input_type -> rill.v1.RevokeSessionRequest
+	53, // 38: rill.v1.IdentityService.RotateTokenKeys:input_type -> rill.v1.RotateTokenKeysRequest
+	55, // 39: rill.v1.IdentityService.ListTokenKeys:input_type -> rill.v1.ListTokenKeysRequest
+	36, // 40: rill.v1.IdentityService.GetIdentityProvider:input_type -> rill.v1.GetIdentityProviderRequest
+	40, // 41: rill.v1.IdentityService.ListIdentityProviders:input_type -> rill.v1.ListIdentityProvidersRequest
+	38, // 42: rill.v1.IdentityService.UpdateIdentityProvider:input_type -> rill.v1.UpdateIdentityProviderRequest
+	42, // 43: rill.v1.IdentityService.DeleteIdentityProvider:input_type -> rill.v1.DeleteIdentityProviderRequest
+	45, // 44: rill.v1.IdentityService.ListUsers:input_type -> rill.v1.ListUsersRequest
+	47, // 45: rill.v1.IdentityService.UpdateUser:input_type -> rill.v1.UpdateUserRequest
+	19, // 46: rill.v1.IdentityService.CreateAgent:input_type -> rill.v1.CreateAgentRequest
+	21, // 47: rill.v1.IdentityService.GetAgent:input_type -> rill.v1.GetAgentRequest
+	23, // 48: rill.v1.IdentityService.ListAgents:input_type -> rill.v1.ListAgentsRequest
+	25, // 49: rill.v1.IdentityService.UpdateAgent:input_type -> rill.v1.UpdateAgentRequest
+	30, // 50: rill.v1.IdentityService.ListWorkloadIssuers:input_type -> rill.v1.ListWorkloadIssuersRequest
+	28, // 51: rill.v1.IdentityService.UpdateWorkloadIssuer:input_type -> rill.v1.UpdateWorkloadIssuerRequest
+	32, // 52: rill.v1.IdentityService.DeleteWorkloadIssuer:input_type -> rill.v1.DeleteWorkloadIssuerRequest
+	12, // 53: rill.v1.IdentityService.KillSwitch:input_type -> rill.v1.KillSwitchRequest
+	6,  // 54: rill.v1.IdentityService.CreateScimCredential:input_type -> rill.v1.CreateScimCredentialRequest
+	8,  // 55: rill.v1.IdentityService.ListScimCredentials:input_type -> rill.v1.ListScimCredentialsRequest
+	10, // 56: rill.v1.IdentityService.DeleteScimCredential:input_type -> rill.v1.DeleteScimCredentialRequest
+	2,  // 57: rill.v1.IdentityService.GetCaller:output_type -> rill.v1.GetCallerResponse
+	4,  // 58: rill.v1.IdentityService.IssueToken:output_type -> rill.v1.IssueTokenResponse
+	50, // 59: rill.v1.IdentityService.RevokeToken:output_type -> rill.v1.RevokeTokenResponse
+	52, // 60: rill.v1.IdentityService.RevokeSession:output_type -> rill.v1.RevokeSessionResponse
+	54, // 61: rill.v1.IdentityService.RotateTokenKeys:output_type -> rill.v1.RotateTokenKeysResponse
+	57, // 62: rill.v1.IdentityService.ListTokenKeys:output_type -> rill.v1.ListTokenKeysResponse
+	37, // 63: rill.v1.IdentityService.GetIdentityProvider:output_type -> rill.v1.GetIdentityProviderResponse
+	41, // 64: rill.v1.IdentityService.ListIdentityProviders:output_type -> rill.v1.ListIdentityProvidersResponse
+	39, // 65: rill.v1.IdentityService.UpdateIdentityProvider:output_type -> rill.v1.UpdateIdentityProviderResponse
+	43, // 66: rill.v1.IdentityService.DeleteIdentityProvider:output_type -> rill.v1.DeleteIdentityProviderResponse
+	46, // 67: rill.v1.IdentityService.ListUsers:output_type -> rill.v1.ListUsersResponse
+	48, // 68: rill.v1.IdentityService.UpdateUser:output_type -> rill.v1.UpdateUserResponse
+	20, // 69: rill.v1.IdentityService.CreateAgent:output_type -> rill.v1.CreateAgentResponse
+	22, // 70: rill.v1.IdentityService.GetAgent:output_type -> rill.v1.GetAgentResponse
+	24, // 71: rill.v1.IdentityService.ListAgents:output_type -> rill.v1.ListAgentsResponse
+	26, // 72: rill.v1.IdentityService.UpdateAgent:output_type -> rill.v1.UpdateAgentResponse
+	31, // 73: rill.v1.IdentityService.ListWorkloadIssuers:output_type -> rill.v1.ListWorkloadIssuersResponse
+	29, // 74: rill.v1.IdentityService.UpdateWorkloadIssuer:output_type -> rill.v1.UpdateWorkloadIssuerResponse
+	33, // 75: rill.v1.IdentityService.DeleteWorkloadIssuer:output_type -> rill.v1.DeleteWorkloadIssuerResponse
+	13, // 76: rill.v1.IdentityService.KillSwitch:output_type -> rill.v1.KillSwitchResponse
+	7,  // 77: rill.v1.IdentityService.CreateScimCredential:output_type -> rill.v1.CreateScimCredentialResponse
+	9,  // 78: rill.v1.IdentityService.ListScimCredentials:output_type -> rill.v1.ListScimCredentialsResponse
+	11, // 79: rill.v1.IdentityService.DeleteScimCredential:output_type -> rill.v1.DeleteScimCredentialResponse
+	57, // [57:80] is the sub-list for method output_type
+	34, // [34:57] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_identity_proto_init() }
@@ -4298,27 +4399,28 @@ func file_rill_v1_identity_proto_init() {
 	}
 	file_rill_v1_identity_proto_msgTypes[14].OneofWrappers = []any{}
 	file_rill_v1_identity_proto_msgTypes[16].OneofWrappers = []any{}
-	file_rill_v1_identity_proto_msgTypes[26].OneofWrappers = []any{
+	file_rill_v1_identity_proto_msgTypes[17].OneofWrappers = []any{}
+	file_rill_v1_identity_proto_msgTypes[27].OneofWrappers = []any{
 		(*WorkloadIssuerSpec_Discovery)(nil),
 		(*WorkloadIssuerSpec_JwksUri)(nil),
 		(*WorkloadIssuerSpec_Jwks)(nil),
 	}
-	file_rill_v1_identity_proto_msgTypes[33].OneofWrappers = []any{}
 	file_rill_v1_identity_proto_msgTypes[34].OneofWrappers = []any{}
-	file_rill_v1_identity_proto_msgTypes[43].OneofWrappers = []any{}
-	file_rill_v1_identity_proto_msgTypes[48].OneofWrappers = []any{
+	file_rill_v1_identity_proto_msgTypes[35].OneofWrappers = []any{}
+	file_rill_v1_identity_proto_msgTypes[44].OneofWrappers = []any{}
+	file_rill_v1_identity_proto_msgTypes[49].OneofWrappers = []any{
 		(*RevokeTokenRequest_Token)(nil),
 		(*RevokeTokenRequest_TokenId)(nil),
 	}
-	file_rill_v1_identity_proto_msgTypes[53].OneofWrappers = []any{}
-	file_rill_v1_identity_proto_msgTypes[55].OneofWrappers = []any{}
+	file_rill_v1_identity_proto_msgTypes[54].OneofWrappers = []any{}
+	file_rill_v1_identity_proto_msgTypes[56].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_identity_proto_rawDesc), len(file_rill_v1_identity_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   58,
+			NumMessages:   59,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

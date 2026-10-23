@@ -7039,6 +7039,7 @@ dependencies = [
  "rill-store",
  "rill-types",
  "serde",
+ "serde_json",
  "thiserror 2.0.21",
  "tokio",
  "tokio-util",
@@ -7209,15 +7210,38 @@ dependencies = [
  "bytes",
  "futures",
  "hex",
+ "parking_lot",
  "regex",
  "rill-core",
  "rill-policy",
  "rill-store",
  "rill-types",
  "serde",
+ "serde_json",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "rill-review-runner"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "blake3",
+ "bytes",
+ "clap",
+ "reqwest",
+ "rill-api",
+ "rill-sdk",
+ "rill-types",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

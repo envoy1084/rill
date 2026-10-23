@@ -6,7 +6,8 @@ use rill_proto::rill::v1::{
     ChecksServiceClient, ContentServiceClient, EventServiceClient, IdentityServiceClient,
     IntentServiceClient, LandingServiceClient, OperationServiceClient, OrgServiceClient,
     PolicyServiceClient, ProtectionServiceClient, RepoServiceClient, ReviewServiceClient,
-    SecretServiceClient, SessionServiceClient, TrunkServiceClient, WorkspaceServiceClient,
+    ReviewerServiceClient, SecretServiceClient, SessionServiceClient, TrunkServiceClient,
+    WorkspaceServiceClient,
 };
 
 use super::server::TestServer;
@@ -99,6 +100,7 @@ authed!(
     ProtectionServiceClient,
     RepoServiceClient,
     ReviewServiceClient,
+    ReviewerServiceClient,
     SecretServiceClient,
     SessionServiceClient,
     TrunkServiceClient,
@@ -122,6 +124,8 @@ pub(crate) struct Clients {
     pub(crate) admin: AdminServiceClient<Svc>,
     pub(crate) secrets: SecretServiceClient<Svc>,
     pub(crate) intents: IntentServiceClient<Svc>,
+    pub(crate) reviewers: ReviewerServiceClient<Svc>,
+    pub(crate) trunk: TrunkServiceClient<Svc>,
 }
 
 pub(crate) async fn clients(server: &TestServer, token: Option<&str>) -> Clients {
@@ -147,7 +151,9 @@ pub(crate) async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
         review: ReviewServiceClient::authed(channel.clone(), bearer.clone()),
         admin: AdminServiceClient::authed(channel.clone(), bearer.clone()),
         secrets: SecretServiceClient::authed(channel.clone(), bearer.clone()),
-        intents: IntentServiceClient::authed(channel, bearer),
+        intents: IntentServiceClient::authed(channel.clone(), bearer.clone()),
+        reviewers: ReviewerServiceClient::authed(channel.clone(), bearer.clone()),
+        trunk: TrunkServiceClient::authed(channel, bearer),
     }
 }
 

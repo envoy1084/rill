@@ -20,7 +20,7 @@ impl Error {
                 match e {
                     E::Contended(_) => R::Contended,
                     E::InvalidStatus { .. } | E::ThreadAlreadyResolved(_) => R::InvalidState,
-                    E::ReviewerTimeout(_) => R::Timeout,
+                    E::StaleVersion { .. } => R::InvalidState,
                     E::Policy(p) => policy_reason(p).unwrap_or_else(|| by_code(self.code())),
                     E::Store(s) => store_reason(s).unwrap_or_else(|| by_code(self.code())),
                     _ => by_code(self.code()),

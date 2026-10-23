@@ -33,6 +33,7 @@ pub mod refs;
 pub mod release;
 pub mod repo;
 pub mod review;
+pub mod reviewer;
 pub mod secrets;
 pub mod session;
 pub mod show;

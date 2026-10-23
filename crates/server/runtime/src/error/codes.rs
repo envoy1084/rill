@@ -17,6 +17,7 @@ impl Error {
             Error::Events(rill_events::Error::Store(e)) => store_code(e),
             Error::Jobs(rill_jobs::Error::Store(e)) => store_code(e),
             Error::Jobs(rill_jobs::Error::Lost(_)) => Code::Aborted,
+            Error::Jobs(rill_jobs::Error::Foreign(_)) => Code::InvalidArgument,
             Error::Exec(e) => exec_code(e),
             Error::Identity(e) => match e {
                 rill_identity::Error::Store(e) => store_code(e),
@@ -129,19 +130,21 @@ pub(super) fn review_code(e: &rill_review::error::Error) -> Code {
         | E::VersionNotFound(_)
         | E::ThreadNotFound { .. } => Code::NotFound,
         E::AlreadySubmitted(_) => Code::AlreadyExists,
-        E::InvalidStatus { .. } | E::ThreadAlreadyResolved(_) => Code::FailedPrecondition,
+        E::InvalidStatus { .. } | E::ThreadAlreadyResolved(_) | E::StaleVersion { .. } => {
+            Code::FailedPrecondition
+        }
         E::WrongChange { .. }
+        | E::BadResult(_)
         | E::UnknownLabel(_)
         | E::VoteOutOfRange { .. }
         | E::InvalidStack(_)
         | E::Types(_) => Code::InvalidArgument,
         E::MaxRequiresHuman(_) => Code::PermissionDenied,
         E::Contended(_) => Code::Aborted,
-        E::ReviewerTimeout(_) => Code::DeadlineExceeded,
         E::Policy(p) => policy_code(p),
         E::Core(c) => core_code(c),
         E::Store(s) => store_code(s),
-        E::ReviewerFailed { .. } | E::Join(_) => Code::Internal,
+        E::Join(_) => Code::Internal,
     }
 }
 
@@ -157,6 +160,7 @@ pub(super) fn lander_code(e: &rill_lander::Error) -> Code {
         E::Core(c) => core_code(c),
         E::Store(s) | E::Jobs(rill_jobs::Error::Store(s)) => store_code(s),
         E::Jobs(rill_jobs::Error::Lost(_)) => Code::Aborted,
+        E::Jobs(rill_jobs::Error::Foreign(_)) => Code::Internal,
         E::Hook(_) | E::Verifier(_) | E::Codec(_) | E::Join(_) => Code::Internal,
     }
 }

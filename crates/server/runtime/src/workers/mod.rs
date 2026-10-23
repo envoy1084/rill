@@ -1,10 +1,12 @@
 //! Background tasks: per repository, the landing loop, post-land
 //! verification, the derive and index job workers, event retention, the
 //! follower that keeps cached policy and relations current, and durable
-//! event consumers (owner-review escalation); per server, local
+//! event consumers (owner-review escalation, intent budgets, reviewer
+//! routing and calibration); per server, local
 //! execution workers.
 
 mod build_graph;
+pub mod calibration;
 pub mod consumer;
 mod deriver;
 mod discovery;
@@ -19,6 +21,7 @@ mod local_exec;
 mod regenerator;
 mod repo_tasks;
 mod reverter;
+pub mod reviewers;
 pub(crate) mod rights;
 mod verifier;
 

@@ -72,13 +72,16 @@ pub enum Error {
     #[error("too many concurrent updates to change {0}; giving up")]
     Contended(ChangeId),
 
-    /// A reviewer did not finish within its budget.
-    #[error("reviewer {0:?} timed out")]
-    ReviewerTimeout(String),
+    /// The change moved past the version an action was meant for.
+    #[error("{version} is not the current version of change {change_id}")]
+    StaleVersion {
+        change_id: ChangeId,
+        version: ChangeVersionHash,
+    },
 
-    /// A reviewer failed.
-    #[error("reviewer {name:?} failed: {reason}")]
-    ReviewerFailed { name: String, reason: String },
+    /// A reviewer's result breaks its limits.
+    #[error("reviewer result refused: {0}")]
+    BadResult(String),
 
     /// The policy layer rejected the evaluation.
     #[error(transparent)]

@@ -15,6 +15,7 @@ mod lander;
 mod ownership;
 mod primitives;
 mod review;
+mod reviewers;
 mod search;
 mod workspace;
 
@@ -35,5 +36,6 @@ pub use review::{
     land_progress, land_ticket, landed_change, new_thread, review_event, review_info, review_state,
     submit_decision, sync_result, thread,
 };
+pub use reviewers::{review_run, reviewer_stats};
 pub use search::{grep_hit, grep_result};
 pub use workspace::{operation, sparse_profile, workspace, workspace_op};

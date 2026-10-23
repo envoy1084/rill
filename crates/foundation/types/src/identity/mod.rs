@@ -15,7 +15,7 @@ mod team;
 mod user;
 mod workload;
 
-pub use agent::{AgentBudgets, AgentRecord, Sponsor, WorkloadBinding};
+pub use agent::{AgentBudgets, AgentRecord, ReviewerProfile, Sponsor, WorkloadBinding};
 pub use data_key::DataKeyRecord;
 pub use event::{IdentityChange, IdentityEvent};
 pub use keys::{TokenKeyRecord, WrappedSecret};

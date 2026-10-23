@@ -1,7 +1,8 @@
 //! Casting votes.
 
 use rill_types::{
-    ChangeId, LabelVote, Principal, PrincipalKind, ReviewState, ReviewStatus, Timestamp,
+    ChangeId, ChangeVersionHash, LabelVote, Principal, PrincipalKind, ReviewState, ReviewStatus,
+    Timestamp,
 };
 
 use crate::error::{Error, Result};
@@ -21,6 +22,22 @@ impl ReviewService {
         value: i8,
         reason: Option<String>,
     ) -> Result<ReviewState> {
+        self.vote_at(change_id, voter, label, value, reason, None)
+            .await
+    }
+
+    /// [`ReviewService::vote`], refused with [`Error::StaleVersion`] when
+    /// `expected` is set and is no longer the current version when the vote
+    /// is written.
+    pub async fn vote_at(
+        &self,
+        change_id: &ChangeId,
+        voter: &Principal,
+        label: &str,
+        value: i8,
+        reason: Option<String>,
+        expected: Option<ChangeVersionHash>,
+    ) -> Result<ReviewState> {
         validate_vote(&self.labels, voter, label, value)?;
         let current = self.get(change_id).await?;
         let facts = self
@@ -36,6 +53,12 @@ impl ReviewService {
                     });
                 }
                 let version = s.current_version().ok_or(Error::NoVersions(*change_id))?;
+                if let Some(expected) = expected.filter(|e| *e != version) {
+                    return Err(Error::StaleVersion {
+                        change_id: *change_id,
+                        version: expected,
+                    });
+                }
                 let vote = LabelVote {
                     label: label.to_string(),
                     value,

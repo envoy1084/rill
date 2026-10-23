@@ -203,6 +203,21 @@ message AgentSpec {
   AgentBudgets budgets = 8;
   repeated WorkloadBinding workloads = 9;
   optional int64 expires_at = 10;
+  // Set when the agent reviews changes.
+  ReviewerProfile reviewer = 11;
+}
+
+// How an agent reviews.
+message ReviewerProfile {
+  // The model's family (`claude`, …); a quorum needs different families
+  // or prompts.
+  string model_family = 1;
+  string model = 2;
+  // Its prompt's repository path; default `.rill/reviewers/<name>/prompt.md`.
+  string prompt = 3;
+  // The largest `Review` vote it may cast, either way (1 or 2).
+  int32 max_vote = 4;
+  optional uint64 runs_per_day = 5;
 }
 
 message Agent {

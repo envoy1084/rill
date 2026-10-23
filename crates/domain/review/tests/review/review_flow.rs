@@ -1,9 +1,8 @@
 //! End-to-end review flow over in-memory stores.
 
-use rill_review::agents::{HeuristicReviewer, PoolConfig, ReviewerPool};
-use rill_review::{Error, ReviewEvent};
+use rill_review::{Error, Finding, ReviewEvent, ReviewResult};
 use rill_types::objects::review::CommentCategory;
-use rill_types::{RepoPathBuf, ReviewStatus, RiskClass, ThreadAnchor};
+use rill_types::{Principal, RepoPathBuf, ReviewStatus, RiskClass, ThreadAnchor};
 
 use crate::common::{harness, LIB_V0, LIB_V1};
 
@@ -11,7 +10,8 @@ use crate::common::{harness, LIB_V0, LIB_V1};
 async fn normal_change_needs_human_plus_two_or_agents_plus_owner() {
     let h = harness().await;
     let root = h.root().await;
-    let (cid, _) = h.child(&h.agent_a, root, &[("src/lib.rs", LIB_V1)]).await;
+    let coder = Principal::agent("coder");
+    let (cid, _) = h.child(&coder, root, &[("src/lib.rs", LIB_V1)]).await;
     let mut events = h.service.subscribe();
 
     let state = h.service.submit(&cid, &h.alice).await.unwrap();
@@ -243,49 +243,57 @@ async fn stacks_validate_and_restack() {
 }
 
 #[tokio::test]
-async fn heuristic_reviewer_posts_findings_and_votes() {
+async fn a_reviewer_result_lands_on_the_version_it_reviewed_only() {
     let h = harness().await;
     let root = h.root().await;
-    let leaky = format!("{LIB_V1}\nconst AWS_KEY: &str = \"AKIAABCDEFGHIJKLMNOP\";\n// TODO remove\npub fn dbg() {{ println!(\"here\"); }}\n");
-    let (cid, v1) = h.child(&h.agent_a, root, &[("src/lib.rs", &leaky)]).await;
+    let (cid, v1) = h.child(&h.agent_a, root, &[("src/lib.rs", LIB_V1)]).await;
     h.service.submit(&cid, &h.alice).await.unwrap();
-
-    let pool = ReviewerPool::new(PoolConfig::default()).with(HeuristicReviewer::default().shared());
-    let report = pool.run(&h.service, &cid).await.unwrap();
-    assert_eq!(report.version, v1);
-    let outcome = &report.outcomes[0];
-    assert_eq!(outcome.name, "heuristics");
-    assert!(outcome.error.is_none(), "{:?}", outcome.error);
-    let categories: Vec<_> = outcome.findings.iter().map(|f| f.category).collect();
-    assert!(categories.contains(&CommentCategory::Security));
-    assert!(categories.contains(&CommentCategory::Suggestion));
-    assert!(categories.contains(&CommentCategory::Style));
-    assert!(categories.contains(&CommentCategory::TestGap));
-    assert_eq!(outcome.vote, Some(-1));
-
+    let reviewer = Principal::agent("reviewer");
+    let result = ReviewResult {
+        version: v1,
+        findings: vec![
+            Finding::at(
+                RepoPathBuf::new("src/lib.rs").unwrap(),
+                1,
+                1,
+                CommentCategory::Bug,
+                90,
+                "subtracts instead of adding",
+            ),
+            Finding::change(CommentCategory::Suggestion, 10, "too unsure to post"),
+        ],
+        vote: -1,
+        summary: "one bug".into(),
+    };
+    let posted = h
+        .service
+        .post_review_result(&cid, &reviewer, &result)
+        .await
+        .unwrap();
+    assert_eq!((posted.threads.len(), posted.vote), (1, -1));
     let state = h.service.get(&cid).await.unwrap();
-    assert_eq!(state.threads.len(), outcome.thread_ids.len());
     let vote = state.current_votes().next().unwrap();
-    assert_eq!(vote.voter.name, "heuristics");
-    assert_eq!(vote.value, -1);
-    let d = h.service.evaluate(&cid).await.unwrap();
-    assert!(!d.allowed);
+    assert_eq!((&vote.voter, vote.value), (&reviewer, -1));
+    assert!(!h.service.evaluate(&cid).await.unwrap().allowed);
 
-    // A clean change gets +1 and only the test-gap note.
-    let (clean, _) = h
-        .child(
-            &h.alice,
-            root,
-            &[
-                ("src/lib.rs", LIB_V1),
-                ("tests/add.rs", "#[test] fn t() {}\n"),
-            ],
-        )
+    let edited = LIB_V1.replace("a - b", "a + b");
+    let v2 = h
+        .amend(cid, v1, root, &[("src/lib.rs", &edited)], "fix")
         .await;
-    h.service.submit(&clean, &h.alice).await.unwrap();
-    let report = pool.run(&h.service, &clean).await.unwrap();
-    assert_eq!(report.outcomes[0].vote, Some(1));
-    assert!(report.outcomes[0].findings.is_empty());
+    h.service.add_version(&cid, v2).await.unwrap();
+    let late = ReviewResult {
+        vote: 1,
+        findings: vec![],
+        ..result
+    };
+    assert!(matches!(
+        h.service.post_review_result(&cid, &reviewer, &late).await,
+        Err(Error::StaleVersion { .. })
+    ));
+    assert_eq!(
+        h.service.get(&cid).await.unwrap().current_votes().count(),
+        0
+    );
 }
 
 #[tokio::test]
@@ -293,11 +301,11 @@ async fn review_context_carries_blame_and_intent() {
     let h = harness().await;
     let root = h.root().await;
     let changed = LIB_V0.replace("a + b", "a.wrapping_add(b)");
-    let (cid, _) = h.child(&h.bob, root, &[("src/lib.rs", &changed)]).await;
+    let (cid, v) = h.child(&h.bob, root, &[("src/lib.rs", &changed)]).await;
     h.service.submit(&cid, &h.bob).await.unwrap();
     let ctx = h
         .service
-        .review_context(&cid, rill_review::Budget::default())
+        .review_context(&cid, v, rill_review::Budget::default())
         .await
         .unwrap();
     assert_eq!(ctx.diffs.len(), 1);

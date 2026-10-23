@@ -5,22 +5,27 @@ use rill_core::{diff_lines, diff_trees, LineTag};
 use super::reviewer::{Budget, FileDiff, ReviewContext, TouchedLine};
 use crate::error::{Error, Result};
 use crate::service::ReviewService;
-use rill_types::ChangeId;
+use rill_types::{ChangeId, ChangeVersionHash};
 
 /// Rough bytes-per-token used to fit diffs into a token budget.
 const BYTES_PER_TOKEN: usize = 4;
 
 impl ReviewService {
-    /// Build the context reviewers see for the change's current version.
+    /// Build the context a reviewer sees for `version` of the change.
     pub async fn review_context(
         &self,
         change_id: &ChangeId,
+        version: ChangeVersionHash,
         budget: Budget,
     ) -> Result<ReviewContext> {
         let state = self.get(change_id).await?;
-        let version = state
-            .current_version()
-            .ok_or(Error::NoVersions(*change_id))?;
+        if !state.versions.contains(&version) {
+            return Err(Error::WrongChange {
+                version,
+                expected: *change_id,
+                actual: self.derive.change(&version).await?.change_id,
+            });
+        }
         let change = self.derive.change(&version).await?;
         let root = self.root_of(&version).await?;
         let parent = change.first_parent();

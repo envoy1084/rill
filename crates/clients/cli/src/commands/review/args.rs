@@ -31,6 +31,20 @@ pub enum ReviewCmd {
     ResolveThread(ResolveThreadArgs),
     /// Evaluate the submit policy and print the reasons.
     Evaluate(ChangeArg),
+    /// Ask reviewer agents to review the current version.
+    Request(RequestArgs),
+    /// Agent review runs on a change.
+    Runs(ChangeArg),
+}
+
+/// `rill review request`.
+#[derive(Args, Debug)]
+pub struct RequestArgs {
+    /// Change id or version hash (default: the checkout's working change).
+    pub change: Option<String>,
+    /// Reviewer agents to ask (default: as `.rill/review.toml` routes it).
+    #[arg(long = "reviewer", value_name = "AGENT")]
+    pub reviewers: Vec<String>,
 }
 
 /// `rill approve` and `rill reject`.

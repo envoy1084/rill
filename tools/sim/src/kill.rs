@@ -57,6 +57,7 @@ pub async fn register_agents(world: &World, agents: &[Agent]) {
                     created_by: admin.clone(),
                     created_at: now,
                     updated_at: now,
+                    reviewer: None,
                 },
                 &admin,
             )

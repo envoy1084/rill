@@ -93,6 +93,27 @@ pub struct AgentRecord {
     pub created_by: Principal,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    /// Present when the agent reviews changes for repositories that route
+    /// work to it.
+    #[serde(default)]
+    pub reviewer: Option<ReviewerProfile>,
+}
+
+/// How an agent reviews: what it runs and how far its vote reaches.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewerProfile {
+    /// The model's family (`claude`, …): reviewers in one quorum must
+    /// differ in family or prompt.
+    pub model_family: String,
+    /// The model it runs, recorded on every result.
+    pub model: String,
+    /// Its prompt's path in the repository (default
+    /// `.rill/reviewers/<name>/prompt.md`).
+    pub prompt: String,
+    /// The largest `Review` vote it may cast, positive or negative.
+    pub max_vote: i8,
+    /// Reviews it may run per day, across repositories.
+    pub runs_per_day: Option<u64>,
 }
 
 impl Record for AgentRecord {

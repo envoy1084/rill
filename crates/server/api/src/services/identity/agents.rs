@@ -30,6 +30,17 @@ pub fn agent_proto(a: &AgentRecord) -> pb::Agent {
     out
 }
 
+/// A reviewer profile on the wire.
+pub(crate) fn profile_proto(r: &rill_types::identity::ReviewerProfile) -> pb::ReviewerProfile {
+    pb::ReviewerProfile {
+        model_family: r.model_family.clone(),
+        model: r.model.clone(),
+        prompt: r.prompt.clone(),
+        max_vote: r.max_vote.into(),
+        runs_per_day: r.runs_per_day,
+    }
+}
+
 fn agent_fields(a: &AgentRecord) -> pb::Agent {
     pb::Agent {
         name: names::org_resource(&AGENT, &a.org, &a.principal.name),
@@ -59,6 +70,7 @@ fn agent_fields(a: &AgentRecord) -> pb::Agent {
                 })
                 .collect(),
             expires_at: a.expires_at.map(timestamp_to_proto),
+            reviewer: a.reviewer.as_ref().map(profile_proto).into(),
         })
         .into(),
         principal: pb::Principal::from(&a.principal).into(),
@@ -88,6 +100,34 @@ fn from_spec(spec: pb::AgentSpec, created_by: &Principal, now: Timestamp) -> Res
         ));
     }
     let budgets = spec.budgets.into_option().unwrap_or_default();
+    let reviewer = match spec.reviewer.into_option() {
+        None => None,
+        Some(r) => {
+            if r.model_family.is_empty() || r.model.is_empty() {
+                return Err(Error::invalid(
+                    "a reviewer needs a model and a model family",
+                ));
+            }
+            let max_vote = i8::try_from(r.max_vote)
+                .ok()
+                .filter(|v| (1..=2).contains(v))
+                .ok_or_else(|| Error::invalid("a reviewer's max_vote is 1 or 2"))?;
+            let prompt = if r.prompt.is_empty() {
+                format!(".rill/reviewers/{}/prompt.md", spec.name)
+            } else {
+                RepoPathBuf::new(&r.prompt)
+                    .map_err(|e| Error::invalid(format!("prompt path: {e}")))?
+                    .into_string()
+            };
+            Some(rill_types::identity::ReviewerProfile {
+                model_family: r.model_family,
+                model: r.model,
+                prompt,
+                max_vote,
+                runs_per_day: r.runs_per_day,
+            })
+        }
+    };
     Ok(AgentRecord {
         org: spec.org,
         principal: Principal::agent(&spec.name),
@@ -116,6 +156,7 @@ fn from_spec(spec: pb::AgentSpec, created_by: &Principal, now: Timestamp) -> Res
         created_by: created_by.clone(),
         created_at: now,
         updated_at: now,
+        reviewer,
     })
 }
 

@@ -117,6 +117,11 @@ pub fn change_entity(change: &ChangeFacts, review: &SubmitFacts) -> Result<(Enti
             RestrictedExpression::new_bool(change.intent.as_ref().is_some_and(|i| i.in_scope)),
         ),
         (
+            "independent_agent_approvals",
+            long(review.independent_agent_approvals.into()),
+        ),
+        ("min_agent_trust", long(review.min_agent_trust.into())),
+        (
             "intent_agent_quorum",
             long(
                 change

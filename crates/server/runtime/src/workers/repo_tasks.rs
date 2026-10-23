@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use super::{consumer, deriver, escalation, follower, indexer, intents, reverter};
+use super::{
+    calibration, consumer, deriver, escalation, follower, indexer, intents, reverter, reviewers,
+};
 use crate::state::RepoContext;
 
 /// How often expired events are swept.
@@ -57,6 +59,16 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>, roles: crate::config::Roles) {
     ctx.lifecycle.tasks.spawn(consumer::run(
         ctx.clone(),
         Arc::new(intents::Budgets),
+        shutdown.clone(),
+    ));
+    ctx.lifecycle.tasks.spawn(consumer::run(
+        ctx.clone(),
+        Arc::new(reviewers::Router),
+        shutdown.clone(),
+    ));
+    ctx.lifecycle.tasks.spawn(consumer::run(
+        ctx.clone(),
+        Arc::new(calibration::Calibrator),
         shutdown.clone(),
     ));
     ctx.lifecycle

@@ -1,9 +1,11 @@
 //! Who people are, as review needs to know: their teams (for ownership)
-//! and who sponsors an agent (for reviewer independence).
+//! and who sponsors an agent and how it reviews (for reviewer
+//! independence).
 
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
+use rill_types::identity::ReviewerProfile;
 use rill_types::Principal;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +17,12 @@ pub struct Person {
     pub teams: Vec<String>,
     /// The sponsor of an agent (`user:<name>` or `team:<name>`).
     pub sponsor: Option<String>,
+    /// How an agent reviews, when it is a registered reviewer.
+    pub reviewer: Option<ReviewerProfile>,
+    /// A reviewer's trust in this repository, in permille.
+    pub trust: Option<u16>,
+    /// A reviewer demoted for its track record.
+    pub demoted: bool,
 }
 
 /// Looks up teams and sponsors. The server answers from its identity

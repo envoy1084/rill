@@ -19,5 +19,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+serde_json = { workspace = true }
 parking_lot = { workspace = true }
 async-trait = { workspace = true }

@@ -184,7 +184,7 @@ class WorkloadBinding(_message.Message):
     def __init__(self, issuer: _Optional[str] = ..., subject: _Optional[str] = ..., claims: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class AgentSpec(_message.Message):
-    __slots__ = ("org", "name", "sponsor", "purpose", "repos", "paths", "models", "budgets", "workloads", "expires_at")
+    __slots__ = ("org", "name", "sponsor", "purpose", "repos", "paths", "models", "budgets", "workloads", "expires_at", "reviewer")
     ORG_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     SPONSOR_FIELD_NUMBER: _ClassVar[int]
@@ -195,6 +195,7 @@ class AgentSpec(_message.Message):
     BUDGETS_FIELD_NUMBER: _ClassVar[int]
     WORKLOADS_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    REVIEWER_FIELD_NUMBER: _ClassVar[int]
     org: str
     name: str
     sponsor: str
@@ -205,7 +206,22 @@ class AgentSpec(_message.Message):
     budgets: AgentBudgets
     workloads: _containers.RepeatedCompositeFieldContainer[WorkloadBinding]
     expires_at: int
-    def __init__(self, org: _Optional[str] = ..., name: _Optional[str] = ..., sponsor: _Optional[str] = ..., purpose: _Optional[str] = ..., repos: _Optional[_Iterable[str]] = ..., paths: _Optional[_Iterable[str]] = ..., models: _Optional[_Iterable[str]] = ..., budgets: _Optional[_Union[AgentBudgets, _Mapping]] = ..., workloads: _Optional[_Iterable[_Union[WorkloadBinding, _Mapping]]] = ..., expires_at: _Optional[int] = ...) -> None: ...
+    reviewer: ReviewerProfile
+    def __init__(self, org: _Optional[str] = ..., name: _Optional[str] = ..., sponsor: _Optional[str] = ..., purpose: _Optional[str] = ..., repos: _Optional[_Iterable[str]] = ..., paths: _Optional[_Iterable[str]] = ..., models: _Optional[_Iterable[str]] = ..., budgets: _Optional[_Union[AgentBudgets, _Mapping]] = ..., workloads: _Optional[_Iterable[_Union[WorkloadBinding, _Mapping]]] = ..., expires_at: _Optional[int] = ..., reviewer: _Optional[_Union[ReviewerProfile, _Mapping]] = ...) -> None: ...
+
+class ReviewerProfile(_message.Message):
+    __slots__ = ("model_family", "model", "prompt", "max_vote", "runs_per_day")
+    MODEL_FAMILY_FIELD_NUMBER: _ClassVar[int]
+    MODEL_FIELD_NUMBER: _ClassVar[int]
+    PROMPT_FIELD_NUMBER: _ClassVar[int]
+    MAX_VOTE_FIELD_NUMBER: _ClassVar[int]
+    RUNS_PER_DAY_FIELD_NUMBER: _ClassVar[int]
+    model_family: str
+    model: str
+    prompt: str
+    max_vote: int
+    runs_per_day: int
+    def __init__(self, model_family: _Optional[str] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., max_vote: _Optional[int] = ..., runs_per_day: _Optional[int] = ...) -> None: ...
 
 class Agent(_message.Message):
     __slots__ = ("name", "etag", "spec", "principal", "status", "created_by", "created_at", "updated_at")

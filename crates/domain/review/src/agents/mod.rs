@@ -1,13 +1,15 @@
-//! Agent orchestration: reviewers that post findings and vote, and the
-//! resolver interface for conflict-resolving agents.
+//! The reviewer fleet's server side: the context a reviewing agent is
+//! given, the checks its result must pass before it is posted as that
+//! agent, the record of every run, and reviewers' track records.
 
+mod calibration;
 mod context;
-mod heuristic;
-mod pool;
-mod resolver;
+mod results;
 mod reviewer;
+mod routing;
+mod runs;
 
-pub use heuristic::{HeuristicConfig, HeuristicReviewer, HEURISTIC_REVIEWER_NAME};
-pub use pool::{PoolConfig, PoolReport, ReviewerOutcome, ReviewerPool, REVIEW_LABEL};
-pub use resolver::{ConflictTerms, Resolution, Resolver};
-pub use reviewer::{Budget, FileDiff, Finding, ReviewContext, Reviewer, TouchedLine};
+pub use calibration::StatsMap;
+pub use results::{check_result, PostedResult, ReviewResult, MAX_BODY, MAX_FINDINGS};
+pub use reviewer::{Budget, FileDiff, Finding, ReviewContext, TouchedLine};
+pub use runs::{ReviewRun, RunKind, RunStatus, MAX_RUNS};

@@ -45,12 +45,12 @@ when {
     && resource.hasTag("Review") && resource.getTag("Review").human_max >= 2
 };
 
-// ... or two distinct agent approvals on Review plus a human owner's +1.
+// ... or two independent agent approvals on Review plus a human owner's +1.
 @id("land_normal_agent_review_with_owner")
 permit(principal, action == Rill::Action::"land", resource)
 when {
     resource.risk == "normal"
-    && resource.hasTag("Review") && resource.getTag("Review").agent_approvals >= 2
+    && resource.independent_agent_approvals >= 2
     && resource.hasTag("Owner") && resource.getTag("Owner").human_max >= 1
 };
 

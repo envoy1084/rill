@@ -48,6 +48,7 @@ pub(crate) async fn register_bot(stores: &rill_store::Stores, budgets: AgentBudg
                 created_by: root.clone(),
                 created_at: now,
                 updated_at: now,
+                reviewer: None,
             },
             &root,
         )

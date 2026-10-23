@@ -1,4 +1,4 @@
-//! Teams and sponsors for review, from the org's identity records.
+//! Teams, sponsors and reviewer profiles for review, from the org's identity records.
 
 use std::sync::Arc;
 
@@ -9,7 +9,7 @@ use rill_types::{Principal, PrincipalKind};
 use super::view::IdentityView;
 
 /// Answers [`Directory`] questions for one org: a user's teams, an
-/// agent's sponsor.
+/// agent's sponsor and reviewer profile.
 pub struct OrgDirectory {
     org: String,
     identity: Arc<IdentityView>,
@@ -37,17 +37,21 @@ impl Directory for OrgDirectory {
                     .map_err(lookup)?
                     .map(|u| u.teams.clone())
                     .unwrap_or_default(),
-                sponsor: None,
+                ..Person::default()
             },
-            PrincipalKind::Agent => Person {
-                teams: Vec::new(),
-                sponsor: self
+            PrincipalKind::Agent => {
+                let agent = self
                     .identity
                     .agent(&self.org, &principal.name)
                     .await
-                    .map_err(lookup)?
-                    .map(|a| a.sponsor.label()),
-            },
+                    .map_err(lookup)?;
+                Person {
+                    teams: Vec::new(),
+                    sponsor: agent.as_ref().map(|a| a.sponsor.label()),
+                    reviewer: agent.and_then(|a| a.reviewer.clone()),
+                    ..Person::default()
+                }
+            }
             PrincipalKind::Service => Person::default(),
         })
     }

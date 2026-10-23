@@ -1,0 +1,32 @@
+[package]
+name = "rill-review-runner"
+description = "Reference reviewer and resolver runner: leases jobs from a Rill server as an agent and runs them on a fake or Claude backend"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "rill-review-runner"
+path = "src/bin/rill_review_runner.rs"
+
+[dependencies]
+rill-sdk = { workspace = true }
+rill-types = { workspace = true }
+async-trait = { workspace = true }
+blake3 = { workspace = true }
+bytes = { workspace = true }
+clap = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+axum = { workspace = true }
+rill-sdk = { workspace = true, features = ["testing"] }
+rill-api = { workspace = true }

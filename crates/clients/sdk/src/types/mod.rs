@@ -11,6 +11,7 @@ mod ownership;
 mod page;
 mod repo;
 mod review;
+mod reviewers;
 mod root;
 mod search;
 mod trunk;
@@ -34,6 +35,10 @@ pub use repo::{
 pub use review::{
     status_name, LandProgress, LandStatus, LandTicket, NewComment, NewThread, Reply, ReviewEvent,
     ReviewEventKind, ReviewFilter, ReviewInfo, SubmitDecision,
+};
+pub use reviewers::{
+    parse_category, Lease, ResolveJob, ReviewFile, ReviewFinding, ReviewJob, ReviewPacket,
+    ReviewReport, ReviewRun, ReviewRunStatus, ReviewerProfile, ReviewerStats,
 };
 pub use root::{LogStart, Root};
 pub use search::{GrepHit, GrepQuery, GrepResult};
