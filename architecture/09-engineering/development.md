@@ -64,18 +64,37 @@ picks one package. Node 24.
 | Profile | Settings | Reason |
 | --- | --- | --- |
 | `dev` | `opt-level = 1`, `debug = "line-tables-only"` | tests and the dev server run at usable speed; full debuginfo made each test binary several hundred MB |
-| `dev.package."*"` | `opt-level = 2` | dependencies (BLAKE3, zstd, redb, regex, cedar) run near release speed in debug builds |
+| `dev.package."*"` | `opt-level = 2`, `debug = false` | dependencies (BLAKE3, zstd, redb, regex, cedar) run near release speed in debug builds; without their debug info a clean build is 19 GB rather than 20.6 |
 | `test` | `debug = "line-tables-only"` | same size control for test binaries |
-| `release` | `lto = "thin"`, `codegen-units = 4`, `debug = 1` | cross-crate inlining with bounded link time; line tables kept for backtraces |
+| `release` | `lto = "thin"`, `codegen-units = 4`, `debug = 1` | cross-crate inlining with bounded link time; line tables kept for backtraces and profiling (load runs) |
+| `dist` | inherits `release`; `lto = "fat"`, `codegen-units = 1`, `debug = false`, `strip = true` | what ships (the image, archives): `rill` 97 MB, `rill-server` 106 MB, `rill-mcp` 14 MB |
 
 `rill-store` features: `local` (default, redb plus files), `s3`
 (`object_store`) and `fdb` (the FoundationDB metadata store).
-`rill-api` enables `s3`; `rill-api/fdb` and `rill-cli/fdb` forward
+`rill-api` enables `s3`; `rill-api/fdb` and `rill-server/fdb` forward
 `fdb`. Without `fdb` nothing needs the FoundationDB client library.
 `aws` and `gcp` add the cloud key services. `saml` (on `rill-identity`,
-`rill-api` and `rill-cli`) adds SAML sign-in and needs libxml2 and xmlsec1;
+`rill-api` and `rill-server`) adds SAML sign-in and needs libxml2 and xmlsec1;
 see [identity](../05-policy/identity-and-auth.md#saml-20) for the macOS
 `PKG_CONFIG_PATH`. CI builds neither.
+
+## Keeping `target/` small
+
+Cargo names each artifact by a hash of the crate, its features, the
+profile, the compiler and its dependencies, and never deletes the old one.
+Different feature sets (`clippy` with the deployment features), commands
+(`build`, `test`, `clippy`), dependency updates and toolchain updates all
+add copies beside the old ones. What keeps it bounded:
+
+* `rust-toolchain.toml` pins an exact Rust release, so a toolchain update
+  is a deliberate commit rather than a silent rebuild every six weeks.
+* Dependencies build without debug info, and each crate has one
+  integration-test binary ([testing](testing.md)).
+* `cargo sweep` ([cargo-sweep](https://github.com/holmgr/cargo-sweep),
+  `cargo install cargo-sweep`) removes stale artifacts and keeps current
+  ones warm: `cargo sweep --installed` drops what toolchains no longer
+  installed built, `cargo sweep --time 14` what was not used for two
+  weeks. Reach for `cargo clean` only when that is not enough.
 
 ## FoundationDB locally
 
