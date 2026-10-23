@@ -89,13 +89,28 @@ fn tool_result(value: Value) -> CallToolResult {
     result
 }
 
-/// A failed tool result, with the error's code.
+/// A failed tool result, with the error's code and, when the server
+/// refused, its reason, what is missing and how long to wait.
 fn tool_error(e: &ToolError) -> CallToolResult {
-    let mut result = CallToolResult::error(vec![ContentBlock::text(format!(
-        "error ({}): {e}",
-        e.code()
-    ))]);
-    result.structured_content =
-        Some(json!({ "error": { "code": e.code(), "message": e.to_string() } }));
+    let (reason, missing, retry_after) = match e {
+        ToolError::Sdk(e) => (
+            e.reason().map(rill_sdk::error::reason_name),
+            e.missing().to_vec(),
+            e.retry_after(),
+        ),
+        _ => (None, Vec::new(), None),
+    };
+    let mut text = format!("error ({}): {e}", reason.unwrap_or(&e.code()));
+    for m in &missing {
+        text.push_str(&format!("\nneeds: {m}"));
+    }
+    let mut result = CallToolResult::error(vec![ContentBlock::text(text)]);
+    result.structured_content = Some(json!({ "error": {
+        "code": e.code(),
+        "reason": reason,
+        "message": e.to_string(),
+        "missing": missing,
+        "retry_after_ms": retry_after.map(|d| d.as_millis() as u64),
+    } }));
     result
 }

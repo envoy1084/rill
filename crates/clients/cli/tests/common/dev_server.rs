@@ -62,6 +62,23 @@ impl Server {
         full.extend_from_slice(args);
         let (code, out) = self.rill(cwd, &full).await;
         assert_eq!(code, 0, "{args:?} failed: {out}");
+        let doc: Value =
+            serde_json::from_str(&out).unwrap_or_else(|e| panic!("{args:?}: {e}: {out}"));
+        assert!(
+            doc["schema"]
+                .as_str()
+                .is_some_and(|s| s.starts_with("rill.cli.v1.")),
+            "{args:?}: no schema: {out}"
+        );
+        doc["result"].clone()
+    }
+
+    /// Like `json` but returns the whole document, schema included.
+    pub async fn document(&self, cwd: &Path, args: &[&str]) -> Value {
+        let mut full = vec!["--json"];
+        full.extend_from_slice(args);
+        let (code, out) = self.rill(cwd, &full).await;
+        assert_eq!(code, 0, "{args:?} failed: {out}");
         serde_json::from_str(&out).unwrap_or_else(|e| panic!("{args:?}: {e}: {out}"))
     }
 

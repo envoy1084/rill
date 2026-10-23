@@ -141,6 +141,19 @@ impl AdminClient {
         Ok(required("create_org.org", resp.org)?.into())
     }
 
+    /// One org.
+    pub async fn org(&self, name: &str) -> Result<OrgInfo> {
+        let name = names::org(name);
+        let resp = crate::client::retry_idempotent(|| {
+            let svc = self.client.org_svc();
+            let request = pb::GetOrgRequest { name: name.clone() };
+            async move { svc.get_org(request).await }
+        })
+        .await?
+        .into_owned();
+        Ok(required("get_org.org", resp.org)?.into())
+    }
+
     /// Every org.
     pub async fn list_orgs(&self) -> Result<Vec<OrgInfo>> {
         crate::paging::all(|page_token| async move {

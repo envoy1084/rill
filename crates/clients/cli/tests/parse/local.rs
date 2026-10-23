@@ -19,8 +19,8 @@ fn repo_group() {
         other => panic!("{other:?}"),
     }
     assert!(matches!(
-        parse(&["repo", "info"]).command,
-        Command::Repo(repo::RepoCmd::Info)
+        parse(&["repo", "show"]).command,
+        Command::Repo(repo::RepoCmd::Show)
     ));
 }
 
@@ -73,7 +73,7 @@ fn checkout_and_local_commands() {
         parse(&["sync", "--onto", "trunk@4"]).command,
         Command::Sync(_)
     ));
-    assert!(matches!(parse(&["resolve", "--list"]).command, Command::Resolve(a) if a.list));
+    assert!(matches!(parse(&["conflicts"]).command, Command::Conflicts));
     assert!(
         matches!(parse(&["resolve", "a", "b"]).command, Command::Resolve(a) if a.paths.len() == 2)
     );

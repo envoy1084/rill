@@ -16,7 +16,7 @@ mod sync;
 mod undo;
 
 pub use args::{AmendArgs, DescribeArgs, NewArgs, ResolveArgs, SyncArgs};
-pub use resolve::resolve;
+pub use resolve::{conflicts, resolve};
 pub use snapshot::{amend, describe, new};
 pub use sync::sync;
 pub(crate) use sync::update_checkout;

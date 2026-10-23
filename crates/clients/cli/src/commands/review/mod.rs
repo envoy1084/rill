@@ -1,5 +1,6 @@
-//! `rill submit` and `rill review`: show, list, vote, comment, threads,
-//! resolve-thread, evaluate, abandon.
+//! `rill submit`, `rill approve`, `rill reject`, `rill abandon` and
+//! `rill review`: show, list, vote, comment, threads, resolve-thread,
+//! evaluate.
 
 mod args;
 mod dispatch;
@@ -9,9 +10,9 @@ mod threads;
 mod working_change;
 
 pub use args::{
-    AbandonArgs, ChangeArg, CommentArgs, ListArgs, ResolveThreadArgs, ReviewCmd, SubmitArgs,
-    VoteArgs,
+    AbandonArgs, ApproveArgs, ChangeArg, CommentArgs, ListArgs, ResolveThreadArgs, ReviewCmd,
+    SubmitArgs, VoteArgs,
 };
 pub use dispatch::run;
-pub use lifecycle::submit;
+pub use lifecycle::{abandon, approve, submit};
 pub use working_change::change_or_working;

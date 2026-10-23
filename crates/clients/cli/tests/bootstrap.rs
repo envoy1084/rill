@@ -76,12 +76,12 @@ async fn a_minted_token_signs_in_to_a_server_on_the_same_store() {
         "--token",
         &token,
         "--json",
-        "admin",
         "whoami",
     ])
     .await;
     assert_eq!(code, 0, "{out}");
     let me: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let me = me["result"].clone();
     assert_eq!(me["principal"]["name"], "root", "{me}");
     let (code, _) = rill(&[
         "rill",
@@ -89,7 +89,6 @@ async fn a_minted_token_signs_in_to_a_server_on_the_same_store() {
         &endpoint,
         "--token",
         "made-up",
-        "admin",
         "whoami",
     ])
     .await;

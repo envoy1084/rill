@@ -76,7 +76,7 @@ rill cache --origin https://rill.internal:7421 --dir /var/cache/rill \
   --max-bytes 500G --listen 0.0.0.0:7422 --origin-token "$CACHE_TOKEN"
 ```
 
-The origin token is a service token (`rill admin token issue` for a
+The origin token is a service token (`rill auth token` for a
 `service:` principal); the origin gives its redaction list only to service
 principals and instance administrators.
 

@@ -118,7 +118,7 @@ A guarded trunk holds back, until a later sweep, landings that could
 affect a failing step (asked of the verifier as above), except emergency
 landings and those naming an open incident as fixed. An owner can freeze
 trunk (`FreezeTrunk`): then only the emergency lane lands, whatever the
-health. `rill trunk health`, `rill trunk incidents`, `rill trunk
+health. `rill trunk health`, `rill incidents`, `rill trunk
 freeze [--reason]` and `rill trunk thaw` show and change it.
 
 ## Revert

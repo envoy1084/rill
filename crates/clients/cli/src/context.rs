@@ -33,11 +33,19 @@ pub struct Ctx<'w> {
     checkout_dir: Option<Option<PathBuf>>,
     meta: Option<CheckoutMeta>,
     client: Option<Client>,
+    schema: String,
 }
 
 impl<'w> Ctx<'w> {
     /// Build a context. `cwd` is where checkout discovery starts.
-    pub fn new(opts: GlobalOpts, writer: &'w mut dyn Write, color: bool, cwd: PathBuf) -> Self {
+    /// `schema` names the JSON the command prints (`rill.cli.v1.log`).
+    pub fn new(
+        opts: GlobalOpts,
+        writer: &'w mut dyn Write,
+        color: bool,
+        cwd: PathBuf,
+        schema: String,
+    ) -> Self {
         Ctx {
             opts,
             out: Out::new(writer, color),
@@ -45,6 +53,7 @@ impl<'w> Ctx<'w> {
             checkout_dir: None,
             meta: None,
             client: None,
+            schema,
         }
     }
 
@@ -53,9 +62,9 @@ impl<'w> Ctx<'w> {
         &self.opts
     }
 
-    /// True with `--json`.
+    /// True with `--json` or `--json-schema`.
     pub fn json(&self) -> bool {
-        self.opts.json
+        self.opts.json || self.opts.json_schema.is_some()
     }
 
     /// The human output sink.
@@ -69,9 +78,9 @@ impl<'w> Ctx<'w> {
         value: Value,
         human: impl FnOnce(&mut Out<'w>) -> std::io::Result<()>,
     ) -> Result<()> {
-        if self.opts.json {
-            let text = serde_json::to_string_pretty(&value)?;
-            self.out.line(text)?;
+        if self.json() {
+            let envelope = serde_json::json!({ "schema": self.schema, "result": value });
+            self.out.line(serde_json::to_string_pretty(&envelope)?)?;
         } else {
             human(&mut self.out)?;
         }
@@ -79,9 +88,11 @@ impl<'w> Ctx<'w> {
         Ok(())
     }
 
-    /// Print one compact JSON line (for streams).
+    /// Print one compact JSON line of a stream, as `<schema>.event`.
     pub fn emit_json_line(&mut self, value: &Value) -> Result<()> {
-        self.out.line(serde_json::to_string(value)?)?;
+        let envelope =
+            serde_json::json!({ "schema": format!("{}.event", self.schema), "event": value });
+        self.out.line(serde_json::to_string(&envelope)?)?;
         self.out.flush()?;
         Ok(())
     }

@@ -131,6 +131,7 @@ libc = "0.2.191"
 ignore = "0.4.33"
 globset = "0.4.20"
 regex = "1.13.1"
+insta = { version = "1.49.0", features = ["json"] }
 aho-corasick = "1.1"
 landlock = "0.4.7"
 seccompiler = "0.5.0"

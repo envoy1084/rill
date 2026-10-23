@@ -159,6 +159,7 @@ async fn a_directory_reader_reads_its_directory_and_nothing_else() {
     .await;
     assert_eq!(code, 0, "{out}");
     let check: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let check = check["result"].clone();
     assert_eq!(check["allowed"], false, "{check}");
 
     shutdown.cancel();

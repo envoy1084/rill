@@ -24,8 +24,6 @@ pub enum WsCmd {
     Show(WsArg),
     /// Hand a workspace to another principal.
     Handoff(HandoffArgs),
-    /// Show a workspace's operation log.
-    Ops(OpsArgs),
     /// Delete a workspace.
     Delete(WsArg),
 }
@@ -67,7 +65,14 @@ pub struct HandoffArgs {
     pub principal: String,
 }
 
-/// `rill ws ops`.
+/// `rill op <subcommand>`.
+#[derive(Subcommand, Debug)]
+pub enum OpCmd {
+    /// The operation log, newest first.
+    Log(OpsArgs),
+}
+
+/// `rill op log`.
 #[derive(Args, Debug)]
 pub struct OpsArgs {
     /// Workspace id (default: the checkout's workspace).
@@ -142,7 +147,6 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: WsCmd) -> Result<()> {
         WsCmd::List(args) => list(ctx, args).await,
         WsCmd::Show(args) => show(ctx, args).await,
         WsCmd::Handoff(args) => handoff(ctx, args).await,
-        WsCmd::Ops(args) => ops(ctx, args).await,
         WsCmd::Delete(args) => delete(ctx, args).await,
     }
 }
@@ -208,6 +212,13 @@ async fn handoff(ctx: &mut Ctx<'_>, args: HandoffArgs) -> Result<()> {
     ctx.emit(json::workspace_op(&op), |out| {
         out.line(format!("handed {} to {to}", out.id(&id.to_string())))
     })
+}
+
+/// Run `rill op`.
+pub async fn op(ctx: &mut Ctx<'_>, cmd: OpCmd) -> Result<()> {
+    match cmd {
+        OpCmd::Log(args) => ops(ctx, args).await,
+    }
 }
 
 async fn ops(ctx: &mut Ctx<'_>, args: OpsArgs) -> Result<()> {

@@ -1,0 +1,19 @@
+---
+source: crates/clients/cli/tests/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.repo.create",
+  "result": {
+    "id": "rp_[id]",
+    "name": "shape",
+    "description": "schemas",
+    "created_at": {
+      "rfc3339": "[time]",
+      "millis": 0
+    },
+    "trunk_head_seq": 0,
+    "windows_safe": false,
+    "org": "default"
+  }
+}

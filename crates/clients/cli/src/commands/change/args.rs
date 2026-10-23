@@ -40,12 +40,6 @@ pub struct SyncArgs {
 /// `rill resolve`.
 #[derive(Args, Debug)]
 pub struct ResolveArgs {
-    /// List conflicted paths instead of marking.
-    #[arg(long)]
-    pub list: bool,
-    /// Mark the paths resolved (the default action).
-    #[arg(long)]
-    pub mark: bool,
     /// Mark every conflicted path resolved.
     #[arg(long)]
     pub all: bool,

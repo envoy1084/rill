@@ -1,7 +1,7 @@
 //! The CLI error type: what went wrong, how to say it, and which exit code
 //! it maps to (see [`crate::exit`]).
 
-use rill_sdk::Code;
+use rill_sdk::{Code, ErrorReason};
 use thiserror::Error;
 
 /// Everything a command can fail with.
@@ -83,6 +83,63 @@ impl CliError {
     }
 }
 
+impl CliError {
+    /// The server's reason, when the server refused.
+    pub fn reason(&self) -> Option<ErrorReason> {
+        match self {
+            CliError::Sdk(e) => e.reason(),
+            _ => None,
+        }
+    }
+
+    /// The error as `--json` prints it.
+    pub fn to_json(&self) -> serde_json::Value {
+        let (missing, retry_after) = match self {
+            CliError::Sdk(e) => (e.missing().to_vec(), e.retry_after()),
+            _ => (Vec::new(), None),
+        };
+        serde_json::json!({
+            "code": self.code(),
+            "reason": self.reason().map(rill_sdk::error::reason_name),
+            "message": self.to_string(),
+            "missing": missing,
+            "retry_after_ms": retry_after.map(|d| d.as_millis() as u64),
+            "exit": crate::exit::code_for(self),
+        })
+    }
+
+    /// What to do about the error, a line each, for people.
+    pub fn hints(&self) -> Vec<String> {
+        let CliError::Sdk(e) = self else {
+            return Vec::new();
+        };
+        let mut hints: Vec<String> = e.missing().iter().map(|m| format!("needs: {m}")).collect();
+        if let Some(wait) = e.retry_after() {
+            hints.push(format!("retry in {}s", wait.as_secs().max(1)));
+        }
+        let advice = match e.reason() {
+            Some(ErrorReason::Unauthenticated) => {
+                Some("sign in with `rill login`, or pass --token")
+            }
+            Some(ErrorReason::EtagMismatch) | Some(ErrorReason::RefMoved) => {
+                Some("it changed since it was read: read it again, then retry")
+            }
+            Some(ErrorReason::RequestIdReused) => {
+                Some("that request id was used for another request: use a fresh one")
+            }
+            Some(ErrorReason::ConflictsUnresolved) => {
+                Some("resolve the conflicts first: `rill conflicts`, then `rill resolve`")
+            }
+            Some(ErrorReason::VersionSuperseded) => {
+                Some("the change has a newer version: act on that one")
+            }
+            _ => None,
+        };
+        hints.extend(advice.map(str::to_string));
+        hints
+    }
+}
+
 impl From<connectrpc::ConnectError> for CliError {
     fn from(err: connectrpc::ConnectError) -> Self {
         CliError::Sdk(rill_sdk::Error::from(err))
@@ -103,8 +160,29 @@ impl From<rill_mcp::ToolError> for CliError {
 fn describe_sdk(e: &rill_sdk::Error) -> String {
     use rill_sdk::Error;
     match e {
-        Error::Status { code, message, .. } => {
-            let what = match code {
+        Error::Status {
+            code,
+            message,
+            reason,
+            ..
+        } => {
+            let by_reason = match reason {
+                Some(ErrorReason::PolicyDenied) => Some("not allowed by policy"),
+                Some(ErrorReason::CapabilityDenied) => Some("outside your token's scope"),
+                Some(ErrorReason::EtagMismatch) | Some(ErrorReason::RefMoved) => {
+                    Some("changed meanwhile")
+                }
+                Some(ErrorReason::RateLimited) => Some("rate limited"),
+                Some(ErrorReason::QueueFull) => Some("the landing queue is full"),
+                Some(ErrorReason::BudgetExhausted) => Some("budget exhausted"),
+                Some(ErrorReason::InvalidName) => Some("invalid name"),
+                Some(ErrorReason::InvalidRevision) => Some("invalid revision"),
+                Some(ErrorReason::InvalidFilter) => Some("invalid filter"),
+                Some(ErrorReason::MissingObjects) => Some("objects missing"),
+                Some(ErrorReason::Redacted) => Some("redacted"),
+                _ => None,
+            };
+            let what = by_reason.unwrap_or(match code {
                 Code::NotFound => "not found",
                 Code::AlreadyExists => "already exists",
                 Code::PermissionDenied => "permission denied",
@@ -115,8 +193,9 @@ fn describe_sdk(e: &rill_sdk::Error) -> String {
                 Code::Unavailable => "server unavailable",
                 Code::Unimplemented => "not supported by the server",
                 Code::DeadlineExceeded => "timed out",
+                Code::ResourceExhausted => "too much",
                 _ => "server error",
-            };
+            });
             if message.is_empty() {
                 what.to_string()
             } else {
@@ -143,6 +222,26 @@ fn describe_sdk(e: &rill_sdk::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn json_errors_carry_the_reason_and_what_is_missing() {
+        let err = CliError::Sdk(rill_sdk::Error::Status {
+            code: Code::FailedPrecondition,
+            message: "submit policy does not allow landing".into(),
+            reason: Some(ErrorReason::PolicyDenied),
+            missing: vec!["Review +2".into()],
+            retry_after: None,
+        });
+        let doc = err.to_json();
+        assert_eq!(doc["reason"], "POLICY_DENIED");
+        assert_eq!(doc["missing"][0], "Review +2");
+        assert_eq!(doc["exit"], crate::exit::DENIED);
+        assert_eq!(
+            err.to_string(),
+            "not allowed by policy: submit policy does not allow landing"
+        );
+        assert_eq!(err.hints(), ["needs: Review +2"]);
+    }
 
     #[test]
     fn sdk_status_is_described_plainly() {

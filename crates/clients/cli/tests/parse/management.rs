@@ -60,8 +60,8 @@ fn intent_ws_ref_admin() {
         Command::Ws(ws::WsCmd::Handoff(_))
     ));
     assert!(matches!(
-        parse(&["ws", "ops", "ws_00", "-n", "2"]).command,
-        Command::Ws(ws::WsCmd::Ops(_))
+        parse(&["op", "log", "ws_00", "-n", "2"]).command,
+        Command::Op(ws::OpCmd::Log(_))
     ));
     assert!(matches!(
         parse(&["ws", "delete", "ws_00"]).command,
@@ -85,14 +85,10 @@ fn intent_ws_ref_admin() {
         Command::Ref(refs::RefCmd::Delete(_))
     ));
 
-    assert!(matches!(
-        parse(&["admin", "whoami"]).command,
-        Command::Admin(admin::AdminCmd::Whoami)
-    ));
+    assert!(matches!(parse(&["whoami"]).command, Command::Whoami));
     match parse(&[
-        "admin",
+        "auth",
         "token",
-        "issue",
         "--repo",
         "m",
         "--verbs",
@@ -104,7 +100,7 @@ fn intent_ws_ref_admin() {
     ])
     .command
     {
-        Command::Admin(admin::AdminCmd::Token(admin::TokenCmd::Issue(a))) => {
+        Command::Auth(admin::AuthCmd::Token(a)) => {
             assert_eq!(a.verbs, vec!["read", "write"]);
             assert_eq!(a.paths, vec!["src"]);
         }

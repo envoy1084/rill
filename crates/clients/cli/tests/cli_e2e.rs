@@ -20,7 +20,7 @@ async fn create_checkout_land_and_sync() {
     assert_eq!(created["name"], "e2e");
     let repos = server.json(home, &["repo", "list"]).await;
     assert_eq!(repos["items"][0]["name"], "e2e");
-    let (code, _) = server.rill(home, &["repo", "info", "--repo", "nope"]).await;
+    let (code, _) = server.rill(home, &["repo", "show", "--repo", "nope"]).await;
     assert_eq!(code, 1, "missing repo is an error");
 
     // Checkout an empty repository and write files.
@@ -93,9 +93,11 @@ async fn create_checkout_land_and_sync() {
     assert_eq!(trunk["head_seq"], 1);
     let refs = server.json(home, &["--repo", "e2e", "ref", "list"]).await;
     assert_eq!(refs["refs"][0]["name"], "trunk");
-    let landings = server.json(home, &["--repo", "e2e", "landings"]).await;
+    let landings = server
+        .json(home, &["--repo", "e2e", "trunk", "landings"])
+        .await;
     assert_eq!(landings["landings"][0]["event"]["seq"], 1);
-    let me = server.json(home, &["admin", "whoami"]).await;
+    let me = server.json(home, &["whoami"]).await;
     assert!(me["principal"]["name"].is_string());
 
     // Sync the first checkout onto trunk after landing.
@@ -184,6 +186,7 @@ async fn conflicting_sync_exits_three() {
     let (code, out) = server.rill(&co, &["--json", "sync"]).await;
     assert_eq!(code, 3, "{out}");
     let value: Value = serde_json::from_str(&out).unwrap();
+    let value = value["result"].clone();
     assert_eq!(value["conflicts"], serde_json::json!(["f.txt"]));
     let content = std::fs::read_to_string(co.join("f.txt")).unwrap();
     assert!(
@@ -191,7 +194,7 @@ async fn conflicting_sync_exits_three() {
         "{content}"
     );
 
-    let listed = server.json(&co, &["resolve", "--list"]).await;
+    let listed = server.json(&co, &["conflicts"]).await;
     assert_eq!(listed["conflicts"], serde_json::json!(["f.txt"]));
     std::fs::write(co.join("f.txt"), "one\nTWO-ab\nthree\n").unwrap();
     let resolved = server.json(&co, &["resolve", "f.txt"]).await;

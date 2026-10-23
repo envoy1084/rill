@@ -1,0 +1,25 @@
+---
+source: crates/clients/cli/tests/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.status",
+  "result": {
+    "repo": "shape",
+    "base": "tree:[hash]",
+    "base_version": null,
+    "working_change": null,
+    "workspace": "ws_[id]",
+    "changes": [
+      {
+        "path": "README.md",
+        "kind": "added"
+      },
+      {
+        "path": "src/lib.rs",
+        "kind": "added"
+      }
+    ],
+    "conflicts": 0
+  }
+}

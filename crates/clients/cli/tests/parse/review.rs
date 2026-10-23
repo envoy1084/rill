@@ -56,8 +56,19 @@ fn stack_submit_review() {
         Command::Review(review::ReviewCmd::Evaluate(_))
     ));
     assert!(matches!(
-        parse(&["review", "abandon", "ch_00", "-m", "why"]).command,
-        Command::Review(review::ReviewCmd::Abandon(_))
+        parse(&["abandon", "ch_00", "-m", "why"]).command,
+        Command::Abandon(_)
+    ));
+    assert!(matches!(
+        parse(&["approve", "ch_00"]).command,
+        Command::Approve(review::ApproveArgs { value: None, .. })
+    ));
+    assert!(matches!(
+        parse(&["reject", "--label", "Verified", "--value", "-1"]).command,
+        Command::Reject(review::ApproveArgs {
+            value: Some(-1),
+            ..
+        })
     ));
 }
 
@@ -82,19 +93,17 @@ fn landing_group() {
         }) if reason == "incident"
     ));
     assert!(matches!(
-        parse(&["trunk", "incidents", "-n", "5"]).command,
-        Command::Trunk(health::TrunkArgs {
-            cmd: Some(health::TrunkCmd::Incidents(health::IncidentsArgs {
-                limit: 5
-            }))
-        })
+        parse(&["incidents", "-n", "5"]).command,
+        Command::Incidents(health::IncidentsArgs { limit: 5 })
     ));
     assert!(
-        matches!(parse(&["landings", "-n", "3", "--page-token", "t"]).command, Command::Landings(a) if a.limit == 3 && a.page_token.as_deref() == Some("t"))
+        matches!(parse(&["trunk", "landings", "-n", "3", "--page-token", "t"]).command, Command::Trunk(health::TrunkArgs { cmd: Some(health::TrunkCmd::Landings(a)) }) if a.limit == 3 && a.page_token.as_deref() == Some("t"))
     );
     assert!(matches!(
-        parse(&["verify", "7"]).command,
-        Command::Verify(_)
+        parse(&["trunk", "verify", "7"]).command,
+        Command::Trunk(health::TrunkArgs {
+            cmd: Some(health::TrunkCmd::Verify(_))
+        })
     ));
     assert!(matches!(
         parse(&["revert", "7", "-m", "bad"]).command,

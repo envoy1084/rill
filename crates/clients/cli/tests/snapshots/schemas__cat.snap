@@ -1,0 +1,14 @@
+---
+source: crates/clients/cli/tests/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.cat",
+  "result": {
+    "encoding": "utf8",
+    "size": 8,
+    "text": "# shape\n",
+    "path": "README.md",
+    "root": "trunk"
+  }
+}

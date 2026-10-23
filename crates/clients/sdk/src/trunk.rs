@@ -223,6 +223,25 @@ impl TrunkClient {
         })
     }
 
+    /// The land requests waiting, in serve order, with their place in the
+    /// queue and estimated wait.
+    pub async fn queue(&self) -> Result<Vec<crate::types::LandProgress>> {
+        let requests = crate::paging::all(|page_token| async move {
+            let request = pb::ListLandRequestsRequest {
+                parent: self.repo.clone(),
+                page_size: crate::paging::PAGE,
+                page_token,
+            };
+            let resp = retry_idempotent_landing(&self.client, request).await?;
+            Ok((resp.land_requests, resp.next_page_token))
+        })
+        .await?;
+        requests
+            .into_iter()
+            .map(crate::types::LandProgress::try_from)
+            .collect()
+    }
+
     /// Trunk's state and its open incidents.
     pub async fn health(&self) -> Result<(pb::TrunkHealth, Vec<pb::Incident>)> {
         let resp = crate::client::retry_idempotent(|| {
@@ -341,4 +360,16 @@ impl TrunkClient {
         .into_owned();
         Ok(required("bulk_revert.operation", resp.operation)?)
     }
+}
+
+async fn retry_idempotent_landing(
+    client: &Client,
+    request: pb::ListLandRequestsRequest,
+) -> Result<pb::ListLandRequestsResponse> {
+    Ok(crate::client::retry_idempotent(|| {
+        let (svc, request) = (client.landing_svc(), request.clone());
+        async move { svc.list_land_requests(request).await }
+    })
+    .await?
+    .into_owned())
 }

@@ -37,7 +37,7 @@ pub struct LandArgs {
     pub onto: Option<String>,
 }
 
-/// `rill landings`.
+/// `rill trunk landings`.
 #[derive(Args, Debug)]
 pub struct LandingsArgs {
     /// Maximum landings.
@@ -48,7 +48,7 @@ pub struct LandingsArgs {
     pub page_token: Option<String>,
 }
 
-/// `rill verify`.
+/// `rill trunk verify`.
 #[derive(Args, Debug)]
 pub struct VerifyArgs {
     /// Trunk sequence (`7` or `trunk@7`).
@@ -241,7 +241,33 @@ fn verification_text(out: &Out<'_>, v: Option<&VerificationRecord>) -> String {
     }
 }
 
-/// Run `rill landings`.
+/// Run `rill queue`.
+pub async fn queue(ctx: &mut Ctx<'_>) -> Result<()> {
+    let queue = ctx.repo()?.trunk().queue().await?;
+    ctx.emit(
+        j!({ "land_requests": queue.iter().map(json::land_progress).collect::<Vec<_>>() }),
+        |out| {
+            if queue.is_empty() {
+                return out.line(out.dim("nothing waiting to land"));
+            }
+            let mut table = Table::new(&["PLACE", "REQUEST", "CHANGE", "STATUS", "WAIT"]);
+            for p in &queue {
+                table.row(vec![
+                    p.position.map(|n| n.to_string()).unwrap_or_default(),
+                    out.id(&p.ticket.id),
+                    p.ticket.change_id.to_string(),
+                    format!("{:?}", p.status()).to_ascii_lowercase(),
+                    p.eta
+                        .map(|d| format!("{}s", d.as_secs()))
+                        .unwrap_or_default(),
+                ]);
+            }
+            out.table(table)
+        },
+    )
+}
+
+/// Run `rill trunk landings`.
 pub async fn landings(ctx: &mut Ctx<'_>, args: LandingsArgs) -> Result<()> {
     let page = ctx
         .repo()?
@@ -274,7 +300,7 @@ pub async fn landings(ctx: &mut Ctx<'_>, args: LandingsArgs) -> Result<()> {
     )
 }
 
-/// Run `rill verify`.
+/// Run `rill trunk verify`.
 pub async fn verify(ctx: &mut Ctx<'_>, args: VerifyArgs) -> Result<()> {
     let seq = seq_arg(&args.seq)?;
     let record = ctx.repo()?.trunk().verification(seq).await?;

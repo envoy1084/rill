@@ -15,7 +15,7 @@ pub enum RepoCmd {
     /// Create a repository.
     Create(CreateArgs),
     /// Show one repository (the current one by default).
-    Info,
+    Show,
 }
 
 /// `rill repo list`.
@@ -44,7 +44,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: RepoCmd) -> Result<()> {
     match cmd {
         RepoCmd::List(args) => list(ctx, args).await,
         RepoCmd::Create(args) => create(ctx, args).await,
-        RepoCmd::Info => info(ctx).await,
+        RepoCmd::Show => info(ctx).await,
     }
 }
 

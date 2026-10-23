@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    access, admin, change, checkout, health, history, import, intent, land, org, refs, release,
-    repo, review, stack, status, watch, ws,
+    access, admin, change, checkout, health, history, identity, import, intent, land, org, refs,
+    release, repo, review, stack, status, watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -48,6 +48,11 @@ pub struct GlobalOpts {
     /// Print the result as JSON (stable machine output) instead of tables.
     #[arg(long, global = true)]
     pub json: bool,
+
+    /// Print JSON in this schema version (only `v1` exists); implies
+    /// `--json`.
+    #[arg(long, global = true, value_name = "VERSION", value_parser = ["v1"])]
+    pub json_schema: Option<String>,
 
     /// Run as if started in this directory (checkout discovery starts here).
     #[arg(short = 'C', long, global = true, value_name = "DIR")]
@@ -116,11 +121,21 @@ pub enum Command {
     /// Update the checkout to a new base, merging local edits.
     Sync(change::SyncArgs),
 
-    /// Mark conflicted paths as resolved (or list them).
+    /// The checkout's conflicted paths.
+    Conflicts,
+
+    /// Mark conflicted paths as resolved.
     Resolve(change::ResolveArgs),
 
     /// Undo the workspace's last operation and restore its base.
     Undo,
+
+    /// The workspace's operation log.
+    #[command(subcommand)]
+    Op(ws::OpCmd),
+
+    /// Abandon a change.
+    Abandon(review::AbandonArgs),
 
     /// Stacks of changes: show, sync, submit, land.
     #[command(subcommand)]
@@ -129,22 +144,27 @@ pub enum Command {
     /// Submit a change for review.
     Submit(review::SubmitArgs),
 
-    /// Reviews: show, list, vote, comment, threads, evaluate, abandon.
+    /// Approve a change: vote `Review +2` (or `--label`).
+    Approve(review::ApproveArgs),
+
+    /// Reject a change: vote `Review -2` (or `--label`).
+    Reject(review::ApproveArgs),
+
+    /// Reviews: show, list, vote, comment, threads, evaluate.
     #[command(subcommand)]
     Review(review::ReviewCmd),
 
     /// Land a change on trunk.
     Land(land::LandArgs),
 
-    /// Trunk status: head, in-flight landings, recent landings; and its
-    /// health, incidents and freeze.
+    /// Land requests waiting, in serve order, with their place and wait.
+    Queue,
+
+    /// Trunk: status, health, landings and their verification, freeze.
     Trunk(health::TrunkArgs),
 
-    /// Recent landings with their verification.
-    Landings(land::LandingsArgs),
-
-    /// Verification record of a landed sequence.
-    Verify(land::VerifyArgs),
+    /// Trunk's incidents, open and closed, newest first.
+    Incidents(health::IncidentsArgs),
 
     /// Land a revert of a sequence.
     Revert(land::RevertArgs),
@@ -178,7 +198,19 @@ pub enum Command {
     /// End the stored session for the server.
     Logout,
 
-    /// Identity, tokens, policies and health.
+    /// Who the server thinks you are.
+    Whoami,
+
+    /// Credentials for scripts: print a capability token.
+    #[command(subcommand)]
+    Auth(admin::AuthCmd),
+
+    /// Registered agents: register, list, suspend, activate.
+    #[command(subcommand)]
+    Agent(identity::AgentCmd),
+
+    /// Org administration: policies, health, identity providers, users,
+    /// keys, trust, audit, protection, secrets, SCIM.
     #[command(subcommand)]
     Admin(admin::AdminCmd),
 

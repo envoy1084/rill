@@ -219,6 +219,12 @@ fn decode_detail(value: &str) -> Option<Vec<u8>> {
         .ok()
 }
 
+/// A reason as the wire names it: `ETAG_MISMATCH`.
+pub fn reason_name(reason: ErrorReason) -> &'static str {
+    let name = reason.proto_name();
+    name.strip_prefix("ERROR_REASON_").unwrap_or(name)
+}
+
 /// Result alias used throughout the SDK.
 pub type Result<T> = std::result::Result<T, Error>;
 

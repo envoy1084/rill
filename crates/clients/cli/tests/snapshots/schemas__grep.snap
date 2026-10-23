@@ -1,0 +1,19 @@
+---
+source: crates/clients/cli/tests/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.grep",
+  "result": {
+    "matches": [
+      {
+        "path": "src/lib.rs",
+        "line_no": 1,
+        "line": "pub fn one() -> u32 { 1 }"
+      }
+    ],
+    "files_searched": 1,
+    "truncated": false,
+    "root": "trunk"
+  }
+}

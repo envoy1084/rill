@@ -1,0 +1,10 @@
+---
+source: crates/clients/cli/tests/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.queue",
+  "result": {
+    "land_requests": []
+  }
+}

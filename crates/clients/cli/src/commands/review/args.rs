@@ -26,8 +26,22 @@ pub enum ReviewCmd {
     ResolveThread(ResolveThreadArgs),
     /// Evaluate the submit policy and print the reasons.
     Evaluate(ChangeArg),
-    /// Abandon a change.
-    Abandon(AbandonArgs),
+}
+
+/// `rill approve` and `rill reject`.
+#[derive(Args, Debug)]
+pub struct ApproveArgs {
+    /// Change id or version hash (default: the checkout's working change).
+    pub change: Option<String>,
+    /// The label to vote on.
+    #[arg(long, default_value = "Review")]
+    pub label: String,
+    /// The value (default: the label's most, +2 or -2 for `Review`).
+    #[arg(long, allow_hyphen_values = true)]
+    pub value: Option<i8>,
+    /// Reason for the vote.
+    #[arg(short, long)]
+    pub message: Option<String>,
 }
 
 /// A command taking one change.

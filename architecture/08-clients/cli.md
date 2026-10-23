@@ -33,22 +33,23 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 
 | Group | Commands |
 | --- | --- |
-| Repositories | `repo list`, `repo create [--windows-safe]`, `repo info`; names are `org/name` or a name in the default org |
-| Orgs | `org list`, `org create <name> [--description]` |
+| Repositories | `repo list`, `repo create [--windows-safe]`, `repo show`; names are `org/name` or a name in the default org |
+| Orgs | `org list`, `org show <name>`, `org create <name> [--description]` |
 | Checkout | `checkout`, `status`, `diff` |
 | History | `log`, `blame`, `show`, `ls`, `cat`, `grep` |
-| Changes | `new`, `describe`, `amend`, `sync`, `resolve`, `undo` |
+| Changes | `new`, `describe`, `amend`, `sync`, `conflicts` (list), `resolve <paths> \| --all`, `undo`, `op log`, `abandon` |
 | Stacks | `stack show`, `stack sync`, `stack submit`, `stack land [--prefix]` (one ordered group: all or nothing, or the longest landable prefix) |
-| Review | `submit`, `review show/list/vote/comment/threads/resolve-thread/evaluate/abandon` |
-| Landing | `land [--wait] [--timeout 300] [--no-sync] [--onto release/<name>]`, `trunk`, `trunk health`, `trunk incidents [-n]`, `trunk freeze [--reason]`, `trunk thaw`, `landings`, `verify`, `revert <seq>`, `revert --session/--model/--sponsor/--author/--intent [--since] [--until] [--apply]` (a preview without `--apply`), `bisect` |
+| Review | `submit`, `approve` / `reject` (the label's most or least, `Review` unless `--label`), `review show/list/vote/comment/threads/resolve-thread/evaluate` |
+| Landing | `land [--wait] [--timeout 300] [--no-sync] [--onto release/<name>]`, `queue` (requests waiting, with place and wait), `trunk` (status), `trunk health`, `trunk landings`, `trunk verify <seq>`, `trunk freeze [--reason]`, `trunk thaw`, `incidents [-n]`, `revert <seq>`, `revert --session/--model/--sponsor/--author/--intent [--since] [--until] [--apply]` (a preview without `--apply`), `bisect` |
 | Releases | `release cut <name> [--at SEQ]` (repository owners), `release list`; land on one with `land --onto release/<name>` or `stack land --onto` |
 | Checks | `checks runs [--of-version]`, `checks run <id> [--watch]`, `checks log <run> <step> [--stderr] [--tail]`, `checks artifact <run> <step> <path> [-o]`, `checks nonhermetic`, `checks flaky [--min-score] [--limit]`, `checks history <target>`, `checks quarantine list/add/release` ([checks](../06-services/checks.md)) |
 | Intents | `intent create/list/show/update/link/similar` |
-| Workspaces, refs | `ws create/list/show/handoff/ops/delete`, `ref list/show/set/delete` |
-| Sign-in | `login [--org] [--provider]` (device flow through the org's identity provider), `logout` |
+| Workspaces, refs | `ws create/list/show/handoff/delete`, `ref list/show/set/delete` |
+| Sign-in | `login [--org] [--provider]` (device flow through the org's identity provider), `logout`, `whoami`, `auth token` (an attenuated capability token for scripts) |
+| Agents | `agent register/list/suspend/activate` |
 | Services | `dev`, `api [--roles]`, `cache --origin --dir --max-bytes` ([cache tier](../07-runtime/cache.md)) |
 | Access | `access grant/revoke <subject> <relation> [path]`, `access list [--path] [--subject] [--relation]`, `access check <relation> [path] [--as]`, `access who <relation> [path]`, `access where <relation> [--as]` |
-| Admin | `admin whoami`, `admin token issue`, `admin policy get/set`, `admin health`, `admin idp add/list/remove` (OIDC, or SAML with `--saml-metadata`), `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session`, `admin agent register/list/suspend/activate`, `admin trust add/list/remove` (workload issuers), `admin kill --agent/--session/--sponsor/--model`, `admin scim create/list/revoke`, `admin audit list/watch/seal/verify/export`, `admin protect redact/approve/redactions/release/rotate-key`, `admin secret set/list/delete` (the value from standard input or `--from-file`, never an argument) |
+| Admin | `admin policy get/set` (of the current repository), `admin health`, `admin idp add/list/remove` (OIDC, or SAML with `--saml-metadata`), `admin user list/suspend/activate/roles`, `admin key list/rotate`, `admin revoke token/session`, `admin trust add/list/remove` (workload issuers), `admin kill --agent/--session/--sponsor/--model`, `admin scim create/list/revoke`, `admin audit list/watch/seal/verify/export`, `admin protect redact/approve/redactions/release/rotate-key`, `admin secret set/list/delete` (the value from standard input or `--from-file`, never an argument) |
 | Other | `import git` (through the server, or `--storage-dir`), `export git` (mirror trunk to a git branch; `--follow` keeps it following), `watch trunk/refs/log/events` (`log` and `events` take `--after <cursor>` or `--from-start`; `events` filters with `--kind` (repeatable), `--change` and `--ref-prefix`), `completions <shell>` |
 
 Each group lives in `commands/<group>.rs`. `commands/parse.rs` holds the
@@ -100,24 +101,41 @@ Commands that never call the server never dial it.
 
 ## Output, errors and exit codes
 
-`Ctx::emit(value, human)` pretty-prints the JSON under `--json`. Otherwise it
-runs the human renderer against `Out`, which provides `line`, `kv`, `table`
-(`comfy-table`) and style helpers. `watch` prints one compact JSON object per
-line through `emit_json_line`.
+`Ctx::emit(value, human)` prints the JSON under `--json` (or
+`--json-schema v1`, which pins the version and implies `--json`).
+Otherwise it runs the human renderer against `Out`, which provides `line`,
+`kv`, `table` (`comfy-table`) and style helpers.
 
-Errors go to stderr. With `--json` an error is printed as
-`{"error": {code, message, exit}}`. `code` comes from `CliError::code`. For
-SDK errors it is `rill_mcp::error::sdk_code`, the snake_case error code.
+Every JSON document is versioned: `{"schema": "rill.cli.v1.<command>",
+"result": …}`, where `<command>` is the command's path with dots
+(`rill.cli.v1.review.list`, `rill.cli.v1.trunk.landings`). Streams
+(`watch`) print one compact `{"schema": "rill.cli.v1.watch.<kind>.event",
+"event": …}` per line. `tests/schemas.rs` runs a session against an
+in-process dev server and snapshots each command's document (`insta`, with
+hashes, ids, times and paths redacted); a changed snapshot is a changed
+schema, and a breaking one needs a new version.
+
+Errors go to stderr. A person sees the error worded by the server's reason
+(`not allowed by policy: …`, `changed meanwhile: …`) and hints: what a
+policy denial still needs, when to retry, what to do next. With `--json` an
+error is `{"schema": "rill.cli.v1.error", "error": {code, reason, message,
+missing, retry_after_ms, exit}}`: `code` is the snake_case status code,
+`reason` the `ErrorReason` (`POLICY_DENIED`, `ETAG_MISMATCH`, …).
 
 | Exit | Meaning |
 | --- | --- |
 | 0 | success, including `--help` and `--version` |
-| 1 | failure: server error, not found, permission denied, transport, I/O, storage |
+| 1 | failure: server error, not found, transport, I/O, storage, a request over a size limit |
 | 2 | usage: parse error, `CliError::Usage`, `CliError::Invalid`, SDK `Config` error |
-| 3 | needs attention: conflict, `LandFailed`, SDK `Conflict`, status `ABORTED` or `FAILED_PRECONDITION` |
+| 3 | needs attention: conflict, `LandFailed`, SDK `Conflict`, status `ABORTED` or `FAILED_PRECONDITION` (other than a policy denial) |
+| 4 | denied: unauthenticated, `PERMISSION_DENIED`, reason `POLICY_DENIED` |
+| 5 | retryable: `UNAVAILABLE`, `DEADLINE_EXCEEDED`, a client timeout, `RESOURCE_EXHAUSTED` with a wait (rate limit, full queue) |
 
-Scripts and agents can rely on these codes. Exit 3 means "read the output
-and decide".
+Scripts and agents can rely on these codes: 3 means "read the output and
+decide", 4 "get permission or approval", 5 "try again later".
+
+The MCP server reports a failed tool the same way: its structured error
+carries `code`, `reason`, `missing` and `retry_after_ms`.
 
 ## Running the service
 
@@ -157,7 +175,7 @@ the root `CancellationToken`. See
 
 - [lib.rs](../../crates/clients/cli/src/lib.rs), [cli.rs](../../crates/clients/cli/src/cli.rs), [context.rs](../../crates/clients/cli/src/context.rs), [error.rs](../../crates/clients/cli/src/error.rs), [exit.rs](../../crates/clients/cli/src/exit.rs), [checkout_meta.rs](../../crates/clients/cli/src/checkout_meta.rs)
 - [commands/mod.rs](../../crates/clients/cli/src/commands/mod.rs), [commands/parse.rs](../../crates/clients/cli/src/commands/parse.rs), [commands/change/mod.rs](../../crates/clients/cli/src/commands/change/mod.rs), [commands/import/](../../crates/clients/cli/src/commands/import/mod.rs), [commands/export.rs](../../crates/clients/cli/src/commands/export.rs)
-- [output/mod.rs](../../crates/clients/cli/src/output/mod.rs), [output/table.rs](../../crates/clients/cli/src/output/table.rs), [output/format.rs](../../crates/clients/cli/src/output/format.rs)
+- [tests/schemas.rs](../../crates/clients/cli/tests/schemas.rs), [output/mod.rs](../../crates/clients/cli/src/output/mod.rs), [output/table.rs](../../crates/clients/cli/src/output/table.rs), [output/format.rs](../../crates/clients/cli/src/output/format.rs)
 - [server/mod.rs](../../crates/clients/cli/src/server/mod.rs), [server/template.rs](../../crates/clients/cli/src/server/template.rs)
 - [bin/rill.rs](../../crates/clients/cli/src/bin/rill.rs)
 

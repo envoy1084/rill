@@ -1,4 +1,4 @@
-//! `rill admin agent`, `rill admin trust` and `rill admin kill`.
+//! `rill agent`, `rill admin trust` and `rill admin kill`.
 
 use clap::{Args, Subcommand};
 use rill_proto::rill::v1 as pb;
@@ -10,7 +10,7 @@ use crate::error::CliError;
 use crate::output::Table;
 use crate::Result;
 
-/// `rill admin agent <subcommand>`.
+/// `rill agent <subcommand>`.
 #[derive(Subcommand, Debug)]
 pub enum AgentCmd {
     /// Register an agent.
@@ -23,7 +23,7 @@ pub enum AgentCmd {
     Activate(AgentArg),
 }
 
-/// `rill admin agent register`.
+/// `rill agent register`.
 #[derive(Args, Debug)]
 pub struct RegisterArgs {
     /// The agent's name, unique in the instance.
@@ -140,7 +140,7 @@ fn agent_json(a: &pb::Agent) -> serde_json::Value {
     })
 }
 
-/// Run `rill admin agent`.
+/// Run `rill agent`.
 pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
     let mut svc = ctx.client()?.identity_svc();
     let agent = match cmd {

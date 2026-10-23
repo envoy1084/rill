@@ -25,7 +25,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches};
 
 pub use cli::{Cli, Command, GlobalOpts};
 pub use error::CliError;
@@ -41,8 +41,11 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
-    let cli = match Cli::try_parse_from(args) {
-        Ok(cli) => cli,
+    let parsed = Cli::command()
+        .try_get_matches_from(args)
+        .and_then(|m| Cli::from_arg_matches(&m).map(|cli| (cli, schema_of(&m))));
+    let (cli, schema) = match parsed {
+        Ok(parsed) => parsed,
         Err(e) => {
             // Help and version are "errors" to clap but successes to us.
             let code = if e.use_stderr() {
@@ -66,8 +69,9 @@ where
         Some(dir) => dir.clone(),
         None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
     };
-    let json = global.json;
-    let mut ctx = context::Ctx::new(global, out, color, cwd);
+    let json = global.json || global.json_schema.is_some();
+    let color = color && !json;
+    let mut ctx = context::Ctx::new(global, out, color, cwd, schema);
     match commands::run(&mut ctx, cli.command).await {
         Ok(()) => exit::OK,
         Err(e) => {
@@ -77,15 +81,36 @@ where
     }
 }
 
+/// The JSON schema a command's output follows: `rill.cli.v1.` and the
+/// command's path (`rill.cli.v1.review.list`).
+fn schema_of(matches: &clap::ArgMatches) -> String {
+    let mut schema = String::from(SCHEMA_PREFIX);
+    let mut m = matches;
+    while let Some((name, sub)) = m.subcommand() {
+        schema.push('.');
+        schema.push_str(&name.replace('-', "_"));
+        m = sub;
+    }
+    schema
+}
+
+/// The JSON schema names' prefix: every `--json` document is
+/// `{"schema": "rill.cli.v1.<command>", "result": …}`.
+pub const SCHEMA_PREFIX: &str = "rill.cli.v1";
+
 /// Print an error to stderr.
 fn report_error(e: &CliError, json: bool) {
     if json {
         let value = serde_json::json!({
-            "error": { "code": e.code(), "message": e.to_string(), "exit": exit::code_for(e) }
+            "schema": format!("{SCHEMA_PREFIX}.error"),
+            "error": e.to_json(),
         });
         eprintln!("{value}");
     } else {
         eprintln!("rill: {e}");
+        for line in e.hints() {
+            eprintln!("  {line}");
+        }
     }
 }
 

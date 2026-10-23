@@ -21,17 +21,21 @@ pub struct TrunkArgs {
 /// What `rill trunk` can do besides showing status.
 #[derive(Subcommand, Debug)]
 pub enum TrunkCmd {
+    /// Head, in-flight landings, recent landings (the default).
+    Status,
     /// Trunk's state (green, red, fixing, guarded) and open incidents.
     Health,
-    /// Incidents, open and closed, newest first.
-    Incidents(IncidentsArgs),
+    /// Recent landings with their verification.
+    Landings(crate::commands::land::LandingsArgs),
+    /// Verification record of a landed position.
+    Verify(crate::commands::land::VerifyArgs),
     /// Let only emergency landings land (repository owners).
     Freeze(FreezeArgs),
     /// Lift a freeze (repository owners).
     Thaw,
 }
 
-/// `rill trunk incidents`.
+/// `rill incidents`.
 #[derive(Args, Debug)]
 pub struct IncidentsArgs {
     /// Most incidents to show.
@@ -72,16 +76,22 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: TrunkCmd) -> Result<()> {
                 },
             )
         }
-        TrunkCmd::Incidents(args) => {
-            let incidents = trunk.incidents(None, args.limit, None).await?.items;
-            ctx.emit(
-                j!({ "incidents": incidents.iter().map(incident_json).collect::<Vec<_>>() }),
-                |out| incidents_table(out, &incidents),
-            )
-        }
+        TrunkCmd::Status => crate::commands::land::trunk(ctx).await,
+        TrunkCmd::Landings(args) => crate::commands::land::landings(ctx, args).await,
+        TrunkCmd::Verify(args) => crate::commands::land::verify(ctx, args).await,
         TrunkCmd::Freeze(args) => freeze(ctx, &trunk, true, args.reason).await,
         TrunkCmd::Thaw => freeze(ctx, &trunk, false, String::new()).await,
     }
+}
+
+/// Run `rill incidents`.
+pub async fn incidents(ctx: &mut Ctx<'_>, args: IncidentsArgs) -> Result<()> {
+    let trunk = ctx.repo()?.trunk();
+    let incidents = trunk.incidents(None, args.limit, None).await?.items;
+    ctx.emit(
+        j!({ "incidents": incidents.iter().map(incident_json).collect::<Vec<_>>() }),
+        |out| incidents_table(out, &incidents),
+    )
 }
 
 async fn freeze(

@@ -103,6 +103,7 @@ async fn login_keeps_a_session_that_refreshes_until_logout() {
     .await;
     assert_eq!(code, 0, "{out}");
     let users: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let users = users["result"].clone();
     assert_eq!(users[0]["name"], "eve", "{users}");
     let (code, out) = rill(&[
         "rill",
@@ -118,15 +119,16 @@ async fn login_keeps_a_session_that_refreshes_until_logout() {
     .await;
     assert_eq!(code, 0, "{out}");
     let keys: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let keys = keys["result"].clone();
     assert_eq!(keys[0]["backend"], "local", "{keys}");
     let whoami = |endpoint: String| async move {
-        let (code, out) =
-            rill(&["rill", "--endpoint", &endpoint, "--json", "admin", "whoami"]).await;
+        let (code, out) = rill(&["rill", "--endpoint", &endpoint, "--json", "whoami"]).await;
         (code, out)
     };
     let (code, out) = whoami(endpoint.clone()).await;
     assert_eq!(code, 0, "{out}");
     let me: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let me = me["result"].clone();
     assert_eq!(me["principal"]["name"], "eve");
 
     // A stored session near expiry refreshes itself and saves the rotated

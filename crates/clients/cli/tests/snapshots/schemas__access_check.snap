@@ -1,0 +1,19 @@
+---
+source: crates/clients/cli/tests/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.access.check",
+  "result": {
+    "allowed": true,
+    "org_admin": false,
+    "because": [
+      {
+        "repo": "shape",
+        "path": "",
+        "relation": "owner",
+        "subject": "principal:pr_[id]"
+      }
+    ]
+  }
+}

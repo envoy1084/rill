@@ -59,6 +59,8 @@ bytes = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true }
+regex = { workspace = true }
 rill-identity = { workspace = true, features = ["testing"] }
 rill-policy = { workspace = true }
 base64 = { workspace = true }

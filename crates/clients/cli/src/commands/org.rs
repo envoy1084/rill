@@ -14,6 +14,15 @@ pub enum OrgCmd {
     List,
     /// Create an org; repositories in it are named `org/repo`.
     Create(CreateArgs),
+    /// Show one org.
+    Show(ShowArgs),
+}
+
+/// `rill org show`.
+#[derive(Args, Debug)]
+pub struct ShowArgs {
+    /// The org.
+    pub name: String,
 }
 
 /// `rill org create`.
@@ -50,6 +59,16 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: OrgCmd) -> Result<()> {
                     ]);
                 }
                 out.table(table)
+            })
+        }
+        OrgCmd::Show(args) => {
+            let org = admin.org(&args.name).await?;
+            ctx.emit(json!({ "name": org.name, "description": org.description, "created_at": org.created_at.to_string() }), |out| {
+                out.kv(&[
+                    ("org", org.name.clone()),
+                    ("created", when(&org.created_at)),
+                    ("description", org.description.clone().unwrap_or_default()),
+                ])
             })
         }
         OrgCmd::Create(args) => {

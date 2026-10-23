@@ -10,12 +10,16 @@
 //!   attention: a sync or rebase left conflict markers, a land request was
 //!   refused or failed, a submit evaluation said no, a compare-and-swap
 //!   lost the race (`Aborted` / `FailedPrecondition` from the server).
+//! * `4` – denied: the caller may not do this (unauthenticated, a missing
+//!   permission or capability, the policy refuses).
+//! * `5` – retryable: the server is unavailable or asked for a wait (a
+//!   rate limit, a full queue); the same command may succeed later.
 //!
 //! Scripts and agents can rely on these: `3` means "look at the output
-//! and decide", `1` means "something is broken", `2` means "fix the
-//! invocation".
+//! and decide", `4` "get permission or approval", `5` "try again later",
+//! `1` "something is broken", `2` "fix the invocation".
 
-use rill_sdk::Code;
+use rill_sdk::{Code, ErrorReason};
 
 use crate::error::CliError;
 
@@ -27,6 +31,10 @@ pub const ERROR: i32 = 1;
 pub const USAGE: i32 = 2;
 /// Conflict or not landable.
 pub const CONFLICT: i32 = 3;
+/// Denied.
+pub const DENIED: i32 = 4;
+/// Retryable.
+pub const RETRYABLE: i32 = 5;
 
 /// The exit code for an error.
 pub fn code_for(error: &CliError) -> i32 {
@@ -35,6 +43,21 @@ pub fn code_for(error: &CliError) -> i32 {
         CliError::Conflict(_) => CONFLICT,
         CliError::Sdk(e) => match e {
             rill_sdk::Error::Conflict { .. } | rill_sdk::Error::LandFailed { .. } => CONFLICT,
+            rill_sdk::Error::Status { .. } if e.is(ErrorReason::PolicyDenied) => DENIED,
+            rill_sdk::Error::Status {
+                code: Code::PermissionDenied | Code::Unauthenticated,
+                ..
+            } => DENIED,
+            rill_sdk::Error::Status {
+                code: Code::Unavailable | Code::DeadlineExceeded,
+                ..
+            } => RETRYABLE,
+            rill_sdk::Error::Status {
+                code: Code::ResourceExhausted,
+                retry_after: Some(_),
+                ..
+            } => RETRYABLE,
+            rill_sdk::Error::Timeout(_) => RETRYABLE,
             rill_sdk::Error::Status {
                 code: Code::Aborted | Code::FailedPrecondition,
                 ..
@@ -63,7 +86,37 @@ mod tests {
             code_for(&CliError::Sdk(rill_sdk::Error::Timeout(
                 std::time::Duration::from_secs(1)
             ))),
-            ERROR
+            RETRYABLE
         );
+        let denied = CliError::Sdk(rill_sdk::Error::status(
+            Code::PermissionDenied,
+            String::new(),
+        ));
+        assert_eq!(code_for(&denied), DENIED);
+        let policy = CliError::Sdk(rill_sdk::Error::Status {
+            code: Code::FailedPrecondition,
+            message: String::new(),
+            reason: Some(ErrorReason::PolicyDenied),
+            missing: vec!["Review +2".into()],
+            retry_after: None,
+        });
+        assert_eq!(
+            code_for(&policy),
+            DENIED,
+            "a policy refusal is not a conflict"
+        );
+        let limited = CliError::Sdk(rill_sdk::Error::Status {
+            code: Code::ResourceExhausted,
+            message: String::new(),
+            reason: Some(ErrorReason::RateLimited),
+            missing: vec![],
+            retry_after: Some(std::time::Duration::from_secs(2)),
+        });
+        assert_eq!(code_for(&limited), RETRYABLE);
+        let too_large = CliError::Sdk(rill_sdk::Error::status(
+            Code::ResourceExhausted,
+            String::new(),
+        ));
+        assert_eq!(code_for(&too_large), ERROR);
     }
 }

@@ -1,0 +1,40 @@
+---
+source: crates/clients/cli/tests/schemas.rs
+expression: doc
+---
+{
+  "schema": "rill.cli.v1.submit",
+  "result": {
+    "change_id": "ch_[id]",
+    "versions": [
+      "[hash]",
+      "[hash]"
+    ],
+    "current_version": "[hash]",
+    "status": "open",
+    "intent": null,
+    "owner": {
+      "id": "pr_[id]",
+      "kind": "human",
+      "name": "dev",
+      "identity": null,
+      "display": "dev"
+    },
+    "votes": [],
+    "threads": [],
+    "unresolved_threads": 0,
+    "risk": "normal",
+    "risk_reasons": [],
+    "stack": [],
+    "landed_seq": null,
+    "created_at": {
+      "rfc3339": "[time]",
+      "millis": 0
+    },
+    "updated_at": {
+      "rfc3339": "[time]",
+      "millis": 0
+    },
+    "extra": {}
+  }
+}

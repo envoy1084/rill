@@ -1,7 +1,7 @@
 //! Routing `rill review` subcommands.
 
 use super::args::ReviewCmd;
-use super::lifecycle::{abandon, evaluate, list, show, vote};
+use super::lifecycle::{evaluate, list, show, vote};
 use super::threads::{comment, resolve_thread, threads};
 use crate::context::Ctx;
 use crate::Result;
@@ -16,6 +16,5 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ReviewCmd) -> Result<()> {
         ReviewCmd::Threads(args) => threads(ctx, args).await,
         ReviewCmd::ResolveThread(args) => resolve_thread(ctx, args).await,
         ReviewCmd::Evaluate(args) => evaluate(ctx, args).await,
-        ReviewCmd::Abandon(args) => abandon(ctx, args).await,
     }
 }

@@ -16,11 +16,6 @@ use crate::Result;
 /// `rill admin <subcommand>`.
 #[derive(Subcommand, Debug)]
 pub enum AdminCmd {
-    /// Who the server thinks you are.
-    Whoami,
-    /// Capability tokens.
-    #[command(subcommand)]
-    Token(TokenCmd),
     /// Named Cedar policies.
     #[command(subcommand)]
     Policy(PolicyCmd),
@@ -38,9 +33,6 @@ pub enum AdminCmd {
     /// Revoke tokens and end sessions.
     #[command(subcommand)]
     Revoke(super::identity::RevokeCmd),
-    /// Registered agents.
-    #[command(subcommand)]
-    Agent(super::identity::AgentCmd),
     /// Issuers whose workload JWTs agents exchange.
     #[command(subcommand)]
     Trust(super::identity::TrustCmd),
@@ -60,14 +52,14 @@ pub enum AdminCmd {
     Scim(super::identity::ScimCmd),
 }
 
-/// `rill admin token <subcommand>`.
+/// `rill auth <subcommand>`.
 #[derive(Subcommand, Debug)]
-pub enum TokenCmd {
-    /// Mint an attenuated token.
-    Issue(IssueArgs),
+pub enum AuthCmd {
+    /// Mint a token attenuated from yours and print it.
+    Token(IssueArgs),
 }
 
-/// `rill admin token issue`.
+/// `rill auth token`.
 #[derive(Args, Debug)]
 pub struct IssueArgs {
     /// Repository the token is scoped to (default: the current one).
@@ -139,26 +131,31 @@ pub fn parse_expiry(text: &str, now: Timestamp) -> Result<Timestamp> {
 /// Run an admin subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: AdminCmd) -> Result<()> {
     match cmd {
-        AdminCmd::Whoami => whoami(ctx).await,
         AdminCmd::Idp(cmd) => super::identity::providers::run(ctx, cmd).await,
         AdminCmd::User(cmd) => super::identity::users::run(ctx, cmd).await,
         AdminCmd::Key(cmd) => super::identity::keys::run(ctx, cmd).await,
         AdminCmd::Revoke(cmd) => super::identity::revoke(ctx, cmd).await,
-        AdminCmd::Agent(cmd) => super::identity::agents::agent(ctx, cmd).await,
         AdminCmd::Trust(cmd) => super::identity::agents::trust(ctx, cmd).await,
         AdminCmd::Kill(args) => super::identity::agents::kill(ctx, args).await,
         AdminCmd::Scim(cmd) => super::identity::scim::run(ctx, cmd).await,
         AdminCmd::Audit(cmd) => super::audit::run(ctx, cmd).await,
         AdminCmd::Protect(cmd) => super::protection::run(ctx, cmd).await,
         AdminCmd::Secret(cmd) => super::secrets::run(ctx, cmd).await,
-        AdminCmd::Token(TokenCmd::Issue(args)) => issue(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Get(args)) => policy_get(ctx, args).await,
         AdminCmd::Policy(PolicyCmd::Set(args)) => policy_set(ctx, args).await,
         AdminCmd::Health => health(ctx).await,
     }
 }
 
-async fn whoami(ctx: &mut Ctx<'_>) -> Result<()> {
+/// Run `rill auth`.
+pub async fn auth(ctx: &mut Ctx<'_>, cmd: AuthCmd) -> Result<()> {
+    match cmd {
+        AuthCmd::Token(args) => issue(ctx, args).await,
+    }
+}
+
+/// Run `rill whoami`.
+pub async fn whoami(ctx: &mut Ctx<'_>) -> Result<()> {
     let me = ctx.client()?.admin().whoami().await?;
     ctx.emit(json::whoami(&me), |out| {
         out.kv(&[

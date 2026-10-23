@@ -3,8 +3,8 @@
 use clap::CommandFactory;
 
 use super::{
-    access, admin, change, checkout, export, health, history, import, intent, land, org, refs,
-    release, repo, review, session, stack, status, watch, ws,
+    access, admin, change, checkout, export, health, history, identity, import, intent, land, org,
+    refs, release, repo, review, session, stack, status, watch, ws,
 };
 use crate::cli::{Cli, Command};
 use crate::context::Ctx;
@@ -40,18 +40,23 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Describe(args) => change::describe(ctx, args).await,
         Command::Amend(args) => change::amend(ctx, args).await,
         Command::Sync(args) => change::sync(ctx, args).await,
+        Command::Conflicts => change::conflicts(ctx).await,
         Command::Resolve(args) => change::resolve(ctx, args).await,
         Command::Undo => change::undo(ctx).await,
+        Command::Op(cmd) => ws::op(ctx, cmd).await,
+        Command::Abandon(args) => review::abandon(ctx, args).await,
+        Command::Approve(args) => review::approve(ctx, args, false).await,
+        Command::Reject(args) => review::approve(ctx, args, true).await,
         Command::Stack(cmd) => stack::run(ctx, cmd).await,
         Command::Submit(args) => review::submit(ctx, args).await,
         Command::Review(cmd) => review::run(ctx, cmd).await,
         Command::Land(args) => land::land(ctx, args).await,
+        Command::Queue => land::queue(ctx).await,
         Command::Trunk(args) => match args.cmd {
             None => land::trunk(ctx).await,
             Some(cmd) => health::run(ctx, cmd).await,
         },
-        Command::Landings(args) => land::landings(ctx, args).await,
-        Command::Verify(args) => land::verify(ctx, args).await,
+        Command::Incidents(args) => health::incidents(ctx, args).await,
         Command::Revert(args) => land::revert(ctx, args).await,
         Command::Bisect(args) => land::bisect(ctx, args).await,
         Command::Checks(cmd) => super::checks::run(ctx, cmd).await,
@@ -63,6 +68,9 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Access(cmd) => access::run(ctx, cmd).await,
         Command::Login(args) => session::login(ctx, args).await,
         Command::Logout => session::logout(ctx).await,
+        Command::Whoami => admin::whoami(ctx).await,
+        Command::Auth(cmd) => admin::auth(ctx, cmd).await,
+        Command::Agent(cmd) => identity::agents::agent(ctx, cmd).await,
         Command::Import(cmd) => import::run(ctx, cmd).await,
         Command::Export(cmd) => export::run(ctx, cmd).await,
         Command::Watch(cmd) => watch::run(ctx, cmd).await,
