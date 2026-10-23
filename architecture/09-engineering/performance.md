@@ -72,8 +72,8 @@ When the in-flight limit is reached, new work is counted as dropped rather
 than queued, so overload shows in the report instead of inflating latency.
 
 ```
-cargo run --release -p rill-load -- --percent 1 --duration 60
-cargo run --release -p rill-load -- --endpoint http://host:7470 --percent 5 --json
+cargo run --release -p rill-load --bin rill-load -- --percent 1 --duration 60
+cargo run --release -p rill-load --bin rill-load -- --endpoint http://host:7470 --percent 5 --json
 ```
 
 Laptop results against the embedded single-process server:
@@ -115,7 +115,7 @@ report counts give-ups (requests that did not land) by reason and which
 merge driver resolved each landing.
 
 ```
-cargo run --release -p rill-load -- --contended --percent 0 --lands-per-sec 10 \
+cargo run --release -p rill-load --bin rill-load -- --contended --percent 0 --lands-per-sec 10 \
   --burst-every 30 --burst-secs 10 --duration 90          # embedded server, 16 local workers
 ```
 
