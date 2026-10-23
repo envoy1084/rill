@@ -213,10 +213,11 @@ cargo run --release -p rill-load --bin daemon_gate [-- --dirs 10000 --files-per-
 On an OrbStack Linux machine (arm64): the 10M-file repository builds in
 4.5 s; the lazy mount takes 18 ms and the shell is usable at 26 ms; status
 p99 is 0.66 ms (p50 0.60) with 1,000 edits; the cold CI host reads 1,000
-files in 0.6 s with 1,000 regional hits and no misses. On macOS (eager
-sparse checkout of one directory, no FUSE): status p99 is 14 ms (each call
-settles the watcher with a cookie), the first status after 1,000 fresh
-edits 0.85 s, and the cold CI host again 100% regional hits.
+files in 0.6 s with 1,000 regional hits and no misses. On macOS with the
+NFS view: the shell is usable at 43 ms; status p99 is 1.6 ms (the first
+status, which commits the 1,000 buffered writes, 0.99 s); the cold CI host
+reads 1,000 files in 1.2 s, all regional hits. An eager checkout on macOS
+has status p99 14 ms, each call settling the watcher with a cookie.
 
 ## Limitations
 
