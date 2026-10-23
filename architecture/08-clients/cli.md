@@ -38,7 +38,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Orgs | `org list`, `org show <name>`, `org create <name> [--description]` |
 | Checkout | `clone [--eager]`, `checkout [--lazy \| --snapshot]`, `status [-s]`, `diff [--stat \| --name-status] [-U N]` |
 | History | `log [--oneline] [--no-graph]`, `blame`, `show [--stat \| --name-status \| -s]`, `ls`, `cat`, `grep` |
-| Changes | `new`, `commit`, `describe`, `amend` (no `-m`: your editor), `sync`, `conflicts` (list), `resolve <paths> \| --all \| -i`, `undo`, `redo`, `op log`, `abandon` |
+| Changes | `new`, `commit`, `describe`, `amend` (no `-m`: your editor), `squash` (fold the working change into its parent), `split <paths>` (move paths into a new change on top), `sync`, `conflicts` (list), `resolve <paths> \| --all \| -i`, `undo`, `redo`, `op log`, `abandon` |
 | Stacks | `stack show`, `stack sync`, `stack submit`, `stack land [--prefix]` (one ordered group: all or nothing, or the longest landable prefix) |
 | Review | `submit`, `approve` / `reject` (the label's most or least, `Review` unless `--label`), `comment`, `inbox`, `review open` (full screen), `review show/list/vote/comment/threads/resolve-thread/evaluate` |
 | Landing | `land [--wait] [--timeout 300] [--no-sync] [--onto release/<name>]`, `land cancel [ticket \| change] [-m reason]`, `queue` (requests waiting, with place and wait), `trunk` (status), `trunk health`, `trunk landings`, `trunk verify <seq>`, `trunk freeze [--reason]`, `trunk thaw`, `incidents [-n]`, `revert <seq>`, `revert --session/--model/--sponsor/--author/--intent [--since] [--until] [--apply]` (a preview without `--apply`), `bisect` |
