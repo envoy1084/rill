@@ -10,15 +10,19 @@ pub mod config;
 mod daemon;
 pub mod eager;
 pub mod error;
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 mod fuse;
 pub mod mount;
+#[cfg(target_os = "macos")]
+mod nfs;
 pub mod overlay;
 pub mod proto;
 pub mod server;
 mod shared;
 pub mod state;
 mod sync;
+#[cfg(unix)]
+mod vfs;
 pub mod view;
 
 pub use client::{connect_or_start, DaemonClient};

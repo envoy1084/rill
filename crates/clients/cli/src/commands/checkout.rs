@@ -26,11 +26,11 @@ pub struct CheckoutArgs {
     /// Do not register a server-side workspace.
     #[arg(long)]
     pub no_workspace: bool,
-    /// Present files lazily through the virtual filesystem (Linux).
+    /// Present files lazily through the virtual filesystem (Linux, macOS).
     #[arg(long, conflicts_with = "snapshot")]
     pub lazy: bool,
     /// A read-only view of the revision for CI: writes stay in a scratch
-    /// overlay that is never synced (Linux; no workspace).
+    /// overlay that is never synced (Linux, macOS; no workspace).
     #[arg(long)]
     pub snapshot: bool,
 }

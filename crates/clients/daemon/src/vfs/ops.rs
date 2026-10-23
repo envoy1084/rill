@@ -1,13 +1,13 @@
-//! The view's operations as async functions, one per filesystem call the
-//! view serves; `fs.rs` bridges the kernel's calls onto them.
+//! The view's operations as async functions, one per filesystem call;
+//! the FUSE and NFS front ends bridge the kernel's calls onto them.
 
 use std::os::unix::fs::FileExt;
+use std::sync::Arc;
 
 use bytes::Bytes;
-use fuser::FileAttr;
 use rill_types::{FileKind, RepoPath, RepoPathBuf};
 
-use super::attrs::{dir_attr, file_attr};
+use super::attrs::{dir_attr, file_attr, Attr};
 use super::handles::{read_at, slice, Handle, Scratch};
 use super::node::{Node, Source};
 use super::view::View;
@@ -15,7 +15,7 @@ use crate::error::{Error, Result};
 use crate::overlay::OverlayOp;
 
 /// An error with a POSIX code the kernel passes on as is.
-pub(super) fn posix(code: i32) -> Error {
+pub(crate) fn posix(code: i32) -> Error {
     Error::Io(std::io::Error::from_raw_os_error(code))
 }
 
@@ -23,11 +23,12 @@ pub(super) fn posix(code: i32) -> Error {
 pub struct Opened {
     pub fh: u64,
     /// A cached object the kernel may read directly (passthrough).
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub backing: Option<std::fs::File>,
 }
 
 impl View {
-    fn attr_of(&self, ino: u64, node: &Node) -> FileAttr {
+    fn attr_of(&self, ino: u64, node: &Node) -> Attr {
         match node {
             Node::Dir => dir_attr(ino, self.owner),
             Node::File { size, kind, source } => {
@@ -42,13 +43,13 @@ impl View {
             .ok_or_else(|| Error::NotFound(path.to_string()))
     }
 
-    pub(super) async fn lookup(&self, parent: u64, name: &std::ffi::OsStr) -> Result<FileAttr> {
+    pub(crate) async fn lookup(&self, parent: u64, name: &std::ffi::OsStr) -> Result<Attr> {
         let path = self.child(parent, name)?;
         let node = self.node(&path).await?;
         Ok(self.attr_of(self.ino(&path), &node))
     }
 
-    pub(super) async fn getattr(&self, ino: u64, fh: Option<u64>) -> Result<FileAttr> {
+    pub(crate) async fn getattr(&self, ino: u64, fh: Option<u64>) -> Result<Attr> {
         if let Some(fh) = fh {
             if let Some(Handle::Write(s)) = self.handles.lock().get(&fh) {
                 let size = s.file.metadata()?.len();
@@ -67,17 +68,17 @@ impl View {
         match source {
             Source::Base(c) => content.get(&self.mount.repo, c).await,
             Source::Local(d) => content.local(*d).await,
-            Source::Marker(b) => Ok(b.clone()),
+            Source::Virtual(b) => Ok(b.clone()),
         }
     }
 
-    pub(super) async fn open(&self, ino: u64, write: bool, truncate: bool) -> Result<Opened> {
+    pub(crate) async fn open(&self, ino: u64, write: bool, truncate: bool) -> Result<Opened> {
         let path = self.path(ino)?;
         let Node::File { kind, source, .. } = self.node(&path).await? else {
             return Err(posix(libc::EISDIR));
         };
         if write {
-            if matches!(source, Source::Marker(_)) {
+            if matches!(source, Source::Virtual(_)) {
                 return Err(posix(libc::EROFS));
             }
             let initial = if truncate {
@@ -92,7 +93,7 @@ impl View {
             });
         }
         let handle = match &source {
-            Source::Marker(b) => Handle::ReadBytes(b.clone()),
+            Source::Virtual(b) => Handle::ReadBytes(b.clone()),
             Source::Base(rill_types::ContentRef::Inline { bytes }) => {
                 Handle::ReadBytes(bytes.clone())
             }
@@ -115,6 +116,68 @@ impl View {
         })
     }
 
+    /// Read a file without an open handle (NFS is stateless), returning
+    /// the bytes and whether they reach the end.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(crate) async fn read_node(
+        &self,
+        ino: u64,
+        offset: u64,
+        size: u32,
+    ) -> Result<(Vec<u8>, bool)> {
+        let path = self.path(ino)?;
+        let Node::File {
+            size: total,
+            source,
+            ..
+        } = self.node(&path).await?
+        else {
+            return Err(posix(libc::EISDIR));
+        };
+        let file = match &source {
+            Source::Virtual(_) | Source::Base(rill_types::ContentRef::Inline { .. }) => None,
+            Source::Base(c) => {
+                self.mount.shared.content.get(&self.mount.repo, c).await?;
+                Some(self.open_cached(&c.content_hash())?)
+            }
+            Source::Local(d) => self.open_cached(d).ok(),
+        };
+        let data = match file {
+            Some(f) => tokio::task::spawn_blocking(move || read_at(&f, offset, size)).await??,
+            None => slice(&self.bytes(&source).await?, offset, size),
+        };
+        let eof = offset + data.len() as u64 >= total;
+        Ok((data, eof))
+    }
+
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    fn open_cached(&self, hash: &rill_types::ObjectHash) -> Result<Arc<std::fs::File>> {
+        if let Some(f) = self.files.get(hash) {
+            return Ok(f);
+        }
+        let f = Arc::new(self.cached(hash)?);
+        self.files.insert(*hash, f.clone());
+        Ok(f)
+    }
+
+    /// The entries of directory `ino` with their attributes, by name.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(crate) async fn entries(&self, ino: u64) -> Result<Vec<(String, Attr)>> {
+        let path = self.path(ino)?;
+        let names = self
+            .list(&path)
+            .await?
+            .ok_or_else(|| posix(libc::ENOTDIR))?;
+        let mut out = Vec::with_capacity(names.len());
+        for name in names.into_keys() {
+            let child = path.join(&name)?;
+            if let Some(node) = self.resolve(&child).await? {
+                out.push((name, self.attr_of(self.ino(&child), &node)));
+            }
+        }
+        Ok(out)
+    }
+
     fn cached(&self, hash: &rill_types::ObjectHash) -> Result<std::fs::File> {
         Ok(std::fs::File::open(
             self.mount.shared.content.cache().path_of(hash),
@@ -134,7 +197,7 @@ impl View {
         Ok(s)
     }
 
-    pub(super) fn read(&self, fh: u64, offset: u64, size: u32) -> Result<Vec<u8>> {
+    pub(crate) fn read(&self, fh: u64, offset: u64, size: u32) -> Result<Vec<u8>> {
         match self.handles.lock().get(&fh) {
             Some(Handle::ReadFile(f)) => read_at(f, offset, size),
             Some(Handle::ReadBytes(b)) => Ok(slice(b, offset, size)),
@@ -143,7 +206,7 @@ impl View {
         }
     }
 
-    pub(super) fn write(&self, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
+    pub(crate) fn write(&self, fh: u64, offset: u64, data: &[u8]) -> Result<u32> {
         match self.handles.lock().get_mut(&fh) {
             Some(Handle::Write(s)) => {
                 s.file.write_all_at(data, offset)?;
@@ -155,7 +218,7 @@ impl View {
     }
 
     /// Turn a dirty scratch file into an overlay entry.
-    pub(super) async fn flush(&self, fh: u64) -> Result<()> {
+    pub(crate) async fn flush(&self, fh: u64) -> Result<()> {
         let pending = match self.handles.lock().get_mut(&fh) {
             Some(Handle::Write(s)) if s.dirty => {
                 s.dirty = false;
@@ -169,18 +232,18 @@ impl View {
         Ok(())
     }
 
-    pub(super) async fn release(&self, fh: u64) -> Result<()> {
+    pub(crate) async fn release(&self, fh: u64) -> Result<()> {
         let flushed = self.flush(fh).await;
         self.handles.lock().remove(&fh);
         flushed
     }
 
-    pub(super) async fn create(
+    pub(crate) async fn create(
         &self,
         parent: u64,
         name: &std::ffi::OsStr,
         mode: u32,
-    ) -> Result<(FileAttr, u64)> {
+    ) -> Result<(Attr, u64)> {
         let path = self.child(parent, name)?;
         let kind = if mode & 0o111 != 0 {
             FileKind::Executable
@@ -194,7 +257,7 @@ impl View {
         Ok((self.attr_of(self.ino(&path), &node), fh))
     }
 
-    pub(super) async fn mkdir(&self, parent: u64, name: &std::ffi::OsStr) -> Result<FileAttr> {
+    pub(crate) async fn mkdir(&self, parent: u64, name: &std::ffi::OsStr) -> Result<Attr> {
         let path = self.child(parent, name)?;
         if self.resolve(&path).await?.is_some() {
             return Err(posix(libc::EEXIST));
@@ -207,19 +270,19 @@ impl View {
         Ok(dir_attr(self.ino(&path), self.owner))
     }
 
-    pub(super) async fn unlink(&self, parent: u64, name: &std::ffi::OsStr) -> Result<()> {
+    pub(crate) async fn unlink(&self, parent: u64, name: &std::ffi::OsStr) -> Result<()> {
         let path = self.child(parent, name)?;
         match self.node(&path).await? {
             Node::Dir => Err(posix(libc::EISDIR)),
             Node::File {
-                source: Source::Marker(_),
+                source: Source::Virtual(_),
                 ..
             } => Err(posix(libc::EROFS)),
             Node::File { .. } => self.record(vec![(path, OverlayOp::Delete)]).await,
         }
     }
 
-    pub(super) async fn rmdir(&self, parent: u64, name: &std::ffi::OsStr) -> Result<()> {
+    pub(crate) async fn rmdir(&self, parent: u64, name: &std::ffi::OsStr) -> Result<()> {
         let path = self.child(parent, name)?;
         match self.list(&path).await? {
             None => Err(posix(libc::ENOTDIR)),
@@ -233,12 +296,12 @@ impl View {
         }
     }
 
-    pub(super) async fn symlink(
+    pub(crate) async fn symlink(
         &self,
         parent: u64,
         name: &std::ffi::OsStr,
         target: &std::path::Path,
-    ) -> Result<FileAttr> {
+    ) -> Result<Attr> {
         let path = self.child(parent, name)?;
         let target = target
             .to_str()
@@ -253,7 +316,7 @@ impl View {
         Ok(self.attr_of(self.ino(&path), &node))
     }
 
-    pub(super) async fn readlink(&self, ino: u64) -> Result<Bytes> {
+    pub(crate) async fn readlink(&self, ino: u64) -> Result<Bytes> {
         let path = self.path(ino)?;
         match self.node(&path).await? {
             Node::File {
@@ -267,7 +330,7 @@ impl View {
 
     /// Move a file, or a directory and everything below it, in one
     /// overlay transaction.
-    pub(super) async fn rename(
+    pub(crate) async fn rename(
         &self,
         parent: u64,
         name: &std::ffi::OsStr,
@@ -280,7 +343,7 @@ impl View {
         let mut ops = Vec::new();
         match node {
             Node::File {
-                source: Source::Marker(_),
+                source: Source::Virtual(_),
                 ..
             } => return Err(posix(libc::EROFS)),
             Node::File { size, kind, source } => {
@@ -349,13 +412,13 @@ impl View {
     }
 
     /// Truncate or change the mode of a file.
-    pub(super) async fn setattr(
+    pub(crate) async fn setattr(
         &self,
         ino: u64,
         fh: Option<u64>,
         size: Option<u64>,
         mode: Option<u32>,
-    ) -> Result<FileAttr> {
+    ) -> Result<Attr> {
         let path = self.path(ino)?;
         if let (Some(size), Some(fh)) = (size, fh) {
             if let Some(Handle::Write(s)) = self.handles.lock().get_mut(&fh) {
@@ -399,7 +462,8 @@ impl View {
         self.getattr(ino, fh).await
     }
 
-    pub(super) async fn opendir(&self, ino: u64) -> Result<u64> {
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    pub(crate) async fn opendir(&self, ino: u64) -> Result<u64> {
         let path = self.path(ino)?;
         let entries = self
             .list(&path)

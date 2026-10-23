@@ -33,8 +33,11 @@ impl Mount {
     /// Wait until every edit made to the working copy so far is in the
     /// overlay. Eager mounts learn of edits from a watcher, which lags.
     pub async fn settle(&self) -> Result<()> {
-        match self.watch.get() {
-            Some(watch) => watch.clone().settle(self).await,
+        if let Some(watch) = self.watch.get() {
+            return watch.clone().settle(self).await;
+        }
+        match self.settler.get() {
+            Some(settle) => settle().await,
             None => Ok(()),
         }
     }

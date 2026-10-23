@@ -32,6 +32,7 @@ accepted one beyond fixing errors. Status is one of `accepted`,
 | [016](016-plain-blake3-for-content.md) | Raw content is plain BLAKE3 | accepted |
 | [017](017-api-in-place-on-connect.md) | The API is redesigned in place as `rill.v1`, on connect-rust | accepted |
 | [018](018-client-daemon.md) | Working copies belong to a per-host daemon | accepted |
+| [019](019-macos-nfs-view.md) | The macOS lazy view is an NFS loopback server | accepted |
 
 ## Template
 

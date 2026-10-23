@@ -20,7 +20,8 @@ pub enum Handle {
     ReadBytes(Bytes),
     /// Writable: a scratch copy of the file.
     Write(Scratch),
-    /// A directory listing taken at open.
+    /// A directory listing taken at open (FUSE).
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Dir(Vec<(u64, bool, String)>),
 }
 

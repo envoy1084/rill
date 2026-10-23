@@ -144,9 +144,9 @@ impl Daemon {
                 spec.path.display()
             )));
         }
-        if spec.mode != MountMode::Eager && !cfg!(target_os = "linux") {
+        if spec.mode != MountMode::Eager && !cfg!(any(target_os = "linux", target_os = "macos")) {
             return Err(Error::Unsupported(
-                "lazy and snapshot mounts need Linux; use an eager checkout".into(),
+                "lazy and snapshot mounts need Linux or macOS; use an eager checkout".into(),
             ));
         }
         let path = prepare_dir(&spec.path).await?;
@@ -221,7 +221,7 @@ impl Daemon {
         } else {
             0
         };
-        self.start(&mount)?;
+        self.start(&mount).await?;
         self.mounts.write().insert(record.id.clone(), mount.clone());
         Ok((mount, files))
     }
@@ -239,6 +239,7 @@ impl Daemon {
                 self.shared.content.cache().unpin(&d);
             }
         }
+        mount.settle().await?;
         let view = mount.view.lock().take();
         let marker = record.path.join(MARKER);
         let eager = record.mode == MountMode::Eager;
@@ -258,14 +259,14 @@ impl Daemon {
         let id = record.id.clone();
         let entries = self.shared.db(move |db| db.overlay(&id)).await?;
         let mount = Arc::new(Mount::new(self.shared.clone(), repo, record, entries));
-        self.start(&mount)?;
+        self.start(&mount).await?;
         if mount.pending_count() > 0 {
             mount.dirty.notify_one();
         }
         Ok(mount)
     }
 
-    fn start(&self, mount: &Arc<Mount>) -> Result<()> {
+    async fn start(&self, mount: &Arc<Mount>) -> Result<()> {
         match mount.mode() {
             MountMode::Eager => {
                 let watch = Watch::start(mount)?;
@@ -275,7 +276,7 @@ impl Daemon {
                 #[cfg(unix)]
                 {
                     let marker = marker_json(&mount.record(), &self.shared.config.dir)?;
-                    let session = crate::fuse::start(mount, bytes::Bytes::from(marker))?;
+                    let session = crate::vfs::start(mount, bytes::Bytes::from(marker)).await?;
                     *mount.view.lock() = Some(session);
                 }
             }
@@ -284,15 +285,26 @@ impl Daemon {
         Ok(())
     }
 
-    /// Stop every mount's background work and unmount every view.
+    /// Stop every mount's background work; [`Daemon::close`] then
+    /// unmounts the views.
     pub fn stop(&self) {
         for mount in self.mounts() {
             mount.cancel.cancel();
-            if let Some(view) = mount.view.lock().take() {
-                std::thread::spawn(move || drop(view));
-            }
         }
         self.shutdown.cancel();
+    }
+
+    /// Commit what the views still hold and unmount them.
+    pub async fn close(&self) {
+        for mount in self.mounts() {
+            if let Err(e) = mount.settle().await {
+                tracing::warn!(mount = %mount.id(), error = %e, "pending writes not committed");
+            }
+            let view = mount.view.lock().take();
+            if let Some(view) = view {
+                let _ = tokio::task::spawn_blocking(move || drop(view)).await;
+            }
+        }
     }
 }
 

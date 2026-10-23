@@ -1,5 +1,6 @@
 //! What a path is in the view: the overlay over the base, plus the
-//! marker file and the directories made locally. Listings and lookups read
+//! files the view synthesizes (the checkout marker) and the directories
+//! made locally. Listings and lookups read
 //! trees only; no file content is fetched.
 
 use std::collections::BTreeMap;
@@ -9,7 +10,6 @@ use rill_types::{ContentRef, EntryKind, FileKind, ObjectHash, RepoPath};
 
 use super::view::View;
 use crate::cache::local_digest;
-use crate::eager::MARKER;
 use crate::error::Result;
 use crate::overlay::OverlayOp;
 
@@ -20,8 +20,8 @@ pub enum Source {
     Base(ContentRef),
     /// The overlay (local digest).
     Local(ObjectHash),
-    /// The marker the view synthesizes.
-    Marker(Bytes),
+    /// A read-only file the view synthesizes.
+    Virtual(Bytes),
 }
 
 impl Source {
@@ -30,7 +30,7 @@ impl Source {
         match self {
             Source::Base(c) => c.content_hash(),
             Source::Local(d) => *d,
-            Source::Marker(b) => local_digest(b),
+            Source::Virtual(b) => local_digest(b),
         }
     }
 }
@@ -54,22 +54,21 @@ impl Node {
     }
 }
 
-fn marker_dir() -> &'static str {
-    MARKER.rsplit_once('/').map_or("", |(d, _)| d)
-}
-
 impl View {
     /// What `path` is, if it exists.
-    pub(super) async fn resolve(&self, path: &RepoPath) -> Result<Option<Node>> {
-        if path.is_root() || path.as_str() == marker_dir() {
+    pub(crate) async fn resolve(&self, path: &RepoPath) -> Result<Option<Node>> {
+        if path.is_root() {
             return Ok(Some(Node::Dir));
         }
-        if path.as_str() == MARKER {
+        if let Some(bytes) = self.virtuals.get(path) {
             return Ok(Some(Node::File {
-                size: self.marker.len() as u64,
+                size: bytes.len() as u64,
                 kind: FileKind::Regular,
-                source: Source::Marker(self.marker.clone()),
+                source: Source::Virtual(bytes.clone()),
             }));
+        }
+        if self.virtuals.keys().any(|v| v.starts_with(path)) {
+            return Ok(Some(Node::Dir));
         }
         match self.mount.entry(path).map(|e| e.op) {
             Some(OverlayOp::Set { digest, kind, size }) => {
@@ -108,7 +107,7 @@ impl View {
 
     /// The entries of directory `dir` (names and whether each is a
     /// directory), or `None` when it is not one.
-    pub(super) async fn list(&self, dir: &RepoPath) -> Result<Option<BTreeMap<String, bool>>> {
+    pub(crate) async fn list(&self, dir: &RepoPath) -> Result<Option<BTreeMap<String, bool>>> {
         if !self.resolve(dir).await?.is_some_and(|n| n.is_dir()) {
             return Ok(None);
         }
@@ -155,11 +154,13 @@ impl View {
                 }
             }
         }
-        if dir.is_root() {
-            names.insert(marker_dir().to_string(), true);
-        } else if dir.as_str() == marker_dir() {
-            if let Some(name) = MARKER.rsplit('/').next() {
-                names.insert(name.to_string(), false);
+        for virtual_path in self.virtuals.keys() {
+            let Some(rest) = virtual_path.strip_prefix(dir) else {
+                continue;
+            };
+            let mut parts = rest.components();
+            if let Some(first) = parts.next() {
+                names.insert(first.to_string(), parts.next().is_some());
             }
         }
         Ok(Some(names))

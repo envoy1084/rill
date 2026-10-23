@@ -14,11 +14,36 @@ use fuser::{
     ReplyEmpty, ReplyEntry, ReplyOpen, ReplyStatfs, ReplyWrite, Request, TimeOrNow, WriteFlags,
 };
 
-use super::view::View;
 use crate::error::Error;
+use crate::vfs::{Attr, AttrKind, Handle, View};
 
 /// How long the kernel may cache entries and attributes.
 const TTL: Duration = Duration::from_secs(1);
+
+fn to_fuse(a: Attr) -> fuser::FileAttr {
+    let kind = match a.kind {
+        AttrKind::Dir => fuser::FileType::Directory,
+        AttrKind::File => fuser::FileType::RegularFile,
+        AttrKind::Symlink => fuser::FileType::Symlink,
+    };
+    fuser::FileAttr {
+        ino: INodeNo(a.ino),
+        size: a.size,
+        blocks: a.size.div_ceil(512),
+        atime: a.mtime,
+        mtime: a.mtime,
+        ctime: a.mtime,
+        crtime: a.mtime,
+        kind,
+        perm: a.perm,
+        nlink: if a.kind == AttrKind::Dir { 2 } else { 1 },
+        uid: a.uid,
+        gid: a.gid,
+        rdev: 0,
+        blksize: 4096,
+        flags: 0,
+    }
+}
 
 /// The view as a FUSE filesystem.
 pub struct Fs(pub Arc<View>);
@@ -65,7 +90,7 @@ impl Filesystem for Fs {
 
     fn lookup(&self, _req: &Request, parent: INodeNo, name: &OsStr, reply: ReplyEntry) {
         answer!(reply, self.block(self.0.lookup(parent.0, name)), |attr| {
-            reply.entry(&TTL, &attr, Generation(0))
+            reply.entry(&TTL, &to_fuse(attr), Generation(0))
         })
     }
 
@@ -73,7 +98,7 @@ impl Filesystem for Fs {
         answer!(
             reply,
             self.block(self.0.getattr(ino.0, fh.map(|f| f.0))),
-            |attr| { reply.attr(&TTL, &attr) }
+            |attr| { reply.attr(&TTL, &to_fuse(attr)) }
         )
     }
 
@@ -96,7 +121,7 @@ impl Filesystem for Fs {
         reply: ReplyAttr,
     ) {
         let result = self.block(self.0.setattr(ino.0, fh.map(|f| f.0), size, mode));
-        answer!(reply, result, |attr| reply.attr(&TTL, &attr))
+        answer!(reply, result, |attr| reply.attr(&TTL, &to_fuse(attr)))
     }
 
     fn readlink(&self, _req: &Request, ino: INodeNo, reply: ReplyData) {
@@ -114,7 +139,7 @@ impl Filesystem for Fs {
         reply: ReplyEntry,
     ) {
         answer!(reply, self.block(self.0.mkdir(parent.0, name)), |attr| {
-            reply.entry(&TTL, &attr, Generation(0))
+            reply.entry(&TTL, &to_fuse(attr), Generation(0))
         })
     }
 
@@ -139,7 +164,7 @@ impl Filesystem for Fs {
         answer!(
             reply,
             self.block(self.0.symlink(parent.0, link_name, target)),
-            |attr| { reply.entry(&TTL, &attr, Generation(0)) }
+            |attr| { reply.entry(&TTL, &to_fuse(attr), Generation(0)) }
         )
     }
 
@@ -273,7 +298,7 @@ impl Filesystem for Fs {
                 let (attr, fh) = created;
                 reply.created(
                     &TTL,
-                    &attr,
+                    &to_fuse(attr),
                     Generation(0),
                     FileHandle(fh),
                     FopenFlags::empty(),
@@ -297,7 +322,7 @@ impl Filesystem for Fs {
         mut reply: ReplyDirectory,
     ) {
         let handles = self.0.handles.lock();
-        let Some(super::handles::Handle::Dir(entries)) = handles.get(&fh.0) else {
+        let Some(Handle::Dir(entries)) = handles.get(&fh.0) else {
             return reply.error(Errno::EBADF);
         };
         let parent = ino.0;

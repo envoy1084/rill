@@ -53,6 +53,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
         .await;
     watchdog.abort();
     daemon.stop();
+    daemon.close().await;
     if identity(&socket) == ours {
         let _ = std::fs::remove_file(&socket);
     }

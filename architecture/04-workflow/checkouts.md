@@ -37,7 +37,7 @@ repository's trunk is the empty tree with no version. Unless
 sparse profile (`--sparse` include prefixes). An eager mount then writes
 every base file inside the profile, 32 fetches in flight, recording each
 file's size, mtime and digest in its stat cache. `--lazy` mounts the
-Linux virtual filesystem instead, which fetches nothing up front, and
+virtual filesystem instead (FUSE on Linux, an NFS loopback on macOS), which fetches nothing up front, and
 `--snapshot` mounts one version read-only for CI (no workspace; writes
 stay local and are discarded by `rill daemon unmount`).
 

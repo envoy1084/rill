@@ -1,7 +1,8 @@
-//! Lazy and snapshot mounts through FUSE (Linux): listings without
-//! fetching, reads through the cache, writes into the overlay.
+//! Lazy and snapshot mounts through the platform's view (FUSE on Linux,
+//! NFS on macOS): listings without fetching, reads through the cache,
+//! writes into the overlay.
 
-#![cfg(target_os = "linux")]
+#![cfg(any(target_os = "linux", target_os = "macos"))]
 
 mod common;
 
@@ -15,12 +16,19 @@ const MODIFIED: pb::ChangeKind = pb::ChangeKind::Modified;
 const DELETED: pb::ChangeKind = pb::ChangeKind::Deleted;
 
 /// FUSE needs `/dev/fuse` and `fusermount3`; skip where they are missing.
+#[cfg(target_os = "linux")]
 fn fuse_available() -> bool {
     std::path::Path::new("/dev/fuse").exists()
         && std::process::Command::new("fusermount3")
             .arg("--version")
             .output()
             .is_ok()
+}
+
+/// macOS mounts the view with its own NFS client.
+#[cfg(target_os = "macos")]
+fn fuse_available() -> bool {
+    std::path::Path::new("/sbin/mount_nfs").exists()
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -47,6 +55,7 @@ async fn listing_does_not_fetch_and_edits_land_in_the_overlay() {
     let mut names: Vec<String> = std::fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .filter(|n| n != ".metadata_never_index")
         .collect();
     names.sort();
     assert_eq!(names, [".rill", "a.txt", "src"]);
@@ -137,4 +146,32 @@ async fn a_snapshot_mount_reads_a_version_and_keeps_writes_to_itself() {
         .await
         .unwrap();
     assert!(!dir.join("build.sh").exists());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_editor_save_by_rename_replaces_the_file() {
+    if !fuse_available() {
+        eprintln!("no view here; skipped");
+        return;
+    }
+    let fx = Fixture::start().await;
+    let v1 = fx.repo_with("ed", &[("main.rs", "fn main() {}\n")]).await;
+    let mount = fx.checkout_as("ed", v1, "ed", pb::MountMode::Lazy).await;
+    let dir = fx.checkout_dir("ed");
+    write(&dir, ".main.rs.swp", "fn main() { run() }\n");
+    std::fs::rename(dir.join(".main.rs.swp"), dir.join("main.rs")).unwrap();
+    assert_eq!(read(&dir, "main.rs"), "fn main() { run() }\n");
+    assert_eq!(fx.status(&mount).await, vec![("main.rs".into(), MODIFIED)]);
+}
+
+#[cfg(target_os = "macos")]
+#[tokio::test(flavor = "multi_thread")]
+async fn finder_bookkeeping_files_never_reach_the_overlay() {
+    let fx = Fixture::start().await;
+    let v1 = fx.repo_with("fd", &[("a.txt", "a\n")]).await;
+    let mount = fx.checkout_as("fd", v1, "fd", pb::MountMode::Lazy).await;
+    let dir = fx.checkout_dir("fd");
+    assert!(std::fs::write(dir.join(".DS_Store"), b"x").is_err());
+    assert!(std::fs::write(dir.join("._a.txt"), b"x").is_err());
+    assert!(fx.status(&mount).await.is_empty());
 }

@@ -55,7 +55,12 @@ pub struct Mount {
     pub(crate) uploaded: moka::sync::Cache<ObjectHash, ContentRef>,
     /// Keeps a lazy mount's view mounted.
     pub(crate) view: Mutex<Option<Box<dyn Send>>>,
+    /// Commits what a view still buffers (macOS writes between flushes).
+    pub(crate) settler: OnceLock<Settler>,
 }
+
+/// Commits a view's buffered writes.
+pub type Settler = Arc<dyn Fn() -> futures::future::BoxFuture<'static, Result<()>> + Send + Sync>;
 
 impl std::fmt::Debug for Mount {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -96,6 +101,7 @@ impl Mount {
             watch: OnceLock::new(),
             uploaded: moka::sync::Cache::new(1 << 16),
             view: Mutex::new(None),
+            settler: OnceLock::new(),
         }
     }
 

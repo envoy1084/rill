@@ -11,7 +11,7 @@ mod status;
 mod update;
 
 pub use commit::{CommitOptions, Committed};
-pub use mount::{Change, Mount};
+pub use mount::{Change, Mount, Settler};
 pub use record::{MountMode, MountRecord};
 pub(crate) use update::resolve_base;
 pub use update::UpdateReport;

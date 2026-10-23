@@ -2,7 +2,7 @@
 //! made or removed locally (directories are not versioned), open handles,
 //! and the runtime the filesystem callbacks run their async work on.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -26,22 +26,31 @@ pub struct LocalDirs {
 
 /// A mounted view.
 pub struct View {
-    pub(super) mount: Arc<Mount>,
-    pub(super) rt: tokio::runtime::Handle,
-    pub(super) inodes: Mutex<Inodes>,
-    pub(super) dirs: Mutex<LocalDirs>,
-    pub(super) handles: Mutex<HashMap<u64, Handle>>,
+    pub(crate) mount: Arc<Mount>,
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    pub(crate) rt: tokio::runtime::Handle,
+    pub(crate) inodes: Mutex<Inodes>,
+    pub(crate) dirs: Mutex<LocalDirs>,
+    pub(crate) handles: Mutex<HashMap<u64, Handle>>,
     next_handle: AtomicU64,
-    pub(super) owner: Owner,
-    /// The marker file the view shows at `.rill/mount.json`.
-    pub(super) marker: Bytes,
-    /// Cleared after the kernel refuses passthrough once.
-    pub(super) passthrough: AtomicBool,
+    pub(crate) owner: Owner,
+    /// Read-only files the view synthesizes (the checkout marker).
+    pub(crate) virtuals: BTreeMap<RepoPathBuf, Bytes>,
+    /// Cleared after the kernel refuses passthrough once (FUSE).
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    pub(crate) passthrough: AtomicBool,
+    /// Cached objects kept open for reads without a handle.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(crate) files: moka::sync::Cache<rill_types::ObjectHash, Arc<std::fs::File>>,
 }
 
 impl View {
-    /// A view of `mount` showing `marker`.
-    pub fn new(mount: Arc<Mount>, rt: tokio::runtime::Handle, marker: Bytes) -> Self {
+    /// A view of `mount` that also shows `virtuals`.
+    pub fn new(
+        mount: Arc<Mount>,
+        rt: tokio::runtime::Handle,
+        virtuals: BTreeMap<RepoPathBuf, Bytes>,
+    ) -> Self {
         View {
             mount,
             rt,
@@ -50,13 +59,14 @@ impl View {
             handles: Mutex::new(HashMap::new()),
             next_handle: AtomicU64::new(1),
             owner: Owner::current(),
-            marker,
+            virtuals,
             passthrough: AtomicBool::new(true),
+            files: moka::sync::Cache::new(1024),
         }
     }
 
     /// The path of `ino`.
-    pub(super) fn path(&self, ino: u64) -> Result<RepoPathBuf> {
+    pub(crate) fn path(&self, ino: u64) -> Result<RepoPathBuf> {
         self.inodes
             .lock()
             .path(ino)
@@ -64,25 +74,25 @@ impl View {
     }
 
     /// The child `name` of directory `parent`.
-    pub(super) fn child(&self, parent: u64, name: &std::ffi::OsStr) -> Result<RepoPathBuf> {
+    pub(crate) fn child(&self, parent: u64, name: &std::ffi::OsStr) -> Result<RepoPathBuf> {
         let name = name
             .to_str()
             .ok_or_else(|| Error::Invalid("a non-UTF-8 name".into()))?;
         Ok(self.path(parent)?.join(name)?)
     }
 
-    pub(super) fn ino(&self, path: &RepoPath) -> u64 {
+    pub(crate) fn ino(&self, path: &RepoPath) -> u64 {
         self.inodes.lock().ino(path)
     }
 
-    pub(super) fn add_handle(&self, handle: Handle) -> u64 {
+    pub(crate) fn add_handle(&self, handle: Handle) -> u64 {
         let fh = self.next_handle.fetch_add(1, Ordering::Relaxed);
         self.handles.lock().insert(fh, handle);
         fh
     }
 
     /// Record `bytes` as the content of `path`, keeping its conflict flag.
-    pub(super) async fn commit(&self, path: &RepoPath, bytes: Bytes, kind: FileKind) -> Result<()> {
+    pub(crate) async fn commit(&self, path: &RepoPath, bytes: Bytes, kind: FileKind) -> Result<()> {
         let size = bytes.len() as u64;
         let digest = self.mount.shared.content.put_local(bytes).await?;
         let conflict = self.mount.entry(path).is_some_and(|e| e.conflict);
@@ -101,7 +111,7 @@ impl View {
     }
 
     /// Record a batch of overlay operations in one transaction.
-    pub(super) async fn record(&self, ops: Vec<(RepoPathBuf, OverlayOp)>) -> Result<()> {
+    pub(crate) async fn record(&self, ops: Vec<(RepoPathBuf, OverlayOp)>) -> Result<()> {
         let overlay = ops
             .into_iter()
             .map(|(p, op)| {

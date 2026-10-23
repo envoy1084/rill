@@ -84,11 +84,22 @@ writing a cookie file and waiting for its event, as Watchman does; if the
 watcher does not answer in five seconds, it rescans. An update holds the
 reconcile lock while it rewrites files.
 
-## Lazy and snapshot mounts (Linux)
+## Lazy and snapshot mounts
 
-A FUSE view (`fuser`, pure-Rust mounting through `fusermount3`, eight
-worker threads) of the overlay over the base. Each kernel call runs its
-async work on the daemon's runtime from the worker that received it.
+The view (`vfs/`) is the overlay over the base, independent of the
+kernel interface: what each path is, directory listings, and the file
+operations as async functions. Two front ends serve it:
+
+* **Linux:** FUSE (`fuser`, pure-Rust mounting through `fusermount3`,
+  eight worker threads); each kernel call runs its async work on the
+  daemon's runtime from the worker that received it.
+* **macOS:** an NFSv3 server on 127.0.0.1, one per mount (`nfsserve`),
+  mounted by macOS's own NFS client (`mount_nfs`, NFSv3 over TCP, no
+  lock daemon, `nobrowse`, `soft` so a dead daemon fails calls after
+  about a minute instead of hanging them). No kernel extension and no
+  privileges are needed: a user mounts onto a directory they own.
+
+How the view behaves on both:
 
 * `lookup`, `getattr` and `readdir` read trees only: no content is
   fetched to list or stat, so `find .` over a huge tree costs tree reads.
@@ -109,8 +120,19 @@ async work on the daemon's runtime from the worker that received it.
   supported. Directories are not versioned: `mkdir` and `rmdir` live in
   the view's memory, and a directory exists while it holds a file.
 * The marker `.rill/mount.json` is a synthesized, read-only file.
-* A mount left by a daemon that died (`ENOTCONN`) is detached before the
-  directory is mounted again.
+* A mount left by a daemon that died (`ENOTCONN` on Linux, an NFS mount
+  at the path on macOS) is detached before the directory is mounted
+  again.
+
+NFS has no open or close, so on macOS a file's writes collect in a
+scratch copy and become an overlay entry once the file has been quiet
+for 500 ms, before any rename or delete, and whenever the mount settles
+(`status`, `commit`, unmount, daemon shutdown). Reads without a write
+pending come straight from the cached object. The view also shows a
+`.metadata_never_index` file so Spotlight skips the mount, and refuses
+`.DS_Store` and `._*` files so Finder's bookkeeping never reaches the
+overlay. File handles do not survive a daemon restart (the mount is
+remounted), so a shell inside the mount must `cd` again.
 
 A snapshot mount (`rill checkout --snapshot`, for CI) is the same view of
 one version with no server workspace: writes stay in its overlay and are
@@ -148,8 +170,8 @@ server keep their code and details; its own map to `NOT_FOUND`,
 
 ## Limitations
 
-* Lazy and snapshot mounts need Linux (macOS and Windows views are
-  phase 21). Chunked blobs and trees are not read through the regional
+* Lazy and snapshot mounts need Linux or macOS (Windows comes after
+  phase 30). Chunked blobs and trees are not read through the regional
   cache yet. Inodes are never forgotten while a view is mounted.
 * One daemon per user; a second writer to the same workspace is not
   detected, it only forces a full push.
@@ -157,7 +179,7 @@ server keep their code and details; its own map to `NOT_FOUND`,
 
 ## Code
 
-* [rill-daemon/src/](../../crates/clients/daemon/src/lib.rs): `cache/`, `overlay/`, `state/`, `view/`, `mount/`, `sync/`, `eager/`, `fuse/`, `server/`, `client/`
+* [rill-daemon/src/](../../crates/clients/daemon/src/lib.rs): `cache/`, `overlay/`, `state/`, `view/`, `mount/`, `sync/`, `eager/`, `vfs/`, `fuse/`, `nfs/`, `server/`, `client/`
 * [rill-sdk/src/cache_tier.rs](../../crates/clients/sdk/src/cache_tier.rs)
 * [rill-cli/src/commands/daemon.rs](../../crates/clients/cli/src/commands/daemon.rs)
 
