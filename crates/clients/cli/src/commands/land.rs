@@ -127,10 +127,21 @@ pub async fn land(ctx: &mut Ctx<'_>, args: LandArgs) -> Result<()> {
             ))
         });
     }
+    let spinner = ctx.spinner("land requested");
     let progress = repo
         .stack()
-        .await_land(&ticket.id, Duration::from_secs(args.timeout))
+        .await_land_with(&ticket.id, Duration::from_secs(args.timeout), |p| {
+            let place = match (p.position, p.eta) {
+                (Some(at), Some(eta)) if !eta.is_zero() => {
+                    format!(" · {at} ahead · about {}s", eta.as_secs().max(1))
+                }
+                (Some(at), _) => format!(" · {at} ahead"),
+                _ => String::new(),
+            };
+            spinner.set(format!("{:?}{place}", p.status()).to_lowercase());
+        })
         .await;
+    spinner.finish();
     match progress {
         Ok(progress) => {
             let sync = if args.no_sync || args.onto.is_some() {

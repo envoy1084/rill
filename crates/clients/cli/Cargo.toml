@@ -48,6 +48,7 @@ clap_complete = { workspace = true }
 comfy-table = { workspace = true }
 owo-colors = { workspace = true }
 shlex = { workspace = true }
+tempfile = { workspace = true }
 terminal_size = { workspace = true }
 textwrap = { workspace = true }
 similar = { workspace = true }

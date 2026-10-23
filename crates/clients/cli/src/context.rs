@@ -71,6 +71,29 @@ impl<'w> Ctx<'w> {
         &self.settings
     }
 
+    /// Whether to show progress and ask questions: stderr is a terminal
+    /// and neither `--json` nor `--quiet` is given.
+    pub fn interactive(&self) -> bool {
+        use std::io::IsTerminal;
+        !self.json() && !self.opts.quiet && std::io::stderr().is_terminal()
+    }
+
+    /// A spinner saying `message` while an operation runs.
+    pub fn spinner(&self, message: impl Into<String>) -> crate::output::progress::Spinner {
+        crate::output::progress::Spinner::start(self.interactive(), message)
+    }
+
+    /// Ask a yes/no question; `default` when not on a terminal.
+    pub fn confirm(&self, question: &str, default: bool) -> Result<bool> {
+        if !self.interactive() || !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+            return Ok(default);
+        }
+        inquire::Confirm::new(question)
+            .with_default(default)
+            .prompt()
+            .map_err(|e| CliError::usage(format!("no answer: {e}")))
+    }
+
     /// The global options.
     pub fn opts(&self) -> &GlobalOpts {
         &self.opts

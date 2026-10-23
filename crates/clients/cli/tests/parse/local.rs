@@ -1,7 +1,6 @@
 //! Repository and checkout-local commands.
 
-use clap::Parser;
-use rill_cli::cli::{Cli, Command};
+use rill_cli::cli::Command;
 use rill_cli::commands::repo;
 
 use super::parse;
@@ -62,7 +61,7 @@ fn checkout_and_local_commands() {
         matches!(parse(&["grep", "-i", "fn", "--glob", "*.rs"]).command, Command::Grep(a) if a.ignore_case)
     );
     assert!(
-        matches!(parse(&["new", "-m", "msg", "--intent", "in_00"]).command, Command::New(a) if a.message == "msg")
+        matches!(parse(&["new", "-m", "msg", "--intent", "in_00"]).command, Command::New(a) if a.message.as_deref() == Some("msg"))
     );
     assert!(matches!(
         parse(&["describe", "-m", "m"]).command,
@@ -79,7 +78,7 @@ fn checkout_and_local_commands() {
     );
     assert!(matches!(parse(&["undo"]).command, Command::Undo));
     assert!(
-        Cli::try_parse_from(["rill", "new"]).is_err(),
-        "new requires -m"
+        matches!(parse(&["new"]).command, Command::New(a) if a.message.is_none()),
+        "new without -m asks the editor"
     );
 }

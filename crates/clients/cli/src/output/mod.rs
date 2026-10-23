@@ -6,10 +6,12 @@
 //! the writer and the colour decision.
 
 pub mod diff;
+pub mod editor;
 pub mod format;
 pub mod graph;
 pub mod pager;
 pub mod patch;
+pub mod progress;
 pub mod stat;
 mod table;
 pub mod theme;

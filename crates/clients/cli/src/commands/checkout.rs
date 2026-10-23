@@ -49,9 +49,9 @@ pub async fn run(ctx: &mut Ctx<'_>, args: CheckoutArgs) -> Result<()> {
         (true, false) => dpb::MountMode::Lazy,
         (false, false) => dpb::MountMode::Eager,
     };
-    let created = ctx
-        .daemon()
-        .await?
+    let daemon = ctx.daemon().await?;
+    let spinner = ctx.spinner(format!("checking out {}", args.repo));
+    let created = daemon
         .create_mount(dpb::CreateMountRequest {
             path: dir.display().to_string(),
             endpoint,
@@ -62,7 +62,9 @@ pub async fn run(ctx: &mut Ctx<'_>, args: CheckoutArgs) -> Result<()> {
             mode: mode.into(),
             no_workspace: args.no_workspace,
         })
-        .await?;
+        .await;
+    spinner.finish();
+    let created = created?;
     let mount = created.mount.into_option().unwrap_or_default();
     let files = created.files;
     ctx.emit(

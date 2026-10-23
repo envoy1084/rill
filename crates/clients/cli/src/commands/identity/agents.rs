@@ -293,6 +293,9 @@ pub async fn kill(ctx: &mut Ctx<'_>, a: KillArgs) -> Result<()> {
             ))
         }
     };
+    if !ctx.confirm("Stop these agents and end their sessions now?", true)? {
+        return Err(CliError::usage("not stopped"));
+    }
     let done = ctx
         .client()?
         .identity(&a.org.org)

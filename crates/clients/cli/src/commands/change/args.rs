@@ -5,9 +5,9 @@ use clap::Args;
 /// `rill new`.
 #[derive(Args, Debug)]
 pub struct NewArgs {
-    /// Change message.
+    /// Change message (default: write it in your editor).
     #[arg(short, long)]
-    pub message: String,
+    pub message: Option<String>,
     /// Intent the change belongs to.
     #[arg(long)]
     pub intent: Option<String>,
@@ -16,9 +16,9 @@ pub struct NewArgs {
 /// `rill describe`.
 #[derive(Args, Debug)]
 pub struct DescribeArgs {
-    /// New change message.
+    /// New change message (default: edit the current one in your editor).
     #[arg(short, long)]
-    pub message: String,
+    pub message: Option<String>,
 }
 
 /// `rill amend`.

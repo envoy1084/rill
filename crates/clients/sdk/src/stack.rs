@@ -192,10 +192,22 @@ impl StackClient {
     /// [`Error::LandFailed`] on a failed or cancelled landing and
     /// [`Error::Timeout`] when `timeout` elapses first.
     pub async fn await_land(&self, ticket: &str, timeout: Duration) -> Result<LandProgress> {
+        self.await_land_with(ticket, timeout, |_| {}).await
+    }
+
+    /// [`StackClient::await_land`], calling `seen` with every status
+    /// polled (to show progress).
+    pub async fn await_land_with(
+        &self,
+        ticket: &str,
+        timeout: Duration,
+        mut seen: impl FnMut(&LandProgress),
+    ) -> Result<LandProgress> {
         let started = Instant::now();
         let mut waits = backon::BackoffBuilder::build(self.backoff);
         loop {
             let progress = self.reviews.land_status(ticket).await?;
+            seen(&progress);
             match progress.status() {
                 LandStatus::Landed => return Ok(progress),
                 status @ (LandStatus::Failed | LandStatus::Cancelled) => {

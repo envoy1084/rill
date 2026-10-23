@@ -58,12 +58,14 @@ pub(crate) async fn update_checkout(
     revision: &str,
 ) -> Result<dpb::UpdateMountResponse> {
     let mount = ctx.mount().await?;
-    Ok(ctx
-        .daemon()
-        .await?
+    let daemon = ctx.daemon().await?;
+    let spinner = ctx.spinner(format!("moving onto {revision}"));
+    let report = daemon
         .update_mount(dpb::UpdateMountRequest {
             name: mount.name,
             revision: revision.to_string(),
         })
-        .await?)
+        .await;
+    spinner.finish();
+    Ok(report?)
 }

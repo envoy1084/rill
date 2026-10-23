@@ -9,6 +9,7 @@ use serde_json::Value;
 use super::args::{AmendArgs, DescribeArgs, NewArgs};
 use super::render::print_version;
 use crate::context::{Ctx, TOOL_NAME};
+use crate::error::CliError;
 use crate::Result;
 
 async fn commit(
@@ -37,9 +38,47 @@ async fn commit(
     Ok((VersionResult { hash, version }, stacked_on))
 }
 
+/// `message`, else one written in the editor on a terminal, starting
+/// from `current` and listing the local changes.
+async fn message_or_edit(
+    ctx: &mut Ctx<'_>,
+    message: Option<String>,
+    current: &str,
+) -> Result<String> {
+    if let Some(m) = message {
+        return Ok(m);
+    }
+    if !ctx.interactive() || !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+        return Err(CliError::usage("no message: pass -m <message>"));
+    }
+    let mount = ctx.mount().await?;
+    let changes = ctx
+        .daemon()
+        .await?
+        .get_status(dpb::GetStatusRequest {
+            name: mount.name,
+            prefixes: vec![],
+        })
+        .await?
+        .changes;
+    let mut template = format!("{current}\n\n# Describe the change. Lines starting with '#' are ignored;\n# an empty message aborts.\n#\n# Changes:\n");
+    for c in rill_daemon::client::local_changes(&changes) {
+        template.push_str(&format!(
+            "#   {:<9} {}\n",
+            format!("{:?}", c.kind).to_lowercase(),
+            c.path
+        ));
+    }
+    crate::output::editor::edit_message(&template)
+}
+
 /// Run `rill new`.
 pub async fn new(ctx: &mut Ctx<'_>, args: NewArgs) -> Result<()> {
-    let (result, stacked_on) = commit(ctx, Some(args.message), args.intent, true).await?;
+    let message = message_or_edit(ctx, args.message, "").await?;
+    let spinner = ctx.spinner("recording the change");
+    let committed = commit(ctx, Some(message), args.intent, true).await;
+    spinner.finish();
+    let (result, stacked_on) = committed?;
     let mut value = json::version_result(&result);
     value["stacked_on"] = stacked_on.clone().map(Value::String).unwrap_or(Value::Null);
     ctx.emit(value, |out| {
@@ -53,7 +92,12 @@ pub async fn new(ctx: &mut Ctx<'_>, args: NewArgs) -> Result<()> {
 
 /// Run `rill describe`.
 pub async fn describe(ctx: &mut Ctx<'_>, args: DescribeArgs) -> Result<()> {
-    let (result, _) = commit(ctx, Some(args.message), None, false).await?;
+    let current = match ctx.working_change().await? {
+        Some(id) => ctx.repo()?.current_version(id).await?.message,
+        None => String::new(),
+    };
+    let message = message_or_edit(ctx, args.message, &current).await?;
+    let (result, _) = commit(ctx, Some(message), None, false).await?;
     ctx.emit(json::version_result(&result), |out| {
         print_version(out, "described", &result)
     })

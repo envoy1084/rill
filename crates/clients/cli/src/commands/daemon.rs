@@ -27,6 +27,9 @@ pub enum DaemonCmd {
     Unmount {
         /// The checkout directory.
         dir: std::path::PathBuf,
+        /// Unmount even with edits not synced to the server (they are lost).
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -69,7 +72,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: DaemonCmd) -> Result<()> {
                 })
             })
         }
-        DaemonCmd::Unmount { dir } => {
+        DaemonCmd::Unmount { dir, force } => {
             let dir = if dir.is_absolute() {
                 dir
             } else {
@@ -85,6 +88,17 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: DaemonCmd) -> Result<()> {
                 .mount
                 .into_option()
                 .unwrap_or_default();
+            if mount.pending > 0 && !force {
+                let question = format!(
+                    "{} has {} edit(s) not synced to the server; unmounting loses them. Unmount anyway?",
+                    mount.path, mount.pending
+                );
+                if !ctx.confirm(&question, false)? {
+                    return Err(crate::error::CliError::usage(
+                        "not unmounted: edits are not synced yet (`rill daemon status`, or --force)",
+                    ));
+                }
+            }
             daemon
                 .delete_mount(dpb::DeleteMountRequest {
                     name: mount.name.clone(),
