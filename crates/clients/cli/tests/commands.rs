@@ -65,7 +65,10 @@ async fn clone_commit_redo_comment_inbox_cancel_and_bug_report() {
     let cancelled = server.json(&co, &["land", "cancel", "-m", "not yet"]).await;
     assert_eq!(cancelled["status"], "cancelled", "{cancelled}");
 
-    let report = server.json(&co, &["bug-report", "-o", "report.md"]).await;
+    let out = co.join("report.md");
+    let report = server
+        .json(&co, &["bug-report", "-o", out.to_str().unwrap()])
+        .await;
     let text = std::fs::read_to_string(report["path"].as_str().unwrap()).unwrap();
     assert!(text.contains("# rill bug report") && text.contains("rill doctor"));
 }
