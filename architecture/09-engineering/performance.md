@@ -188,6 +188,36 @@ conflicting revert is recorded as blocked and the owner's fix closes it,
 and a forward fix within the grace period cancels the revert. A run takes
 about 7 minutes.
 
+### Client daemon
+
+`daemon_gate` (in `rill-load`) is the client daemon's gate. It builds a
+synthetic repository of 10M files on an embedded server (10,000 leaf
+directories of 1,000 files, drawn from 100 distinct leaf trees and copied
+into place a hundred directories per version, so storage stays small the
+way content addressing deduplicates), then measures three things against
+the targets lazy clone to a usable shell < 5 s, status p99 < 200 ms with
+1k local edits, and a CI build at a ≥ 99% regional hit rate:
+
+* a lazy mount (Linux) and a shell's first steps: list the root and `d/`,
+  stat and read one file;
+* `GetStatus` 200 times after 1,000 edits made through the filesystem,
+  once the first status (which, on an eager mount, waits for the watcher
+  to reconcile them) has answered;
+* a host reading every file of one directory through a regional
+  `rill-cache` another host warmed, from a cold local cache.
+
+```
+cargo run --release -p rill-load --bin daemon_gate [-- --dirs 10000 --files-per-dir 1000]
+```
+
+On an OrbStack Linux machine (arm64): the 10M-file repository builds in
+4.5 s; the lazy mount takes 18 ms and the shell is usable at 26 ms; status
+p99 is 0.66 ms (p50 0.60) with 1,000 edits; the cold CI host reads 1,000
+files in 0.6 s with 1,000 regional hits and no misses. On macOS (eager
+sparse checkout of one directory, no FUSE): status p99 is 14 ms (each call
+settles the watcher with a cookie), the first status after 1,000 fresh
+edits 0.85 s, and the cold CI host again 100% regional hits.
+
 ## Limitations
 
 - No benchmark covers search indexing, blame or path history yet.
@@ -201,7 +231,7 @@ about 7 minutes.
 ## Code
 
 - [rill-bench/src/lib.rs](../../tools/bench/src/lib.rs), [rill-bench/benches/core.rs](../../tools/bench/benches/core.rs), [rill-bench/benches/meta.rs](../../tools/bench/benches/meta.rs)
-- [rill-load/src/bin/exec_load.rs](../../tools/load/src/bin/exec_load.rs), [trunk_red.rs](../../tools/load/src/bin/trunk_red.rs), [healing/](../../tools/load/src/healing/mod.rs)
+- [rill-load/src/bin/exec_load.rs](../../tools/load/src/bin/exec_load.rs), [trunk_red.rs](../../tools/load/src/bin/trunk_red.rs), [healing/](../../tools/load/src/healing/mod.rs), [daemon_gate.rs](../../tools/load/src/bin/daemon_gate.rs)
 - [rill-load/src/run.rs](../../tools/load/src/run.rs), [workload.rs](../../tools/load/src/workload.rs), [profile.rs](../../tools/load/src/profile.rs), [stats.rs](../../tools/load/src/stats.rs)
 
 ---
