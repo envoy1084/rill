@@ -140,7 +140,8 @@ Tiered, so a phase spends its time on work rather than rebuilds:
 
 `.github/workflows/ci.yml` has two jobs. `check` runs `cargo fmt --check`,
 `cargo deny check` (licences, advisories, sources per `deny.toml`),
-`cargo clippy -D warnings`, `cargo test --workspace`, then regenerates
+`cargo clippy -D warnings`, `cargo test --workspace` (with `fuse3`
+installed, so FUSE tests mount), then regenerates
 everything derived from the protos (`sdks/generate.sh`: `buf lint`, the
 API reference, the Go, TypeScript and Python SDKs' code), failing on any
 diff, and runs the SDK conformance suites against `rill dev`
@@ -149,6 +150,11 @@ installs a pinned FoundationDB (version and package checksums in the job's
 env) and runs the store conformance suite and the end-to-end server test
 with the `fdb` feature. Keep it that small; anything else is run locally or
 added only when it catches real problems.
+
+The daemon's FUSE tests (`rill-daemon/tests/lazy.rs`) mount only on
+Linux; locally run them in the OrbStack machine `rill-fuse` with a
+separate target directory:
+`orb -m rill-fuse bash -lc 'cd <repo> && CARGO_TARGET_DIR=$HOME/target cargo test -p rill-daemon'`.
 
 Locally, with FoundationDB running:
 `cargo test -p rill-store --features fdb,s3` and

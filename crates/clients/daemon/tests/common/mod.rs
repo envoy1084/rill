@@ -44,8 +44,6 @@ impl Fixture {
         if let Some(old) = self.daemon.take() {
             old.stop();
         }
-        // The old daemon's tasks hold the state database until they end.
-        tokio::time::sleep(Duration::from_millis(300)).await;
         let (daemon, rpc) = start_daemon(self.dir.path()).await;
         self.daemon = Some(daemon);
         self.rpc = rpc;

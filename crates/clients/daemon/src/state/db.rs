@@ -71,9 +71,21 @@ fn bounds(mount: &str) -> (Vec<u8>, Vec<u8>) {
 }
 
 impl StateDb {
-    /// Open (or create) the database at `path`.
+    /// Open (or create) the database at `path`, waiting up to ten seconds
+    /// for a daemon that is shutting down to let go of it.
     pub fn open(path: &Path) -> Result<Self> {
-        let db = Database::create(path).map_err(Error::state)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let db = loop {
+            match Database::create(path) {
+                Ok(db) => break db,
+                Err(redb::DatabaseError::DatabaseAlreadyOpen)
+                    if std::time::Instant::now() < deadline =>
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                Err(e) => return Err(Error::state(e)),
+            }
+        };
         let tx = db.begin_write().map_err(Error::state)?;
         tx.open_table(MOUNTS).map_err(Error::state)?;
         tx.open_table(OVERLAY).map_err(Error::state)?;

@@ -59,8 +59,9 @@ fn leaf(k: usize) -> String {
     format!("t/{k:03}")
 }
 
+/// Leaf directory `i`, grouped a hundred to a directory.
 fn dir(i: usize) -> String {
-    format!("d/{i:05}")
+    format!("d/{:03}/{:02}", i / 100, i % 100)
 }
 
 fn file(n: usize) -> String {
@@ -151,7 +152,7 @@ async fn build_repo(client: &Client, args: &Args) -> anyhow::Result<ChangeVersio
                 kind: FileKind::Regular,
             });
         }
-        if edits.len() >= 20_000 || k + 1 == args.variants {
+        if edits.len() >= 5_000 || k + 1 == args.variants {
             let made = repo
                 .apply_edits(
                     EditBase::Root(base.clone()),
@@ -164,31 +165,45 @@ async fn build_repo(client: &Client, args: &Args) -> anyhow::Result<ChangeVersio
         }
     }
     let leaves = last.context("no leaf variants")?;
-    let mut subtrees = BTreeMap::new();
-    for i in 0..args.dirs {
-        subtrees.insert(
-            path(&dir(i)),
-            SubtreeChange::Copy {
-                from_path: path(&leaf(i % args.variants)),
-                from_version: leaves,
-            },
-        );
+    // A version may copy at most 100k files: one version per group of
+    // leaf directories, the last also dropping `t/`.
+    let per_version = (rill_types::limits::MAX_FILES_PER_CHANGE / args.files_per_dir).clamp(1, 100);
+    let mut parent = leaves;
+    let groups: Vec<Vec<usize>> = (0..args.dirs)
+        .collect::<Vec<_>>()
+        .chunks(per_version)
+        .map(<[usize]>::to_vec)
+        .collect();
+    for (g, group) in groups.iter().enumerate() {
+        let mut subtrees = BTreeMap::new();
+        for &i in group {
+            subtrees.insert(
+                path(&dir(i)),
+                SubtreeChange::Copy {
+                    from_path: path(&leaf(i % args.variants)),
+                    from_version: leaves,
+                },
+            );
+        }
+        if g + 1 == groups.len() {
+            subtrees.insert(path("t"), SubtreeChange::Delete);
+        }
+        let version = ChangeVersion {
+            change_id: ChangeId::new(),
+            parents: vec![parent],
+            predecessor: None,
+            subtree_changes: subtrees,
+            file_changes: BTreeMap::new(),
+            author: Principal::human("dev"),
+            provenance: Provenance::default(),
+            intent: None,
+            message: format!("synthetic group {g}"),
+            created_at: Timestamp::now(),
+            extra: BTreeMap::new(),
+        };
+        parent = repo.create_change_version(&version, vec![]).await?;
     }
-    subtrees.insert(path("t"), SubtreeChange::Delete);
-    let version = ChangeVersion {
-        change_id: ChangeId::new(),
-        parents: vec![leaves],
-        predecessor: None,
-        subtree_changes: subtrees,
-        file_changes: BTreeMap::new(),
-        author: Principal::human("dev"),
-        provenance: Provenance::default(),
-        intent: None,
-        message: "synthetic".into(),
-        created_at: Timestamp::now(),
-        extra: BTreeMap::new(),
-    };
-    Ok(repo.create_change_version(&version, vec![]).await?)
+    Ok(parent)
 }
 
 struct Host {
@@ -263,6 +278,7 @@ async fn clone_and_status(
         let mounted = started.elapsed();
         let top: Vec<_> = std::fs::read_dir(&work)?.collect();
         let dirs = std::fs::read_dir(work.join("d"))?.count();
+        let groups = args.dirs.div_ceil(100);
         let probe = work
             .join(dir(args.dirs / 2))
             .join(file(args.files_per_dir / 2));
@@ -270,8 +286,9 @@ async fn clone_and_status(
         let read = std::fs::read(&probe)?.len() as u64;
         let usable = started.elapsed();
         anyhow::ensure!(
-            size == read && !top.is_empty() && dirs == args.dirs,
-            "the view is wrong"
+            size == read && !top.is_empty() && dirs == groups,
+            "the view is wrong: stat {size} read {read}, {} top entries, {dirs} of {groups} groups",
+            top.len()
         );
         (
             name,
@@ -279,7 +296,7 @@ async fn clone_and_status(
                 "mode": "lazy",
                 "mount_secs": mounted.as_secs_f64(),
                 "usable_secs": usable.as_secs_f64(),
-                "listed_dirs": dirs,
+                "listed_groups": dirs,
             }),
         )
     } else {
