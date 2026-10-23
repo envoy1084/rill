@@ -71,9 +71,18 @@ pub struct GlobalOpts {
     #[arg(short, long, global = true)]
     pub quiet: bool,
 
-    /// Never use colour.
+    /// Never use colour (same as `--color never`).
     #[arg(long, global = true)]
     pub no_color: bool,
+
+    /// When to colour: `auto` (a terminal), `always` or `never`
+    /// [default: `[color] ui`, else auto].
+    #[arg(long, global = true, value_name = "WHEN", value_parser = ["auto", "always", "never"])]
+    pub color: Option<String>,
+
+    /// Print long output directly instead of through the pager.
+    #[arg(long, global = true)]
+    pub no_pager: bool,
 }
 
 /// Top-level commands.

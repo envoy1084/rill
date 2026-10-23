@@ -17,6 +17,7 @@ pub struct Server {
 
 impl Server {
     pub async fn start() -> Self {
+        super::isolate_settings();
         let any: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let listeners = Listeners::bind(any, any).await.unwrap();
         let (grpc, _http) = listeners.addrs().unwrap();

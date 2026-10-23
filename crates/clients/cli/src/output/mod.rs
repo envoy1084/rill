@@ -6,9 +6,12 @@
 //! the writer and the colour decision.
 
 mod format;
+pub mod pager;
 mod table;
+pub mod theme;
 mod writer;
 
 pub use format::{short, when, yes_no};
 pub use table::Table;
+pub use theme::{Role, Theme};
 pub use writer::Out;

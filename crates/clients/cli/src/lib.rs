@@ -11,6 +11,7 @@
 
 #![warn(missing_docs)]
 
+mod aliases;
 pub mod cli;
 pub mod commands;
 pub mod context;
@@ -19,12 +20,16 @@ pub mod error;
 pub mod exit;
 pub mod output;
 pub mod server;
+pub mod settings;
 
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use clap::{CommandFactory, FromArgMatches};
+
+use crate::settings::Settings;
 
 pub use cli::{Cli, Command, GlobalOpts};
 pub use error::CliError;
@@ -40,11 +45,39 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
+    let settings = Arc::new(Settings::load());
+    let args: Vec<OsString> = args.into_iter().map(Into::into).collect();
+    match prepare(args, &settings, out) {
+        Ok(invocation) => run(invocation, out, stdout_is_terminal(), settings).await,
+        Err(code) => code,
+    }
+}
+
+/// A parsed command line, ready to run.
+struct Invocation {
+    cli: Cli,
+    schema: String,
+}
+
+/// Expand aliases and parse; help and version are printed here and
+/// return their exit code, as do usage errors.
+fn prepare(
+    args: Vec<OsString>,
+    settings: &Settings,
+    out: &mut dyn Write,
+) -> std::result::Result<Invocation, i32> {
+    let builtins: Vec<String> = Cli::command()
+        .get_subcommands()
+        .flat_map(|c| {
+            std::iter::once(c.get_name().to_string()).chain(c.get_all_aliases().map(String::from))
+        })
+        .collect();
+    let args = aliases::expand(args, &settings.alias, &builtins);
     let parsed = Cli::command()
         .try_get_matches_from(args)
         .and_then(|m| Cli::from_arg_matches(&m).map(|cli| (cli, schema_of(&m))));
-    let (cli, schema) = match parsed {
-        Ok(parsed) => parsed,
+    match parsed {
+        Ok((cli, schema)) => Ok(Invocation { cli, schema }),
         Err(e) => {
             // Help and version are "errors" to clap but successes to us.
             let code = if e.use_stderr() {
@@ -52,32 +85,92 @@ where
             } else {
                 exit::OK
             };
-            let text = e.render().to_string();
             if code == exit::OK {
+                let text = if stdout_is_terminal() {
+                    e.render().ansi().to_string()
+                } else {
+                    e.render().to_string()
+                };
                 let _ = out.write_all(text.as_bytes());
                 let _ = out.flush();
             } else {
-                eprint!("{text}");
+                eprint!("{}", e.render().ansi());
             }
-            return code;
+            Err(code)
         }
-    };
+    }
+}
+
+async fn run(
+    invocation: Invocation,
+    out: &mut dyn Write,
+    terminal: bool,
+    settings: Arc<Settings>,
+) -> i32 {
+    let Invocation { cli, schema } = invocation;
     let global = cli.global.clone();
-    let color = !global.no_color && !global.json && color_enabled();
+    let json = global.json || global.json_schema.is_some();
+    let color = !json && color_on(&global, &settings, terminal);
     let cwd = match &global.cwd {
         Some(dir) => dir.clone(),
         None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
     };
-    let json = global.json || global.json_schema.is_some();
-    let color = color && !json;
-    let mut ctx = context::Ctx::new(global, out, color, cwd, schema);
+    let mut ctx = context::Ctx::new(global, out, color, cwd, schema, settings);
     match commands::run(&mut ctx, cli.command).await {
         Ok(()) => exit::OK,
+        // The reader (a pager the user quit, `head`) went away.
+        Err(CliError::Io(e)) if e.kind() == std::io::ErrorKind::BrokenPipe => exit::OK,
         Err(e) => {
             report_error(&e, json);
             exit::code_for(&e)
         }
     }
+}
+
+/// Whether to colour: `--no-color`/`--color`, then `NO_COLOR` and
+/// `CLICOLOR_FORCE`, then `[color] ui`, then whether the output is a
+/// terminal.
+fn color_on(global: &cli::GlobalOpts, settings: &Settings, terminal: bool) -> bool {
+    if global.no_color {
+        return false;
+    }
+    let when = global
+        .color
+        .clone()
+        .or_else(|| {
+            if std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()) {
+                Some("never".into())
+            } else if std::env::var("CLICOLOR_FORCE").is_ok_and(|v| v != "0") {
+                Some("always".into())
+            } else {
+                None
+            }
+        })
+        .or_else(|| settings.color.ui.clone())
+        .unwrap_or_else(|| "auto".into());
+    match when.as_str() {
+        "always" => true,
+        "never" => false,
+        _ => terminal,
+    }
+}
+
+fn stdout_is_terminal() -> bool {
+    use std::io::IsTerminal;
+    std::io::stdout().is_terminal()
+}
+
+/// Commands whose output can run long and goes through the pager.
+fn pages(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Log(_)
+            | Command::Diff(_)
+            | Command::Show(_)
+            | Command::Blame(_)
+            | Command::Cat(_)
+            | Command::Grep(_)
+    )
 }
 
 /// The JSON schema a command's output follows: `rill.cli.v1.` and the
@@ -111,12 +204,6 @@ fn report_error(e: &CliError, json: bool) {
             eprintln!("  {line}");
         }
     }
-}
-
-/// True when stdout is a terminal and `NO_COLOR` is unset.
-fn color_enabled() -> bool {
-    use std::io::IsTerminal;
-    std::env::var_os("NO_COLOR").is_none() && std::io::stdout().is_terminal()
 }
 
 /// Logging to stderr controlled by `-v`/`-q` and `RUST_LOG`.
@@ -171,9 +258,40 @@ pub fn run_cli() -> std::process::ExitCode {
             return std::process::ExitCode::from(exit::ERROR as u8);
         }
     };
+    let settings = Arc::new(Settings::load());
     let stdout = std::io::stdout();
     let mut lock = std::io::BufWriter::new(stdout.lock());
-    let code = runtime.block_on(run_cli_with_args(args, &mut lock));
+    let invocation = match prepare(args, &settings, &mut lock) {
+        Ok(i) => i,
+        Err(code) => return std::process::ExitCode::from(code as u8),
+    };
+    let terminal = stdout_is_terminal();
+    let global = &invocation.cli.global;
+    let paged = terminal
+        && !global.no_pager
+        && !global.json
+        && global.json_schema.is_none()
+        && pages(&invocation.cli.command);
+    let pager = paged
+        .then(|| output::pager::command(&settings))
+        .flatten()
+        .and_then(|cmd| output::pager::Pager::start(&cmd));
+    let code = match pager {
+        Some(mut pager) => {
+            let code = match pager.writer() {
+                Some(w) => {
+                    let mut buffered = std::io::BufWriter::new(w);
+                    let code = runtime.block_on(run(invocation, &mut buffered, true, settings));
+                    let _ = buffered.flush();
+                    code
+                }
+                None => runtime.block_on(run(invocation, &mut lock, terminal, settings)),
+            };
+            pager.finish();
+            code
+        }
+        None => runtime.block_on(run(invocation, &mut lock, terminal, settings)),
+    };
     let _ = lock.flush();
     std::process::ExitCode::from(code as u8)
 }

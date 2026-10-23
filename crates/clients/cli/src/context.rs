@@ -8,6 +8,7 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use rill_daemon::proto as dpb;
 use rill_daemon::{DaemonClient, DaemonDir, Marker};
@@ -17,7 +18,8 @@ use serde_json::Value;
 
 use crate::cli::GlobalOpts;
 use crate::error::CliError;
-use crate::output::Out;
+use crate::output::{Out, Theme};
+use crate::settings::Settings;
 use crate::Result;
 
 /// Tool name recorded in the provenance of every change the CLI makes.
@@ -30,6 +32,7 @@ pub const REPO_ENV: &str = "RILL_REPO";
 pub struct Ctx<'w> {
     opts: GlobalOpts,
     out: Out<'w>,
+    settings: Arc<Settings>,
     cwd: PathBuf,
     checkout: Option<Option<(PathBuf, Marker)>>,
     daemon: Option<DaemonClient>,
@@ -46,16 +49,24 @@ impl<'w> Ctx<'w> {
         color: bool,
         cwd: PathBuf,
         schema: String,
+        settings: Arc<Settings>,
     ) -> Self {
+        let theme = Arc::new(Theme::with_overrides(&settings.color.roles));
         Ctx {
             opts,
-            out: Out::new(writer, color),
+            out: Out::new(writer, color).with_theme(theme),
+            settings,
             cwd,
             checkout: None,
             daemon: None,
             client: None,
             schema,
         }
+    }
+
+    /// The CLI's settings.
+    pub fn settings(&self) -> &Settings {
+        &self.settings
     }
 
     /// The global options.

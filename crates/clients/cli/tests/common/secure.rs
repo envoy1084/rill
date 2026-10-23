@@ -21,11 +21,13 @@ pub struct SecureServer {
 
 impl SecureServer {
     pub async fn start() -> Self {
+        super::isolate_settings();
         Self::start_with_admins(&[]).await
     }
 
     /// A server whose instance administrators are `admins`.
     pub async fn start_with_admins(admins: &[&str]) -> Self {
+        super::isolate_settings();
         let dir = tempfile::tempdir().unwrap();
         let config = ServerConfig {
             storage: StorageConfig::Local {

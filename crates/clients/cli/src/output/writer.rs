@@ -2,20 +2,51 @@
 
 use std::io::Write;
 
+use std::sync::Arc;
+
 use owo_colors::{OwoColorize, Style};
 
 use super::table::Table;
+use super::theme::{Role, Theme};
+
+/// Columns assumed when the terminal's width is unknown.
+const DEFAULT_WIDTH: usize = 100;
 
 /// The writer commands print to, with colour support.
 pub struct Out<'w> {
     writer: &'w mut dyn Write,
     color: bool,
+    theme: Arc<Theme>,
 }
 
 impl<'w> Out<'w> {
-    /// Wrap a writer; `color` enables ANSI styling.
+    /// Wrap a writer; `color` enables ANSI styling with the default theme.
     pub fn new(writer: &'w mut dyn Write, color: bool) -> Self {
-        Out { writer, color }
+        Out {
+            writer,
+            color,
+            theme: Arc::new(Theme::default()),
+        }
+    }
+
+    /// Use `theme` for every role.
+    pub fn with_theme(mut self, theme: Arc<Theme>) -> Self {
+        self.theme = theme;
+        self
+    }
+
+    /// Text in `role`'s style (plain without colour).
+    pub fn paint(&self, role: Role, text: &str) -> String {
+        self.styled(text, self.theme.of(role))
+    }
+
+    /// The terminal's width: `$COLUMNS`, else the terminal's, else 100.
+    pub fn width(&self) -> usize {
+        std::env::var("COLUMNS")
+            .ok()
+            .and_then(|c| c.parse().ok())
+            .or_else(|| terminal_size::terminal_size().map(|(w, _)| w.0 as usize))
+            .unwrap_or(DEFAULT_WIDTH)
     }
 
     /// True when ANSI colour is on.
@@ -75,32 +106,39 @@ impl<'w> Out<'w> {
 
     /// Bold text.
     pub fn bold(&self, text: &str) -> String {
-        self.styled(text, Style::new().bold())
+        self.paint(Role::Bold, text)
     }
 
     /// Dimmed text.
     pub fn dim(&self, text: &str) -> String {
-        self.styled(text, Style::new().dimmed())
+        self.paint(Role::Dim, text)
     }
 
-    /// Green text.
+    /// Something that went well.
     pub fn good(&self, text: &str) -> String {
-        self.styled(text, Style::new().green())
+        self.paint(Role::Good, text)
     }
 
-    /// Red text.
+    /// Something that failed.
     pub fn bad(&self, text: &str) -> String {
-        self.styled(text, Style::new().red())
+        self.paint(Role::Error, text)
     }
 
-    /// Yellow text.
+    /// Something to watch.
     pub fn warn(&self, text: &str) -> String {
-        self.styled(text, Style::new().yellow())
+        self.paint(Role::Warning, text)
     }
 
-    /// Cyan text, used for hashes and ids.
+    /// A hash or id.
     pub fn id(&self, text: &str) -> String {
-        self.styled(text, Style::new().cyan())
+        self.paint(Role::Id, text)
+    }
+
+    /// A `hint:` line after an error or a state, like git's.
+    pub fn hint(&mut self, text: &str) -> std::io::Result<()> {
+        let line = format!("hint: {text}");
+        let painted = self.paint(Role::Hint, &line);
+        self.line(painted)
     }
 }
 
