@@ -88,12 +88,12 @@ fn parse_ws(text: &str) -> Result<WorkspaceId> {
 }
 
 /// Resolve a workspace argument, defaulting to the checkout's.
-fn ws_or_checkout(ctx: &mut Ctx<'_>, arg: Option<&str>) -> Result<WorkspaceId> {
+async fn ws_or_checkout(ctx: &mut Ctx<'_>, arg: Option<&str>) -> Result<WorkspaceId> {
     match arg {
         Some(w) => parse_ws(w),
         None => ctx
-            .checkout_meta()
-            .and_then(|m| m.workspace)
+            .checkout_workspace()
+            .await?
             .ok_or_else(|| CliError::usage("no workspace in this checkout; pass a workspace id")),
     }
 }
@@ -200,7 +200,7 @@ async fn list(ctx: &mut Ctx<'_>, args: ListArgs) -> Result<()> {
 }
 
 async fn show(ctx: &mut Ctx<'_>, args: WsArg) -> Result<()> {
-    let id = ws_or_checkout(ctx, args.workspace.as_deref())?;
+    let id = ws_or_checkout(ctx, args.workspace.as_deref()).await?;
     let ws = ctx.repo()?.workspaces().get(id).await?;
     ctx.emit(json::workspace(&ws), |out| print_ws(out, &ws))
 }
@@ -222,7 +222,7 @@ pub async fn op(ctx: &mut Ctx<'_>, cmd: OpCmd) -> Result<()> {
 }
 
 async fn ops(ctx: &mut Ctx<'_>, args: OpsArgs) -> Result<()> {
-    let id = ws_or_checkout(ctx, args.workspace.as_deref())?;
+    let id = ws_or_checkout(ctx, args.workspace.as_deref()).await?;
     let ops = ctx
         .repo()?
         .workspaces()
@@ -255,7 +255,7 @@ async fn ops(ctx: &mut Ctx<'_>, args: OpsArgs) -> Result<()> {
 }
 
 async fn delete(ctx: &mut Ctx<'_>, args: WsArg) -> Result<()> {
-    let id = ws_or_checkout(ctx, args.workspace.as_deref())?;
+    let id = ws_or_checkout(ctx, args.workspace.as_deref()).await?;
     ctx.repo()?.workspaces().delete(id).await?;
     ctx.emit(j!({ "deleted": id.to_string() }), |out| {
         out.line(format!("deleted workspace {}", out.id(&id.to_string())))

@@ -69,7 +69,6 @@ pub fn sdk_code(e: &rill_sdk::Error) -> String {
         Error::Io(_) => "io".into(),
         Error::Timeout(_) => "timeout".into(),
         Error::Conflict { .. } => "conflict".into(),
-        Error::Checkout(_) => "checkout".into(),
         Error::LandFailed { .. } => "land_failed".into(),
     }
 }

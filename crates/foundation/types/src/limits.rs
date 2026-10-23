@@ -23,7 +23,7 @@ pub const MAX_EXTRA_VALUE_BYTES: usize = 4096;
 
 /// Files a checkout keeps its own state in. Committing them would let a
 /// repository rewrite another user's endpoint and credentials.
-pub const RESERVED_PATHS: &[&str] = &[".rill/checkout.toml", ".rill/manifest.toml"];
+pub const RESERVED_PATHS: &[&str] = &[".rill/mount.json"];
 
 /// Names Windows cannot create, with or without an extension.
 const WINDOWS_RESERVED: &[&str] = &[
@@ -205,8 +205,8 @@ mod tests {
         assert!(check_symlink_target(&link("a/l"), b"../top").is_ok());
         assert!(check_symlink_target(&link("a/l"), b"../../etc/passwd").is_err());
         assert!(check_symlink_target(&link("l"), b"/etc/passwd").is_err());
-        assert!(check_symlink_target(&link("l"), b".rill/checkout.toml").is_err());
-        assert!(check_symlink_target(&link("x/l"), b"../.rill/manifest.toml").is_err());
+        assert!(check_symlink_target(&link("l"), b".rill/mount.json").is_err());
+        assert!(check_symlink_target(&link("x/l"), b"../.rill/mount.json").is_err());
     }
 
     #[test]

@@ -1,9 +1,9 @@
 //! `rill undo`: reverting the server workspace's last operation.
 
 use rill_mcp::json;
-use rill_sdk::Root;
 
-use super::render::{join_paths, print_report};
+use super::render::{join_paths, print_report, update_json};
+use super::sync::update_checkout;
 use crate::context::Ctx;
 use crate::error::CliError;
 use crate::output::short;
@@ -11,17 +11,16 @@ use crate::Result;
 
 /// Run `rill undo`.
 pub async fn undo(ctx: &mut Ctx<'_>) -> Result<()> {
-    let mut checkout = ctx.checkout().await?;
-    let ws = checkout.meta().workspace.ok_or_else(|| {
+    let ws = ctx.checkout_workspace().await?.ok_or_else(|| {
         CliError::usage(
             "this checkout has no server workspace to undo (created with --no-workspace)",
         )
     })?;
-    let op = checkout.repo().workspaces().undo(ws, None).await?;
+    let op = ctx.repo()?.workspaces().undo(ws, None).await?;
     let base = op.workspace.base;
-    let report = checkout.update(Root::Version(base)).await?;
+    let report = update_checkout(ctx, &base.to_hex()).await?;
     let mut value = json::workspace_op(&op);
-    value["update"] = json::update_report(&report);
+    value["update"] = update_json(&report);
     ctx.emit(value, |out| {
         out.line(format!(
             "undid operation {}; base is now {}",

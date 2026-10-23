@@ -1,9 +1,12 @@
 //! `rill status` and `rill diff`.
 
 use clap::Args;
+use rill_daemon::proto as dpb;
+use rill_daemon::{ChangeKind as LocalChangeKind, LocalChange};
 use rill_mcp::json;
-use rill_sdk::{Checkout, DiffFormat, DiffOptions, LocalChange, LocalChangeKind, Root};
-use rill_types::{RepoPath, RepoPathBuf};
+use rill_sdk::{DiffFormat, DiffOptions, RepoClient, Root};
+use rill_types::RepoPathBuf;
+use rill_types::Tree;
 use serde_json::{json as j, Value};
 
 use crate::commands::root_arg;
@@ -42,10 +45,6 @@ fn parse_paths(paths: &[String]) -> Result<Vec<RepoPathBuf>> {
         .collect()
 }
 
-fn under(path: &RepoPath, prefixes: &[RepoPathBuf]) -> bool {
-    prefixes.is_empty() || prefixes.iter().any(|p| path.starts_with(p))
-}
-
 fn kind_letter(kind: LocalChangeKind) -> &'static str {
     match kind {
         LocalChangeKind::Added => "A",
@@ -57,15 +56,18 @@ fn kind_letter(kind: LocalChangeKind) -> &'static str {
 
 /// Run `rill status`.
 pub async fn status(ctx: &mut Ctx<'_>, args: StatusArgs) -> Result<()> {
-    let prefixes = parse_paths(&args.paths)?;
-    let checkout = ctx.checkout().await?;
-    let changes: Vec<LocalChange> = checkout
-        .status()
+    parse_paths(&args.paths)?;
+    let mount = ctx.mount().await?;
+    let reply = ctx
+        .daemon()
         .await?
-        .into_iter()
-        .filter(|c| under(&c.path, &prefixes))
-        .collect();
-    let meta = checkout.meta().clone();
+        .get_status(dpb::GetStatusRequest {
+            name: mount.name.clone(),
+            prefixes: args.paths.clone(),
+        })
+        .await?;
+    let changes: Vec<LocalChange> = rill_daemon::client::local_changes(&reply.changes);
+    let meta = reply.mount.into_option().unwrap_or(mount);
     let conflicts = changes
         .iter()
         .filter(|c| c.kind == LocalChangeKind::Conflict)
@@ -73,11 +75,12 @@ pub async fn status(ctx: &mut Ctx<'_>, args: StatusArgs) -> Result<()> {
     ctx.emit(
         j!({
             "repo": meta.repo,
-            "base": meta.base.to_string(),
-            "base_version": meta.base_version.map(|h| h.to_hex()),
-            "working_change": meta.working_change.map(|c| c.to_string()),
-            "workspace": meta.workspace.map(|w| w.to_string()),
-            "changes": changes.iter().map(json::local_change).collect::<Vec<_>>(),
+            "base": meta.base,
+            "base_version": non_empty(&meta.base_version),
+            "working_change": non_empty(&meta.working_change),
+            "workspace": non_empty(&meta.workspace),
+            "pending_sync": meta.pending,
+            "changes": changes.iter().map(local_change_json).collect::<Vec<_>>(),
             "conflicts": conflicts,
         }),
         |out| {
@@ -86,11 +89,12 @@ pub async fn status(ctx: &mut Ctx<'_>, args: StatusArgs) -> Result<()> {
                 out.bold(&meta.repo),
                 meta.base,
                 meta.base_version
-                    .map(|h| format!(" ({})", crate::output::short(&h)))
+                    .get(..12)
+                    .map(|h| format!(" ({h})"))
                     .unwrap_or_default()
             ))?;
-            if let Some(c) = meta.working_change {
-                out.line(format!("working change {}", out.id(&c.to_string())))?;
+            if !meta.working_change.is_empty() {
+                out.line(format!("working change {}", out.id(&meta.working_change)))?;
             }
             if changes.is_empty() {
                 return out.line(out.dim("no local changes"));
@@ -208,20 +212,26 @@ async fn local_diff(
     prefixes: Vec<RepoPathBuf>,
     context: u32,
 ) -> Result<()> {
-    let checkout = ctx.checkout().await?;
+    let dir = ctx.require_checkout_dir()?;
+    let mount = ctx.mount().await?;
     let base = match base {
         Some(b) => root_arg(Some(b))?,
-        None => checkout.base().clone(),
+        None if mount.base_version.is_empty() => Root::Tree(Tree::empty_hash()),
+        None => Root::Version(mount.base_version.parse()?),
     };
-    let changes: Vec<LocalChange> = checkout
-        .status()
+    let reply = ctx
+        .daemon()
         .await?
-        .into_iter()
-        .filter(|c| under(&c.path, &prefixes))
-        .collect();
+        .get_status(dpb::GetStatusRequest {
+            name: mount.name.clone(),
+            prefixes: prefixes.iter().map(|p| p.as_str().to_string()).collect(),
+        })
+        .await?;
+    let changes = rill_daemon::client::local_changes(&reply.changes);
+    let repo = ctx.repo()?;
     let mut files = Vec::with_capacity(changes.len());
     for change in &changes {
-        files.push(diff_one(&checkout, &base, change, context).await?);
+        files.push(diff_one(&repo, &dir, &base, change, context).await?);
     }
     ctx.emit(
         j!({
@@ -253,15 +263,15 @@ async fn local_diff(
 }
 
 async fn diff_one(
-    checkout: &Checkout,
+    repo: &RepoClient,
+    dir: &std::path::Path,
     base: &Root,
     change: &LocalChange,
     context: u32,
 ) -> Result<LocalFileDiff> {
     let before = match change.kind {
         LocalChangeKind::Added => Vec::new(),
-        _ => checkout
-            .repo()
+        _ => repo
             .read_file(base, change.path.as_path())
             .await
             .map(|b| b.to_vec())
@@ -276,7 +286,8 @@ async fn diff_one(
     let after = match change.kind {
         LocalChangeKind::Deleted => Vec::new(),
         _ => {
-            let fs_path = checkout.fs_path(change.path.as_path());
+            let mut fs_path = dir.to_path_buf();
+            fs_path.extend(change.path.components());
             tokio::task::spawn_blocking(move || std::fs::read(fs_path))
                 .await
                 .map_err(|e| CliError::Other(anyhow::anyhow!("read task failed: {e}")))??
@@ -295,4 +306,13 @@ async fn diff_one(
         binary,
         unified,
     })
+}
+
+/// `{"path", "kind"}` of one local change.
+pub(crate) fn local_change_json(c: &LocalChange) -> Value {
+    j!({ "path": c.path.as_str(), "kind": json::enum_name(&c.kind) })
+}
+
+fn non_empty(s: &str) -> Option<&str> {
+    (!s.is_empty()).then_some(s)
 }

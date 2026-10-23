@@ -146,6 +146,17 @@ impl From<connectrpc::ConnectError> for CliError {
     }
 }
 
+impl From<rill_daemon::Error> for CliError {
+    fn from(err: rill_daemon::Error) -> Self {
+        match err {
+            rill_daemon::Error::Sdk(e) => CliError::Sdk(e),
+            rill_daemon::Error::Conflict(m) => CliError::Conflict(m),
+            rill_daemon::Error::Invalid(m) => CliError::Usage(m),
+            other => CliError::Other(anyhow::anyhow!(other)),
+        }
+    }
+}
+
 impl From<rill_mcp::ToolError> for CliError {
     fn from(e: rill_mcp::ToolError) -> Self {
         match e {
@@ -203,7 +214,6 @@ fn describe_sdk(e: &rill_sdk::Error) -> String {
             }
         }
         Error::Config(m) => format!("configuration: {m}"),
-        Error::Checkout(m) => format!("checkout: {m}"),
         Error::Conflict { paths, .. } => format!(
             "conflicts in {}",
             paths

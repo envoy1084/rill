@@ -37,7 +37,7 @@ async fn commits_enforce_path_rules() {
         Code::InvalidArgument
     );
     assert_eq!(
-        edit(".rill/checkout.toml").await.unwrap_err().code,
+        edit(".rill/mount.json").await.unwrap_err().code,
         Code::InvalidArgument
     );
     edit("README.md").await.unwrap();

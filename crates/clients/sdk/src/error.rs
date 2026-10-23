@@ -7,8 +7,7 @@ pub use rill_proto::rill::v1::ErrorReason;
 use rill_types::{ChangeId, ChangeVersionHash, RepoPathBuf};
 use thiserror::Error;
 
-/// Everything that can go wrong talking to a Rill server or working with a
-/// local checkout.
+/// Everything that can go wrong talking to a Rill server.
 #[derive(Debug, Error)]
 pub enum Error {
     /// The server answered with an error, or the connection failed
@@ -60,10 +59,6 @@ pub enum Error {
         /// Paths left in conflict.
         paths: Vec<RepoPathBuf>,
     },
-
-    /// The local checkout metadata is missing or malformed.
-    #[error("checkout error: {0}")]
-    Checkout(String),
 
     /// A landing finished without landing (failed or cancelled).
     #[error("land {ticket} ended with {status:?}: {message}")]
@@ -134,11 +129,6 @@ impl Error {
     /// Build a configuration error.
     pub fn config(msg: impl Into<String>) -> Self {
         Error::Config(msg.into())
-    }
-
-    /// Build a checkout error.
-    pub fn checkout(msg: impl Into<String>) -> Self {
-        Error::Checkout(msg.into())
     }
 }
 

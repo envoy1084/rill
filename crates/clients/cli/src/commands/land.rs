@@ -381,15 +381,11 @@ enum AfterLand {
 /// next change is not based on stale history. Edits made since the last
 /// snapshot are merged exactly as `rill sync` would.
 async fn sync_after_land(ctx: &mut Ctx<'_>, landed: ChangeId) -> Result<AfterLand> {
-    if ctx.find_checkout().is_none() {
+    if ctx.working_change().await? != Some(landed) {
         return Ok(AfterLand::Skipped);
     }
-    let mut checkout = ctx.checkout().await?;
-    if checkout.meta().working_change != Some(landed) {
-        return Ok(AfterLand::Skipped);
-    }
-    let report = update_checkout(ctx, &mut checkout, &Root::trunk()).await?;
+    let report = update_checkout(ctx, &Root::trunk().to_string()).await?;
     Ok(AfterLand::Synced {
-        conflicts: report.conflicts,
+        conflicts: crate::commands::change::conflicts_of(&report),
     })
 }

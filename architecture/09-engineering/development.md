@@ -156,8 +156,9 @@ cd demo && echo 'fn main() {}' > main.rs
 rill new -m "initial" && rill submit && rill land --wait
 ```
 
-Inside a checkout, `.rill/checkout.toml` supplies the endpoint and
-repository ([cli](../08-clients/cli.md)). `rill api init-config` prints
+Inside a checkout, its `.rill/mount.json` marker supplies the endpoint
+and repository ([cli](../08-clients/cli.md)); the first checkout command
+starts the client daemon in the background ([client daemon](../08-clients/daemon.md)). `rill api init-config` prints
 an annotated default config ([configuration](../07-runtime/configuration.md)).
 `rill-mcp --list-tools` prints the MCP tool schemas. `RUST_LOG` controls
 logging in all three binaries.

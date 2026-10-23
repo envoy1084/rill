@@ -17,8 +17,8 @@ pub async fn change_or_working(
     match change {
         Some(c) => change_ref(c)?.id(repo).await,
         None => ctx
-            .checkout_meta()
-            .and_then(|m| m.working_change)
+            .working_change()
+            .await?
             .ok_or_else(|| CliError::usage("no working change in this checkout; pass a change id")),
     }
 }

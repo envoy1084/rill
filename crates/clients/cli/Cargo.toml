@@ -27,6 +27,7 @@ path = "src/bin/rill.rs"
 
 [dependencies]
 rill-sdk = { workspace = true }
+rill-daemon = { workspace = true }
 connectrpc = { workspace = true }
 rill-mcp = { workspace = true }
 rill-types = { workspace = true }

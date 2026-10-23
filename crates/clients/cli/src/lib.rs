@@ -11,7 +11,6 @@
 
 #![warn(missing_docs)]
 
-pub mod checkout_meta;
 pub mod cli;
 pub mod commands;
 pub mod context;

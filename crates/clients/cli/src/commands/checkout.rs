@@ -1,17 +1,13 @@
-//! `rill checkout`: materialize a root into a directory and register a
-//! server-side workspace for it.
+//! `rill checkout`: ask the daemon to check out a revision into a
+//! directory, with a server workspace it keeps in sync.
 
 use std::path::PathBuf;
 
 use clap::Args;
-use rill_mcp::json;
-use rill_sdk::{Checkout, Root};
-use rill_types::{RepoPathBuf, SparseProfile, Tree};
+use rill_daemon::proto as dpb;
 use serde_json::json as j;
 
-use crate::commands::root_arg;
 use crate::context::Ctx;
-use crate::error::CliError;
 use crate::Result;
 
 /// `rill checkout`.
@@ -21,112 +17,76 @@ pub struct CheckoutArgs {
     pub repo: String,
     /// Directory to create (must be empty or absent).
     pub dir: PathBuf,
-    /// Root to materialize: trunk, trunk@N, a version hash or a ref.
+    /// Revision to check out: trunk, trunk@N, a version hash or a ref.
     #[arg(long, value_name = "ROOT")]
     pub at: Option<String>,
-    /// Only materialize these directory prefixes (repeatable).
+    /// Only check out these directory prefixes (repeatable).
     #[arg(long, value_name = "PREFIX")]
     pub sparse: Vec<String>,
     /// Do not register a server-side workspace.
     #[arg(long)]
     pub no_workspace: bool,
+    /// Present files lazily through the virtual filesystem (Linux).
+    #[arg(long)]
+    pub lazy: bool,
 }
 
 /// Run `rill checkout`.
 pub async fn run(ctx: &mut Ctx<'_>, args: CheckoutArgs) -> Result<()> {
-    let root = root_arg(args.at.as_deref())?;
-    let sparse = SparseProfile {
-        include: args
-            .sparse
-            .iter()
-            .map(RepoPathBuf::new)
-            .collect::<std::result::Result<_, _>>()?,
-        exclude: Vec::new(),
-    };
     let dir = if args.dir.is_absolute() {
         args.dir.clone()
     } else {
         ctx.cwd().join(&args.dir)
     };
-    let repo = ctx.client()?.repo(args.repo.clone());
-    // Fail early with a clear message when the repository does not exist,
-    // rather than after creating the directory.
-    repo.info().await?;
-
-    // An empty repository has no trunk ref to materialize. Its checkout is
-    // based on the empty tree, which the server stores when a workspace is
-    // created without a base, so the workspace is registered first.
-    let empty = args.at.is_none() && trunk_is_empty(&repo).await?;
-    let root = if empty {
-        if args.no_workspace {
-            return Err(CliError::usage(
-                "the repository is empty: checking it out needs a workspace (drop --no-workspace)",
-            ));
-        }
-        Root::Tree(Tree::empty_hash())
+    let endpoint = ctx.client_config()?.endpoint;
+    let token = ctx.daemon_token();
+    let mode = if args.lazy {
+        dpb::MountMode::Lazy
     } else {
-        root
+        dpb::MountMode::Eager
     };
-    let mut workspace = None;
-    if !args.no_workspace {
-        let name = dir
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "checkout".to_string());
-        let base = if empty { None } else { Some(root.clone()) };
-        let created = repo
-            .workspaces()
-            .create(&name, base, sparse.clone())
-            .await?;
-        workspace = Some(created.workspace);
-    }
-    let mut checkout = Checkout::create(&dir, repo.clone(), root.clone(), sparse).await?;
-    if let Some(ws) = &workspace {
-        checkout.set_workspace(Some(ws.id)).await?;
-    }
-    let files = checkout.manifest().len();
-    let base_version = checkout.meta().base_version;
+    let created = ctx
+        .daemon()
+        .await?
+        .create_mount(dpb::CreateMountRequest {
+            path: dir.display().to_string(),
+            endpoint,
+            token,
+            repo: args.repo.clone(),
+            revision: args.at.clone().unwrap_or_default(),
+            sparse: args.sparse.clone(),
+            mode: mode.into(),
+            no_workspace: args.no_workspace,
+        })
+        .await?;
+    let mount = created.mount.into_option().unwrap_or_default();
+    let files = created.files;
     ctx.emit(
         j!({
-            "dir": dir.display().to_string(),
+            "dir": mount.path,
             "repo": args.repo,
-            "base": root.to_string(),
-            "base_version": base_version.map(|h| h.to_hex()),
+            "mount": mount.name,
+            "base": mount.base,
+            "base_version": (!mount.base_version.is_empty()).then_some(&mount.base_version),
             "files": files,
-            "workspace": workspace.as_ref().map(json::workspace),
+            "workspace": (!mount.workspace.is_empty()).then_some(&mount.workspace),
         }),
         |out| {
+            let version = if mount.base_version.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", &mount.base_version[..12])
+            };
             out.line(format!(
-                "checked out {} at {} into {} ({files} files)",
+                "checked out {} at {}{version} into {} ({files} files)",
                 out.bold(&args.repo),
-                describe_root(&root, base_version),
-                dir.display()
+                mount.base,
+                mount.path
             ))?;
-            if let Some(ws) = &workspace {
-                out.line(format!(
-                    "workspace {} ({})",
-                    ws.name,
-                    out.id(&ws.id.to_string())
-                ))?;
+            if !mount.workspace.is_empty() {
+                out.line(format!("workspace {}", out.id(&mount.workspace)))?;
             }
             Ok(())
         },
     )
-}
-
-fn describe_root(root: &Root, version: Option<rill_types::ChangeVersionHash>) -> String {
-    match version {
-        Some(v) => format!("{root} ({})", crate::output::short(&v)),
-        None => root.to_string(),
-    }
-}
-
-/// True when trunk has no head. The server reports this either as an
-/// empty answer or as `NotFound`, depending on version.
-async fn trunk_is_empty(repo: &rill_sdk::RepoClient) -> Result<bool> {
-    match repo.trunk_head().await {
-        Ok(head) => Ok(head.is_none()),
-        Err(e) if e.is_not_found() => Ok(true),
-        Err(e) => Err(e.into()),
-    }
 }

@@ -19,6 +19,7 @@ fn redact(value: &mut Value, dir: &str) {
             "${1}_[id]",
         ),
         (r"\b[0-9a-f]{64}\b", "[hash]"),
+        (r"\bmounts/[0-9a-f]{32}\b", "mounts/[id]"),
         (
             r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
             "[uuid]",
@@ -88,7 +89,8 @@ async fn snapshot(server: &Server, cwd: &Path, dir: &Path, name: &str, args: &[&
 async fn json_documents_keep_their_schemas() {
     let server = Server::start().await;
     let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path();
+    // Checkouts report canonical paths (`/private/var/…` on macOS).
+    let home = &std::fs::canonicalize(tmp.path()).unwrap();
     let co = home.join("co");
     let co_s = co.to_str().unwrap();
     let s = |name: &'static str, cwd: &Path, args: &'static [&'static str]| {

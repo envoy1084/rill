@@ -84,8 +84,8 @@ async fn top(ctx: &mut Ctx<'_>, top: Option<&str>, repo: &RepoClient) -> Result<
     if let Some(t) = top {
         return change_ref(t)?.id(repo).await;
     }
-    ctx.checkout_meta()
-        .and_then(|m| m.working_change)
+    ctx.working_change()
+        .await?
         .ok_or_else(|| CliError::usage("no working change in this checkout; pass --top <change>"))
 }
 

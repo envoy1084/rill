@@ -171,7 +171,7 @@ and `rill_core::validate_version` adds the checks that need content:
 | Terms in one conflict | 63 (32 sides) |
 | `extra` fields | 32, keys up to 64 bytes, values up to 4 KiB |
 | Symlink target | relative, at most 4096 bytes, never climbing above the root |
-| Reserved paths | `.rill/checkout.toml`, `.rill/manifest.toml`: not set, copied into or linked to |
+| Reserved paths | `.rill/mount.json` (the client daemon's checkout marker): not set, copied into or linked to |
 
 Symlink targets are checked whether inline or stored as a blob. Adding a
 name that differs only in case from a sibling (full Unicode case folding

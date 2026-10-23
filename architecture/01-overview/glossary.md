@@ -79,8 +79,11 @@ flowchart LR
 - **Workspace**: a principal's server-side in-progress state: base version,
   working `ChangeId`, latest snapshot, sparse profile and an operation log
   for undo. See [workspaces](../04-workflow/workspaces.md).
-- **Checkout**: a local working copy of part of a repository, backed by
-  `.rill/`, owned by `rill-sdk`. See [checkouts](../04-workflow/checkouts.md).
+- **Checkout**: a local working copy of part of a repository, served by
+  the client daemon as a mount. See [checkouts](../04-workflow/checkouts.md).
+- **Mount**: a working copy the client daemon serves: a base, an overlay
+  of local edits, and the files (on disk, or a virtual filesystem). See
+  [client daemon](../08-clients/daemon.md).
 - **Trunk**: the single landed line; the `trunk` ref plus one row per
   landed version. See [landing](../04-workflow/landing.md).
 - **Sequence number** (`TrunkSeq`): gap-free position on trunk, written as
@@ -149,7 +152,7 @@ flowchart LR
 - [Workspace](../../crates/foundation/types/src/objects/workspace.rs)
 - [Relations](../../crates/domain/policy/src/rebac/model.rs)
 - [Capability verbs](../../crates/domain/policy/src/tokens/capability.rs)
-- [Checkout](../../crates/clients/sdk/src/local/checkout.rs)
+- [Mount](../../crates/clients/daemon/src/mount/mount.rs)
 
 ---
 ← Previous: [Crates and layering](crates-and-layering.md) · [Index](../index.md) · Next: [Objects and ids](../02-data/objects-and-ids.md) →

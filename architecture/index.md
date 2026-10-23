@@ -90,19 +90,20 @@ Read in this order the first time; each page ends with Previous / Next links.
 
 48. [SDK](08-clients/sdk.md)
 49. [SDKs in other languages](08-clients/other-sdks.md)
-50. [CLI](08-clients/cli.md)
-51. [MCP server](08-clients/mcp.md)
+50. [Client daemon](08-clients/daemon.md)
+51. [CLI](08-clients/cli.md)
+52. [MCP server](08-clients/mcp.md)
 
 **09 Engineering**
 
-52. [Development](09-engineering/development.md)
-53. [Testing](09-engineering/testing.md)
-54. [Simulation](09-engineering/simulation.md)
-55. [Performance](09-engineering/performance.md)
+53. [Development](09-engineering/development.md)
+54. [Testing](09-engineering/testing.md)
+55. [Simulation](09-engineering/simulation.md)
+56. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-56. [Architecture decisions](10-decisions/README.md): the seventeen ADRs that
+57. [Architecture decisions](10-decisions/README.md): the eighteen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -141,7 +142,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Server flags, config file, dev mode | [Configuration](07-runtime/configuration.md) |
 | Metrics, logs, traces, health endpoints, dashboards | [Observability](07-runtime/observability.md) |
 | The regional cache in front of the origin | [Cache tier](07-runtime/cache.md) |
-| Client library, `rill` commands, agent tools | [SDK](08-clients/sdk.md), [CLI](08-clients/cli.md), [MCP server](08-clients/mcp.md) |
+| Client library, `rill` commands, agent tools | [SDK](08-clients/sdk.md), [Client daemon](08-clients/daemon.md), [CLI](08-clients/cli.md), [MCP server](08-clients/mcp.md) |
 | Building, CI, tests | [Development](09-engineering/development.md), [Testing](09-engineering/testing.md) |
 | Seeded fault simulation, benchmarks, load | [Simulation](09-engineering/simulation.md), [Performance](09-engineering/performance.md) |
 | Fixed design decisions for v2 | [Architecture decisions](10-decisions/README.md) |

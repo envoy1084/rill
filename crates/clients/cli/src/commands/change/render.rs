@@ -1,8 +1,9 @@
-//! Human rendering of new versions and checkout updates.
+//! Human and JSON rendering of new versions and checkout updates.
 
-use rill_sdk::local::UpdateReport;
+use rill_daemon::proto as dpb;
 use rill_sdk::VersionResult;
 use rill_types::RepoPathBuf;
+use serde_json::{json, Value};
 
 use crate::output::{short, Out};
 
@@ -36,15 +37,36 @@ pub(super) fn print_version(
     Ok(())
 }
 
-pub(super) fn join_paths(paths: &[RepoPathBuf]) -> String {
+pub(super) fn join_paths(paths: &[impl AsRef<str>]) -> String {
     paths
         .iter()
-        .map(|p| p.as_str())
+        .map(|p| p.as_ref())
         .collect::<Vec<_>>()
         .join(", ")
 }
 
-pub(super) fn print_report(out: &mut Out<'_>, report: &UpdateReport) -> std::io::Result<()> {
+/// What an update did, as `--json` prints it.
+pub(crate) fn update_json(r: &dpb::UpdateMountResponse) -> Value {
+    json!({
+        "updated": r.updated,
+        "removed": r.removed,
+        "merged": r.merged,
+        "conflicts": r.conflicts,
+    })
+}
+
+/// The conflicted paths of an update.
+pub(crate) fn conflicts_of(r: &dpb::UpdateMountResponse) -> Vec<RepoPathBuf> {
+    r.conflicts
+        .iter()
+        .filter_map(|p| RepoPathBuf::new(p).ok())
+        .collect()
+}
+
+pub(super) fn print_report(
+    out: &mut Out<'_>,
+    report: &dpb::UpdateMountResponse,
+) -> std::io::Result<()> {
     for p in &report.updated {
         out.line(format!("{} {p}", out.good("U")))?;
     }

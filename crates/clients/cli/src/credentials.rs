@@ -62,3 +62,24 @@ pub fn store() -> Arc<dyn CredentialStore> {
         }),
     }
 }
+
+/// The client configuration the daemon uses for `endpoint`: the token a
+/// caller handed it, else `$RILL_TOKEN`, else the signed-in session.
+pub fn daemon_client_config(endpoint: &str, token: Option<String>) -> rill_sdk::ClientConfig {
+    let mut config = rill_sdk::ClientConfig::new(endpoint);
+    config.token = token.or_else(|| {
+        std::env::var(rill_sdk::config::TOKEN_ENV)
+            .ok()
+            .filter(|t| !t.is_empty())
+    });
+    if config.token.is_none() {
+        let store = store();
+        match store.load(endpoint) {
+            Ok(Some(credentials)) => config = config.with_session(credentials, Some(store)),
+            Ok(None) => {}
+            Err(e) => tracing::debug!(error = %e, "reading stored credentials failed"),
+        }
+    }
+    config.user_agent = format!("rilld/{}", env!("CARGO_PKG_VERSION"));
+    config
+}

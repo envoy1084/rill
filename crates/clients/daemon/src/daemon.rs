@@ -45,6 +45,10 @@ pub struct Marker {
     pub mount: String,
     /// The daemon directory serving it.
     pub daemon: PathBuf,
+    /// The server endpoint.
+    pub endpoint: String,
+    /// The repository.
+    pub repo: String,
 }
 
 impl Marker {
@@ -285,6 +289,8 @@ async fn write_marker(
     let marker = Marker {
         mount: record.name(),
         daemon: dir.root().to_path_buf(),
+        endpoint: record.endpoint.clone(),
+        repo: record.repo.clone(),
     };
     let text = serde_json::to_vec_pretty(&marker).map_err(|e| Error::Invalid(e.to_string()))?;
     let path = root.join(MARKER);

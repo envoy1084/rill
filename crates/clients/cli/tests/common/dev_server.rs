@@ -7,10 +7,12 @@ use rill_api::{Listeners, ServerConfig, StorageConfig};
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
-/// A running dev server.
+/// A running dev server, and a client daemon serving checkouts.
 pub struct Server {
     endpoint: String,
     shutdown: CancellationToken,
+    daemon: std::sync::Arc<rill_daemon::Daemon>,
+    daemon_dir: tempfile::TempDir,
 }
 
 impl Server {
@@ -33,9 +35,24 @@ impl Server {
                 .await
                 .unwrap();
         });
+        let daemon_dir = tempfile::tempdir().unwrap();
+        let mut config =
+            rill_daemon::DaemonConfig::new(rill_daemon::DaemonDir::new(daemon_dir.path()));
+        config.cache_budget = 1 << 30;
+        // Pushes to server workspaces would make operation logs depend on
+        // timing; the daemon's own tests cover them.
+        config.sync_delay = std::time::Duration::from_secs(3600);
+        let daemon = rill_daemon::Daemon::open(config).await.unwrap();
+        tokio::spawn(rill_daemon::serve(daemon.clone()));
+        let socket = daemon_dir.path().join("rilld.sock");
+        while !socket.exists() {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
         Server {
             endpoint: format!("http://{grpc}"),
             shutdown,
+            daemon,
+            daemon_dir,
         }
     }
 
@@ -48,6 +65,8 @@ impl Server {
             self.endpoint.clone(),
             "-C".to_string(),
             cwd.display().to_string(),
+            "--daemon-dir".to_string(),
+            self.daemon_dir.path().display().to_string(),
             "--no-color".to_string(),
         ];
         full.extend(args.iter().map(|a| a.to_string()));
@@ -92,6 +111,7 @@ impl Server {
 
 impl Drop for Server {
     fn drop(&mut self) {
+        self.daemon.stop();
         self.shutdown.cancel();
     }
 }

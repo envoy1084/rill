@@ -29,10 +29,7 @@ async fn create_checkout_land_and_sync() {
         .json(home, &["checkout", "e2e", co.to_str().unwrap()])
         .await;
     assert_eq!(checkout["files"], 0);
-    assert!(checkout["workspace"]["id"]
-        .as_str()
-        .unwrap()
-        .starts_with("ws_"));
+    assert!(checkout["workspace"].as_str().unwrap().starts_with("ws_"));
     std::fs::write(co.join("README.md"), "# e2e\n").unwrap();
     std::fs::create_dir_all(co.join("src")).unwrap();
     std::fs::write(co.join("src/lib.rs"), "pub fn one() -> u32 { 1 }\n").unwrap();

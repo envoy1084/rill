@@ -49,7 +49,7 @@ flowchart LR
 | T1 | Tokens sniffed on the wire | TLS on both listeners when `[tls]` is set, optionally mutual (`client_ca`); the SDK checks the server for `https` endpoints and can present a client certificate. Plain text when unset (`rill dev`) | Certificates from an issuer (SPIFFE) and rotation | 8 (done), 10 |
 | T2 | Repository writer runs code on the server | Fixed: REAPI actions and `.rill/verify.toml` steps run only on workers. Buildbarn workers run them under gVisor with no network, a read-only root and cleaned state between actions, and the sandbox escape suite passes ([remote execution](../06-services/remote-execution.md)). In-process local workers must be `confined` or `gvisor` outside dev mode ([exec](../06-services/exec.md)) | — | 15, 16 (done) |
 | T3 | Checkout writes outside its directory | Server side fixed: every commit rejects symlink targets that are absolute or climb above the root, inline or blob-stored. Clients still follow symlinks when writing | `O_NOFOLLOW` writes on clients | 20 |
-| T4 | Repository content rewrites client state | Server side fixed: `.rill/checkout.toml` and `.rill/manifest.toml` cannot be committed, copied into or targeted by a symlink. Client state still lives in the working tree | Client state outside the working tree | 20 |
+| T4 | Repository content rewrites client state | Fixed: client state lives in the daemon's directory, outside the working tree; the only file in the tree, the `.rill/mount.json` marker, cannot be committed, copied into or targeted by a symlink | — | 20 (done) |
 | T5 | Reader of one directory reads another | Fixed: objects are fetched by hash only with a signed read grant naming them, checked by the server and the cache tier; listings, diffs, versions and logs show only readable paths; each org's objects are stored apart, so a hash from another org fetches nothing | — | 11 (done) |
 | T6 | Path-scoped token searches everything | Fixed: read filters intersect relations, token paths and agent scope; the generated permission matrix covers every RPC | — | 11 (done) |
 | T7 | Writer edits paths they cannot write | Fixed: every version's write set (files, subtrees, copy sources, owner-only `.rill/`) is checked inside its commit, which asserts the relation version, and again at landing | — | 11 (done) |
@@ -88,7 +88,7 @@ flowchart LR
 
 - [rill-api/src/auth/](../../crates/server/api/src/auth/mod.rs), [rill-api/src/services/changes/write.rs](../../crates/server/api/src/services/changes/write.rs)
 - [rill-api/src/objects/](../../crates/server/api/src/objects/mod.rs), [rill-exec/src/sandbox/](../../crates/domain/exec/src/sandbox/mod.rs)
-- [rill-sdk/src/local/](../../crates/clients/sdk/src/local/mod.rs), [rill-policy/src/tokens/](../../crates/domain/policy/src/tokens/mod.rs)
+- [rill-daemon/src/eager/](../../crates/clients/daemon/src/eager/mod.rs), [rill-policy/src/tokens/](../../crates/domain/policy/src/tokens/mod.rs)
 
 ---
 ← Previous: [Data protection](data-protection.md) · [Index](../index.md) · Next: [Security review packet](security-review.md) →

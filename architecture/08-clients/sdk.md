@@ -21,7 +21,6 @@ flowchart LR
     Repo --> Ck[ChecksClient]
     Repo --> Op[OperationClient]
     Repo --> St[StackClient]
-    Repo --> Co[local::Checkout]
 ```
 
 A `Client` is one pooled `connectrpc` connection plus `CallHeaders`, which
@@ -152,31 +151,15 @@ converted with `TryFrom`. A `Status` becomes one `Error::Status` item, and
 the stream ends after it. List RPCs return `Page<T> {items,
 next_page_token}`.
 
-## Local checkouts
+## Working copies
 
-`local/` is a minimal working copy for the CLI. Agents do not need one.
-
-- `.rill/checkout.toml` holds `CheckoutMeta`: endpoint, repo, workspace,
-  base, base_version, working_change and sparse profile.
-- `.rill/manifest.toml` maps each path to a `ManifestEntry` (content hash,
-  local hash, size, mtime, kind, conflict flag). Both files, and the
-  credential store, are written through `files::write_atomic` (a
-  `tempfile` in the same directory, fsynced, then persisted over the
-  target), so concurrent writers never interleave.
-- `Checkout::create` lists the tree one `ListDirectory` at a time, never entering
-  a directory outside the `SparseProfile`, and writes the files.
-- `status` treats a file as unchanged when size and mtime match the
-  manifest, and hashes it otherwise. `.rillignore` (gitignore syntax) hides
-  untracked files only.
-- `snapshot` turns status into edits and calls `apply_edits` with
-  `EditBase::Root(base)` and `change_id = working_change`, so later
-  snapshots amend the same change. An unresolved conflict is an
-  `Error::Checkout`.
-- `update(new_root)` classifies each path by upstream and local change. If
-  both sides changed, it runs `rill_core::merge::merge_file`. A conflict is
-  written as marker text and flagged in the manifest. It returns
-  `UpdateReport {updated, removed, merged, conflicts}`. Filesystem work
-  runs under `spawn_blocking`.
+The SDK has no working copy: checkouts belong to the
+[client daemon](daemon.md), and agents without files edit through
+`apply_edits` or a workspace. `WorkspaceClient::snapshot_edits` records
+edits as a workspace's snapshot (the server builds the tree), and
+`Edit::Stored` names content already uploaded. The credential store is
+written through `files::write_atomic` (a `tempfile` in the same
+directory, fsynced, then persisted over the target).
 
 ## Stacks
 
@@ -195,7 +178,9 @@ cancelled land and `Error::Timeout` when the deadline passes.
 
 `Error` variants: `Status {code, message, reason, missing, retry_after}`,
 `Convert`, `Invalid`, `Config`, `Io`, `Timeout`, `Conflict {change_id,
-hash, paths}`, `Checkout` and `LandFailed {ticket, status, message}`. A
+hash, paths}` and `LandFailed {ticket, status, message}`. `to_connect`
+re-encodes an error with its details, for a service that relays it (the
+daemon). A
 status error carries what the server's details say: the `ErrorReason`
 from `ErrorInfo` (only for the `rill.dev` domain), what a policy denial
 still misses, and how long to wait. Callers branch on `Error::code()`,
@@ -242,7 +227,6 @@ scenarios](../../sdks/conformance/README.md) against it.
 - [lib.rs](../../crates/clients/sdk/src/lib.rs), [client.rs](../../crates/clients/sdk/src/client.rs), [config.rs](../../crates/clients/sdk/src/config.rs), [error.rs](../../crates/clients/sdk/src/error.rs), [stream.rs](../../crates/clients/sdk/src/stream.rs)
 - [repo/mod.rs](../../crates/clients/sdk/src/repo/mod.rs), [repo/blobs.rs](../../crates/clients/sdk/src/repo/blobs.rs), [repo/write.rs](../../crates/clients/sdk/src/repo/write.rs), [repo/history.rs](../../crates/clients/sdk/src/repo/history.rs), [repo/watch.rs](../../crates/clients/sdk/src/repo/watch.rs)
 - [types/root.rs](../../crates/clients/sdk/src/types/root.rs), [types/edit.rs](../../crates/clients/sdk/src/types/edit.rs), [types/page.rs](../../crates/clients/sdk/src/types/page.rs)
-- [local/checkout.rs](../../crates/clients/sdk/src/local/checkout.rs), [local/meta.rs](../../crates/clients/sdk/src/local/meta.rs), [local/status.rs](../../crates/clients/sdk/src/local/status.rs), [local/update.rs](../../crates/clients/sdk/src/local/update.rs), [local/walk.rs](../../crates/clients/sdk/src/local/walk.rs)
 - [stack.rs](../../crates/clients/sdk/src/stack.rs), [review.rs](../../crates/clients/sdk/src/review.rs), [workspace.rs](../../crates/clients/sdk/src/workspace.rs), [trunk.rs](../../crates/clients/sdk/src/trunk.rs), [admin.rs](../../crates/clients/sdk/src/admin.rs), [checks.rs](../../crates/clients/sdk/src/checks.rs), [operations.rs](../../crates/clients/sdk/src/operations.rs), [identity/](../../crates/clients/sdk/src/identity/mod.rs), [protection.rs](../../crates/clients/sdk/src/protection.rs), [secrets.rs](../../crates/clients/sdk/src/secrets.rs)
 - [names.rs](../../crates/clients/sdk/src/names.rs), [filter.rs](../../crates/clients/sdk/src/filter.rs), [paging.rs](../../crates/clients/sdk/src/paging.rs), [testing.rs](../../crates/clients/sdk/src/testing.rs), [tests/conformance.rs](../../crates/clients/sdk/tests/conformance.rs)
 

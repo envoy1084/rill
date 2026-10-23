@@ -47,4 +47,4 @@ it; each language's suite skips its server scenarios without
 - [sdks/generate.sh](../../sdks/generate.sh), [sdks/conformance/](../../sdks/conformance/README.md)
 
 ---
-← Previous: [SDK](sdk.md) · [Index](../index.md) · Next: [CLI](cli.md) →
+← Previous: [SDK](sdk.md) · [Index](../index.md) · Next: [Client daemon](daemon.md) →

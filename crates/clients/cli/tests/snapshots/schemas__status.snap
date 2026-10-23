@@ -6,10 +6,11 @@ expression: doc
   "schema": "rill.cli.v1.status",
   "result": {
     "repo": "shape",
-    "base": "tree:[hash]",
+    "base": "trunk",
     "base_version": null,
     "working_change": null,
     "workspace": "ws_[id]",
+    "pending_sync": 2,
     "changes": [
       {
         "path": "README.md",

@@ -3,13 +3,13 @@
 use std::io::Write;
 use std::path::Path;
 
+/// The name prefix of a file being written atomically.
+pub(crate) const TEMP_PREFIX: &str = ".rill-tmp-";
+
 /// Replace `path` with `bytes`: written to a uniquely named temporary file
 /// beside it, flushed to disk, then renamed over it, so a reader or a
 /// concurrent writer never sees a partial file and a crash keeps one whole
 /// version. `mode` sets Unix permissions on the new file.
-/// The name prefix of a file being written atomically.
-pub(crate) const TEMP_PREFIX: &str = ".rill-tmp-";
-
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8], mode: Option<u32>) -> std::io::Result<()> {
     let dir = match path.parent() {
         Some(dir) if !dir.as_os_str().is_empty() => dir,

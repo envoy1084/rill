@@ -188,7 +188,7 @@ pub async fn show(ctx: &mut Ctx<'_>, args: ShowArgs) -> Result<()> {
     let repo = ctx.repo()?;
     let target = match args.change.as_deref() {
         Some(text) => change_ref(text)?,
-        None => match ctx.checkout_meta().and_then(|m| m.working_change) {
+        None => match ctx.working_change().await? {
             Some(id) => ChangeRef::Id(id),
             None => match repo.trunk_head().await? {
                 Some((_, head)) => ChangeRef::Version(head),

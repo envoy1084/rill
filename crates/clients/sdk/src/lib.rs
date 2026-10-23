@@ -7,8 +7,8 @@
 //! instance. Inputs and outputs are `rill-types` values where one exists
 //! and the small structs in [`types`] otherwise.
 //!
-//! [`stack`] composes those calls into stack-level operations and
-//! [`local`] provides a minimal working copy for the CLI.
+//! [`stack`] composes those calls into stack-level operations; working
+//! copies are the client daemon's (`rill-daemon`).
 //!
 //! ```no_run
 //! # async fn demo() -> rill_sdk::Result<()> {
@@ -37,7 +37,6 @@ pub mod filter;
 pub mod grants;
 pub mod identity;
 pub mod intent;
-pub mod local;
 pub mod names;
 pub mod operations;
 mod paging;
@@ -63,7 +62,6 @@ pub use connectrpc::ErrorCode as Code;
 pub use error::{Error, ErrorReason, Result};
 pub use identity::IdentityClient;
 pub use intent::IntentClient;
-pub use local::{Checkout, LocalChange, LocalChangeKind};
 pub use operations::OperationClient;
 pub use protection::ProtectionClient;
 pub use repo::{RepoClient, WatchStart};

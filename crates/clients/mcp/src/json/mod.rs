@@ -11,7 +11,6 @@ mod diff;
 mod history;
 mod intent;
 mod lander;
-mod local;
 mod primitives;
 mod review;
 mod workspace;
@@ -26,7 +25,6 @@ pub use intent::{intent, scored_intent};
 pub use lander::{
     bisect_result, landing, revert_result, trunk_status, verification_record, verification_report,
 };
-pub use local::{local_change, update_report};
 pub use primitives::{bytes, enum_name, hash, opt, page, principal, timestamp};
 pub use review::{
     land_progress, land_ticket, landed_change, new_thread, review_event, review_info, review_state,

@@ -18,7 +18,7 @@ flowchart LR
     Run -->|Ok| Emit[ctx.emit: JSON or human]
     Run -->|CliError| Rep[report_error, exit::code_for]
     Ctx -.lazy.-> Client[Client::connect_lazy]
-    Ctx -.lazy.-> Co[Checkout::find]
+    Ctx -.lazy.-> Co[Marker::find, DaemonClient]
 ```
 
 `run_cli` reads `-v` and `-q` before clap runs, so logging also covers
@@ -62,9 +62,12 @@ Behaviours worth knowing:
   command clears it and starts fresh. Otherwise it updates the checkout onto
   the previous change's current version and snapshots a new change stacked on
   it. Only edits made since the last snapshot go into the new change.
-- `rill new` and `rill sync` change `working_change` through
-  `checkout_meta::set_working_change`. This is the only place the CLI edits
-  `.rill/checkout.toml` directly.
+- Checkout commands (`checkout`, `status`, `diff`, `new`, `amend`,
+  `describe`, `sync`, `conflicts`, `resolve`, `undo`) go through the
+  [client daemon](daemon.md), found from the checkout's `.rill/mount.json`
+  and started in the background when it is not running. `--daemon-dir`
+  (or `RILL_DAEMON_DIR`) picks another daemon; `rill daemon run | start |
+  stop | status` manage it.
 - `rill import git <path> --repo R` imports through the server the client
   is configured for; `--storage-dir DIR` (or `RILL_STORAGE_DIR`) opens
   `LocalStores` directly instead. `rill export git <dir>` mirrors trunk into
@@ -94,7 +97,7 @@ invocation.
 | endpoint | `--endpoint`, then the checkout's `endpoint`, then `ClientConfig::discover` (`RILL_ENDPOINT`, then the config file) |
 | token | `--token`, then `RILL_TOKEN`, then the config file's token (only when the file also supplied the endpoint), then the session `rill login` stored for the endpoint |
 | repository | `--repo`, then the checkout's `repo`, then `RILL_REPO`, else a usage error |
-| checkout | `Checkout::find` walks up from `-C` or the process cwd to the nearest `.rill/` |
+| checkout | `Marker::find` walks up from `-C` or the process cwd to the nearest `.rill/mount.json` |
 
 The client uses `connect_lazy` with user agent `rill-cli/<version>`.
 Commands that never call the server never dial it.
@@ -163,8 +166,8 @@ the root `CancellationToken`. See
 
 ## Limitations
 
-- If checkout metadata fails to parse, the CLI logs a warning and acts as if
-  it is outside a checkout.
+- If the checkout marker fails to parse, the CLI acts as if it is outside
+  a checkout.
 - `rill import git` prints only its final result, with no progress output.
 - `rill api` has no flags for S3 storage or the key service. Those come
   from the config file or the environment.
@@ -173,11 +176,11 @@ the root `CancellationToken`. See
 
 ## Code
 
-- [lib.rs](../../crates/clients/cli/src/lib.rs), [cli.rs](../../crates/clients/cli/src/cli.rs), [context.rs](../../crates/clients/cli/src/context.rs), [error.rs](../../crates/clients/cli/src/error.rs), [exit.rs](../../crates/clients/cli/src/exit.rs), [checkout_meta.rs](../../crates/clients/cli/src/checkout_meta.rs)
+- [lib.rs](../../crates/clients/cli/src/lib.rs), [cli.rs](../../crates/clients/cli/src/cli.rs), [context.rs](../../crates/clients/cli/src/context.rs), [error.rs](../../crates/clients/cli/src/error.rs), [exit.rs](../../crates/clients/cli/src/exit.rs)
 - [commands/mod.rs](../../crates/clients/cli/src/commands/mod.rs), [commands/parse.rs](../../crates/clients/cli/src/commands/parse.rs), [commands/change/mod.rs](../../crates/clients/cli/src/commands/change/mod.rs), [commands/import/](../../crates/clients/cli/src/commands/import/mod.rs), [commands/export.rs](../../crates/clients/cli/src/commands/export.rs)
 - [tests/schemas.rs](../../crates/clients/cli/tests/schemas.rs), [output/mod.rs](../../crates/clients/cli/src/output/mod.rs), [output/table.rs](../../crates/clients/cli/src/output/table.rs), [output/format.rs](../../crates/clients/cli/src/output/format.rs)
 - [server/mod.rs](../../crates/clients/cli/src/server/mod.rs), [server/template.rs](../../crates/clients/cli/src/server/template.rs)
 - [bin/rill.rs](../../crates/clients/cli/src/bin/rill.rs)
 
 ---
-← Previous: [SDKs in other languages](other-sdks.md) · [Index](../index.md) · Next: [MCP server](mcp.md) →
+← Previous: [Client daemon](daemon.md) · [Index](../index.md) · Next: [MCP server](mcp.md) →

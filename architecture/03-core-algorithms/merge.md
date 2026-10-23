@@ -105,7 +105,7 @@ disjoint blocks in one slot). Inputs that are not UTF-8 or exceed
 `rill_structural_merges{extension,outcome}`.
 
 The server enables it from `[merge]` ([configuration](../07-runtime/configuration.md#merge));
-client sync (`rill-sdk` `local/update.rs`) uses it too unless
+client sync (the daemon's `mount/merge.rs`) uses it too unless
 `RILL_STRUCTURAL_MERGE=false`.
 
 ## Change-level merge (`merge/change.rs`)
@@ -194,7 +194,7 @@ re-materialises to identical bytes.
 - [merge/materialize.rs](../../crates/engine/core/src/merge/materialize.rs)
 - [merge/parse.rs](../../crates/engine/core/src/merge/parse.rs)
 - [rill-types merge.rs](../../crates/foundation/types/src/merge.rs)
-- [rill-sdk local/update.rs](../../crates/clients/sdk/src/local/update.rs)
+- [rill-daemon mount/merge.rs](../../crates/clients/daemon/src/mount/merge.rs)
 
 ---
 ← Previous: [Diff](diff.md) · [Index](../index.md) · Next: [Rebase](rebase.md) →

@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    access, admin, change, checkout, health, history, identity, import, intent, land, org, refs,
-    release, repo, review, stack, status, watch, ws,
+    access, admin, change, checkout, daemon, health, history, identity, import, intent, land, org,
+    refs, release, repo, review, stack, status, watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -54,6 +54,11 @@ pub struct GlobalOpts {
     #[arg(long, global = true, value_name = "VERSION", value_parser = ["v1"])]
     pub json_schema: Option<String>,
 
+    /// The client daemon's directory [default: the checkout's daemon, then
+    /// $RILL_DAEMON_DIR, then the per-user data directory].
+    #[arg(long, global = true, value_name = "DIR")]
+    pub daemon_dir: Option<PathBuf>,
+
     /// Run as if started in this directory (checkout discovery starts here).
     #[arg(short = 'C', long, global = true, value_name = "DIR")]
     pub cwd: Option<PathBuf>,
@@ -82,8 +87,12 @@ pub enum Command {
     #[command(subcommand)]
     Org(org::OrgCmd),
 
-    /// Materialize a repository into a directory and register a workspace.
+    /// Check out a repository into a directory, served by the daemon.
     Checkout(checkout::CheckoutArgs),
+
+    /// The client daemon: run, start, stop, status.
+    #[command(subcommand)]
+    Daemon(daemon::DaemonCmd),
 
     /// Local changes in the checkout.
     Status(status::StatusArgs),

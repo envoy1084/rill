@@ -1,7 +1,8 @@
 //! `rill conflicts` and `rill resolve`: listing conflicted paths and
 //! marking them resolved.
 
-use rill_sdk::LocalChangeKind;
+use rill_daemon::proto as dpb;
+use rill_daemon::ChangeKind;
 use rill_types::RepoPathBuf;
 use serde_json::json as j;
 
@@ -30,32 +31,30 @@ pub async fn conflicts(ctx: &mut Ctx<'_>) -> Result<()> {
 }
 
 async fn conflicted(ctx: &mut Ctx<'_>) -> Result<Vec<RepoPathBuf>> {
-    Ok(ctx
-        .checkout()
+    let mount = ctx.mount().await?;
+    let reply = ctx
+        .daemon()
         .await?
-        .status()
-        .await?
+        .get_status(dpb::GetStatusRequest {
+            name: mount.name,
+            prefixes: vec![],
+        })
+        .await?;
+    Ok(rill_daemon::client::local_changes(&reply.changes)
         .into_iter()
-        .filter(|c| c.kind == LocalChangeKind::Conflict)
+        .filter(|c| c.kind == ChangeKind::Conflict)
         .map(|c| c.path)
         .collect())
 }
 
 /// Run `rill resolve`.
 pub async fn resolve(ctx: &mut Ctx<'_>, args: ResolveArgs) -> Result<()> {
-    let mut checkout = ctx.checkout().await?;
-    let conflicted: Vec<RepoPathBuf> = checkout
-        .status()
-        .await?
-        .into_iter()
-        .filter(|c| c.kind == LocalChangeKind::Conflict)
-        .map(|c| c.path)
-        .collect();
     if args.paths.is_empty() && !args.all {
         return Err(CliError::usage(
             "name the paths to mark resolved, or `--all`; `rill conflicts` lists them",
         ));
     }
+    let conflicted = conflicted(ctx).await?;
     let paths: Vec<RepoPathBuf> = if args.all {
         conflicted.clone()
     } else {
@@ -69,7 +68,15 @@ pub async fn resolve(ctx: &mut Ctx<'_>, args: ResolveArgs) -> Result<()> {
             return Err(CliError::usage(format!("{p} is not conflicted")));
         }
     }
-    checkout.mark_resolved(&paths, args.force).await?;
+    let mount = ctx.mount().await?;
+    ctx.daemon()
+        .await?
+        .resolve_paths(dpb::ResolvePathsRequest {
+            name: mount.name,
+            paths: paths.iter().map(|p| p.as_str().to_string()).collect(),
+            force: args.force,
+        })
+        .await?;
     let remaining = conflicted.len() - paths.len();
     ctx.emit(
         j!({

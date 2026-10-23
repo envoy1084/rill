@@ -58,11 +58,32 @@ pub(crate) async fn resolve_base(
 }
 
 impl Mount {
-    /// Move onto `onto`, merging local edits.
+    /// Move onto `onto`, merging local edits, and forget the working
+    /// change once it has landed so the next commit starts a new one.
     pub async fn update(&self, onto: Root) -> Result<UpdateReport> {
         self.settle().await?;
         let _op = self.ops.lock().await;
-        self.update_locked(onto).await
+        let report = self.update_locked(onto).await?;
+        if let Some(id) = self.record().working_change {
+            let landed = match self.repo.current_version(id).await {
+                Ok(info) => info.trunk_seq.is_some(),
+                Err(e) if e.is_not_found() => true,
+                Err(e) => return Err(e.into()),
+            };
+            if landed {
+                let mut record = self.record();
+                record.working_change = None;
+                self.write(
+                    Change {
+                        record: Some(record),
+                        ..Change::default()
+                    },
+                    None,
+                )
+                .await?;
+            }
+        }
+        Ok(report)
     }
 
     pub(crate) async fn update_locked(&self, onto: Root) -> Result<UpdateReport> {
