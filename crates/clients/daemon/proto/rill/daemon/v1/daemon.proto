@@ -73,6 +73,10 @@ message Mount {
   uint64 pending = 11;
   // The last sync failure; empty after a success.
   string sync_error = 12;
+  // When edits last reached the server, in Unix milliseconds; 0 if never.
+  int64 last_sync_ms = 13;
+  // How files are presented: `eager`, `fuse` or `nfs`.
+  string view = 14;
 }
 
 // How a path differs from the base.
@@ -101,12 +105,41 @@ message CacheStats {
   uint64 evictions = 6;
 }
 
+// Reads one tier served.
+message TierStats {
+  uint64 reads = 1;
+  double p50_ms = 2;
+  double p99_ms = 3;
+}
+
+// Something on the host worth fixing.
+message Warning {
+  // What it concerns: `cache`, `daemon`, or a checkout path.
+  string subject = 1;
+  string message = 2;
+  // A command or step that fixes it.
+  string fix = 3;
+}
+
 message GetDaemonRequest {}
 message GetDaemonResponse {
   string version = 1;
   uint32 pid = 2;
   CacheStats cache = 3;
   uint32 mounts = 4;
+  // Reads served from the host's object cache.
+  TierStats local = 5;
+  // Reads served by the regional cache.
+  TierStats regional = 6;
+  // Reads served by the origin.
+  TierStats origin = 7;
+  // Reads the regional cache could not serve.
+  uint64 regional_fallbacks = 8;
+  // Free bytes on the cache's volume.
+  uint64 cache_free_bytes = 9;
+  repeated Warning warnings = 10;
+  // The daemon directory.
+  string dir = 11;
 }
 
 message CreateMountRequest {

@@ -95,7 +95,8 @@ impl std::fmt::Debug for DaemonConfig {
 }
 
 impl DaemonConfig {
-    /// Defaults for `dir`: a cache of 20% of its disk up to 200 GB, a
+    /// Defaults for `dir`: a cache of 20% of its disk (at most half the
+    /// free space, at most 200 GB), a
     /// two-second sync delay, and a token from the caller or `RILL_TOKEN`.
     pub fn new(dir: DaemonDir) -> Self {
         let cache_budget = default_budget(dir.root());
@@ -122,23 +123,25 @@ fn default_budget(dir: &Path) -> u64 {
         .ancestors()
         .find(|d| d.exists())
         .unwrap_or(Path::new("/"));
-    disk_size(probe).map_or(MAX_DEFAULT_BUDGET / 10, |size| {
-        (size / 5).min(MAX_DEFAULT_BUDGET)
+    disk_space(probe).map_or(MAX_DEFAULT_BUDGET / 10, |(size, free)| {
+        (size / 5).min(free / 2).min(MAX_DEFAULT_BUDGET)
     })
 }
 
+/// The size of `path`'s volume and the bytes free on it for this user.
 #[cfg(unix)]
-fn disk_size(path: &Path) -> Option<u64> {
+pub(crate) fn disk_space(path: &Path) -> Option<(u64, u64)> {
     use std::os::unix::ffi::OsStrExt;
     let c = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
     let mut st: libc::statvfs = unsafe { std::mem::zeroed() };
     // SAFETY: `c` is a valid NUL-terminated path and `st` a writable
     // statvfs the call fills in.
     let rc = unsafe { libc::statvfs(c.as_ptr(), &mut st) };
-    (rc == 0).then(|| st.f_blocks as u64 * st.f_frsize as u64)
+    let block = st.f_frsize as u64;
+    (rc == 0).then(|| (st.f_blocks as u64 * block, st.f_bavail as u64 * block))
 }
 
 #[cfg(not(unix))]
-fn disk_size(_path: &Path) -> Option<u64> {
+pub(crate) fn disk_space(_path: &Path) -> Option<(u64, u64)> {
     None
 }

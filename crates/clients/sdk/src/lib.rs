@@ -42,6 +42,7 @@ pub mod names;
 pub mod operations;
 mod paging;
 pub mod protection;
+pub mod read_stats;
 pub mod repo;
 pub mod review;
 pub mod secrets;

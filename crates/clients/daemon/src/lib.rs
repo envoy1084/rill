@@ -8,6 +8,7 @@ pub mod client;
 mod clients;
 pub mod config;
 mod daemon;
+pub mod doctor;
 pub mod eager;
 pub mod error;
 #[cfg(target_os = "linux")]

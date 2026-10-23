@@ -27,6 +27,7 @@ postcard = { workspace = true }
 redb = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
+hdrhistogram = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 dirs = { workspace = true }

@@ -18,18 +18,25 @@ impl RepoClient {
         if let ContentRef::Inline { bytes } = content {
             return Ok(bytes.clone());
         }
+        let reads = self.client.read_counters();
         if let (ContentRef::Blob { hash, .. }, Some(tier)) = (content, self.client.cache_tier()) {
             let grant = self.grants().for_hash(hash);
             if !grant.is_empty() {
+                let started = std::time::Instant::now();
                 if let Some(bytes) = tier
                     .blob(&self.repo, hash, &grant, self.client.bearer())
                     .await
                 {
+                    reads.regional(started.elapsed());
                     return Ok(bytes);
                 }
             }
+            reads.fallback();
         }
-        self.get_blob_range(content, None, None).await
+        let started = std::time::Instant::now();
+        let bytes = self.get_blob_range(content, None, None).await?;
+        reads.origin(started.elapsed());
+        Ok(bytes)
     }
 
     /// A byte range of a blob; `None` bounds mean the start or the end.

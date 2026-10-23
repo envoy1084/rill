@@ -57,6 +57,8 @@ pub struct Mount {
     pub(crate) view: Mutex<Option<Box<dyn Send>>>,
     /// Commits what a view still buffers (macOS writes between flushes).
     pub(crate) settler: OnceLock<Settler>,
+    /// When edits last reached the server.
+    pub(crate) last_sync: Mutex<Option<std::time::SystemTime>>,
 }
 
 /// Commits a view's buffered writes.
@@ -102,6 +104,7 @@ impl Mount {
             uploaded: moka::sync::Cache::new(1 << 16),
             view: Mutex::new(None),
             settler: OnceLock::new(),
+            last_sync: Mutex::new(None),
         }
     }
 

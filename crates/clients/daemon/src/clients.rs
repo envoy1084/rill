@@ -44,6 +44,15 @@ impl Clients {
         }
     }
 
+    /// Where every client's blob reads were served from.
+    pub fn read_stats(&self) -> rill_sdk::read_stats::ReadStats {
+        let mut total = rill_sdk::read_stats::ReadStats::default();
+        for (_, client) in self.entries.lock().values() {
+            total.merge(&client.read_stats());
+        }
+        total
+    }
+
     /// The client for `endpoint`.
     pub fn get(&self, endpoint: &str) -> Result<Client> {
         if let Some((_, client)) = self.entries.lock().get(endpoint) {

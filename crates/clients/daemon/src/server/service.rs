@@ -62,6 +62,20 @@ impl pb::DaemonService for DaemonSvc {
         _request: ServiceRequest<'_, pb::GetDaemonRequest>,
     ) -> Reply<pb::GetDaemonResponse> {
         let s = self.daemon.cache_stats();
+        let ms = |d: std::time::Duration| d.as_secs_f64() * 1e3;
+        let tier = |t: rill_sdk::read_stats::TierStats| pb::TierStats {
+            reads: t.reads,
+            p50_ms: ms(t.p50),
+            p99_ms: ms(t.p99),
+        };
+        let reads = self.daemon.read_stats();
+        let (local, p50, p99) = self.daemon.local_reads();
+        let daemon = self.daemon.clone();
+        let warnings = tokio::task::spawn_blocking(move || crate::doctor::check(&daemon))
+            .await
+            .unwrap_or_default();
+        let dir = self.daemon.config().dir.clone();
+        let free = crate::config::disk_space(&dir.cache()).map_or(0, |(_, f)| f);
         reply(Ok(pb::GetDaemonResponse {
             version: env!("CARGO_PKG_VERSION").into(),
             pid: std::process::id(),
@@ -75,6 +89,25 @@ impl pb::DaemonService for DaemonSvc {
             }
             .into(),
             mounts: self.daemon.mounts().len() as u32,
+            local: pb::TierStats {
+                reads: local,
+                p50_ms: ms(p50),
+                p99_ms: ms(p99),
+            }
+            .into(),
+            regional: tier(reads.regional()).into(),
+            origin: tier(reads.origin()).into(),
+            regional_fallbacks: reads.regional_fallbacks,
+            cache_free_bytes: free,
+            warnings: warnings
+                .into_iter()
+                .map(|w| pb::Warning {
+                    subject: w.subject,
+                    message: w.message,
+                    fix: w.fix,
+                })
+                .collect(),
+            dir: dir.root().display().to_string(),
         }))
     }
 

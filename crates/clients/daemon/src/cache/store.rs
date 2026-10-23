@@ -115,13 +115,30 @@ impl ObjectCache {
         }
     }
 
+    /// The object's bytes without counting a hit or a miss.
+    pub fn peek(&self, hash: &ObjectHash) -> Result<Option<Bytes>> {
+        if !self.lru.lock().touch(hash) {
+            return Ok(None);
+        }
+        match fs::read(self.path_of(hash)) {
+            Ok(bytes) => Ok(Some(Bytes::from(bytes))),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                self.lru.lock().remove(hash);
+                Ok(None)
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+
     /// Store an object (a no-op when held) and evict to the budget.
-    pub fn put(&self, hash: &ObjectHash, bytes: &[u8]) -> Result<()> {
+    /// `durable` objects (local edits, which exist nowhere else) are
+    /// synced to disk; fetched ones can be fetched again, so are not.
+    pub fn put(&self, hash: &ObjectHash, bytes: &[u8], durable: bool) -> Result<()> {
         if self.lru.lock().touch(hash) {
             return Ok(());
         }
         let path = self.path_of(hash);
-        write_atomically(&path, bytes)?;
+        write_file(&path, bytes, durable)?;
         let evicted = self.lru.lock().insert(*hash, bytes.len() as u64);
         self.delete(&evicted);
         Ok(())
@@ -161,14 +178,20 @@ impl ObjectCache {
     }
 }
 
-/// Write to a temporary sibling, then rename, so a reader never sees a
-/// partial object.
+/// Write durably to a temporary sibling, then rename, so a reader never
+/// sees a partial file and a crash keeps one whole version.
 pub(crate) fn write_atomically(path: &Path, bytes: &[u8]) -> Result<()> {
+    write_file(path, bytes, true)
+}
+
+fn write_file(path: &Path, bytes: &[u8], durable: bool) -> Result<()> {
     let parent = path.parent().unwrap_or(Path::new("."));
     fs::create_dir_all(parent)?;
     let mut tmp = tempfile_in(parent)?;
     tmp.1.write_all(bytes)?;
-    tmp.1.sync_data()?;
+    if durable {
+        tmp.1.sync_data()?;
+    }
     fs::rename(&tmp.0, path)?;
     Ok(())
 }
@@ -191,13 +214,13 @@ mod tests {
         let b = ObjectHash::digest(ObjectKind::Blob, b"b");
         {
             let cache = ObjectCache::open(dir.path(), 100).unwrap();
-            cache.put(&a, &[0; 60]).unwrap();
-            cache.put(&b, &[1; 30]).unwrap();
+            cache.put(&a, &[0; 60], true).unwrap();
+            cache.put(&b, &[1; 30], true).unwrap();
         }
         let cache = ObjectCache::open(dir.path(), 100).unwrap();
         assert_eq!(cache.get(&b).unwrap().unwrap().len(), 30);
         let c = ObjectHash::digest(ObjectKind::Blob, b"c");
-        cache.put(&c, &[2; 30]).unwrap();
+        cache.put(&c, &[2; 30], true).unwrap();
         assert!(!cache.contains(&a), "the oldest object is evicted");
         assert!(!cache.path_of(&a).exists());
         assert_eq!(cache.stats().evictions, 1);

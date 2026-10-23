@@ -41,6 +41,7 @@ reqwest = { workspace = true }
 keyring = { workspace = true }
 serde_json = { workspace = true }
 parking_lot = { workspace = true }
+hdrhistogram = { workspace = true }
 postcard = { workspace = true }
 
 [dev-dependencies]

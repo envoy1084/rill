@@ -46,10 +46,23 @@ pub(crate) fn record_to_proto(r: &MountRecord) -> pb::Mount {
 }
 
 pub(crate) fn mount_to_proto(m: &Mount) -> pb::Mount {
+    let record = m.record();
+    let view = match record.mode {
+        MountMode::Eager => "eager",
+        _ if cfg!(target_os = "macos") => "nfs",
+        _ => "fuse",
+    };
+    let last_sync_ms = m
+        .last_sync
+        .lock()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_millis() as i64);
     pb::Mount {
         pending: m.pending_count() as u64,
         sync_error: m.sync_error.lock().clone().unwrap_or_default(),
-        ..record_to_proto(&m.record())
+        last_sync_ms,
+        view: view.into(),
+        ..record_to_proto(&record)
     }
 }
 

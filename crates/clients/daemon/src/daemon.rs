@@ -104,6 +104,16 @@ impl Daemon {
         self.shared.content.cache().stats()
     }
 
+    /// Where blob reads were served from, over every server client.
+    pub fn read_stats(&self) -> rill_sdk::read_stats::ReadStats {
+        self.shared.clients.read_stats()
+    }
+
+    /// Reads the host cache served: count, median, 99th percentile.
+    pub fn local_reads(&self) -> (u64, std::time::Duration, std::time::Duration) {
+        self.shared.content.hit_latency()
+    }
+
     /// Every mount.
     pub fn mounts(&self) -> Vec<Arc<Mount>> {
         self.mounts.read().values().cloned().collect()

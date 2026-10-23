@@ -63,6 +63,7 @@ impl Mount {
             None,
         )
         .await?;
+        *self.last_sync.lock() = Some(std::time::SystemTime::now());
         Ok(pushed as u64)
     }
 }

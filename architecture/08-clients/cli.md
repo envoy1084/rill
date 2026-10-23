@@ -67,7 +67,9 @@ Behaviours worth knowing:
   [client daemon](daemon.md), found from the checkout's `.rill/mount.json`
   and started in the background when it is not running. `--daemon-dir`
   (or `RILL_DAEMON_DIR`) picks another daemon; `rill daemon run | start |
-  stop | status` manage it.
+  stop | status | unmount` manage it, and `rill doctor` reports the
+  server, the daemon, reads per cache tier, each checkout and what to
+  fix.
 - `rill import git <path> --repo R` imports through the server the client
   is configured for; `--storage-dir DIR` (or `RILL_STORAGE_DIR`) opens
   `LocalStores` directly instead. `rill export git <dir>` mirrors trunk into

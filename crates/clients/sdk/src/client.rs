@@ -234,6 +234,7 @@ pub struct Client {
     headers: CallHeaders,
     grants: crate::grants::ReadGrants,
     cache: Option<crate::cache_tier::CacheTier>,
+    reads: Arc<crate::read_stats::ReadCounters>,
 }
 
 impl std::fmt::Debug for Client {
@@ -266,6 +267,7 @@ impl Client {
                         seen: RelationsSeen::default(),
                     },
                     grants: Default::default(),
+                    reads: Default::default(),
                 });
             }
         }
@@ -314,12 +316,22 @@ impl Client {
             connection,
             headers,
             grants: Default::default(),
+            reads: Default::default(),
         })
     }
 
     /// The regional cache blobs are read through, if one is configured.
     pub(crate) fn cache_tier(&self) -> Option<&crate::cache_tier::CacheTier> {
         self.cache.as_ref()
+    }
+
+    /// Where this client's blob reads were served from, and how fast.
+    pub fn read_stats(&self) -> crate::read_stats::ReadStats {
+        self.reads.snapshot()
+    }
+
+    pub(crate) fn read_counters(&self) -> &crate::read_stats::ReadCounters {
+        &self.reads
     }
 
     /// The bearer token the next request would carry.

@@ -94,6 +94,9 @@ pub enum Command {
     #[command(subcommand)]
     Daemon(daemon::DaemonCmd),
 
+    /// How this host serves checkouts: server, daemon, cache tiers, warnings.
+    Doctor,
+
     /// Local changes in the checkout.
     Status(status::StatusArgs),
 

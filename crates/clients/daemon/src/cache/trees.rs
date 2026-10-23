@@ -41,7 +41,7 @@ impl TreeCache {
                 let tree = Arc::new(repo.tree(hash).await?);
                 let bytes = postcard::to_stdvec(tree.as_ref())?;
                 let disk = self.disk.clone();
-                tokio::task::spawn_blocking(move || disk.put(&hash, &bytes)).await??;
+                tokio::task::spawn_blocking(move || disk.put(&hash, &bytes, false)).await??;
                 tree
             }
         };

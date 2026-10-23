@@ -9,6 +9,7 @@ pub mod change;
 pub mod checkout;
 pub mod checks;
 pub mod daemon;
+pub mod doctor;
 pub mod export;
 pub mod health;
 pub mod history;

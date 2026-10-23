@@ -41,9 +41,12 @@ session in the CLI's credential store.
 Content-addressed files under `cache/objects/ab/<hash>`, written to a
 temporary sibling and renamed, shared by every mount. An LRU with pins
 (`cache/lru.rs`, pure, property-tested) keeps unpinned bytes within a
-budget: 20% of the disk, at most 200 GB. Overlay content is pinned until
+budget: 20% of the disk, at most half its free space and at most 200 GB. Overlay content is pinned until
 its entry goes, so unsynced edits are never evicted. On open the cache
-re-indexes what is on disk by modification time. A blob fetched from the
+re-indexes what is on disk by modification time. Only local edits are
+synced to disk when written; fetched objects can be fetched again, so
+they are written without a sync. Concurrent readers of a missing object
+share one fetch. A blob fetched from the
 server is checked against its hash before it is kept; chunked content is
 trusted from the transport and its digest remembered. Trees go through a
 second cache (moka in memory, the object cache on disk): a tree hash
@@ -146,6 +149,26 @@ grant the listing returned and the caller's token), checks the hash, and
 falls back to `ReadBlob` on any failure. A CI host with a cold local cache
 then reads from the region instead of the origin.
 
+## Doctor
+
+`rill doctor` asks the server who you are (and how fast it answers), then
+the daemon, without starting it, for:
+
+* the cache's size, budget and the free space on its volume;
+* where blob reads were served from, with medians: the host cache
+  (timed in `Content::get`), the regional cache and the origin (the
+  SDK's `read_stats`, merged over the daemon's clients), and the reads
+  the regional cache could not serve;
+* each checkout's view (`eager`, `fuse`, `nfs`), base, pending edits and
+  last sync or sync error;
+* warnings with a fix (`doctor.rs`): little free space, a budget larger
+  than the space available, lazy checkouts unavailable (no `/dev/fuse`
+  or `fusermount3` on Linux), a regional cache that serves nothing, a
+  sync failing (and `rill login` when it is an expired session), a view
+  that no longer answers, Spotlight indexing a lazy checkout.
+
+`--json` prints the same as `rill.cli.v1.doctor`.
+
 ## API
 
 `rill.daemon.v1.DaemonService` (`proto/rill/daemon/v1/daemon.proto`),
@@ -158,7 +181,7 @@ server keep their code and details; its own map to `NOT_FOUND`,
 
 | RPC | Does |
 | --- | --- |
-| `GetDaemon` | Version, pid, cache counters |
+| `GetDaemon` | Version, pid, cache counters, reads per tier, host warnings |
 | `CreateMount`, `GetMount`, `ListMounts`, `DeleteMount` | Mounts by name or by a path inside one |
 | `GetStatus` | Changes against the base |
 | `SyncMount` | Push now |

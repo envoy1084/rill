@@ -259,7 +259,8 @@ async fn mount(
 }
 
 fn lazy_supported() -> bool {
-    cfg!(target_os = "linux") && Path::new("/dev/fuse").exists()
+    (cfg!(target_os = "linux") && Path::new("/dev/fuse").exists())
+        || (cfg!(target_os = "macos") && Path::new("/sbin/mount_nfs").exists())
 }
 
 /// The lazy clone to a usable shell (Linux), then status latency with

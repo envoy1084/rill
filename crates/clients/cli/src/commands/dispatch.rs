@@ -3,8 +3,8 @@
 use clap::CommandFactory;
 
 use super::{
-    access, admin, change, checkout, daemon, export, health, history, identity, import, intent,
-    land, org, refs, release, repo, review, session, stack, status, watch, ws,
+    access, admin, change, checkout, daemon, doctor, export, health, history, identity, import,
+    intent, land, org, refs, release, repo, review, session, stack, status, watch, ws,
 };
 use crate::cli::{Cli, Command};
 use crate::context::Ctx;
@@ -21,6 +21,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
             | Command::Logout
             | Command::Completions(_)
             | Command::Daemon(_)
+            | Command::Doctor
     );
     if !local {
         ctx.resolve_workload().await?;
@@ -30,6 +31,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Org(cmd) => org::run(ctx, cmd).await,
         Command::Checkout(args) => checkout::run(ctx, args).await,
         Command::Daemon(cmd) => daemon::run(ctx, cmd).await,
+        Command::Doctor => doctor::run(ctx).await,
         Command::Status(args) => status::status(ctx, args).await,
         Command::Diff(args) => status::diff(ctx, args).await,
         Command::Log(args) => history::log(ctx, args).await,
