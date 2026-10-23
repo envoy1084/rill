@@ -3,6 +3,7 @@
 //! evaluate.
 
 mod args;
+mod browse;
 mod dispatch;
 mod lifecycle;
 mod render;

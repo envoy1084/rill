@@ -9,6 +9,12 @@ use crate::Result;
 /// Run a review subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: ReviewCmd) -> Result<()> {
     match cmd {
+        ReviewCmd::Open(args) => {
+            let repo = ctx.repo()?;
+            let id = super::working_change::change_or_working(ctx, args.change.as_deref(), &repo)
+                .await?;
+            super::browse::open(ctx, id).await
+        }
         ReviewCmd::Show(args) => show(ctx, args).await,
         ReviewCmd::List(args) => list(ctx, args).await,
         ReviewCmd::Vote(args) => vote(ctx, args).await,

@@ -12,6 +12,9 @@ pub struct SubmitArgs {
 /// `rill review <subcommand>`.
 #[derive(Subcommand, Debug)]
 pub enum ReviewCmd {
+    /// Review a change full-screen: files, diffs, threads; comment, approve,
+    /// reject.
+    Open(ChangeArg),
     /// Show a review: status, votes, threads, risk.
     Show(ChangeArg),
     /// List reviews.

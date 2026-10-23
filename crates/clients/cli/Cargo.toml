@@ -57,6 +57,7 @@ indicatif = { workspace = true }
 inquire = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
+ansi-to-tui = { workspace = true }
 supports-hyperlinks = { workspace = true }
 clap_mangen = { workspace = true }
 tokio = { workspace = true }
