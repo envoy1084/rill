@@ -62,6 +62,7 @@ impl Targets {
             ("change", "ApplyEdits") => return None,
             ("change", _) => self.change.clone(),
             ("review", _) => review,
+            ("path", "GetOwners") => "pub/probe.rs".to_string(),
             ("landing", _) => names::position("acl", 1),
             ("run", _) => format!("{repo}/runs/probe"),
             ("version", "ReleaseVersion") => self.version.clone(),

@@ -49,62 +49,63 @@ Read in this order the first time; each page ends with Previous / Next links.
 18. [Checkouts](04-workflow/checkouts.md)
 19. [Changes and stacks](04-workflow/changes-and-stacks.md)
 20. [Review](04-workflow/review.md)
-21. [Review agents](04-workflow/review-agents.md)
-22. [Landing](04-workflow/landing.md)
-23. [Post-land verification](04-workflow/post-land-verification.md)
-24. [Intents](04-workflow/intents.md)
+21. [Code owners](04-workflow/ownership.md)
+22. [Review agents](04-workflow/review-agents.md)
+23. [Landing](04-workflow/landing.md)
+24. [Post-land verification](04-workflow/post-land-verification.md)
+25. [Intents](04-workflow/intents.md)
 
 **05 Policy**
 
-25. [Identity and authentication](05-policy/identity-and-auth.md)
-26. [Capability tokens](05-policy/capability-tokens.md)
-27. [Token keys](05-policy/token-keys.md)
-28. [Permissions](05-policy/permissions.md)
-29. [Risk classification](05-policy/risk-classification.md)
-30. [Submit policy](05-policy/submit-policy.md)
-31. [Signing](05-policy/signing.md)
-32. [Audit log](05-policy/audit.md)
-33. [Data protection](05-policy/data-protection.md)
-34. [Threat model](05-policy/threat-model.md)
-35. [Security review packet](05-policy/security-review.md)
+26. [Identity and authentication](05-policy/identity-and-auth.md)
+27. [Capability tokens](05-policy/capability-tokens.md)
+28. [Token keys](05-policy/token-keys.md)
+29. [Permissions](05-policy/permissions.md)
+30. [Risk classification](05-policy/risk-classification.md)
+31. [Submit policy](05-policy/submit-policy.md)
+32. [Signing](05-policy/signing.md)
+33. [Audit log](05-policy/audit.md)
+34. [Data protection](05-policy/data-protection.md)
+35. [Threat model](05-policy/threat-model.md)
+36. [Security review packet](05-policy/security-review.md)
 
 **06 Services**
 
-36. [Search](06-services/search.md)
-37. [Exec](06-services/exec.md)
-38. [Remote execution](06-services/remote-execution.md)
-39. [Checks](06-services/checks.md)
-40. [Git import and export](06-services/git-import.md)
+37. [Search](06-services/search.md)
+38. [Exec](06-services/exec.md)
+39. [Remote execution](06-services/remote-execution.md)
+40. [Checks](06-services/checks.md)
+41. [Git import and export](06-services/git-import.md)
 
 **07 Runtime**
 
-41. [Server](07-runtime/server.md)
-42. [API surface](07-runtime/api-surface.md)
-43. [API reference](07-runtime/api-reference.md)
-44. [Events and workers](07-runtime/events-and-workers.md)
-45. [Configuration](07-runtime/configuration.md)
-46. [Observability](07-runtime/observability.md)
-47. [Cache tier](07-runtime/cache.md)
+42. [Server](07-runtime/server.md)
+43. [API surface](07-runtime/api-surface.md)
+44. [API reference](07-runtime/api-reference.md)
+45. [Events and workers](07-runtime/events-and-workers.md)
+46. [Configuration](07-runtime/configuration.md)
+47. [Observability](07-runtime/observability.md)
+48. [Cache tier](07-runtime/cache.md)
 
 **08 Clients**
 
-48. [SDK](08-clients/sdk.md)
-49. [SDKs in other languages](08-clients/other-sdks.md)
-50. [Client daemon](08-clients/daemon.md)
-51. [CLI](08-clients/cli.md)
-52. [MCP server](08-clients/mcp.md)
-53. [IDE extensions](08-clients/ide.md)
+49. [SDK](08-clients/sdk.md)
+50. [SDKs in other languages](08-clients/other-sdks.md)
+51. [Client daemon](08-clients/daemon.md)
+52. [CLI](08-clients/cli.md)
+53. [MCP server](08-clients/mcp.md)
+54. [IDE extensions](08-clients/ide.md)
 
 **09 Engineering**
 
-54. [Development](09-engineering/development.md)
-55. [Testing](09-engineering/testing.md)
-56. [Simulation](09-engineering/simulation.md)
-57. [Performance](09-engineering/performance.md)
+55. [Development](09-engineering/development.md)
+56. [Testing](09-engineering/testing.md)
+57. [Simulation](09-engineering/simulation.md)
+58. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-58. [Architecture decisions](10-decisions/README.md): the twenty ADRs that
+59. [Architecture decisions](10-decisions/README.md): the twenty ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -126,6 +127,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | How a working copy reaches the server | [Workspaces](04-workflow/workspaces.md), [Checkouts](04-workflow/checkouts.md) |
 | Amend, versions and stacks | [Changes and stacks](04-workflow/changes-and-stacks.md) |
 | Labels, votes, threads | [Review](04-workflow/review.md) |
+| Who must approve which paths, escalation | [Code owners](04-workflow/ownership.md) |
 | How trunk moves and sequence numbers are assigned | [Landing](04-workflow/landing.md) |
 | Bisect and automatic revert | [Post-land verification](04-workflow/post-land-verification.md) |
 | Who a caller is and what they may do | [Identity and authentication](05-policy/identity-and-auth.md), [Capability tokens](05-policy/capability-tokens.md), [Token keys](05-policy/token-keys.md), [Permissions](05-policy/permissions.md) |

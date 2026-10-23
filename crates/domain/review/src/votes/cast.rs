@@ -23,7 +23,9 @@ impl ReviewService {
     ) -> Result<ReviewState> {
         validate_vote(&self.labels, voter, label, value)?;
         let current = self.get(change_id).await?;
-        let facts = self.change_facts(&current).await?;
+        let facts = self
+            .change_facts_with(&current, std::slice::from_ref(voter))
+            .await?;
         let (state, (vote, transition)) = self
             .update(change_id, voter, |s| {
                 if !matches!(s.status, ReviewStatus::Open | ReviewStatus::Landable) {

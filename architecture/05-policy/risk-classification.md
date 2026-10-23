@@ -27,6 +27,7 @@ the version, its tree diff against the first parent, and its linked intent.
 | `paths: Vec<PathFacts>` | One per `diff_trees` entry, plus conflicted paths with no tree difference. Cached as derived data under `review-paths@1`. |
 | `total_files`, `total_lines` | Derived from `paths` by `ChangeFacts::new`. A caller that truncates `paths` keeps the true counts. |
 | `intent_kind`, `risk_override` | The linked `Intent`, when `cv.intent` resolves. |
+| `owner_sets`, `people` | The owner sets of the touched paths at trunk's head, and the teams and sponsors of the people involved ([code owners](../04-workflow/ownership.md)). |
 | `stack_depth` | Index of the change in `ReviewState::stack`, set by `change_facts`. |
 
 `PathFacts` records `added`, `modified`, `deleted`, `conflict`,
@@ -68,6 +69,8 @@ list as `risk_reasons`.
 | 1 | otherwise | `Normal` | none |
 | 2 | sensitive glob match | `max(class, floor)` | `sensitive path <p> matches "<glob>" (at least <class>)` |
 | 2 | first component is `.rill` | `Critical` | `policy file <p> under .rill/` |
+| 2 | file name is `OWNERS.toml` | at least `Sensitive` | `sensitive path <p> changes ownership` |
+| 2 | a touched owner set is `sensitive` | at least `Sensitive` | `sensitive path owners rule <set> is sensitive` |
 | 3 | `provenance.resolved_by == "agent"` | `bump()` | `conflict resolved by agent` |
 | 3 | any path in conflict | `bump()` | `unresolved conflicts` |
 | 3 | `total_files > max_files` | `bump()` | `<n> files exceeds <max>` |

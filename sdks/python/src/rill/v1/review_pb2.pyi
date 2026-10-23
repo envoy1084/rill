@@ -233,3 +233,63 @@ class WatchReviewResponse(_message.Message):
     new_version: bytes
     land_update: _landing_pb2.LandRequest
     def __init__(self, change_id: _Optional[bytes] = ..., at: _Optional[int] = ..., status_changed: _Optional[_Union[_types_pb2.ReviewStatus, str]] = ..., voted: _Optional[_Union[_types_pb2.LabelVote, _Mapping]] = ..., thread_updated: _Optional[_Union[_types_pb2.Thread, _Mapping]] = ..., new_version: _Optional[bytes] = ..., land_update: _Optional[_Union[_landing_pb2.LandRequest, _Mapping]] = ...) -> None: ...
+
+class OwnerSet(_message.Message):
+    __slots__ = ("id", "dir", "owners", "required", "sensitive", "sla_ms", "escalate_to")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    DIR_FIELD_NUMBER: _ClassVar[int]
+    OWNERS_FIELD_NUMBER: _ClassVar[int]
+    REQUIRED_FIELD_NUMBER: _ClassVar[int]
+    SENSITIVE_FIELD_NUMBER: _ClassVar[int]
+    SLA_MS_FIELD_NUMBER: _ClassVar[int]
+    ESCALATE_TO_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    dir: str
+    owners: _containers.RepeatedScalarFieldContainer[str]
+    required: int
+    sensitive: bool
+    sla_ms: int
+    escalate_to: str
+    def __init__(self, id: _Optional[str] = ..., dir: _Optional[str] = ..., owners: _Optional[_Iterable[str]] = ..., required: _Optional[int] = ..., sensitive: _Optional[bool] = ..., sla_ms: _Optional[int] = ..., escalate_to: _Optional[str] = ...) -> None: ...
+
+class GetOwnersRequest(_message.Message):
+    __slots__ = ("repo", "path")
+    REPO_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    repo: str
+    path: str
+    def __init__(self, repo: _Optional[str] = ..., path: _Optional[str] = ...) -> None: ...
+
+class GetOwnersResponse(_message.Message):
+    __slots__ = ("sets",)
+    SETS_FIELD_NUMBER: _ClassVar[int]
+    sets: _containers.RepeatedCompositeFieldContainer[OwnerSet]
+    def __init__(self, sets: _Optional[_Iterable[_Union[OwnerSet, _Mapping]]] = ...) -> None: ...
+
+class ExplainOwnershipRequest(_message.Message):
+    __slots__ = ("change",)
+    CHANGE_FIELD_NUMBER: _ClassVar[int]
+    change: str
+    def __init__(self, change: _Optional[str] = ...) -> None: ...
+
+class OwnerSetStatus(_message.Message):
+    __slots__ = ("set", "approvals", "covered", "escalated_to", "escalations")
+    SET_FIELD_NUMBER: _ClassVar[int]
+    APPROVALS_FIELD_NUMBER: _ClassVar[int]
+    COVERED_FIELD_NUMBER: _ClassVar[int]
+    ESCALATED_TO_FIELD_NUMBER: _ClassVar[int]
+    ESCALATIONS_FIELD_NUMBER: _ClassVar[int]
+    set: OwnerSet
+    approvals: int
+    covered: bool
+    escalated_to: str
+    escalations: int
+    def __init__(self, set: _Optional[_Union[OwnerSet, _Mapping]] = ..., approvals: _Optional[int] = ..., covered: _Optional[bool] = ..., escalated_to: _Optional[str] = ..., escalations: _Optional[int] = ...) -> None: ...
+
+class ExplainOwnershipResponse(_message.Message):
+    __slots__ = ("sets", "covered")
+    SETS_FIELD_NUMBER: _ClassVar[int]
+    COVERED_FIELD_NUMBER: _ClassVar[int]
+    sets: _containers.RepeatedCompositeFieldContainer[OwnerSetStatus]
+    covered: bool
+    def __init__(self, sets: _Optional[_Iterable[_Union[OwnerSetStatus, _Mapping]]] = ..., covered: _Optional[bool] = ...) -> None: ...

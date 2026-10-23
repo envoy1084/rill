@@ -62,6 +62,8 @@ pub struct RepoContext {
     pub lifecycle: Arc<super::Lifecycle>,
     pub(super) review: Arc<ArcSwap<ReviewService>>,
     pub(super) review_events: broadcast::Sender<ReviewEvent>,
+    /// Teams and sponsors for review.
+    pub(super) directory: Arc<dyn rill_policy::Directory>,
     pub(super) server_config: Arc<ServerConfig>,
     /// Signs an attestation for every committed version.
     pub attestor: Arc<rill_policy::Signer>,
@@ -145,6 +147,7 @@ impl RepoContext {
             &self.labels,
             &self.server_config,
             self.review_events.clone(),
+            self.directory.clone(),
         )
         .await?;
         self.review.store(Arc::new(service));

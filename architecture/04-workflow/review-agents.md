@@ -103,4 +103,4 @@ conflicts to the owner instead of invoking resolvers.
 * [rill-review/tests/review/review_flow.rs](../../crates/domain/review/tests/review/review_flow.rs)
 
 ---
-← Previous: [Review](review.md) · [Index](../index.md) · Next: [Landing](landing.md) →
+← Previous: [Code owners](ownership.md) · [Index](../index.md) · Next: [Landing](landing.md) →

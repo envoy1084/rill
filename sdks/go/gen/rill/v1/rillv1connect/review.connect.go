@@ -72,6 +72,11 @@ const (
 	// ReviewServiceWatchReviewProcedure is the fully-qualified name of the ReviewService's WatchReview
 	// RPC.
 	ReviewServiceWatchReviewProcedure = "/rill.v1.ReviewService/WatchReview"
+	// ReviewServiceGetOwnersProcedure is the fully-qualified name of the ReviewService's GetOwners RPC.
+	ReviewServiceGetOwnersProcedure = "/rill.v1.ReviewService/GetOwners"
+	// ReviewServiceExplainOwnershipProcedure is the fully-qualified name of the ReviewService's
+	// ExplainOwnership RPC.
+	ReviewServiceExplainOwnershipProcedure = "/rill.v1.ReviewService/ExplainOwnership"
 )
 
 // ReviewServiceClient is a client for the rill.v1.ReviewService service.
@@ -100,6 +105,10 @@ type ReviewServiceClient interface {
 	AbandonChange(context.Context, *connect.Request[v1.AbandonChangeRequest]) (*connect.Response[v1.AbandonChangeResponse], error)
 	// A review's updates as they happen.
 	WatchReview(context.Context, *connect.Request[v1.WatchReviewRequest]) (*connect.ServerStreamForClient[v1.WatchReviewResponse], error)
+	// The owner sets covering a path, by trunk's `OWNERS.toml` files.
+	GetOwners(context.Context, *connect.Request[v1.GetOwnersRequest]) (*connect.Response[v1.GetOwnersResponse], error)
+	// Each owner set a change touches, with its approvals and escalation.
+	ExplainOwnership(context.Context, *connect.Request[v1.ExplainOwnershipRequest]) (*connect.Response[v1.ExplainOwnershipResponse], error)
 }
 
 // NewReviewServiceClient constructs a client for the rill.v1.ReviewService service. By default, it
@@ -185,23 +194,37 @@ func NewReviewServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(reviewServiceMethods.ByName("WatchReview")),
 			connect.WithClientOptions(opts...),
 		),
+		getOwners: connect.NewClient[v1.GetOwnersRequest, v1.GetOwnersResponse](
+			httpClient,
+			baseURL+ReviewServiceGetOwnersProcedure,
+			connect.WithSchema(reviewServiceMethods.ByName("GetOwners")),
+			connect.WithClientOptions(opts...),
+		),
+		explainOwnership: connect.NewClient[v1.ExplainOwnershipRequest, v1.ExplainOwnershipResponse](
+			httpClient,
+			baseURL+ReviewServiceExplainOwnershipProcedure,
+			connect.WithSchema(reviewServiceMethods.ByName("ExplainOwnership")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // reviewServiceClient implements ReviewServiceClient.
 type reviewServiceClient struct {
-	getReview       *connect.Client[v1.GetReviewRequest, v1.GetReviewResponse]
-	batchGetReviews *connect.Client[v1.BatchGetReviewsRequest, v1.BatchGetReviewsResponse]
-	listReviews     *connect.Client[v1.ListReviewsRequest, v1.ListReviewsResponse]
-	submitChange    *connect.Client[v1.SubmitChangeRequest, v1.SubmitChangeResponse]
-	vote            *connect.Client[v1.VoteRequest, v1.VoteResponse]
-	createThread    *connect.Client[v1.CreateThreadRequest, v1.CreateThreadResponse]
-	replyThread     *connect.Client[v1.ReplyThreadRequest, v1.ReplyThreadResponse]
-	resolveThread   *connect.Client[v1.ResolveThreadRequest, v1.ResolveThreadResponse]
-	updateStack     *connect.Client[v1.UpdateStackRequest, v1.UpdateStackResponse]
-	evaluateLanding *connect.Client[v1.EvaluateLandingRequest, v1.EvaluateLandingResponse]
-	abandonChange   *connect.Client[v1.AbandonChangeRequest, v1.AbandonChangeResponse]
-	watchReview     *connect.Client[v1.WatchReviewRequest, v1.WatchReviewResponse]
+	getReview        *connect.Client[v1.GetReviewRequest, v1.GetReviewResponse]
+	batchGetReviews  *connect.Client[v1.BatchGetReviewsRequest, v1.BatchGetReviewsResponse]
+	listReviews      *connect.Client[v1.ListReviewsRequest, v1.ListReviewsResponse]
+	submitChange     *connect.Client[v1.SubmitChangeRequest, v1.SubmitChangeResponse]
+	vote             *connect.Client[v1.VoteRequest, v1.VoteResponse]
+	createThread     *connect.Client[v1.CreateThreadRequest, v1.CreateThreadResponse]
+	replyThread      *connect.Client[v1.ReplyThreadRequest, v1.ReplyThreadResponse]
+	resolveThread    *connect.Client[v1.ResolveThreadRequest, v1.ResolveThreadResponse]
+	updateStack      *connect.Client[v1.UpdateStackRequest, v1.UpdateStackResponse]
+	evaluateLanding  *connect.Client[v1.EvaluateLandingRequest, v1.EvaluateLandingResponse]
+	abandonChange    *connect.Client[v1.AbandonChangeRequest, v1.AbandonChangeResponse]
+	watchReview      *connect.Client[v1.WatchReviewRequest, v1.WatchReviewResponse]
+	getOwners        *connect.Client[v1.GetOwnersRequest, v1.GetOwnersResponse]
+	explainOwnership *connect.Client[v1.ExplainOwnershipRequest, v1.ExplainOwnershipResponse]
 }
 
 // GetReview calls rill.v1.ReviewService.GetReview.
@@ -264,6 +287,16 @@ func (c *reviewServiceClient) WatchReview(ctx context.Context, req *connect.Requ
 	return c.watchReview.CallServerStream(ctx, req)
 }
 
+// GetOwners calls rill.v1.ReviewService.GetOwners.
+func (c *reviewServiceClient) GetOwners(ctx context.Context, req *connect.Request[v1.GetOwnersRequest]) (*connect.Response[v1.GetOwnersResponse], error) {
+	return c.getOwners.CallUnary(ctx, req)
+}
+
+// ExplainOwnership calls rill.v1.ReviewService.ExplainOwnership.
+func (c *reviewServiceClient) ExplainOwnership(ctx context.Context, req *connect.Request[v1.ExplainOwnershipRequest]) (*connect.Response[v1.ExplainOwnershipResponse], error) {
+	return c.explainOwnership.CallUnary(ctx, req)
+}
+
 // ReviewServiceHandler is an implementation of the rill.v1.ReviewService service.
 type ReviewServiceHandler interface {
 	// A change's review and the labels it is voted on.
@@ -290,6 +323,10 @@ type ReviewServiceHandler interface {
 	AbandonChange(context.Context, *connect.Request[v1.AbandonChangeRequest]) (*connect.Response[v1.AbandonChangeResponse], error)
 	// A review's updates as they happen.
 	WatchReview(context.Context, *connect.Request[v1.WatchReviewRequest], *connect.ServerStream[v1.WatchReviewResponse]) error
+	// The owner sets covering a path, by trunk's `OWNERS.toml` files.
+	GetOwners(context.Context, *connect.Request[v1.GetOwnersRequest]) (*connect.Response[v1.GetOwnersResponse], error)
+	// Each owner set a change touches, with its approvals and escalation.
+	ExplainOwnership(context.Context, *connect.Request[v1.ExplainOwnershipRequest]) (*connect.Response[v1.ExplainOwnershipResponse], error)
 }
 
 // NewReviewServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -371,6 +408,18 @@ func NewReviewServiceHandler(svc ReviewServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(reviewServiceMethods.ByName("WatchReview")),
 		connect.WithHandlerOptions(opts...),
 	)
+	reviewServiceGetOwnersHandler := connect.NewUnaryHandler(
+		ReviewServiceGetOwnersProcedure,
+		svc.GetOwners,
+		connect.WithSchema(reviewServiceMethods.ByName("GetOwners")),
+		connect.WithHandlerOptions(opts...),
+	)
+	reviewServiceExplainOwnershipHandler := connect.NewUnaryHandler(
+		ReviewServiceExplainOwnershipProcedure,
+		svc.ExplainOwnership,
+		connect.WithSchema(reviewServiceMethods.ByName("ExplainOwnership")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/rill.v1.ReviewService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ReviewServiceGetReviewProcedure:
@@ -397,6 +446,10 @@ func NewReviewServiceHandler(svc ReviewServiceHandler, opts ...connect.HandlerOp
 			reviewServiceAbandonChangeHandler.ServeHTTP(w, r)
 		case ReviewServiceWatchReviewProcedure:
 			reviewServiceWatchReviewHandler.ServeHTTP(w, r)
+		case ReviewServiceGetOwnersProcedure:
+			reviewServiceGetOwnersHandler.ServeHTTP(w, r)
+		case ReviewServiceExplainOwnershipProcedure:
+			reviewServiceExplainOwnershipHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -452,4 +505,12 @@ func (UnimplementedReviewServiceHandler) AbandonChange(context.Context, *connect
 
 func (UnimplementedReviewServiceHandler) WatchReview(context.Context, *connect.Request[v1.WatchReviewRequest], *connect.ServerStream[v1.WatchReviewResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ReviewService.WatchReview is not implemented"))
+}
+
+func (UnimplementedReviewServiceHandler) GetOwners(context.Context, *connect.Request[v1.GetOwnersRequest]) (*connect.Response[v1.GetOwnersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ReviewService.GetOwners is not implemented"))
+}
+
+func (UnimplementedReviewServiceHandler) ExplainOwnership(context.Context, *connect.Request[v1.ExplainOwnershipRequest]) (*connect.Response[v1.ExplainOwnershipResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ReviewService.ExplainOwnership is not implemented"))
 }

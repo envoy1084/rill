@@ -173,24 +173,6 @@ impl Authenticator for StaticTokenAuthenticator {
     }
 }
 
-/// Looks up the teams a principal belongs to.
-#[async_trait]
-pub trait TeamResolver: Send + Sync {
-    /// Teams of `principal`, possibly empty.
-    async fn teams_of(&self, principal: &Principal) -> Result<Vec<String>>;
-}
-
-/// A resolver that returns no teams.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct NoTeams;
-
-#[async_trait]
-impl TeamResolver for NoTeams {
-    async fn teams_of(&self, _principal: &Principal) -> Result<Vec<String>> {
-        Ok(Vec::new())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

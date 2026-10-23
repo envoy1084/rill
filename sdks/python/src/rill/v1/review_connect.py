@@ -53,6 +53,12 @@ class ReviewService(Protocol):
     def watch_review(self, request: rill_dot_v1_dot_review__pb2.WatchReviewRequest, ctx: RequestContext) -> AsyncIterator[rill_dot_v1_dot_review__pb2.WatchReviewResponse]:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_owners(self, request: rill_dot_v1_dot_review__pb2.GetOwnersRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.GetOwnersResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def explain_ownership(self, request: rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class ReviewServiceASGIApplication(ConnectASGIApplication[ReviewService]):
     def __init__(self, service: ReviewService | AsyncGenerator[ReviewService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None) -> None:
@@ -178,6 +184,26 @@ class ReviewServiceASGIApplication(ConnectASGIApplication[ReviewService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.watch_review,
+                ),
+                "/rill.v1.ReviewService/GetOwners": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetOwners",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.GetOwnersRequest,
+                        output=rill_dot_v1_dot_review__pb2.GetOwnersResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_owners,
+                ),
+                "/rill.v1.ReviewService/ExplainOwnership": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ExplainOwnership",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest,
+                        output=rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.explain_ownership,
                 ),
             },
             interceptors=interceptors,
@@ -432,6 +458,46 @@ class ReviewServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_owners(
+        self,
+        request: rill_dot_v1_dot_review__pb2.GetOwnersRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.GetOwnersResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetOwners",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.GetOwnersRequest,
+                output=rill_dot_v1_dot_review__pb2.GetOwnersResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def explain_ownership(
+        self,
+        request: rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ExplainOwnership",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest,
+                output=rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 class ReviewServiceSync(Protocol):
     def get_review(self, request: rill_dot_v1_dot_review__pb2.GetReviewRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.GetReviewResponse:
@@ -457,6 +523,10 @@ class ReviewServiceSync(Protocol):
     def abandon_change(self, request: rill_dot_v1_dot_review__pb2.AbandonChangeRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.AbandonChangeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def watch_review(self, request: rill_dot_v1_dot_review__pb2.WatchReviewRequest, ctx: RequestContext) -> Iterator[rill_dot_v1_dot_review__pb2.WatchReviewResponse]:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_owners(self, request: rill_dot_v1_dot_review__pb2.GetOwnersRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.GetOwnersResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def explain_ownership(self, request: rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -583,6 +653,26 @@ class ReviewServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.watch_review,
+                ),
+                "/rill.v1.ReviewService/GetOwners": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetOwners",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.GetOwnersRequest,
+                        output=rill_dot_v1_dot_review__pb2.GetOwnersResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_owners,
+                ),
+                "/rill.v1.ReviewService/ExplainOwnership": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ExplainOwnership",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest,
+                        output=rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.explain_ownership,
                 ),
             },
             interceptors=interceptors,
@@ -831,6 +921,46 @@ class ReviewServiceClientSync(ConnectClientSync):
                 service_name="rill.v1.ReviewService",
                 input=rill_dot_v1_dot_review__pb2.WatchReviewRequest,
                 output=rill_dot_v1_dot_review__pb2.WatchReviewResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_owners(
+        self,
+        request: rill_dot_v1_dot_review__pb2.GetOwnersRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.GetOwnersResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetOwners",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.GetOwnersRequest,
+                output=rill_dot_v1_dot_review__pb2.GetOwnersResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def explain_ownership(
+        self,
+        request: rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ExplainOwnership",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest,
+                output=rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

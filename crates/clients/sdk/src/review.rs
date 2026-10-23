@@ -27,7 +27,7 @@ impl ReviewClient {
         ReviewClient { client, repo }
     }
 
-    fn svc(&self) -> crate::client::ReviewSvc {
+    pub(crate) fn svc(&self) -> crate::client::ReviewSvc {
         self.client.review_svc()
     }
 
@@ -37,6 +37,14 @@ impl ReviewClient {
 
     fn change(&self, id: &ChangeId) -> String {
         names::change(&self.repo, id)
+    }
+
+    pub(crate) fn change_name(&self, id: &ChangeId) -> String {
+        self.change(id)
+    }
+
+    pub(crate) fn repo_name(&self) -> &str {
+        &self.repo
     }
 
     fn review(&self, id: &ChangeId) -> String {

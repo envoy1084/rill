@@ -18,6 +18,15 @@ when {
 forbid(principal, action == Rill::Action::"land", resource)
 when { resource.unresolved_blocking_threads > 0 };
 
+// Every owner set (OWNERS.toml) a change touches needs its approvals,
+// unless the change is trivial or low risk.
+@id("block_uncovered_owners")
+forbid(principal, action == Rill::Action::"land", resource)
+when {
+    resource.owner_sets_missing > 0
+    && resource.risk != "trivial" && resource.risk != "low"
+};
+
 // ---- permits by risk class ----------------------------------------------
 
 // Trivial and low-risk changes land on a passing verification alone.

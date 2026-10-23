@@ -99,6 +99,15 @@ pub fn change_entity(change: &ChangeFacts, review: &SubmitFacts) -> Result<(Enti
             RestrictedExpression::new_bool(change.resolved_by_agent()),
         ),
         ("label_names", label_names),
+        ("owner_sets", long(review.owner_sets.into())),
+        (
+            "owner_sets_missing",
+            long(review.missing_owner_sets.len() as i64),
+        ),
+        (
+            "owners_covered",
+            RestrictedExpression::new_bool(review.owners_covered()),
+        ),
     ]
     .into_iter()
     .map(|(k, v)| (k.to_string(), v));

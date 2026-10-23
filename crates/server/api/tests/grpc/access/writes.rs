@@ -10,7 +10,11 @@ fn path(p: &str) -> RepoPathBuf {
     RepoPathBuf::new(p).unwrap()
 }
 
-async fn edit(c: &mut Clients, base: Option<String>, edits: Vec<pb::Edit>) -> Result<Bytes, Code> {
+pub(super) async fn edit(
+    c: &mut Clients,
+    base: Option<String>,
+    edits: Vec<pb::Edit>,
+) -> Result<Bytes, Code> {
     c.changes
         .apply_edits(pb::ApplyEditsRequest {
             parent: common::names::repo("acl"),
@@ -32,16 +36,11 @@ async fn repository_configuration_takes_owner() {
     let mut acl = Acl::start().await;
     acl.grant("", "writer", &bob()).await;
     let mut c = acl.as_principal(&bob()).await;
-    let config = || {
-        vec![set_edit(
-            ".rill/owners.toml",
-            b"[[rule]]\npath = \"\"\nowners = [\"user:bob\"]\n",
-        )]
-    };
+    let config = || vec![set_edit("pub/OWNERS.toml", b"owners = [\"user:bob\"]\n")];
     assert_eq!(
         edit(&mut c, Some(acl.at_version()), config()).await,
         Err(Code::PermissionDenied),
-        "a writer cannot make itself owner of everything"
+        "a writer cannot make itself owner of a directory it writes"
     );
     edit(
         &mut c,
@@ -126,7 +125,7 @@ async fn a_merge_is_charged_only_for_what_it_writes() {
     acl.server.stop().await;
 }
 
-async fn change_of(c: &mut Clients, version: &Bytes) -> Bytes {
+pub(super) async fn change_of(c: &mut Clients, version: &Bytes) -> Bytes {
     c.changes
         .get_version(pb::GetVersionRequest {
             name: common::names::version("acl", version),
@@ -142,7 +141,12 @@ async fn change_of(c: &mut Clients, version: &Bytes) -> Bytes {
         .change_id
 }
 
-async fn vote(c: &mut Clients, change: &Bytes, label: &str, value: i32) -> Result<(), Code> {
+pub(super) async fn vote(
+    c: &mut Clients,
+    change: &Bytes,
+    label: &str,
+    value: i32,
+) -> Result<(), Code> {
     c.review
         .vote(pb::VoteRequest {
             review: common::names::review("acl", change),
@@ -248,10 +252,7 @@ async fn owner_approvals_come_from_the_owners_file_or_the_owner_relation() {
     let owners = edit(
         &mut acl.owner,
         None,
-        vec![set_edit(
-            ".rill/owners.toml",
-            b"[[rule]]\npath = \"pub\"\nowners = [\"user:ann\"]\n",
-        )],
+        vec![set_edit("pub/OWNERS.toml", b"owners = [\"user:ann\"]\n")],
     )
     .await
     .unwrap();

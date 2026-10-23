@@ -79,6 +79,7 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Ws(cmd) => ws::run(ctx, cmd).await,
         Command::Ref(cmd) => refs::run(ctx, cmd).await,
         Command::Release(cmd) => release::run(ctx, cmd).await,
+        Command::Owners(cmd) => crate::commands::owners::run(ctx, cmd).await,
         Command::Admin(cmd) => admin::run(ctx, cmd).await,
         Command::Access(cmd) => access::run(ctx, cmd).await,
         Command::Login(args) => session::login(ctx, args).await,

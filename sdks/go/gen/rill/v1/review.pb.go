@@ -1506,6 +1506,380 @@ func (*WatchReviewResponse_NewVersion) isWatchReviewResponse_Event() {}
 
 func (*WatchReviewResponse_LandUpdate) isWatchReviewResponse_Event() {}
 
+// A group of principals of which `required` must approve a change that
+// touches the paths it covers.
+type OwnerSet struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `<dir>#default` or `<dir>#rule<n>`.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The directory whose `OWNERS.toml` declares it; empty for the root.
+	Dir string `protobuf:"bytes,2,opt,name=dir,proto3" json:"dir,omitempty"`
+	// `user:<name>`, `agent:<name>` or `team:<name>`.
+	Owners   []string `protobuf:"bytes,3,rep,name=owners,proto3" json:"owners,omitempty"`
+	Required uint32   `protobuf:"varint,4,opt,name=required,proto3" json:"required,omitempty"`
+	// Touching it makes a change at least `sensitive`.
+	Sensitive bool `protobuf:"varint,5,opt,name=sensitive,proto3" json:"sensitive,omitempty"`
+	// How long a required review may wait before escalating.
+	SlaMs         *int64  `protobuf:"varint,6,opt,name=sla_ms,json=slaMs,proto3,oneof" json:"sla_ms,omitempty"`
+	EscalateTo    *string `protobuf:"bytes,7,opt,name=escalate_to,json=escalateTo,proto3,oneof" json:"escalate_to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OwnerSet) Reset() {
+	*x = OwnerSet{}
+	mi := &file_rill_v1_review_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OwnerSet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OwnerSet) ProtoMessage() {}
+
+func (x *OwnerSet) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OwnerSet.ProtoReflect.Descriptor instead.
+func (*OwnerSet) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *OwnerSet) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *OwnerSet) GetDir() string {
+	if x != nil {
+		return x.Dir
+	}
+	return ""
+}
+
+func (x *OwnerSet) GetOwners() []string {
+	if x != nil {
+		return x.Owners
+	}
+	return nil
+}
+
+func (x *OwnerSet) GetRequired() uint32 {
+	if x != nil {
+		return x.Required
+	}
+	return 0
+}
+
+func (x *OwnerSet) GetSensitive() bool {
+	if x != nil {
+		return x.Sensitive
+	}
+	return false
+}
+
+func (x *OwnerSet) GetSlaMs() int64 {
+	if x != nil && x.SlaMs != nil {
+		return *x.SlaMs
+	}
+	return 0
+}
+
+func (x *OwnerSet) GetEscalateTo() string {
+	if x != nil && x.EscalateTo != nil {
+		return *x.EscalateTo
+	}
+	return ""
+}
+
+type GetOwnersRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `orgs/{org}/repos/{repo}`. Required.
+	Repo string `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
+	// A file path. Required.
+	Path          string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOwnersRequest) Reset() {
+	*x = GetOwnersRequest{}
+	mi := &file_rill_v1_review_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOwnersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOwnersRequest) ProtoMessage() {}
+
+func (x *GetOwnersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOwnersRequest.ProtoReflect.Descriptor instead.
+func (*GetOwnersRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetOwnersRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *GetOwnersRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type GetOwnersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sets          []*OwnerSet            `protobuf:"bytes,1,rep,name=sets,proto3" json:"sets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOwnersResponse) Reset() {
+	*x = GetOwnersResponse{}
+	mi := &file_rill_v1_review_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOwnersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOwnersResponse) ProtoMessage() {}
+
+func (x *GetOwnersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOwnersResponse.ProtoReflect.Descriptor instead.
+func (*GetOwnersResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *GetOwnersResponse) GetSets() []*OwnerSet {
+	if x != nil {
+		return x.Sets
+	}
+	return nil
+}
+
+type ExplainOwnershipRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `…/changes/{change}`. Required.
+	Change        string `protobuf:"bytes,1,opt,name=change,proto3" json:"change,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExplainOwnershipRequest) Reset() {
+	*x = ExplainOwnershipRequest{}
+	mi := &file_rill_v1_review_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExplainOwnershipRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExplainOwnershipRequest) ProtoMessage() {}
+
+func (x *ExplainOwnershipRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExplainOwnershipRequest.ProtoReflect.Descriptor instead.
+func (*ExplainOwnershipRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ExplainOwnershipRequest) GetChange() string {
+	if x != nil {
+		return x.Change
+	}
+	return ""
+}
+
+// One owner set's state for a change.
+type OwnerSetStatus struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Set   *OwnerSet              `protobuf:"bytes,1,opt,name=set,proto3" json:"set,omitempty"`
+	// Distinct approvers who count for the set.
+	Approvals uint32 `protobuf:"varint,2,opt,name=approvals,proto3" json:"approvals,omitempty"`
+	Covered   bool   `protobuf:"varint,3,opt,name=covered,proto3" json:"covered,omitempty"`
+	// Where an overdue review was escalated to, and how many times.
+	EscalatedTo   *string `protobuf:"bytes,4,opt,name=escalated_to,json=escalatedTo,proto3,oneof" json:"escalated_to,omitempty"`
+	Escalations   uint32  `protobuf:"varint,5,opt,name=escalations,proto3" json:"escalations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OwnerSetStatus) Reset() {
+	*x = OwnerSetStatus{}
+	mi := &file_rill_v1_review_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OwnerSetStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OwnerSetStatus) ProtoMessage() {}
+
+func (x *OwnerSetStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OwnerSetStatus.ProtoReflect.Descriptor instead.
+func (*OwnerSetStatus) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *OwnerSetStatus) GetSet() *OwnerSet {
+	if x != nil {
+		return x.Set
+	}
+	return nil
+}
+
+func (x *OwnerSetStatus) GetApprovals() uint32 {
+	if x != nil {
+		return x.Approvals
+	}
+	return 0
+}
+
+func (x *OwnerSetStatus) GetCovered() bool {
+	if x != nil {
+		return x.Covered
+	}
+	return false
+}
+
+func (x *OwnerSetStatus) GetEscalatedTo() string {
+	if x != nil && x.EscalatedTo != nil {
+		return *x.EscalatedTo
+	}
+	return ""
+}
+
+func (x *OwnerSetStatus) GetEscalations() uint32 {
+	if x != nil {
+		return x.Escalations
+	}
+	return 0
+}
+
+type ExplainOwnershipResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Sets  []*OwnerSetStatus      `protobuf:"bytes,1,rep,name=sets,proto3" json:"sets,omitempty"`
+	// Every set is covered (true when the change touches none).
+	Covered       bool `protobuf:"varint,2,opt,name=covered,proto3" json:"covered,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExplainOwnershipResponse) Reset() {
+	*x = ExplainOwnershipResponse{}
+	mi := &file_rill_v1_review_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExplainOwnershipResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExplainOwnershipResponse) ProtoMessage() {}
+
+func (x *ExplainOwnershipResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExplainOwnershipResponse.ProtoReflect.Descriptor instead.
+func (*ExplainOwnershipResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ExplainOwnershipResponse) GetSets() []*OwnerSetStatus {
+	if x != nil {
+		return x.Sets
+	}
+	return nil
+}
+
+func (x *ExplainOwnershipResponse) GetCovered() bool {
+	if x != nil {
+		return x.Covered
+	}
+	return false
+}
+
 var File_rill_v1_review_proto protoreflect.FileDescriptor
 
 const file_rill_v1_review_proto_rawDesc = "" +
@@ -1620,7 +1994,35 @@ const file_rill_v1_review_proto_rawDesc = "" +
 	"newVersion\x127\n" +
 	"\vland_update\x18\a \x01(\v2\x14.rill.v1.LandRequestH\x00R\n" +
 	"landUpdateB\a\n" +
-	"\x05event2\x98\a\n" +
+	"\x05event\"\xdb\x01\n" +
+	"\bOwnerSet\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
+	"\x03dir\x18\x02 \x01(\tR\x03dir\x12\x16\n" +
+	"\x06owners\x18\x03 \x03(\tR\x06owners\x12\x1a\n" +
+	"\brequired\x18\x04 \x01(\rR\brequired\x12\x1c\n" +
+	"\tsensitive\x18\x05 \x01(\bR\tsensitive\x12\x1a\n" +
+	"\x06sla_ms\x18\x06 \x01(\x03H\x00R\x05slaMs\x88\x01\x01\x12$\n" +
+	"\vescalate_to\x18\a \x01(\tH\x01R\n" +
+	"escalateTo\x88\x01\x01B\t\n" +
+	"\a_sla_msB\x0e\n" +
+	"\f_escalate_to\":\n" +
+	"\x10GetOwnersRequest\x12\x12\n" +
+	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\":\n" +
+	"\x11GetOwnersResponse\x12%\n" +
+	"\x04sets\x18\x01 \x03(\v2\x11.rill.v1.OwnerSetR\x04sets\"1\n" +
+	"\x17ExplainOwnershipRequest\x12\x16\n" +
+	"\x06change\x18\x01 \x01(\tR\x06change\"\xc8\x01\n" +
+	"\x0eOwnerSetStatus\x12#\n" +
+	"\x03set\x18\x01 \x01(\v2\x11.rill.v1.OwnerSetR\x03set\x12\x1c\n" +
+	"\tapprovals\x18\x02 \x01(\rR\tapprovals\x12\x18\n" +
+	"\acovered\x18\x03 \x01(\bR\acovered\x12&\n" +
+	"\fescalated_to\x18\x04 \x01(\tH\x00R\vescalatedTo\x88\x01\x01\x12 \n" +
+	"\vescalations\x18\x05 \x01(\rR\vescalationsB\x0f\n" +
+	"\r_escalated_to\"a\n" +
+	"\x18ExplainOwnershipResponse\x12+\n" +
+	"\x04sets\x18\x01 \x03(\v2\x17.rill.v1.OwnerSetStatusR\x04sets\x12\x18\n" +
+	"\acovered\x18\x02 \x01(\bR\acovered2\xb5\b\n" +
 	"\rReviewService\x12B\n" +
 	"\tGetReview\x12\x19.rill.v1.GetReviewRequest\x1a\x1a.rill.v1.GetReviewResponse\x12T\n" +
 	"\x0fBatchGetReviews\x12\x1f.rill.v1.BatchGetReviewsRequest\x1a .rill.v1.BatchGetReviewsResponse\x12H\n" +
@@ -1633,7 +2035,9 @@ const file_rill_v1_review_proto_rawDesc = "" +
 	"\vUpdateStack\x12\x1b.rill.v1.UpdateStackRequest\x1a\x1c.rill.v1.UpdateStackResponse\x12T\n" +
 	"\x0fEvaluateLanding\x12\x1f.rill.v1.EvaluateLandingRequest\x1a .rill.v1.EvaluateLandingResponse\x12N\n" +
 	"\rAbandonChange\x12\x1d.rill.v1.AbandonChangeRequest\x1a\x1e.rill.v1.AbandonChangeResponse\x12J\n" +
-	"\vWatchReview\x12\x1b.rill.v1.WatchReviewRequest\x1a\x1c.rill.v1.WatchReviewResponse0\x01B\x8c\x01\n" +
+	"\vWatchReview\x12\x1b.rill.v1.WatchReviewRequest\x1a\x1c.rill.v1.WatchReviewResponse0\x01\x12B\n" +
+	"\tGetOwners\x12\x19.rill.v1.GetOwnersRequest\x1a\x1a.rill.v1.GetOwnersResponse\x12W\n" +
+	"\x10ExplainOwnership\x12 .rill.v1.ExplainOwnershipRequest\x1a!.rill.v1.ExplainOwnershipResponseB\x8c\x01\n" +
 	"\vcom.rill.v1B\vReviewProtoP\x01Z3github.com/rill-vcs/rill/sdks/go/gen/rill/v1;rillv1\xa2\x02\x03RXX\xaa\x02\aRill.V1\xca\x02\aRill\\V1\xe2\x02\x13Rill\\V1\\GPBMetadata\xea\x02\bRill::V1b\x06proto3"
 
 var (
@@ -1648,95 +2052,108 @@ func file_rill_v1_review_proto_rawDescGZIP() []byte {
 	return file_rill_v1_review_proto_rawDescData
 }
 
-var file_rill_v1_review_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_rill_v1_review_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_rill_v1_review_proto_goTypes = []any{
-	(*GetReviewRequest)(nil),        // 0: rill.v1.GetReviewRequest
-	(*GetReviewResponse)(nil),       // 1: rill.v1.GetReviewResponse
-	(*BatchGetReviewsRequest)(nil),  // 2: rill.v1.BatchGetReviewsRequest
-	(*BatchGetReviewsResponse)(nil), // 3: rill.v1.BatchGetReviewsResponse
-	(*ListReviewsRequest)(nil),      // 4: rill.v1.ListReviewsRequest
-	(*ListReviewsResponse)(nil),     // 5: rill.v1.ListReviewsResponse
-	(*SubmitChangeRequest)(nil),     // 6: rill.v1.SubmitChangeRequest
-	(*SubmitChangeResponse)(nil),    // 7: rill.v1.SubmitChangeResponse
-	(*VoteRequest)(nil),             // 8: rill.v1.VoteRequest
-	(*VoteResponse)(nil),            // 9: rill.v1.VoteResponse
-	(*CreateThreadRequest)(nil),     // 10: rill.v1.CreateThreadRequest
-	(*CreateThreadResponse)(nil),    // 11: rill.v1.CreateThreadResponse
-	(*ReplyThreadRequest)(nil),      // 12: rill.v1.ReplyThreadRequest
-	(*ReplyThreadResponse)(nil),     // 13: rill.v1.ReplyThreadResponse
-	(*ResolveThreadRequest)(nil),    // 14: rill.v1.ResolveThreadRequest
-	(*ResolveThreadResponse)(nil),   // 15: rill.v1.ResolveThreadResponse
-	(*UpdateStackRequest)(nil),      // 16: rill.v1.UpdateStackRequest
-	(*UpdateStackResponse)(nil),     // 17: rill.v1.UpdateStackResponse
-	(*EvaluateLandingRequest)(nil),  // 18: rill.v1.EvaluateLandingRequest
-	(*SubmitDecision)(nil),          // 19: rill.v1.SubmitDecision
-	(*EvaluateLandingResponse)(nil), // 20: rill.v1.EvaluateLandingResponse
-	(*AbandonChangeRequest)(nil),    // 21: rill.v1.AbandonChangeRequest
-	(*AbandonChangeResponse)(nil),   // 22: rill.v1.AbandonChangeResponse
-	(*WatchReviewRequest)(nil),      // 23: rill.v1.WatchReviewRequest
-	(*WatchReviewResponse)(nil),     // 24: rill.v1.WatchReviewResponse
-	(*ReviewState)(nil),             // 25: rill.v1.ReviewState
-	(*Label)(nil),                   // 26: rill.v1.Label
-	(*ThreadAnchor)(nil),            // 27: rill.v1.ThreadAnchor
-	(CommentCategory)(0),            // 28: rill.v1.CommentCategory
-	(*Principal)(nil),               // 29: rill.v1.Principal
-	(*Thread)(nil),                  // 30: rill.v1.Thread
-	(RiskClass)(0),                  // 31: rill.v1.RiskClass
-	(ReviewStatus)(0),               // 32: rill.v1.ReviewStatus
-	(*LabelVote)(nil),               // 33: rill.v1.LabelVote
-	(*LandRequest)(nil),             // 34: rill.v1.LandRequest
+	(*GetReviewRequest)(nil),         // 0: rill.v1.GetReviewRequest
+	(*GetReviewResponse)(nil),        // 1: rill.v1.GetReviewResponse
+	(*BatchGetReviewsRequest)(nil),   // 2: rill.v1.BatchGetReviewsRequest
+	(*BatchGetReviewsResponse)(nil),  // 3: rill.v1.BatchGetReviewsResponse
+	(*ListReviewsRequest)(nil),       // 4: rill.v1.ListReviewsRequest
+	(*ListReviewsResponse)(nil),      // 5: rill.v1.ListReviewsResponse
+	(*SubmitChangeRequest)(nil),      // 6: rill.v1.SubmitChangeRequest
+	(*SubmitChangeResponse)(nil),     // 7: rill.v1.SubmitChangeResponse
+	(*VoteRequest)(nil),              // 8: rill.v1.VoteRequest
+	(*VoteResponse)(nil),             // 9: rill.v1.VoteResponse
+	(*CreateThreadRequest)(nil),      // 10: rill.v1.CreateThreadRequest
+	(*CreateThreadResponse)(nil),     // 11: rill.v1.CreateThreadResponse
+	(*ReplyThreadRequest)(nil),       // 12: rill.v1.ReplyThreadRequest
+	(*ReplyThreadResponse)(nil),      // 13: rill.v1.ReplyThreadResponse
+	(*ResolveThreadRequest)(nil),     // 14: rill.v1.ResolveThreadRequest
+	(*ResolveThreadResponse)(nil),    // 15: rill.v1.ResolveThreadResponse
+	(*UpdateStackRequest)(nil),       // 16: rill.v1.UpdateStackRequest
+	(*UpdateStackResponse)(nil),      // 17: rill.v1.UpdateStackResponse
+	(*EvaluateLandingRequest)(nil),   // 18: rill.v1.EvaluateLandingRequest
+	(*SubmitDecision)(nil),           // 19: rill.v1.SubmitDecision
+	(*EvaluateLandingResponse)(nil),  // 20: rill.v1.EvaluateLandingResponse
+	(*AbandonChangeRequest)(nil),     // 21: rill.v1.AbandonChangeRequest
+	(*AbandonChangeResponse)(nil),    // 22: rill.v1.AbandonChangeResponse
+	(*WatchReviewRequest)(nil),       // 23: rill.v1.WatchReviewRequest
+	(*WatchReviewResponse)(nil),      // 24: rill.v1.WatchReviewResponse
+	(*OwnerSet)(nil),                 // 25: rill.v1.OwnerSet
+	(*GetOwnersRequest)(nil),         // 26: rill.v1.GetOwnersRequest
+	(*GetOwnersResponse)(nil),        // 27: rill.v1.GetOwnersResponse
+	(*ExplainOwnershipRequest)(nil),  // 28: rill.v1.ExplainOwnershipRequest
+	(*OwnerSetStatus)(nil),           // 29: rill.v1.OwnerSetStatus
+	(*ExplainOwnershipResponse)(nil), // 30: rill.v1.ExplainOwnershipResponse
+	(*ReviewState)(nil),              // 31: rill.v1.ReviewState
+	(*Label)(nil),                    // 32: rill.v1.Label
+	(*ThreadAnchor)(nil),             // 33: rill.v1.ThreadAnchor
+	(CommentCategory)(0),             // 34: rill.v1.CommentCategory
+	(*Principal)(nil),                // 35: rill.v1.Principal
+	(*Thread)(nil),                   // 36: rill.v1.Thread
+	(RiskClass)(0),                   // 37: rill.v1.RiskClass
+	(ReviewStatus)(0),                // 38: rill.v1.ReviewStatus
+	(*LabelVote)(nil),                // 39: rill.v1.LabelVote
+	(*LandRequest)(nil),              // 40: rill.v1.LandRequest
 }
 var file_rill_v1_review_proto_depIdxs = []int32{
-	25, // 0: rill.v1.GetReviewResponse.review:type_name -> rill.v1.ReviewState
-	26, // 1: rill.v1.GetReviewResponse.labels:type_name -> rill.v1.Label
-	25, // 2: rill.v1.BatchGetReviewsResponse.reviews:type_name -> rill.v1.ReviewState
-	25, // 3: rill.v1.ListReviewsResponse.reviews:type_name -> rill.v1.ReviewState
-	25, // 4: rill.v1.SubmitChangeResponse.review:type_name -> rill.v1.ReviewState
-	25, // 5: rill.v1.VoteResponse.review:type_name -> rill.v1.ReviewState
-	27, // 6: rill.v1.CreateThreadRequest.anchor:type_name -> rill.v1.ThreadAnchor
-	28, // 7: rill.v1.CreateThreadRequest.category:type_name -> rill.v1.CommentCategory
-	29, // 8: rill.v1.CreateThreadRequest.to:type_name -> rill.v1.Principal
-	30, // 9: rill.v1.CreateThreadResponse.thread:type_name -> rill.v1.Thread
-	28, // 10: rill.v1.ReplyThreadRequest.category:type_name -> rill.v1.CommentCategory
-	30, // 11: rill.v1.ReplyThreadResponse.thread:type_name -> rill.v1.Thread
-	30, // 12: rill.v1.ResolveThreadResponse.thread:type_name -> rill.v1.Thread
-	25, // 13: rill.v1.UpdateStackResponse.reviews:type_name -> rill.v1.ReviewState
-	31, // 14: rill.v1.SubmitDecision.risk:type_name -> rill.v1.RiskClass
+	31, // 0: rill.v1.GetReviewResponse.review:type_name -> rill.v1.ReviewState
+	32, // 1: rill.v1.GetReviewResponse.labels:type_name -> rill.v1.Label
+	31, // 2: rill.v1.BatchGetReviewsResponse.reviews:type_name -> rill.v1.ReviewState
+	31, // 3: rill.v1.ListReviewsResponse.reviews:type_name -> rill.v1.ReviewState
+	31, // 4: rill.v1.SubmitChangeResponse.review:type_name -> rill.v1.ReviewState
+	31, // 5: rill.v1.VoteResponse.review:type_name -> rill.v1.ReviewState
+	33, // 6: rill.v1.CreateThreadRequest.anchor:type_name -> rill.v1.ThreadAnchor
+	34, // 7: rill.v1.CreateThreadRequest.category:type_name -> rill.v1.CommentCategory
+	35, // 8: rill.v1.CreateThreadRequest.to:type_name -> rill.v1.Principal
+	36, // 9: rill.v1.CreateThreadResponse.thread:type_name -> rill.v1.Thread
+	34, // 10: rill.v1.ReplyThreadRequest.category:type_name -> rill.v1.CommentCategory
+	36, // 11: rill.v1.ReplyThreadResponse.thread:type_name -> rill.v1.Thread
+	36, // 12: rill.v1.ResolveThreadResponse.thread:type_name -> rill.v1.Thread
+	31, // 13: rill.v1.UpdateStackResponse.reviews:type_name -> rill.v1.ReviewState
+	37, // 14: rill.v1.SubmitDecision.risk:type_name -> rill.v1.RiskClass
 	19, // 15: rill.v1.EvaluateLandingResponse.decision:type_name -> rill.v1.SubmitDecision
-	25, // 16: rill.v1.AbandonChangeResponse.review:type_name -> rill.v1.ReviewState
-	32, // 17: rill.v1.WatchReviewResponse.status_changed:type_name -> rill.v1.ReviewStatus
-	33, // 18: rill.v1.WatchReviewResponse.voted:type_name -> rill.v1.LabelVote
-	30, // 19: rill.v1.WatchReviewResponse.thread_updated:type_name -> rill.v1.Thread
-	34, // 20: rill.v1.WatchReviewResponse.land_update:type_name -> rill.v1.LandRequest
-	0,  // 21: rill.v1.ReviewService.GetReview:input_type -> rill.v1.GetReviewRequest
-	2,  // 22: rill.v1.ReviewService.BatchGetReviews:input_type -> rill.v1.BatchGetReviewsRequest
-	4,  // 23: rill.v1.ReviewService.ListReviews:input_type -> rill.v1.ListReviewsRequest
-	6,  // 24: rill.v1.ReviewService.SubmitChange:input_type -> rill.v1.SubmitChangeRequest
-	8,  // 25: rill.v1.ReviewService.Vote:input_type -> rill.v1.VoteRequest
-	10, // 26: rill.v1.ReviewService.CreateThread:input_type -> rill.v1.CreateThreadRequest
-	12, // 27: rill.v1.ReviewService.ReplyThread:input_type -> rill.v1.ReplyThreadRequest
-	14, // 28: rill.v1.ReviewService.ResolveThread:input_type -> rill.v1.ResolveThreadRequest
-	16, // 29: rill.v1.ReviewService.UpdateStack:input_type -> rill.v1.UpdateStackRequest
-	18, // 30: rill.v1.ReviewService.EvaluateLanding:input_type -> rill.v1.EvaluateLandingRequest
-	21, // 31: rill.v1.ReviewService.AbandonChange:input_type -> rill.v1.AbandonChangeRequest
-	23, // 32: rill.v1.ReviewService.WatchReview:input_type -> rill.v1.WatchReviewRequest
-	1,  // 33: rill.v1.ReviewService.GetReview:output_type -> rill.v1.GetReviewResponse
-	3,  // 34: rill.v1.ReviewService.BatchGetReviews:output_type -> rill.v1.BatchGetReviewsResponse
-	5,  // 35: rill.v1.ReviewService.ListReviews:output_type -> rill.v1.ListReviewsResponse
-	7,  // 36: rill.v1.ReviewService.SubmitChange:output_type -> rill.v1.SubmitChangeResponse
-	9,  // 37: rill.v1.ReviewService.Vote:output_type -> rill.v1.VoteResponse
-	11, // 38: rill.v1.ReviewService.CreateThread:output_type -> rill.v1.CreateThreadResponse
-	13, // 39: rill.v1.ReviewService.ReplyThread:output_type -> rill.v1.ReplyThreadResponse
-	15, // 40: rill.v1.ReviewService.ResolveThread:output_type -> rill.v1.ResolveThreadResponse
-	17, // 41: rill.v1.ReviewService.UpdateStack:output_type -> rill.v1.UpdateStackResponse
-	20, // 42: rill.v1.ReviewService.EvaluateLanding:output_type -> rill.v1.EvaluateLandingResponse
-	22, // 43: rill.v1.ReviewService.AbandonChange:output_type -> rill.v1.AbandonChangeResponse
-	24, // 44: rill.v1.ReviewService.WatchReview:output_type -> rill.v1.WatchReviewResponse
-	33, // [33:45] is the sub-list for method output_type
-	21, // [21:33] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	31, // 16: rill.v1.AbandonChangeResponse.review:type_name -> rill.v1.ReviewState
+	38, // 17: rill.v1.WatchReviewResponse.status_changed:type_name -> rill.v1.ReviewStatus
+	39, // 18: rill.v1.WatchReviewResponse.voted:type_name -> rill.v1.LabelVote
+	36, // 19: rill.v1.WatchReviewResponse.thread_updated:type_name -> rill.v1.Thread
+	40, // 20: rill.v1.WatchReviewResponse.land_update:type_name -> rill.v1.LandRequest
+	25, // 21: rill.v1.GetOwnersResponse.sets:type_name -> rill.v1.OwnerSet
+	25, // 22: rill.v1.OwnerSetStatus.set:type_name -> rill.v1.OwnerSet
+	29, // 23: rill.v1.ExplainOwnershipResponse.sets:type_name -> rill.v1.OwnerSetStatus
+	0,  // 24: rill.v1.ReviewService.GetReview:input_type -> rill.v1.GetReviewRequest
+	2,  // 25: rill.v1.ReviewService.BatchGetReviews:input_type -> rill.v1.BatchGetReviewsRequest
+	4,  // 26: rill.v1.ReviewService.ListReviews:input_type -> rill.v1.ListReviewsRequest
+	6,  // 27: rill.v1.ReviewService.SubmitChange:input_type -> rill.v1.SubmitChangeRequest
+	8,  // 28: rill.v1.ReviewService.Vote:input_type -> rill.v1.VoteRequest
+	10, // 29: rill.v1.ReviewService.CreateThread:input_type -> rill.v1.CreateThreadRequest
+	12, // 30: rill.v1.ReviewService.ReplyThread:input_type -> rill.v1.ReplyThreadRequest
+	14, // 31: rill.v1.ReviewService.ResolveThread:input_type -> rill.v1.ResolveThreadRequest
+	16, // 32: rill.v1.ReviewService.UpdateStack:input_type -> rill.v1.UpdateStackRequest
+	18, // 33: rill.v1.ReviewService.EvaluateLanding:input_type -> rill.v1.EvaluateLandingRequest
+	21, // 34: rill.v1.ReviewService.AbandonChange:input_type -> rill.v1.AbandonChangeRequest
+	23, // 35: rill.v1.ReviewService.WatchReview:input_type -> rill.v1.WatchReviewRequest
+	26, // 36: rill.v1.ReviewService.GetOwners:input_type -> rill.v1.GetOwnersRequest
+	28, // 37: rill.v1.ReviewService.ExplainOwnership:input_type -> rill.v1.ExplainOwnershipRequest
+	1,  // 38: rill.v1.ReviewService.GetReview:output_type -> rill.v1.GetReviewResponse
+	3,  // 39: rill.v1.ReviewService.BatchGetReviews:output_type -> rill.v1.BatchGetReviewsResponse
+	5,  // 40: rill.v1.ReviewService.ListReviews:output_type -> rill.v1.ListReviewsResponse
+	7,  // 41: rill.v1.ReviewService.SubmitChange:output_type -> rill.v1.SubmitChangeResponse
+	9,  // 42: rill.v1.ReviewService.Vote:output_type -> rill.v1.VoteResponse
+	11, // 43: rill.v1.ReviewService.CreateThread:output_type -> rill.v1.CreateThreadResponse
+	13, // 44: rill.v1.ReviewService.ReplyThread:output_type -> rill.v1.ReplyThreadResponse
+	15, // 45: rill.v1.ReviewService.ResolveThread:output_type -> rill.v1.ResolveThreadResponse
+	17, // 46: rill.v1.ReviewService.UpdateStack:output_type -> rill.v1.UpdateStackResponse
+	20, // 47: rill.v1.ReviewService.EvaluateLanding:output_type -> rill.v1.EvaluateLandingResponse
+	22, // 48: rill.v1.ReviewService.AbandonChange:output_type -> rill.v1.AbandonChangeResponse
+	24, // 49: rill.v1.ReviewService.WatchReview:output_type -> rill.v1.WatchReviewResponse
+	27, // 50: rill.v1.ReviewService.GetOwners:output_type -> rill.v1.GetOwnersResponse
+	30, // 51: rill.v1.ReviewService.ExplainOwnership:output_type -> rill.v1.ExplainOwnershipResponse
+	38, // [38:52] is the sub-list for method output_type
+	24, // [24:38] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_review_proto_init() }
@@ -1757,13 +2174,15 @@ func file_rill_v1_review_proto_init() {
 		(*WatchReviewResponse_NewVersion)(nil),
 		(*WatchReviewResponse_LandUpdate)(nil),
 	}
+	file_rill_v1_review_proto_msgTypes[25].OneofWrappers = []any{}
+	file_rill_v1_review_proto_msgTypes[29].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_review_proto_rawDesc), len(file_rill_v1_review_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

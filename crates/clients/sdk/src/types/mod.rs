@@ -7,6 +7,7 @@ mod diff;
 mod edit;
 mod event;
 mod intent;
+mod ownership;
 mod page;
 mod repo;
 mod review;
@@ -22,6 +23,7 @@ pub(crate) use edit::set_content_proto;
 pub use edit::{ApplyOptions, Edit, EditBase, MergeOptions, Resolution, VersionResult};
 pub use event::{EventQuery, LoggedEvent};
 pub use intent::{FieldUpdate, IntentFilter, IntentUpdate, NewIntent, ScoredIntent};
+pub use ownership::{OwnerSet, OwnerSetStatus, Ownership};
 pub use page::Page;
 pub use repo::{
     BlameLine, Derived, LandEvent, LogEntry, LogPage, OrgInfo, PathHistoryEntry, PathHistoryPage,

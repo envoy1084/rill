@@ -269,9 +269,27 @@ async fn validate(opened: &Opened, cv: &ChangeVersion) -> Result<()> {
             if let Some(source) = copy_from {
                 check_copy_source(ctx, source).await?;
             }
+            if path.file_name() == Some(rill_policy::owners::OWNERS_FILE) {
+                lint_owners(ctx, path, content).await?;
+            }
         }
     }
     Ok(())
+}
+
+/// An `OWNERS.toml` must parse: a bad one would leave its directory's
+/// review to the parent's owners without anyone noticing.
+async fn lint_owners(
+    ctx: &rill_runtime::state::RepoContext,
+    path: &rill_types::RepoPath,
+    content: &rill_types::ContentRef,
+) -> Result<()> {
+    let bytes = rill_core::read_content(ctx.repo.objects().as_ref(), content).await?;
+    let text =
+        std::str::from_utf8(&bytes).map_err(|_| Error::invalid(format!("{path} is not UTF-8")))?;
+    rill_policy::owners::OwnersFile::parse(text)
+        .map(|_| ())
+        .map_err(|e| Error::invalid(format!("{path}: {e}")))
 }
 
 /// A copy source must name a file that exists in the version it cites.

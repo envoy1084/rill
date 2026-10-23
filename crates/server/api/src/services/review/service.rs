@@ -138,6 +138,24 @@ impl ReviewService for ReviewSvc {
         )
     }
 
+    async fn get_owners(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetOwnersRequest>,
+    ) -> GrpcResult<pb::GetOwnersResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.get_owners_impl(request).await?))
+    }
+
+    async fn explain_ownership(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ExplainOwnershipRequest>,
+    ) -> GrpcResult<pb::ExplainOwnershipResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.explain_ownership_impl(request).await?))
+    }
+
     async fn evaluate_landing(
         &self,
         ctx: RequestContext,

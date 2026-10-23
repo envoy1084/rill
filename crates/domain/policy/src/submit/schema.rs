@@ -48,6 +48,11 @@ namespace Rill {
         "unresolved_blocking_threads": Long,
         "touches_sensitive": Bool,
         "has_agent_resolution": Bool,
+        // Owner sets (from OWNERS.toml) the change touches, how many lack
+        // their required approvals, and whether none does.
+        "owner_sets": Long,
+        "owner_sets_missing": Long,
+        "owners_covered": Bool,
         // Names of the labels present as tags, for `.contains` checks.
         "label_names": Set<String>,
     } tags VoteSummary;

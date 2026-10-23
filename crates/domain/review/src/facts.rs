@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use bytes::Bytes;
 use rill_core::{diff_lines, diff_trees, is_binary, read_content, RootTree, TreeDiffEntry};
 use rill_policy::{classify, ChangeFacts, PathFacts, SubmitFacts};
-use rill_types::{ChangeVersion, ChangeVersionHash, ContentRef, ReviewState};
+use rill_types::{ChangeVersion, ChangeVersionHash, ContentRef, Principal, ReviewState};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -27,8 +27,19 @@ struct CachedPaths {
 
 impl ReviewService {
     /// Policy facts for the review's current version, including its depth
-    /// in the stack.
+    /// in the stack, the owner sets it touches and what the directory says
+    /// about the people involved.
     pub async fn change_facts(&self, state: &ReviewState) -> Result<ChangeFacts> {
+        self.change_facts_with(state, &[]).await
+    }
+
+    /// [`ReviewService::change_facts`], also knowing `acting` (who is about
+    /// to vote), whose approval the facts must be able to count.
+    pub async fn change_facts_with(
+        &self,
+        state: &ReviewState,
+        acting: &[Principal],
+    ) -> Result<ChangeFacts> {
         let version = state
             .current_version()
             .ok_or(Error::NoVersions(state.change_id))?;
@@ -38,6 +49,21 @@ impl ReviewService {
             .iter()
             .position(|c| *c == state.change_id)
             .map_or(0, |i| i as u32);
+        let owners = self.trunk_owners().await?;
+        if !owners.is_empty() {
+            facts.owner_sets = owners.sets_for_all(facts.paths.iter().map(|p| p.path.as_path()));
+        }
+        let people = std::iter::once(&state.owner)
+            .chain(std::iter::once(&facts.author))
+            .chain(state.current_votes().map(|v| &v.voter))
+            .chain(acting.iter());
+        for person in people {
+            if let std::collections::btree_map::Entry::Vacant(slot) =
+                facts.people.entry(person.to_string())
+            {
+                slot.insert(self.directory.person(person).await?);
+            }
+        }
         Ok(facts)
     }
 
@@ -76,8 +102,8 @@ impl ReviewService {
     }
 
     /// Review-side facts for the submit policy.
-    pub fn submit_facts(&self, state: &ReviewState) -> SubmitFacts {
-        SubmitFacts::from_review(state)
+    pub fn submit_facts(&self, state: &ReviewState, change: &ChangeFacts) -> SubmitFacts {
+        SubmitFacts::from_review(state, change)
     }
 
     /// Classify and record risk on the state.

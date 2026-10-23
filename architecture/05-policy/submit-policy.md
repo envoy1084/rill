@@ -43,7 +43,7 @@ any label by name without the schema listing them.
 | Entity | Attributes |
 | --- | --- |
 | `Rill::Principal` | `kind`, `name` |
-| `Rill::Change` | `risk`, `author_kind`, `intent_kind` (or `none`), `unresolved_threads`, `unresolved_blocking_threads`, `touches_sensitive`, `has_agent_resolution`, `label_names: Set<String>`; tags of type `VoteSummary` |
+| `Rill::Change` | `risk`, `author_kind`, `intent_kind` (or `none`), `unresolved_threads`, `unresolved_blocking_threads`, `touches_sensitive`, `has_agent_resolution`, `label_names: Set<String>`, `owner_sets`, `owner_sets_missing`, `owners_covered` ([code owners](../04-workflow/ownership.md)); tags of type `VoteSummary` |
 | `Rill::VoteSummary` | the eight `VoteSummary` counters, as `Long` |
 
 [`entities.rs`](../../crates/domain/policy/src/submit/entities.rs) builds
@@ -60,6 +60,7 @@ applies when a repository has no stored submit policy. Each rule has an
 | --- | --- | --- |
 | `block_review_veto` | forbid | `Review.min <= -2` |
 | `block_unresolved_bug_or_security` | forbid | `unresolved_blocking_threads > 0` |
+| `block_uncovered_owners` | forbid | `owner_sets_missing > 0` and risk not `trivial`/`low` |
 | `land_trivial_or_low` | permit | risk `trivial`/`low` and `Verified.max >= 1` |
 | `land_normal_human_review` | permit | risk `normal` and `Review.human_max >= 2` |
 | `land_normal_agent_review_with_owner` | permit | risk `normal`, `Review.agent_approvals >= 2` and `Owner.human_max >= 1` |

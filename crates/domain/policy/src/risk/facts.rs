@@ -1,7 +1,12 @@
 //! The facts about a change that risk classification and submit rules read.
 
+use std::collections::BTreeMap;
+
 use rill_types::{IntentKind, Principal, Provenance, RepoPathBuf, RiskClass};
 use serde::{Deserialize, Serialize};
+
+use crate::directory::Person;
+use crate::owners::OwnerSet;
 
 /// What happened to one path in the change.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,6 +116,12 @@ pub struct ChangeFacts {
     pub risk_override: Option<RiskClass>,
     /// Depth of this change in its stack (0 for a standalone change).
     pub stack_depth: u32,
+    /// The owner sets covering the touched paths, by trunk's `OWNERS.toml`
+    /// files.
+    pub owner_sets: Vec<OwnerSet>,
+    /// What the directory says about the people involved (author, voters),
+    /// keyed by their display form.
+    pub people: BTreeMap<String, Person>,
 }
 
 impl ChangeFacts {
@@ -128,7 +139,24 @@ impl ChangeFacts {
             intent_kind: None,
             risk_override: None,
             stack_depth: 0,
+            owner_sets: Vec::new(),
+            people: BTreeMap::new(),
         }
+    }
+
+    /// Attach the owner sets of the touched paths.
+    pub fn with_owner_sets(mut self, sets: Vec<OwnerSet>) -> Self {
+        self.owner_sets = sets;
+        self
+    }
+
+    /// What is known about `principal`; nothing when the directory was not
+    /// asked.
+    pub fn person(&self, principal: &Principal) -> Person {
+        self.people
+            .get(&principal.to_string())
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// Attach provenance.

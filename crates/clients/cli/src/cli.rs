@@ -243,6 +243,10 @@ pub enum Command {
     #[command(subcommand)]
     Ref(refs::RefCmd),
 
+    /// Code owners: who owns a path, and a change's standing with them.
+    #[command(subcommand)]
+    Owners(crate::commands::owners::OwnersCmd),
+
     /// Releases: cut and list.
     #[command(subcommand)]
     Release(release::ReleaseCmd),

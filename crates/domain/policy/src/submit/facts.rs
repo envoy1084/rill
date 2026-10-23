@@ -3,8 +3,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use rill_types::objects::review::CommentCategory;
-use rill_types::{LabelVote, PrincipalKind, ReviewState, RiskClass};
+use rill_types::{LabelVote, PrincipalKind, ReviewState, RiskClass, Timestamp};
 use serde::{Deserialize, Serialize};
+
+use crate::owners::{coverage, Approver, SetCoverage};
+use crate::risk::ChangeFacts;
+
+/// The label whose approvals count toward owner sets.
+pub const OWNER_LABEL: &str = "Owner";
 
 /// Aggregated votes on one label for the current version of a change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -72,6 +78,26 @@ impl VoteSummary {
     }
 }
 
+/// How far each owner set the change touches is from its required
+/// approvals: positive `Owner` votes on the current version, by people the
+/// change facts know the teams of.
+pub fn owner_coverage(state: &ReviewState, change: &ChangeFacts) -> Vec<SetCoverage> {
+    let approvers: Vec<Approver> = state
+        .current_votes()
+        .filter(|v| v.label == OWNER_LABEL && v.value > 0)
+        .map(|v| Approver {
+            principal: v.voter.clone(),
+            teams: change.person(&v.voter).teams,
+        })
+        .collect();
+    coverage(
+        &change.owner_sets,
+        &approvers,
+        &change.author,
+        Timestamp::now(),
+    )
+}
+
 /// What the review state contributes to a submit decision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubmitFacts {
@@ -85,6 +111,10 @@ pub struct SubmitFacts {
     pub unresolved_blocking_threads: u32,
     /// Whether a sensitive-path glob fired in the risk assessment.
     pub touches_sensitive: bool,
+    /// Owner sets the change touches.
+    pub owner_sets: u32,
+    /// Ids of the touched owner sets that lack their required approvals.
+    pub missing_owner_sets: Vec<String>,
 }
 
 impl SubmitFacts {
@@ -96,12 +126,20 @@ impl SubmitFacts {
             unresolved_threads: 0,
             unresolved_blocking_threads: 0,
             touches_sensitive: false,
+            owner_sets: 0,
+            missing_owner_sets: Vec::new(),
         }
     }
 
-    /// Derive facts from a review state, counting only votes on the current
-    /// version.
-    pub fn from_review(state: &ReviewState) -> Self {
+    /// Whether every touched owner set has its approvals (true when the
+    /// change touches none).
+    pub fn owners_covered(&self) -> bool {
+        self.missing_owner_sets.is_empty()
+    }
+
+    /// Derive facts from a review state and its change's facts, counting
+    /// only votes on the current version.
+    pub fn from_review(state: &ReviewState, change: &ChangeFacts) -> Self {
         let mut by_label: BTreeMap<&str, Vec<&LabelVote>> = BTreeMap::new();
         for v in state.current_votes() {
             by_label.entry(v.label.as_str()).or_default().push(v);
@@ -122,12 +160,19 @@ impl SubmitFacts {
                 })
             })
             .count();
+        let sets = owner_coverage(state, change);
         SubmitFacts {
             risk: state.risk,
             labels,
             unresolved_threads: unresolved.len() as u32,
             unresolved_blocking_threads: blocking as u32,
             touches_sensitive: crate::risk::touches_sensitive(&state.risk_reasons),
+            owner_sets: sets.len() as u32,
+            missing_owner_sets: sets
+                .iter()
+                .filter(|s| !s.covered)
+                .map(|s| s.set.id.clone())
+                .collect(),
         }
     }
 

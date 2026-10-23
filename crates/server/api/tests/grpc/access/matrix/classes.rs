@@ -175,6 +175,8 @@ const MATRIX: &[(&str, Class)] = &[
     ("ReviewService/ResolveThread", Review),
     ("ReviewService/UpdateStack", WriteAny),
     ("ReviewService/EvaluateLanding", ReadRoot),
+    ("ReviewService/GetOwners", ReadAny),
+    ("ReviewService/ExplainOwnership", ReadRoot),
     ("ReviewService/AbandonChange", WriteAny),
     ("ReviewService/WatchReview", ReadRoot),
     ("LandingService/RequestLand", Land),

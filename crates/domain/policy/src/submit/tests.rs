@@ -54,7 +54,7 @@ fn eval(facts: SubmitFacts) -> SubmitDecision {
 #[test]
 fn default_policy_validates() {
     let p = SubmitPolicy::default_rules();
-    assert_eq!(p.len(), 6);
+    assert_eq!(p.len(), 7);
 }
 
 #[test]
@@ -301,7 +301,10 @@ fn facts_from_review_state() {
         updated_at: Timestamp::from_millis(0),
         extra: Default::default(),
     };
-    let f = SubmitFacts::from_review(&state);
+    let f = SubmitFacts::from_review(
+        &state,
+        &ChangeFacts::new(Principal::human("author"), vec![]),
+    );
     assert_eq!(f.risk, RiskClass::Sensitive);
     assert_eq!(f.labels["Review"].human_max, 1);
     assert_eq!(f.labels["Verified"].max, 1);
@@ -309,4 +312,70 @@ fn facts_from_review_state() {
     assert_eq!(f.unresolved_threads, 2);
     assert_eq!(f.unresolved_blocking_threads, 1);
     assert!(f.touches_sensitive);
+}
+
+#[test]
+fn a_policy_can_require_every_touched_owner_set() {
+    use crate::directory::Person;
+    use crate::owners::{OwnersIndex, OwnersTexts};
+
+    let index = OwnersIndex::compile(OwnersTexts(
+        [(
+            "".to_string(),
+            "owners = [\"team:platform\"]\n[[rule]]\npaths = [\"billing/**\"]\nowners = [\"team:billing\"]".to_string(),
+        )]
+        .into(),
+    ))
+    .unwrap();
+    let path = RepoPathBuf::new("billing/invoice.rs").unwrap();
+    let ann = Principal::human("ann");
+    let mut change = ChangeFacts::new(
+        Principal::agent("coder"),
+        vec![PathFacts::modified(path.clone())],
+    )
+    .with_owner_sets(index.sets_for(&path));
+    change.people.insert(
+        ann.to_string(),
+        Person {
+            teams: vec!["billing".into()],
+            sponsor: None,
+        },
+    );
+    let v = ObjectHash::digest(rill_types::ObjectKind::Derived, b"v");
+    let mut state = ReviewState {
+        change_id: ChangeId::new(),
+        versions: vec![v],
+        status: ReviewStatus::Open,
+        intent: None,
+        owner: Principal::agent("coder"),
+        votes: vec![],
+        threads: vec![],
+        risk: RiskClass::Normal,
+        risk_reasons: vec![],
+        stack: vec![],
+        landed_seq: None,
+        created_at: Timestamp::from_millis(0),
+        updated_at: Timestamp::from_millis(0),
+        extra: Default::default(),
+    };
+    let policy = SubmitPolicy::from_source(
+        r#"@id("owners") permit(principal, action == Rill::Action::"land", resource)
+           when { resource.owners_covered && resource.owner_sets > 0 };"#,
+    )
+    .unwrap();
+    let facts = SubmitFacts::from_review(&state, &change);
+    assert_eq!(facts.missing_owner_sets, ["#rule0"]);
+    assert!(!policy.evaluate(&ann, &change, &facts).unwrap().allowed);
+
+    state.votes.push(LabelVote {
+        label: "Owner".into(),
+        value: 1,
+        voter: ann.clone(),
+        version: v,
+        voted_at: Timestamp::from_millis(0),
+        reason: None,
+    });
+    let facts = SubmitFacts::from_review(&state, &change);
+    assert!(facts.owners_covered());
+    assert!(policy.evaluate(&ann, &change, &facts).unwrap().allowed);
 }

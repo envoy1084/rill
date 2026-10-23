@@ -117,6 +117,8 @@ impl ReviewService for MockReview {
         get_review(pb::GetReviewRequest) -> pb::GetReviewResponse;
         batch_get_reviews(pb::BatchGetReviewsRequest) -> pb::BatchGetReviewsResponse;
         list_reviews(pb::ListReviewsRequest) -> pb::ListReviewsResponse;
+        get_owners(pb::GetOwnersRequest) -> pb::GetOwnersResponse;
+        explain_ownership(pb::ExplainOwnershipRequest) -> pb::ExplainOwnershipResponse;
         vote(pb::VoteRequest) -> pb::VoteResponse;
         create_thread(pb::CreateThreadRequest) -> pb::CreateThreadResponse;
         reply_thread(pb::ReplyThreadRequest) -> pb::ReplyThreadResponse;

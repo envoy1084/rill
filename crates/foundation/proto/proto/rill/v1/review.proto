@@ -35,6 +35,10 @@ service ReviewService {
   rpc AbandonChange(AbandonChangeRequest) returns (AbandonChangeResponse);
   // A review's updates as they happen.
   rpc WatchReview(WatchReviewRequest) returns (stream WatchReviewResponse);
+  // The owner sets covering a path, by trunk's `OWNERS.toml` files.
+  rpc GetOwners(GetOwnersRequest) returns (GetOwnersResponse);
+  // Each owner set a change touches, with its approvals and escalation.
+  rpc ExplainOwnership(ExplainOwnershipRequest) returns (ExplainOwnershipResponse);
 }
 
 message GetReviewRequest {
@@ -186,3 +190,51 @@ message WatchReviewResponse {
     LandRequest land_update = 7;
   }
 }
+
+// A group of principals of which `required` must approve a change that
+// touches the paths it covers.
+message OwnerSet {
+  // `<dir>#default` or `<dir>#rule<n>`.
+  string id = 1;
+  // The directory whose `OWNERS.toml` declares it; empty for the root.
+  string dir = 2;
+  // `user:<name>`, `agent:<name>` or `team:<name>`.
+  repeated string owners = 3;
+  uint32 required = 4;
+  // Touching it makes a change at least `sensitive`.
+  bool sensitive = 5;
+  // How long a required review may wait before escalating.
+  optional int64 sla_ms = 6;
+  optional string escalate_to = 7;
+}
+
+message GetOwnersRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  // A file path. Required.
+  string path = 2;
+}
+message GetOwnersResponse {
+  repeated OwnerSet sets = 1;
+}
+
+message ExplainOwnershipRequest {
+  // `…/changes/{change}`. Required.
+  string change = 1;
+}
+// One owner set's state for a change.
+message OwnerSetStatus {
+  OwnerSet set = 1;
+  // Distinct approvers who count for the set.
+  uint32 approvals = 2;
+  bool covered = 3;
+  // Where an overdue review was escalated to, and how many times.
+  optional string escalated_to = 4;
+  uint32 escalations = 5;
+}
+message ExplainOwnershipResponse {
+  repeated OwnerSetStatus sets = 1;
+  // Every set is covered (true when the change touches none).
+  bool covered = 2;
+}
+

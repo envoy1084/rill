@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file rill/v1/review.proto.
  */
 export const file_rill_v1_review: GenFile = /*@__PURE__*/
-  fileDesc("ChRyaWxsL3YxL3Jldmlldy5wcm90bxIHcmlsbC52MSIgChBHZXRSZXZpZXdSZXF1ZXN0EgwKBG5hbWUYASABKAkiWQoRR2V0UmV2aWV3UmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZRIeCgZsYWJlbHMYAiADKAsyDi5yaWxsLnYxLkxhYmVsIjcKFkJhdGNoR2V0UmV2aWV3c1JlcXVlc3QSDgoGcGFyZW50GAEgASgJEg0KBW5hbWVzGAIgAygJIkAKF0JhdGNoR2V0UmV2aWV3c1Jlc3BvbnNlEiUKB3Jldmlld3MYASADKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIlsKEkxpc3RSZXZpZXdzUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSDgoGZmlsdGVyGAQgASgJIlUKE0xpc3RSZXZpZXdzUmVzcG9uc2USJQoHcmV2aWV3cxgBIAMoCzIULnJpbGwudjEuUmV2aWV3U3RhdGUSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjkKE1N1Ym1pdENoYW5nZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZjaGFuZ2UYAiABKAkiPAoUU3VibWl0Q2hhbmdlUmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZSKAAQoLVm90ZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZyZXZpZXcYAiABKAkSDQoFbGFiZWwYAyABKAkSDQoFdmFsdWUYBCABKAUSEwoGcmVhc29uGAUgASgJSACIAQESDwoHdmVyc2lvbhgGIAEoCUIJCgdfcmVhc29uIjQKDFZvdGVSZXNwb25zZRIkCgZyZXZpZXcYASABKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIoACChNDcmVhdGVUaHJlYWRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGcGFyZW50GAIgASgJEiUKBmFuY2hvchgDIAEoCzIVLnJpbGwudjEuVGhyZWFkQW5jaG9yEgwKBGJvZHkYBCABKAkSLwoIY2F0ZWdvcnkYBSABKA4yGC5yaWxsLnYxLkNvbW1lbnRDYXRlZ29yeUgAiAEBEhcKCmNvbmZpZGVuY2UYBiABKA1IAYgBARIjCgJ0bxgHIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsSAKIAQFCCwoJX2NhdGVnb3J5Qg0KC19jb25maWRlbmNlQgUKA190byI3ChRDcmVhdGVUaHJlYWRSZXNwb25zZRIfCgZ0aHJlYWQYASABKAsyDy5yaWxsLnYxLlRocmVhZCKqAQoSUmVwbHlUaHJlYWRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRib2R5GAMgASgJEi8KCGNhdGVnb3J5GAQgASgOMhgucmlsbC52MS5Db21tZW50Q2F0ZWdvcnlIAIgBARIXCgpjb25maWRlbmNlGAUgASgNSAGIAQFCCwoJX2NhdGVnb3J5Qg0KC19jb25maWRlbmNlIjYKE1JlcGx5VGhyZWFkUmVzcG9uc2USHwoGdGhyZWFkGAEgASgLMg8ucmlsbC52MS5UaHJlYWQiSgoUUmVzb2x2ZVRocmVhZFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHJlc29sdmVkGAMgASgIIjgKFVJlc29sdmVUaHJlYWRSZXNwb25zZRIfCgZ0aHJlYWQYASABKAsyDy5yaWxsLnYxLlRocmVhZCJJChJVcGRhdGVTdGFja1JlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZwYXJlbnQYAiABKAkSDwoHY2hhbmdlcxgDIAMoCSI8ChNVcGRhdGVTdGFja1Jlc3BvbnNlEiUKB3Jldmlld3MYASADKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIigKFkV2YWx1YXRlTGFuZGluZ1JlcXVlc3QSDgoGY2hhbmdlGAEgASgJIoQBCg5TdWJtaXREZWNpc2lvbhIPCgdhbGxvd2VkGAEgASgIEg8KB3JlYXNvbnMYAiADKAkSGAoQbWF0Y2hlZF9wb2xpY2llcxgDIAMoCRIgCgRyaXNrGAQgASgOMhIucmlsbC52MS5SaXNrQ2xhc3MSFAoMcmlza19yZWFzb25zGAUgAygJIkQKF0V2YWx1YXRlTGFuZGluZ1Jlc3BvbnNlEikKCGRlY2lzaW9uGAEgASgLMhcucmlsbC52MS5TdWJtaXREZWNpc2lvbiJaChRBYmFuZG9uQ2hhbmdlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBmNoYW5nZRgCIAEoCRITCgZyZWFzb24YAyABKAlIAIgBAUIJCgdfcmVhc29uIj0KFUFiYW5kb25DaGFuZ2VSZXNwb25zZRIkCgZyZXZpZXcYASABKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIiIKEldhdGNoUmV2aWV3UmVxdWVzdBIMCgRuYW1lGAEgASgJIoICChNXYXRjaFJldmlld1Jlc3BvbnNlEhEKCWNoYW5nZV9pZBgBIAEoDBIKCgJhdBgCIAEoAxIvCg5zdGF0dXNfY2hhbmdlZBgDIAEoDjIVLnJpbGwudjEuUmV2aWV3U3RhdHVzSAASIwoFdm90ZWQYBCABKAsyEi5yaWxsLnYxLkxhYmVsVm90ZUgAEikKDnRocmVhZF91cGRhdGVkGAUgASgLMg8ucmlsbC52MS5UaHJlYWRIABIVCgtuZXdfdmVyc2lvbhgGIAEoDEgAEisKC2xhbmRfdXBkYXRlGAcgASgLMhQucmlsbC52MS5MYW5kUmVxdWVzdEgAQgcKBWV2ZW50MpgHCg1SZXZpZXdTZXJ2aWNlEkIKCUdldFJldmlldxIZLnJpbGwudjEuR2V0UmV2aWV3UmVxdWVzdBoaLnJpbGwudjEuR2V0UmV2aWV3UmVzcG9uc2USVAoPQmF0Y2hHZXRSZXZpZXdzEh8ucmlsbC52MS5CYXRjaEdldFJldmlld3NSZXF1ZXN0GiAucmlsbC52MS5CYXRjaEdldFJldmlld3NSZXNwb25zZRJICgtMaXN0UmV2aWV3cxIbLnJpbGwudjEuTGlzdFJldmlld3NSZXF1ZXN0GhwucmlsbC52MS5MaXN0UmV2aWV3c1Jlc3BvbnNlEksKDFN1Ym1pdENoYW5nZRIcLnJpbGwudjEuU3VibWl0Q2hhbmdlUmVxdWVzdBodLnJpbGwudjEuU3VibWl0Q2hhbmdlUmVzcG9uc2USMwoEVm90ZRIULnJpbGwudjEuVm90ZVJlcXVlc3QaFS5yaWxsLnYxLlZvdGVSZXNwb25zZRJLCgxDcmVhdGVUaHJlYWQSHC5yaWxsLnYxLkNyZWF0ZVRocmVhZFJlcXVlc3QaHS5yaWxsLnYxLkNyZWF0ZVRocmVhZFJlc3BvbnNlEkgKC1JlcGx5VGhyZWFkEhsucmlsbC52MS5SZXBseVRocmVhZFJlcXVlc3QaHC5yaWxsLnYxLlJlcGx5VGhyZWFkUmVzcG9uc2USTgoNUmVzb2x2ZVRocmVhZBIdLnJpbGwudjEuUmVzb2x2ZVRocmVhZFJlcXVlc3QaHi5yaWxsLnYxLlJlc29sdmVUaHJlYWRSZXNwb25zZRJICgtVcGRhdGVTdGFjaxIbLnJpbGwudjEuVXBkYXRlU3RhY2tSZXF1ZXN0GhwucmlsbC52MS5VcGRhdGVTdGFja1Jlc3BvbnNlElQKD0V2YWx1YXRlTGFuZGluZxIfLnJpbGwudjEuRXZhbHVhdGVMYW5kaW5nUmVxdWVzdBogLnJpbGwudjEuRXZhbHVhdGVMYW5kaW5nUmVzcG9uc2USTgoNQWJhbmRvbkNoYW5nZRIdLnJpbGwudjEuQWJhbmRvbkNoYW5nZVJlcXVlc3QaHi5yaWxsLnYxLkFiYW5kb25DaGFuZ2VSZXNwb25zZRJKCgtXYXRjaFJldmlldxIbLnJpbGwudjEuV2F0Y2hSZXZpZXdSZXF1ZXN0GhwucmlsbC52MS5XYXRjaFJldmlld1Jlc3BvbnNlMAFiBnByb3RvMw", [file_rill_v1_landing, file_rill_v1_types]);
+  fileDesc("ChRyaWxsL3YxL3Jldmlldy5wcm90bxIHcmlsbC52MSIgChBHZXRSZXZpZXdSZXF1ZXN0EgwKBG5hbWUYASABKAkiWQoRR2V0UmV2aWV3UmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZRIeCgZsYWJlbHMYAiADKAsyDi5yaWxsLnYxLkxhYmVsIjcKFkJhdGNoR2V0UmV2aWV3c1JlcXVlc3QSDgoGcGFyZW50GAEgASgJEg0KBW5hbWVzGAIgAygJIkAKF0JhdGNoR2V0UmV2aWV3c1Jlc3BvbnNlEiUKB3Jldmlld3MYASADKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIlsKEkxpc3RSZXZpZXdzUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSDgoGZmlsdGVyGAQgASgJIlUKE0xpc3RSZXZpZXdzUmVzcG9uc2USJQoHcmV2aWV3cxgBIAMoCzIULnJpbGwudjEuUmV2aWV3U3RhdGUSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjkKE1N1Ym1pdENoYW5nZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZjaGFuZ2UYAiABKAkiPAoUU3VibWl0Q2hhbmdlUmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZSKAAQoLVm90ZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZyZXZpZXcYAiABKAkSDQoFbGFiZWwYAyABKAkSDQoFdmFsdWUYBCABKAUSEwoGcmVhc29uGAUgASgJSACIAQESDwoHdmVyc2lvbhgGIAEoCUIJCgdfcmVhc29uIjQKDFZvdGVSZXNwb25zZRIkCgZyZXZpZXcYASABKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIoACChNDcmVhdGVUaHJlYWRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGcGFyZW50GAIgASgJEiUKBmFuY2hvchgDIAEoCzIVLnJpbGwudjEuVGhyZWFkQW5jaG9yEgwKBGJvZHkYBCABKAkSLwoIY2F0ZWdvcnkYBSABKA4yGC5yaWxsLnYxLkNvbW1lbnRDYXRlZ29yeUgAiAEBEhcKCmNvbmZpZGVuY2UYBiABKA1IAYgBARIjCgJ0bxgHIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsSAKIAQFCCwoJX2NhdGVnb3J5Qg0KC19jb25maWRlbmNlQgUKA190byI3ChRDcmVhdGVUaHJlYWRSZXNwb25zZRIfCgZ0aHJlYWQYASABKAsyDy5yaWxsLnYxLlRocmVhZCKqAQoSUmVwbHlUaHJlYWRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRib2R5GAMgASgJEi8KCGNhdGVnb3J5GAQgASgOMhgucmlsbC52MS5Db21tZW50Q2F0ZWdvcnlIAIgBARIXCgpjb25maWRlbmNlGAUgASgNSAGIAQFCCwoJX2NhdGVnb3J5Qg0KC19jb25maWRlbmNlIjYKE1JlcGx5VGhyZWFkUmVzcG9uc2USHwoGdGhyZWFkGAEgASgLMg8ucmlsbC52MS5UaHJlYWQiSgoUUmVzb2x2ZVRocmVhZFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHJlc29sdmVkGAMgASgIIjgKFVJlc29sdmVUaHJlYWRSZXNwb25zZRIfCgZ0aHJlYWQYASABKAsyDy5yaWxsLnYxLlRocmVhZCJJChJVcGRhdGVTdGFja1JlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZwYXJlbnQYAiABKAkSDwoHY2hhbmdlcxgDIAMoCSI8ChNVcGRhdGVTdGFja1Jlc3BvbnNlEiUKB3Jldmlld3MYASADKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIigKFkV2YWx1YXRlTGFuZGluZ1JlcXVlc3QSDgoGY2hhbmdlGAEgASgJIoQBCg5TdWJtaXREZWNpc2lvbhIPCgdhbGxvd2VkGAEgASgIEg8KB3JlYXNvbnMYAiADKAkSGAoQbWF0Y2hlZF9wb2xpY2llcxgDIAMoCRIgCgRyaXNrGAQgASgOMhIucmlsbC52MS5SaXNrQ2xhc3MSFAoMcmlza19yZWFzb25zGAUgAygJIkQKF0V2YWx1YXRlTGFuZGluZ1Jlc3BvbnNlEikKCGRlY2lzaW9uGAEgASgLMhcucmlsbC52MS5TdWJtaXREZWNpc2lvbiJaChRBYmFuZG9uQ2hhbmdlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBmNoYW5nZRgCIAEoCRITCgZyZWFzb24YAyABKAlIAIgBAUIJCgdfcmVhc29uIj0KFUFiYW5kb25DaGFuZ2VSZXNwb25zZRIkCgZyZXZpZXcYASABKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIiIKEldhdGNoUmV2aWV3UmVxdWVzdBIMCgRuYW1lGAEgASgJIoICChNXYXRjaFJldmlld1Jlc3BvbnNlEhEKCWNoYW5nZV9pZBgBIAEoDBIKCgJhdBgCIAEoAxIvCg5zdGF0dXNfY2hhbmdlZBgDIAEoDjIVLnJpbGwudjEuUmV2aWV3U3RhdHVzSAASIwoFdm90ZWQYBCABKAsyEi5yaWxsLnYxLkxhYmVsVm90ZUgAEikKDnRocmVhZF91cGRhdGVkGAUgASgLMg8ucmlsbC52MS5UaHJlYWRIABIVCgtuZXdfdmVyc2lvbhgGIAEoDEgAEisKC2xhbmRfdXBkYXRlGAcgASgLMhQucmlsbC52MS5MYW5kUmVxdWVzdEgAQgcKBWV2ZW50IqIBCghPd25lclNldBIKCgJpZBgBIAEoCRILCgNkaXIYAiABKAkSDgoGb3duZXJzGAMgAygJEhAKCHJlcXVpcmVkGAQgASgNEhEKCXNlbnNpdGl2ZRgFIAEoCBITCgZzbGFfbXMYBiABKANIAIgBARIYCgtlc2NhbGF0ZV90bxgHIAEoCUgBiAEBQgkKB19zbGFfbXNCDgoMX2VzY2FsYXRlX3RvIi4KEEdldE93bmVyc1JlcXVlc3QSDAoEcmVwbxgBIAEoCRIMCgRwYXRoGAIgASgJIjQKEUdldE93bmVyc1Jlc3BvbnNlEh8KBHNldHMYASADKAsyES5yaWxsLnYxLk93bmVyU2V0IikKF0V4cGxhaW5Pd25lcnNoaXBSZXF1ZXN0Eg4KBmNoYW5nZRgBIAEoCSKVAQoOT3duZXJTZXRTdGF0dXMSHgoDc2V0GAEgASgLMhEucmlsbC52MS5Pd25lclNldBIRCglhcHByb3ZhbHMYAiABKA0SDwoHY292ZXJlZBgDIAEoCBIZCgxlc2NhbGF0ZWRfdG8YBCABKAlIAIgBARITCgtlc2NhbGF0aW9ucxgFIAEoDUIPCg1fZXNjYWxhdGVkX3RvIlIKGEV4cGxhaW5Pd25lcnNoaXBSZXNwb25zZRIlCgRzZXRzGAEgAygLMhcucmlsbC52MS5Pd25lclNldFN0YXR1cxIPCgdjb3ZlcmVkGAIgASgIMrUICg1SZXZpZXdTZXJ2aWNlEkIKCUdldFJldmlldxIZLnJpbGwudjEuR2V0UmV2aWV3UmVxdWVzdBoaLnJpbGwudjEuR2V0UmV2aWV3UmVzcG9uc2USVAoPQmF0Y2hHZXRSZXZpZXdzEh8ucmlsbC52MS5CYXRjaEdldFJldmlld3NSZXF1ZXN0GiAucmlsbC52MS5CYXRjaEdldFJldmlld3NSZXNwb25zZRJICgtMaXN0UmV2aWV3cxIbLnJpbGwudjEuTGlzdFJldmlld3NSZXF1ZXN0GhwucmlsbC52MS5MaXN0UmV2aWV3c1Jlc3BvbnNlEksKDFN1Ym1pdENoYW5nZRIcLnJpbGwudjEuU3VibWl0Q2hhbmdlUmVxdWVzdBodLnJpbGwudjEuU3VibWl0Q2hhbmdlUmVzcG9uc2USMwoEVm90ZRIULnJpbGwudjEuVm90ZVJlcXVlc3QaFS5yaWxsLnYxLlZvdGVSZXNwb25zZRJLCgxDcmVhdGVUaHJlYWQSHC5yaWxsLnYxLkNyZWF0ZVRocmVhZFJlcXVlc3QaHS5yaWxsLnYxLkNyZWF0ZVRocmVhZFJlc3BvbnNlEkgKC1JlcGx5VGhyZWFkEhsucmlsbC52MS5SZXBseVRocmVhZFJlcXVlc3QaHC5yaWxsLnYxLlJlcGx5VGhyZWFkUmVzcG9uc2USTgoNUmVzb2x2ZVRocmVhZBIdLnJpbGwudjEuUmVzb2x2ZVRocmVhZFJlcXVlc3QaHi5yaWxsLnYxLlJlc29sdmVUaHJlYWRSZXNwb25zZRJICgtVcGRhdGVTdGFjaxIbLnJpbGwudjEuVXBkYXRlU3RhY2tSZXF1ZXN0GhwucmlsbC52MS5VcGRhdGVTdGFja1Jlc3BvbnNlElQKD0V2YWx1YXRlTGFuZGluZxIfLnJpbGwudjEuRXZhbHVhdGVMYW5kaW5nUmVxdWVzdBogLnJpbGwudjEuRXZhbHVhdGVMYW5kaW5nUmVzcG9uc2USTgoNQWJhbmRvbkNoYW5nZRIdLnJpbGwudjEuQWJhbmRvbkNoYW5nZVJlcXVlc3QaHi5yaWxsLnYxLkFiYW5kb25DaGFuZ2VSZXNwb25zZRJKCgtXYXRjaFJldmlldxIbLnJpbGwudjEuV2F0Y2hSZXZpZXdSZXF1ZXN0GhwucmlsbC52MS5XYXRjaFJldmlld1Jlc3BvbnNlMAESQgoJR2V0T3duZXJzEhkucmlsbC52MS5HZXRPd25lcnNSZXF1ZXN0GhoucmlsbC52MS5HZXRPd25lcnNSZXNwb25zZRJXChBFeHBsYWluT3duZXJzaGlwEiAucmlsbC52MS5FeHBsYWluT3duZXJzaGlwUmVxdWVzdBohLnJpbGwudjEuRXhwbGFpbk93bmVyc2hpcFJlc3BvbnNlYgZwcm90bzM", [file_rill_v1_landing, file_rill_v1_types]);
 
 /**
  * @generated from message rill.v1.GetReviewRequest
@@ -690,6 +690,195 @@ export const WatchReviewResponseSchema: GenMessage<WatchReviewResponse> = /*@__P
   messageDesc(file_rill_v1_review, 24);
 
 /**
+ * A group of principals of which `required` must approve a change that
+ * touches the paths it covers.
+ *
+ * @generated from message rill.v1.OwnerSet
+ */
+export type OwnerSet = Message<"rill.v1.OwnerSet"> & {
+  /**
+   * `<dir>#default` or `<dir>#rule<n>`.
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * The directory whose `OWNERS.toml` declares it; empty for the root.
+   *
+   * @generated from field: string dir = 2;
+   */
+  dir: string;
+
+  /**
+   * `user:<name>`, `agent:<name>` or `team:<name>`.
+   *
+   * @generated from field: repeated string owners = 3;
+   */
+  owners: string[];
+
+  /**
+   * @generated from field: uint32 required = 4;
+   */
+  required: number;
+
+  /**
+   * Touching it makes a change at least `sensitive`.
+   *
+   * @generated from field: bool sensitive = 5;
+   */
+  sensitive: boolean;
+
+  /**
+   * How long a required review may wait before escalating.
+   *
+   * @generated from field: optional int64 sla_ms = 6;
+   */
+  slaMs?: bigint | undefined;
+
+  /**
+   * @generated from field: optional string escalate_to = 7;
+   */
+  escalateTo?: string | undefined;
+};
+
+/**
+ * Describes the message rill.v1.OwnerSet.
+ * Use `create(OwnerSetSchema)` to create a new message.
+ */
+export const OwnerSetSchema: GenMessage<OwnerSet> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 25);
+
+/**
+ * @generated from message rill.v1.GetOwnersRequest
+ */
+export type GetOwnersRequest = Message<"rill.v1.GetOwnersRequest"> & {
+  /**
+   * `orgs/{org}/repos/{repo}`. Required.
+   *
+   * @generated from field: string repo = 1;
+   */
+  repo: string;
+
+  /**
+   * A file path. Required.
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message rill.v1.GetOwnersRequest.
+ * Use `create(GetOwnersRequestSchema)` to create a new message.
+ */
+export const GetOwnersRequestSchema: GenMessage<GetOwnersRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 26);
+
+/**
+ * @generated from message rill.v1.GetOwnersResponse
+ */
+export type GetOwnersResponse = Message<"rill.v1.GetOwnersResponse"> & {
+  /**
+   * @generated from field: repeated rill.v1.OwnerSet sets = 1;
+   */
+  sets: OwnerSet[];
+};
+
+/**
+ * Describes the message rill.v1.GetOwnersResponse.
+ * Use `create(GetOwnersResponseSchema)` to create a new message.
+ */
+export const GetOwnersResponseSchema: GenMessage<GetOwnersResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 27);
+
+/**
+ * @generated from message rill.v1.ExplainOwnershipRequest
+ */
+export type ExplainOwnershipRequest = Message<"rill.v1.ExplainOwnershipRequest"> & {
+  /**
+   * `…/changes/{change}`. Required.
+   *
+   * @generated from field: string change = 1;
+   */
+  change: string;
+};
+
+/**
+ * Describes the message rill.v1.ExplainOwnershipRequest.
+ * Use `create(ExplainOwnershipRequestSchema)` to create a new message.
+ */
+export const ExplainOwnershipRequestSchema: GenMessage<ExplainOwnershipRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 28);
+
+/**
+ * One owner set's state for a change.
+ *
+ * @generated from message rill.v1.OwnerSetStatus
+ */
+export type OwnerSetStatus = Message<"rill.v1.OwnerSetStatus"> & {
+  /**
+   * @generated from field: rill.v1.OwnerSet set = 1;
+   */
+  set?: OwnerSet | undefined;
+
+  /**
+   * Distinct approvers who count for the set.
+   *
+   * @generated from field: uint32 approvals = 2;
+   */
+  approvals: number;
+
+  /**
+   * @generated from field: bool covered = 3;
+   */
+  covered: boolean;
+
+  /**
+   * Where an overdue review was escalated to, and how many times.
+   *
+   * @generated from field: optional string escalated_to = 4;
+   */
+  escalatedTo?: string | undefined;
+
+  /**
+   * @generated from field: uint32 escalations = 5;
+   */
+  escalations: number;
+};
+
+/**
+ * Describes the message rill.v1.OwnerSetStatus.
+ * Use `create(OwnerSetStatusSchema)` to create a new message.
+ */
+export const OwnerSetStatusSchema: GenMessage<OwnerSetStatus> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 29);
+
+/**
+ * @generated from message rill.v1.ExplainOwnershipResponse
+ */
+export type ExplainOwnershipResponse = Message<"rill.v1.ExplainOwnershipResponse"> & {
+  /**
+   * @generated from field: repeated rill.v1.OwnerSetStatus sets = 1;
+   */
+  sets: OwnerSetStatus[];
+
+  /**
+   * Every set is covered (true when the change touches none).
+   *
+   * @generated from field: bool covered = 2;
+   */
+  covered: boolean;
+};
+
+/**
+ * Describes the message rill.v1.ExplainOwnershipResponse.
+ * Use `create(ExplainOwnershipResponseSchema)` to create a new message.
+ */
+export const ExplainOwnershipResponseSchema: GenMessage<ExplainOwnershipResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 30);
+
+/**
  * Reviews of changes.
  *
  * @generated from service rill.v1.ReviewService
@@ -814,6 +1003,26 @@ export const ReviewService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchReviewRequestSchema;
     output: typeof WatchReviewResponseSchema;
+  },
+  /**
+   * The owner sets covering a path, by trunk's `OWNERS.toml` files.
+   *
+   * @generated from rpc rill.v1.ReviewService.GetOwners
+   */
+  getOwners: {
+    methodKind: "unary";
+    input: typeof GetOwnersRequestSchema;
+    output: typeof GetOwnersResponseSchema;
+  },
+  /**
+   * Each owner set a change touches, with its approvals and escalation.
+   *
+   * @generated from rpc rill.v1.ReviewService.ExplainOwnership
+   */
+  explainOwnership: {
+    methodKind: "unary";
+    input: typeof ExplainOwnershipRequestSchema;
+    output: typeof ExplainOwnershipResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_rill_v1_review, 0);

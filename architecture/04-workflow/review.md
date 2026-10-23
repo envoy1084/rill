@@ -54,14 +54,11 @@ the range (`VoteOutOfRange`), and the maximum value from a non-human on a
 `max_requires_human` label (`MaxRequiresHuman`). An agent may vote
 `Owner -1` but not `Owner +1`.
 
-A positive `Owner` vote must come from an owner of every path the change's
-current version writes
-([`services/review/owners.rs`](../../crates/server/api/src/services/review/owners.rs)).
-Ownership comes from `.rill/owners.toml` on trunk, where each `[[rule]]`
-names a `path` and its `owners` (`user:`, `agent:` or `team:`). The rule with
-the longest covering path decides; rules do not add up. A path no rule
-covers falls back to the `owner` relation on its directory. Changing
-anything under `.rill/` takes `owner` ([permissions](../05-policy/permissions.md)).
+A positive `Owner` vote must come from someone who counts for an owner set
+the change touches. Owner sets come from the `OWNERS.toml` files on trunk;
+paths no file covers fall back to the `owner` relation. The submit policy
+requires every touched set to have its approvals
+([code owners](ownership.md)).
 
 `vote` needs status `Open` or `Landable`. It replaces any earlier vote by
 the same principal on the same label and version, appends a `LabelVote`
@@ -188,4 +185,4 @@ service also still broadcasts a `ReviewEvent` per mutation in process.
 * [rill-types/src/objects/review.rs](../../crates/foundation/types/src/objects/review.rs), [rill-api/src/services/review/](../../crates/server/api/src/services/review/mod.rs)
 
 ---
-← Previous: [Changes and stacks](changes-and-stacks.md) · [Index](../index.md) · Next: [Review agents](review-agents.md) →
+← Previous: [Changes and stacks](changes-and-stacks.md) · [Index](../index.md) · Next: [Code owners](ownership.md) →

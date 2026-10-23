@@ -40,6 +40,7 @@ pub mod identity;
 pub mod intent;
 pub mod names;
 pub mod operations;
+mod ownership;
 mod paging;
 pub mod protection;
 pub mod read_stats;

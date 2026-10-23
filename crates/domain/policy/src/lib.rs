@@ -11,6 +11,7 @@
 //! relationship tuples from a [`rill_store::RepoStore`].
 
 pub mod audit;
+pub mod directory;
 pub mod error;
 pub mod grants;
 pub mod identity;
@@ -22,11 +23,9 @@ pub mod signing;
 pub mod submit;
 pub mod tokens;
 
+pub use directory::{Directory, EmptyDirectory, Person, StaticDirectory};
 pub use error::{Error, Result};
-pub use identity::{
-    AgentScope, AuthContext, AuthHeaders, Authenticator, NoTeams, StaticTokenAuthenticator,
-    TeamResolver,
-};
+pub use identity::{AgentScope, AuthContext, AuthHeaders, Authenticator, StaticTokenAuthenticator};
 pub use rebac::{Authorizer, PathFilter, Relation, Subject};
 pub use risk::{
     classify, ChangeFacts, CompiledRiskConfig, PathFacts, RiskAssessment, RiskConfig, SensitiveGlob,

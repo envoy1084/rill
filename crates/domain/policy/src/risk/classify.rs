@@ -69,6 +69,20 @@ pub fn classify(facts: &ChangeFacts, config: &CompiledRiskConfig) -> RiskAssessm
             reasons.push(format!("policy file {} under {POLICY_DIR}/", p.path));
             class = RiskClass::Critical;
         }
+        if p.path.file_name() == Some(crate::owners::OWNERS_FILE) {
+            reasons.push(format!(
+                "{SENSITIVE_REASON_PREFIX}{} changes ownership",
+                p.path
+            ));
+            class = class.max(RiskClass::Sensitive);
+        }
+    }
+    for set in facts.owner_sets.iter().filter(|s| s.sensitive) {
+        reasons.push(format!(
+            "{SENSITIVE_REASON_PREFIX}owners rule {} is sensitive",
+            set.id
+        ));
+        class = class.max(RiskClass::Sensitive);
     }
 
     if facts.resolved_by_agent() {

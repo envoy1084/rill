@@ -19,11 +19,13 @@ pub struct WriteSet {
     pub copies_from: Vec<RepoPathBuf>,
 }
 
-/// Whether changing `path` takes owner rather than writer.
+/// Whether changing `path` takes owner rather than writer: anything under
+/// `.rill/`, and every directory's `OWNERS.toml`.
 pub fn is_config(path: &RepoPath) -> bool {
     path.components()
         .next()
         .is_some_and(|first| first == CONFIG_DIR)
+        || path.file_name() == Some(rill_policy::owners::OWNERS_FILE)
 }
 
 /// The paths `cv` writes. A merge's changes relative to its first parent

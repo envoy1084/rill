@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use rill_core::{CommitGraph, DeriveManager};
-use rill_policy::{CompiledRiskConfig, SubmitPolicy};
+use rill_policy::owners::OwnersIndex;
+use rill_policy::{CompiledRiskConfig, Directory, EmptyDirectory, SubmitPolicy};
 use rill_store::RepoStore;
 use rill_types::{
     ChangeId, ChangeVersionHash, LabelVote, Principal, ReviewState, ReviewStatus, TrunkSeq,
@@ -98,6 +99,10 @@ pub struct ReviewService {
     pub(crate) risk: Arc<CompiledRiskConfig>,
     pub(crate) labels: Arc<LabelSet>,
     pub(crate) events: broadcast::Sender<ReviewEvent>,
+    /// Teams and sponsors, for ownership and reviewer independence.
+    pub(crate) directory: Arc<dyn Directory>,
+    /// The owners index of the trunk version last asked about.
+    pub(crate) owners: parking_lot::Mutex<Option<(ChangeVersionHash, Arc<OwnersIndex>)>>,
 }
 
 impl ReviewService {
@@ -120,7 +125,15 @@ impl ReviewService {
             risk,
             labels,
             events,
+            directory: Arc::new(EmptyDirectory),
+            owners: parking_lot::Mutex::new(None),
         }
+    }
+
+    /// Answer teams and sponsors from `directory`.
+    pub fn with_directory(mut self, directory: Arc<dyn Directory>) -> Self {
+        self.directory = directory;
+        self
     }
 
     /// Use an existing event channel, for sharing one bus across services.

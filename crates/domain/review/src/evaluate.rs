@@ -72,7 +72,7 @@ impl ReviewService {
         facts: &ChangeFacts,
         principal: &Principal,
     ) -> Result<SubmitDecision> {
-        let review = self.submit_facts(state);
+        let review = self.submit_facts(state, facts);
         Ok(self.policy.evaluate(principal, facts, &review)?)
     }
 }

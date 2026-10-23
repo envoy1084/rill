@@ -43,6 +43,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Stacks | `stack show`, `stack sync`, `stack submit`, `stack land [--prefix]` (one ordered group: all or nothing, or the longest landable prefix) |
 | Review | `submit`, `approve` / `reject` (the label's most or least, `Review` unless `--label`), `comment`, `inbox`, `review open` (full screen), `review show/list/vote/comment/reply/threads/resolve-thread/evaluate` |
 | Landing | `land [--wait] [--timeout 300] [--no-sync] [--onto release/<name>]`, `land cancel [ticket \| change] [-m reason]`, `queue` (requests waiting, with place and wait), `trunk` (status), `trunk health`, `trunk landings`, `trunk verify <seq>`, `trunk freeze [--reason]`, `trunk thaw`, `incidents [-n]`, `revert <seq>`, `revert --session/--model/--sponsor/--author/--intent [--since] [--until] [--apply]` (a preview without `--apply`), `bisect` |
+| Owners | `owners show <path>` (the owner sets covering it), `owners explain [change]` (approvals and escalation per set) |
 | Releases | `release cut <name> [--at SEQ]` (repository owners), `release list`; land on one with `land --onto release/<name>` or `stack land --onto` |
 | Checks | `checks runs [--of-version]`, `checks run <id> [--watch]`, `checks log <run> <step> [--stderr] [--tail]`, `checks artifact <run> <step> <path> [-o]`, `checks nonhermetic`, `checks flaky [--min-score] [--limit]`, `checks history <target>`, `checks quarantine list/add/release` ([checks](../06-services/checks.md)) |
 | Intents | `intent create/list/show/update/link/similar` |

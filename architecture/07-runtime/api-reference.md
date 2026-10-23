@@ -5270,6 +5270,8 @@ Reviews of changes.
 | `EvaluateLanding` | [EvaluateLandingRequest](#rill-v1-EvaluateLandingRequest) | [EvaluateLandingResponse](#rill-v1-EvaluateLandingResponse) | Whether the repository's policy lets a change land now, and why not. |
 | `AbandonChange` | [AbandonChangeRequest](#rill-v1-AbandonChangeRequest) | [AbandonChangeResponse](#rill-v1-AbandonChangeResponse) | Abandon a change. |
 | `WatchReview` | [WatchReviewRequest](#rill-v1-WatchReviewRequest) | [WatchReviewResponse](#rill-v1-WatchReviewResponse) stream | A review's updates as they happen. |
+| `GetOwners` | [GetOwnersRequest](#rill-v1-GetOwnersRequest) | [GetOwnersResponse](#rill-v1-GetOwnersResponse) | The owner sets covering a path, by trunk's `OWNERS.toml` files. |
+| `ExplainOwnership` | [ExplainOwnershipRequest](#rill-v1-ExplainOwnershipRequest) | [ExplainOwnershipResponse](#rill-v1-ExplainOwnershipResponse) | Each owner set a change touches, with its approvals and escalation. |
 
 
 
@@ -5370,6 +5372,52 @@ Reviews of changes.
 | `decision` | [SubmitDecision](#rill-v1-SubmitDecision) |  |  |
 
 
+<a name="rill-v1-ExplainOwnershipRequest"></a>
+
+### ExplainOwnershipRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `change` | [string](#string) |  | `…/changes/{change}`. Required. |
+
+
+<a name="rill-v1-ExplainOwnershipResponse"></a>
+
+### ExplainOwnershipResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `sets` | [OwnerSetStatus](#rill-v1-OwnerSetStatus) | repeated |  |
+| `covered` | [bool](#bool) |  | Every set is covered (true when the change touches none). |
+
+
+<a name="rill-v1-GetOwnersRequest"></a>
+
+### GetOwnersRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `repo` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `path` | [string](#string) |  | A file path. Required. |
+
+
+<a name="rill-v1-GetOwnersResponse"></a>
+
+### GetOwnersResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `sets` | [OwnerSet](#rill-v1-OwnerSet) | repeated |  |
+
+
 <a name="rill-v1-GetReviewRequest"></a>
 
 ### GetReviewRequest
@@ -5417,6 +5465,39 @@ Reviews of changes.
 | --- | --- | --- | --- |
 | `reviews` | [ReviewState](#rill-v1-ReviewState) | repeated |  |
 | `next_page_token` | [string](#string) |  |  |
+
+
+<a name="rill-v1-OwnerSet"></a>
+
+### OwnerSet
+
+A group of principals of which `required` must approve a change that
+touches the paths it covers.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `id` | [string](#string) |  | `<dir>#default` or `<dir>#rule<n>`. |
+| `dir` | [string](#string) |  | The directory whose `OWNERS.toml` declares it; empty for the root. |
+| `owners` | [string](#string) | repeated | `user:<name>`, `agent:<name>` or `team:<name>`. |
+| `required` | [uint32](#uint32) |  |  |
+| `sensitive` | [bool](#bool) |  | Touching it makes a change at least `sensitive`. |
+| `sla_ms` | [int64](#int64) | optional | How long a required review may wait before escalating. |
+| `escalate_to` | [string](#string) | optional |  |
+
+
+<a name="rill-v1-OwnerSetStatus"></a>
+
+### OwnerSetStatus
+
+One owner set's state for a change.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `set` | [OwnerSet](#rill-v1-OwnerSet) |  |  |
+| `approvals` | [uint32](#uint32) |  | Distinct approvers who count for the set. |
+| `covered` | [bool](#bool) |  |  |
+| `escalated_to` | [string](#string) | optional | Where an overdue review was escalated to, and how many times. |
+| `escalations` | [uint32](#uint32) |  |  |
 
 
 <a name="rill-v1-ReplyThreadRequest"></a>

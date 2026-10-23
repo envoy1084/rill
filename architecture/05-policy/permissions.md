@@ -169,7 +169,7 @@ a verb, a relation and a path:
 | Method | Verb | Relation | Typical callers |
 | --- | --- | --- | --- |
 | `read(path)` | `Read` | `Reader` | every read RPC, `GetPolicy`, `EvaluateLanding`, object `GET`/`HEAD` |
-| `write(path)` | `Write` | `Writer` (`Owner` under `.rill/`) | every path a stored version writes, inside its commit (below) |
+| `write(path)` | `Write` | `Writer` (`Owner` under `.rill/` and for any `OWNERS.toml`) | every path a stored version writes, inside its commit (below) |
 | `write_any()` | `Write` | `Writer` somewhere | `RebaseVersion`, `MergeVersions`, `SubmitChange`, `UpdateStack`, `AbandonChange`, `WriteBlob`, object `PUT`, `BatchCheckObjects` |
 | `write(root)` | `Write` | `Writer` | workspace and intent changes, `UpdateRef` |
 | `review()` | `Review` | `Reviewer` | `Vote`, `CreateThread`, `ReplyThread`, `ResolveThread` |
@@ -187,7 +187,8 @@ whichever RPC made it. `write_set` lists what the version writes:
   parent, since what it takes from the other side is brought in, not
   written.
 
-The committer needs `writer` on each of those paths (`owner` under `.rill/`)
+The committer needs `writer` on each of those paths (`owner` under `.rill/`
+and for any `OWNERS.toml`)
 and `reader` on each copy source. The commit transaction asserts the
 relation version the decision used, so a relation change racing the commit
 makes it conflict and decide again. Handlers may refuse earlier, but the

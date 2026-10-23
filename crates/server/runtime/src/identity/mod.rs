@@ -4,12 +4,14 @@
 //! expired records.
 
 mod callers;
+mod directory;
 mod follower;
 mod maintenance;
 mod mint;
 mod standing;
 mod view;
 
+pub use directory::OrgDirectory;
 pub use follower::follow;
 pub use maintenance::maintain_forever;
 pub use mint::mint_token;

@@ -10,7 +10,7 @@ use crate::service::ReviewService;
 pub const MAX_WRITE_ATTEMPTS: usize = 8;
 
 /// The actor for writes the review service makes on its own behalf.
-pub(crate) fn service_actor() -> Principal {
+pub fn service_actor() -> Principal {
     Principal::service("review")
 }
 

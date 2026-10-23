@@ -19,6 +19,7 @@ hex = { workspace = true }
 regex = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
+parking_lot = { workspace = true }
 futures = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

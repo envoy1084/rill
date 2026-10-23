@@ -34,6 +34,7 @@ pub(super) async fn build_review(
     labels: &Arc<LabelSet>,
     config: &ServerConfig,
     events: broadcast::Sender<ReviewEvent>,
+    directory: Arc<dyn rill_policy::Directory>,
 ) -> Result<ReviewService> {
     let submit = policy::effective_submit(repo).await?;
     let risk = policy::effective_risk(repo, &config.risk).await?;
@@ -45,7 +46,8 @@ pub(super) async fn build_review(
         Arc::new(risk),
         labels.clone(),
     )
-    .with_events(events))
+    .with_events(events)
+    .with_directory(directory))
 }
 
 impl RepoRegistry {
@@ -65,6 +67,9 @@ impl RepoRegistry {
         let graph = Arc::new(CommitGraph::new(repo.clone(), derive.clone()));
         let labels = Arc::new(self.config.labels.clone());
         let (review_events, _) = broadcast::channel(rill_review::service::DEFAULT_EVENT_CAPACITY);
+        let directory: Arc<dyn rill_policy::Directory> = Arc::new(
+            crate::identity::OrgDirectory::new(config.org.clone(), self.identity.clone()),
+        );
         let review = Arc::new(ArcSwap::from_pointee(
             build_review(
                 &repo,
@@ -73,6 +78,7 @@ impl RepoRegistry {
                 &labels,
                 &self.config,
                 review_events.clone(),
+                directory.clone(),
             )
             .await?,
         ));
@@ -168,6 +174,7 @@ impl RepoRegistry {
             lifecycle: self.lifecycle.clone(),
             review,
             review_events,
+            directory,
             server_config: self.config.clone(),
             attestor: self.attestor.clone(),
             index_requests: Default::default(),
