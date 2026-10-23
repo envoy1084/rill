@@ -3,6 +3,7 @@
 mod fixture;
 mod grants;
 mod holes;
+mod intents;
 mod matrix;
 mod owners;
 mod raw;

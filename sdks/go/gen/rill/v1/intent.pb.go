@@ -36,8 +36,10 @@ type CreateIntentRequest struct {
 	Body  string     `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
 	Kind  IntentKind `protobuf:"varint,5,opt,name=kind,proto3,enum=rill.v1.IntentKind" json:"kind,omitempty"`
 	// The parent intent, `…/intents/{intent}`.
-	ParentIntent  string     `protobuf:"bytes,6,opt,name=parent_intent,json=parentIntent,proto3" json:"parent_intent,omitempty"`
-	RiskOverride  *RiskClass `protobuf:"varint,7,opt,name=risk_override,json=riskOverride,proto3,enum=rill.v1.RiskClass,oneof" json:"risk_override,omitempty"`
+	ParentIntent string     `protobuf:"bytes,6,opt,name=parent_intent,json=parentIntent,proto3" json:"parent_intent,omitempty"`
+	RiskOverride *RiskClass `protobuf:"varint,7,opt,name=risk_override,json=riskOverride,proto3,enum=rill.v1.RiskClass,oneof" json:"risk_override,omitempty"`
+	// The scope to approve; unset for none.
+	Scope         *IntentScope `protobuf:"bytes,8,opt,name=scope,proto3" json:"scope,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -119,6 +121,13 @@ func (x *CreateIntentRequest) GetRiskOverride() RiskClass {
 		return *x.RiskOverride
 	}
 	return RiskClass_RISK_CLASS_UNSPECIFIED
+}
+
+func (x *CreateIntentRequest) GetScope() *IntentScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
 }
 
 type CreateIntentResponse struct {
@@ -259,8 +268,8 @@ type UpdateIntentRequest struct {
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	// The intent, by `name`, with the fields to change. Required.
 	Intent *Intent `protobuf:"bytes,2,opt,name=intent,proto3" json:"intent,omitempty"`
-	// Which of `title`, `body`, `status`, `parent` and `risk_override` to
-	// change; a masked field left empty is cleared. Required.
+	// Which of `title`, `body`, `status`, `parent`, `risk_override` and
+	// `scope` to change; a masked field left empty is cleared. Required.
 	UpdateMask *fieldmaskpb.FieldMask `protobuf:"bytes,3,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	// The etag read; empty means no condition.
 	Etag          string `protobuf:"bytes,4,opt,name=etag,proto3" json:"etag,omitempty"`
@@ -765,11 +774,338 @@ func (x *FindSimilarIntentsResponse) GetResults() []*ScoredIntent {
 	return nil
 }
 
+type ApproveIntentRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// `…/intents/{intent}`. Required.
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// The revision being approved; refused when it is not current.
+	Revision      uint32 `protobuf:"varint,3,opt,name=revision,proto3" json:"revision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApproveIntentRequest) Reset() {
+	*x = ApproveIntentRequest{}
+	mi := &file_rill_v1_intent_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApproveIntentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApproveIntentRequest) ProtoMessage() {}
+
+func (x *ApproveIntentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_intent_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApproveIntentRequest.ProtoReflect.Descriptor instead.
+func (*ApproveIntentRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_intent_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ApproveIntentRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ApproveIntentRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ApproveIntentRequest) GetRevision() uint32 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+type ApproveIntentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Intent        *Intent                `protobuf:"bytes,1,opt,name=intent,proto3" json:"intent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApproveIntentResponse) Reset() {
+	*x = ApproveIntentResponse{}
+	mi := &file_rill_v1_intent_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApproveIntentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApproveIntentResponse) ProtoMessage() {}
+
+func (x *ApproveIntentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_intent_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApproveIntentResponse.ProtoReflect.Descriptor instead.
+func (*ApproveIntentResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_intent_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ApproveIntentResponse) GetIntent() *Intent {
+	if x != nil {
+		return x.Intent
+	}
+	return nil
+}
+
+type RevokeIntentApprovalRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// `…/intents/{intent}`. Required.
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeIntentApprovalRequest) Reset() {
+	*x = RevokeIntentApprovalRequest{}
+	mi := &file_rill_v1_intent_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeIntentApprovalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeIntentApprovalRequest) ProtoMessage() {}
+
+func (x *RevokeIntentApprovalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_intent_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeIntentApprovalRequest.ProtoReflect.Descriptor instead.
+func (*RevokeIntentApprovalRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_intent_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RevokeIntentApprovalRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RevokeIntentApprovalRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type RevokeIntentApprovalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Intent        *Intent                `protobuf:"bytes,1,opt,name=intent,proto3" json:"intent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeIntentApprovalResponse) Reset() {
+	*x = RevokeIntentApprovalResponse{}
+	mi := &file_rill_v1_intent_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeIntentApprovalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeIntentApprovalResponse) ProtoMessage() {}
+
+func (x *RevokeIntentApprovalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_intent_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeIntentApprovalResponse.ProtoReflect.Descriptor instead.
+func (*RevokeIntentApprovalResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_intent_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RevokeIntentApprovalResponse) GetIntent() *Intent {
+	if x != nil {
+		return x.Intent
+	}
+	return nil
+}
+
+type ExplainIntentScopeRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `…/changes/{change}`. Required.
+	Change        string `protobuf:"bytes,1,opt,name=change,proto3" json:"change,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExplainIntentScopeRequest) Reset() {
+	*x = ExplainIntentScopeRequest{}
+	mi := &file_rill_v1_intent_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExplainIntentScopeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExplainIntentScopeRequest) ProtoMessage() {}
+
+func (x *ExplainIntentScopeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_intent_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExplainIntentScopeRequest.ProtoReflect.Descriptor instead.
+func (*ExplainIntentScopeRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_intent_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ExplainIntentScopeRequest) GetChange() string {
+	if x != nil {
+		return x.Change
+	}
+	return ""
+}
+
+type ExplainIntentScopeResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The linked intent, `…/intents/{intent}`; empty when there is none.
+	Intent   string `protobuf:"bytes,1,opt,name=intent,proto3" json:"intent,omitempty"`
+	Approved bool   `protobuf:"varint,2,opt,name=approved,proto3" json:"approved,omitempty"`
+	InScope  bool   `protobuf:"varint,3,opt,name=in_scope,json=inScope,proto3" json:"in_scope,omitempty"`
+	// Why the change is not in scope.
+	Reasons []string `protobuf:"bytes,4,rep,name=reasons,proto3" json:"reasons,omitempty"`
+	// Scope directories still short of approvals.
+	MissingApprovals []string `protobuf:"bytes,5,rep,name=missing_approvals,json=missingApprovals,proto3" json:"missing_approvals,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ExplainIntentScopeResponse) Reset() {
+	*x = ExplainIntentScopeResponse{}
+	mi := &file_rill_v1_intent_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExplainIntentScopeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExplainIntentScopeResponse) ProtoMessage() {}
+
+func (x *ExplainIntentScopeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_intent_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExplainIntentScopeResponse.ProtoReflect.Descriptor instead.
+func (*ExplainIntentScopeResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_intent_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ExplainIntentScopeResponse) GetIntent() string {
+	if x != nil {
+		return x.Intent
+	}
+	return ""
+}
+
+func (x *ExplainIntentScopeResponse) GetApproved() bool {
+	if x != nil {
+		return x.Approved
+	}
+	return false
+}
+
+func (x *ExplainIntentScopeResponse) GetInScope() bool {
+	if x != nil {
+		return x.InScope
+	}
+	return false
+}
+
+func (x *ExplainIntentScopeResponse) GetReasons() []string {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+func (x *ExplainIntentScopeResponse) GetMissingApprovals() []string {
+	if x != nil {
+		return x.MissingApprovals
+	}
+	return nil
+}
+
 var File_rill_v1_intent_proto protoreflect.FileDescriptor
 
 const file_rill_v1_intent_proto_rawDesc = "" +
 	"\n" +
-	"\x14rill/v1/intent.proto\x12\arill.v1\x1a google/protobuf/field_mask.proto\x1a\x13rill/v1/types.proto\"\x94\x02\n" +
+	"\x14rill/v1/intent.proto\x12\arill.v1\x1a google/protobuf/field_mask.proto\x1a\x13rill/v1/types.proto\"\xc0\x02\n" +
 	"\x13CreateIntentRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
@@ -778,7 +1114,8 @@ const file_rill_v1_intent_proto_rawDesc = "" +
 	"\x04body\x18\x04 \x01(\tR\x04body\x12'\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x13.rill.v1.IntentKindR\x04kind\x12#\n" +
 	"\rparent_intent\x18\x06 \x01(\tR\fparentIntent\x12<\n" +
-	"\rrisk_override\x18\a \x01(\x0e2\x12.rill.v1.RiskClassH\x00R\friskOverride\x88\x01\x01B\x10\n" +
+	"\rrisk_override\x18\a \x01(\x0e2\x12.rill.v1.RiskClassH\x00R\friskOverride\x88\x01\x01\x12*\n" +
+	"\x05scope\x18\b \x01(\v2\x14.rill.v1.IntentScopeR\x05scopeB\x10\n" +
 	"\x0e_risk_override\"?\n" +
 	"\x14CreateIntentResponse\x12'\n" +
 	"\x06intent\x18\x01 \x01(\v2\x0f.rill.v1.IntentR\x06intent\"&\n" +
@@ -821,7 +1158,28 @@ const file_rill_v1_intent_proto_rawDesc = "" +
 	"\x06intent\x18\x01 \x01(\v2\x0f.rill.v1.IntentR\x06intent\x12\x14\n" +
 	"\x05score\x18\x02 \x01(\x02R\x05score\"M\n" +
 	"\x1aFindSimilarIntentsResponse\x12/\n" +
-	"\aresults\x18\x01 \x03(\v2\x15.rill.v1.ScoredIntentR\aresults2\xdd\x03\n" +
+	"\aresults\x18\x01 \x03(\v2\x15.rill.v1.ScoredIntentR\aresults\"e\n" +
+	"\x14ApproveIntentRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
+	"\brevision\x18\x03 \x01(\rR\brevision\"@\n" +
+	"\x15ApproveIntentResponse\x12'\n" +
+	"\x06intent\x18\x01 \x01(\v2\x0f.rill.v1.IntentR\x06intent\"P\n" +
+	"\x1bRevokeIntentApprovalRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"G\n" +
+	"\x1cRevokeIntentApprovalResponse\x12'\n" +
+	"\x06intent\x18\x01 \x01(\v2\x0f.rill.v1.IntentR\x06intent\"3\n" +
+	"\x19ExplainIntentScopeRequest\x12\x16\n" +
+	"\x06change\x18\x01 \x01(\tR\x06change\"\xb2\x01\n" +
+	"\x1aExplainIntentScopeResponse\x12\x16\n" +
+	"\x06intent\x18\x01 \x01(\tR\x06intent\x12\x1a\n" +
+	"\bapproved\x18\x02 \x01(\bR\bapproved\x12\x19\n" +
+	"\bin_scope\x18\x03 \x01(\bR\ainScope\x12\x18\n" +
+	"\areasons\x18\x04 \x03(\tR\areasons\x12+\n" +
+	"\x11missing_approvals\x18\x05 \x03(\tR\x10missingApprovals2\xf1\x05\n" +
 	"\rIntentService\x12K\n" +
 	"\fCreateIntent\x12\x1c.rill.v1.CreateIntentRequest\x1a\x1d.rill.v1.CreateIntentResponse\x12B\n" +
 	"\tGetIntent\x12\x19.rill.v1.GetIntentRequest\x1a\x1a.rill.v1.GetIntentResponse\x12K\n" +
@@ -829,7 +1187,10 @@ const file_rill_v1_intent_proto_rawDesc = "" +
 	"\vListIntents\x12\x1b.rill.v1.ListIntentsRequest\x1a\x1c.rill.v1.ListIntentsResponse\x12E\n" +
 	"\n" +
 	"LinkChange\x12\x1a.rill.v1.LinkChangeRequest\x1a\x1b.rill.v1.LinkChangeResponse\x12]\n" +
-	"\x12FindSimilarIntents\x12\".rill.v1.FindSimilarIntentsRequest\x1a#.rill.v1.FindSimilarIntentsResponseB\x8c\x01\n" +
+	"\x12FindSimilarIntents\x12\".rill.v1.FindSimilarIntentsRequest\x1a#.rill.v1.FindSimilarIntentsResponse\x12N\n" +
+	"\rApproveIntent\x12\x1d.rill.v1.ApproveIntentRequest\x1a\x1e.rill.v1.ApproveIntentResponse\x12c\n" +
+	"\x14RevokeIntentApproval\x12$.rill.v1.RevokeIntentApprovalRequest\x1a%.rill.v1.RevokeIntentApprovalResponse\x12]\n" +
+	"\x12ExplainIntentScope\x12\".rill.v1.ExplainIntentScopeRequest\x1a#.rill.v1.ExplainIntentScopeResponseB\x8c\x01\n" +
 	"\vcom.rill.v1B\vIntentProtoP\x01Z3github.com/rill-vcs/rill/sdks/go/gen/rill/v1;rillv1\xa2\x02\x03RXX\xaa\x02\aRill.V1\xca\x02\aRill\\V1\xe2\x02\x13Rill\\V1\\GPBMetadata\xea\x02\bRill::V1b\x06proto3"
 
 var (
@@ -844,55 +1205,71 @@ func file_rill_v1_intent_proto_rawDescGZIP() []byte {
 	return file_rill_v1_intent_proto_rawDescData
 }
 
-var file_rill_v1_intent_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_rill_v1_intent_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_rill_v1_intent_proto_goTypes = []any{
-	(*CreateIntentRequest)(nil),        // 0: rill.v1.CreateIntentRequest
-	(*CreateIntentResponse)(nil),       // 1: rill.v1.CreateIntentResponse
-	(*GetIntentRequest)(nil),           // 2: rill.v1.GetIntentRequest
-	(*GetIntentResponse)(nil),          // 3: rill.v1.GetIntentResponse
-	(*UpdateIntentRequest)(nil),        // 4: rill.v1.UpdateIntentRequest
-	(*UpdateIntentResponse)(nil),       // 5: rill.v1.UpdateIntentResponse
-	(*ListIntentsRequest)(nil),         // 6: rill.v1.ListIntentsRequest
-	(*ListIntentsResponse)(nil),        // 7: rill.v1.ListIntentsResponse
-	(*LinkChangeRequest)(nil),          // 8: rill.v1.LinkChangeRequest
-	(*LinkChangeResponse)(nil),         // 9: rill.v1.LinkChangeResponse
-	(*FindSimilarIntentsRequest)(nil),  // 10: rill.v1.FindSimilarIntentsRequest
-	(*ScoredIntent)(nil),               // 11: rill.v1.ScoredIntent
-	(*FindSimilarIntentsResponse)(nil), // 12: rill.v1.FindSimilarIntentsResponse
-	(IntentKind)(0),                    // 13: rill.v1.IntentKind
-	(RiskClass)(0),                     // 14: rill.v1.RiskClass
-	(*Intent)(nil),                     // 15: rill.v1.Intent
-	(*fieldmaskpb.FieldMask)(nil),      // 16: google.protobuf.FieldMask
+	(*CreateIntentRequest)(nil),          // 0: rill.v1.CreateIntentRequest
+	(*CreateIntentResponse)(nil),         // 1: rill.v1.CreateIntentResponse
+	(*GetIntentRequest)(nil),             // 2: rill.v1.GetIntentRequest
+	(*GetIntentResponse)(nil),            // 3: rill.v1.GetIntentResponse
+	(*UpdateIntentRequest)(nil),          // 4: rill.v1.UpdateIntentRequest
+	(*UpdateIntentResponse)(nil),         // 5: rill.v1.UpdateIntentResponse
+	(*ListIntentsRequest)(nil),           // 6: rill.v1.ListIntentsRequest
+	(*ListIntentsResponse)(nil),          // 7: rill.v1.ListIntentsResponse
+	(*LinkChangeRequest)(nil),            // 8: rill.v1.LinkChangeRequest
+	(*LinkChangeResponse)(nil),           // 9: rill.v1.LinkChangeResponse
+	(*FindSimilarIntentsRequest)(nil),    // 10: rill.v1.FindSimilarIntentsRequest
+	(*ScoredIntent)(nil),                 // 11: rill.v1.ScoredIntent
+	(*FindSimilarIntentsResponse)(nil),   // 12: rill.v1.FindSimilarIntentsResponse
+	(*ApproveIntentRequest)(nil),         // 13: rill.v1.ApproveIntentRequest
+	(*ApproveIntentResponse)(nil),        // 14: rill.v1.ApproveIntentResponse
+	(*RevokeIntentApprovalRequest)(nil),  // 15: rill.v1.RevokeIntentApprovalRequest
+	(*RevokeIntentApprovalResponse)(nil), // 16: rill.v1.RevokeIntentApprovalResponse
+	(*ExplainIntentScopeRequest)(nil),    // 17: rill.v1.ExplainIntentScopeRequest
+	(*ExplainIntentScopeResponse)(nil),   // 18: rill.v1.ExplainIntentScopeResponse
+	(IntentKind)(0),                      // 19: rill.v1.IntentKind
+	(RiskClass)(0),                       // 20: rill.v1.RiskClass
+	(*IntentScope)(nil),                  // 21: rill.v1.IntentScope
+	(*Intent)(nil),                       // 22: rill.v1.Intent
+	(*fieldmaskpb.FieldMask)(nil),        // 23: google.protobuf.FieldMask
 }
 var file_rill_v1_intent_proto_depIdxs = []int32{
-	13, // 0: rill.v1.CreateIntentRequest.kind:type_name -> rill.v1.IntentKind
-	14, // 1: rill.v1.CreateIntentRequest.risk_override:type_name -> rill.v1.RiskClass
-	15, // 2: rill.v1.CreateIntentResponse.intent:type_name -> rill.v1.Intent
-	15, // 3: rill.v1.GetIntentResponse.intent:type_name -> rill.v1.Intent
-	15, // 4: rill.v1.UpdateIntentRequest.intent:type_name -> rill.v1.Intent
-	16, // 5: rill.v1.UpdateIntentRequest.update_mask:type_name -> google.protobuf.FieldMask
-	15, // 6: rill.v1.UpdateIntentResponse.intent:type_name -> rill.v1.Intent
-	15, // 7: rill.v1.ListIntentsResponse.intents:type_name -> rill.v1.Intent
-	15, // 8: rill.v1.LinkChangeResponse.intent:type_name -> rill.v1.Intent
-	15, // 9: rill.v1.ScoredIntent.intent:type_name -> rill.v1.Intent
-	11, // 10: rill.v1.FindSimilarIntentsResponse.results:type_name -> rill.v1.ScoredIntent
-	0,  // 11: rill.v1.IntentService.CreateIntent:input_type -> rill.v1.CreateIntentRequest
-	2,  // 12: rill.v1.IntentService.GetIntent:input_type -> rill.v1.GetIntentRequest
-	4,  // 13: rill.v1.IntentService.UpdateIntent:input_type -> rill.v1.UpdateIntentRequest
-	6,  // 14: rill.v1.IntentService.ListIntents:input_type -> rill.v1.ListIntentsRequest
-	8,  // 15: rill.v1.IntentService.LinkChange:input_type -> rill.v1.LinkChangeRequest
-	10, // 16: rill.v1.IntentService.FindSimilarIntents:input_type -> rill.v1.FindSimilarIntentsRequest
-	1,  // 17: rill.v1.IntentService.CreateIntent:output_type -> rill.v1.CreateIntentResponse
-	3,  // 18: rill.v1.IntentService.GetIntent:output_type -> rill.v1.GetIntentResponse
-	5,  // 19: rill.v1.IntentService.UpdateIntent:output_type -> rill.v1.UpdateIntentResponse
-	7,  // 20: rill.v1.IntentService.ListIntents:output_type -> rill.v1.ListIntentsResponse
-	9,  // 21: rill.v1.IntentService.LinkChange:output_type -> rill.v1.LinkChangeResponse
-	12, // 22: rill.v1.IntentService.FindSimilarIntents:output_type -> rill.v1.FindSimilarIntentsResponse
-	17, // [17:23] is the sub-list for method output_type
-	11, // [11:17] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	19, // 0: rill.v1.CreateIntentRequest.kind:type_name -> rill.v1.IntentKind
+	20, // 1: rill.v1.CreateIntentRequest.risk_override:type_name -> rill.v1.RiskClass
+	21, // 2: rill.v1.CreateIntentRequest.scope:type_name -> rill.v1.IntentScope
+	22, // 3: rill.v1.CreateIntentResponse.intent:type_name -> rill.v1.Intent
+	22, // 4: rill.v1.GetIntentResponse.intent:type_name -> rill.v1.Intent
+	22, // 5: rill.v1.UpdateIntentRequest.intent:type_name -> rill.v1.Intent
+	23, // 6: rill.v1.UpdateIntentRequest.update_mask:type_name -> google.protobuf.FieldMask
+	22, // 7: rill.v1.UpdateIntentResponse.intent:type_name -> rill.v1.Intent
+	22, // 8: rill.v1.ListIntentsResponse.intents:type_name -> rill.v1.Intent
+	22, // 9: rill.v1.LinkChangeResponse.intent:type_name -> rill.v1.Intent
+	22, // 10: rill.v1.ScoredIntent.intent:type_name -> rill.v1.Intent
+	11, // 11: rill.v1.FindSimilarIntentsResponse.results:type_name -> rill.v1.ScoredIntent
+	22, // 12: rill.v1.ApproveIntentResponse.intent:type_name -> rill.v1.Intent
+	22, // 13: rill.v1.RevokeIntentApprovalResponse.intent:type_name -> rill.v1.Intent
+	0,  // 14: rill.v1.IntentService.CreateIntent:input_type -> rill.v1.CreateIntentRequest
+	2,  // 15: rill.v1.IntentService.GetIntent:input_type -> rill.v1.GetIntentRequest
+	4,  // 16: rill.v1.IntentService.UpdateIntent:input_type -> rill.v1.UpdateIntentRequest
+	6,  // 17: rill.v1.IntentService.ListIntents:input_type -> rill.v1.ListIntentsRequest
+	8,  // 18: rill.v1.IntentService.LinkChange:input_type -> rill.v1.LinkChangeRequest
+	10, // 19: rill.v1.IntentService.FindSimilarIntents:input_type -> rill.v1.FindSimilarIntentsRequest
+	13, // 20: rill.v1.IntentService.ApproveIntent:input_type -> rill.v1.ApproveIntentRequest
+	15, // 21: rill.v1.IntentService.RevokeIntentApproval:input_type -> rill.v1.RevokeIntentApprovalRequest
+	17, // 22: rill.v1.IntentService.ExplainIntentScope:input_type -> rill.v1.ExplainIntentScopeRequest
+	1,  // 23: rill.v1.IntentService.CreateIntent:output_type -> rill.v1.CreateIntentResponse
+	3,  // 24: rill.v1.IntentService.GetIntent:output_type -> rill.v1.GetIntentResponse
+	5,  // 25: rill.v1.IntentService.UpdateIntent:output_type -> rill.v1.UpdateIntentResponse
+	7,  // 26: rill.v1.IntentService.ListIntents:output_type -> rill.v1.ListIntentsResponse
+	9,  // 27: rill.v1.IntentService.LinkChange:output_type -> rill.v1.LinkChangeResponse
+	12, // 28: rill.v1.IntentService.FindSimilarIntents:output_type -> rill.v1.FindSimilarIntentsResponse
+	14, // 29: rill.v1.IntentService.ApproveIntent:output_type -> rill.v1.ApproveIntentResponse
+	16, // 30: rill.v1.IntentService.RevokeIntentApproval:output_type -> rill.v1.RevokeIntentApprovalResponse
+	18, // 31: rill.v1.IntentService.ExplainIntentScope:output_type -> rill.v1.ExplainIntentScopeResponse
+	23, // [23:32] is the sub-list for method output_type
+	14, // [14:23] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_intent_proto_init() }
@@ -908,7 +1285,7 @@ func file_rill_v1_intent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_intent_proto_rawDesc), len(file_rill_v1_intent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

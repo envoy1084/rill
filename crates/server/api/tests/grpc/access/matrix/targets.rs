@@ -79,7 +79,9 @@ impl Targets {
             ("name", "GetLandRequest" | "CancelLandRequest") => format!("{repo}/landRequests/1"),
             ("name", "GetReview" | "WatchReview") => review,
             ("name", "ReplyThread" | "ResolveThread") => format!("{review}/threads/probe"),
-            ("name", "GetIntent" | "LinkChange") => self.intent.clone(),
+            ("name", "GetIntent" | "LinkChange" | "ApproveIntent" | "RevokeIntentApproval") => {
+                self.intent.clone()
+            }
             ("name", "GetRun" | "WatchRun") => format!("{repo}/runs/probe"),
             ("name", "DeleteQuarantine") => format!("{repo}/quarantines/probe"),
             ("name", "GetOperation" | "WaitOperation") => self.operation.clone(),

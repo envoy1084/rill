@@ -9,7 +9,7 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class CreateIntentRequest(_message.Message):
-    __slots__ = ("request_id", "parent", "title", "body", "kind", "parent_intent", "risk_override")
+    __slots__ = ("request_id", "parent", "title", "body", "kind", "parent_intent", "risk_override", "scope")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     PARENT_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
@@ -17,6 +17,7 @@ class CreateIntentRequest(_message.Message):
     KIND_FIELD_NUMBER: _ClassVar[int]
     PARENT_INTENT_FIELD_NUMBER: _ClassVar[int]
     RISK_OVERRIDE_FIELD_NUMBER: _ClassVar[int]
+    SCOPE_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     parent: str
     title: str
@@ -24,7 +25,8 @@ class CreateIntentRequest(_message.Message):
     kind: _types_pb2.IntentKind
     parent_intent: str
     risk_override: _types_pb2.RiskClass
-    def __init__(self, request_id: _Optional[str] = ..., parent: _Optional[str] = ..., title: _Optional[str] = ..., body: _Optional[str] = ..., kind: _Optional[_Union[_types_pb2.IntentKind, str]] = ..., parent_intent: _Optional[str] = ..., risk_override: _Optional[_Union[_types_pb2.RiskClass, str]] = ...) -> None: ...
+    scope: _types_pb2.IntentScope
+    def __init__(self, request_id: _Optional[str] = ..., parent: _Optional[str] = ..., title: _Optional[str] = ..., body: _Optional[str] = ..., kind: _Optional[_Union[_types_pb2.IntentKind, str]] = ..., parent_intent: _Optional[str] = ..., risk_override: _Optional[_Union[_types_pb2.RiskClass, str]] = ..., scope: _Optional[_Union[_types_pb2.IntentScope, _Mapping]] = ...) -> None: ...
 
 class CreateIntentResponse(_message.Message):
     __slots__ = ("intent",)
@@ -123,3 +125,53 @@ class FindSimilarIntentsResponse(_message.Message):
     RESULTS_FIELD_NUMBER: _ClassVar[int]
     results: _containers.RepeatedCompositeFieldContainer[ScoredIntent]
     def __init__(self, results: _Optional[_Iterable[_Union[ScoredIntent, _Mapping]]] = ...) -> None: ...
+
+class ApproveIntentRequest(_message.Message):
+    __slots__ = ("request_id", "name", "revision")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    name: str
+    revision: int
+    def __init__(self, request_id: _Optional[str] = ..., name: _Optional[str] = ..., revision: _Optional[int] = ...) -> None: ...
+
+class ApproveIntentResponse(_message.Message):
+    __slots__ = ("intent",)
+    INTENT_FIELD_NUMBER: _ClassVar[int]
+    intent: _types_pb2.Intent
+    def __init__(self, intent: _Optional[_Union[_types_pb2.Intent, _Mapping]] = ...) -> None: ...
+
+class RevokeIntentApprovalRequest(_message.Message):
+    __slots__ = ("request_id", "name")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    name: str
+    def __init__(self, request_id: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
+
+class RevokeIntentApprovalResponse(_message.Message):
+    __slots__ = ("intent",)
+    INTENT_FIELD_NUMBER: _ClassVar[int]
+    intent: _types_pb2.Intent
+    def __init__(self, intent: _Optional[_Union[_types_pb2.Intent, _Mapping]] = ...) -> None: ...
+
+class ExplainIntentScopeRequest(_message.Message):
+    __slots__ = ("change",)
+    CHANGE_FIELD_NUMBER: _ClassVar[int]
+    change: str
+    def __init__(self, change: _Optional[str] = ...) -> None: ...
+
+class ExplainIntentScopeResponse(_message.Message):
+    __slots__ = ("intent", "approved", "in_scope", "reasons", "missing_approvals")
+    INTENT_FIELD_NUMBER: _ClassVar[int]
+    APPROVED_FIELD_NUMBER: _ClassVar[int]
+    IN_SCOPE_FIELD_NUMBER: _ClassVar[int]
+    REASONS_FIELD_NUMBER: _ClassVar[int]
+    MISSING_APPROVALS_FIELD_NUMBER: _ClassVar[int]
+    intent: str
+    approved: bool
+    in_scope: bool
+    reasons: _containers.RepeatedScalarFieldContainer[str]
+    missing_approvals: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, intent: _Optional[str] = ..., approved: _Optional[bool] = ..., in_scope: _Optional[bool] = ..., reasons: _Optional[_Iterable[str]] = ..., missing_approvals: _Optional[_Iterable[str]] = ...) -> None: ...

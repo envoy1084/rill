@@ -14,7 +14,8 @@ service IntentService {
   rpc CreateIntent(CreateIntentRequest) returns (CreateIntentResponse);
   // One intent.
   rpc GetIntent(GetIntentRequest) returns (GetIntentResponse);
-  // Change an intent's title, body, status, parent or risk override.
+  // Change an intent's title, body, status, parent, risk override or
+  // scope. Changing the scope starts a new revision, which needs approving.
   rpc UpdateIntent(UpdateIntentRequest) returns (UpdateIntentResponse);
   // A repository's intents, most recently updated first.
   rpc ListIntents(ListIntentsRequest) returns (ListIntentsResponse);
@@ -22,6 +23,13 @@ service IntentService {
   rpc LinkChange(LinkChangeRequest) returns (LinkChangeResponse);
   // Intents whose words overlap a title and body, best first.
   rpc FindSimilarIntents(FindSimilarIntentsRequest) returns (FindSimilarIntentsResponse);
+  // Approve the intent's current scope revision, for the scope directories
+  // the caller owns.
+  rpc ApproveIntent(ApproveIntentRequest) returns (ApproveIntentResponse);
+  // Withdraw the caller's approval.
+  rpc RevokeIntentApproval(RevokeIntentApprovalRequest) returns (RevokeIntentApprovalResponse);
+  // Whether a change's intent is approved and the change inside its scope.
+  rpc ExplainIntentScope(ExplainIntentScopeRequest) returns (ExplainIntentScopeResponse);
 }
 
 message CreateIntentRequest {
@@ -35,6 +43,8 @@ message CreateIntentRequest {
   // The parent intent, `…/intents/{intent}`.
   string parent_intent = 6;
   optional RiskClass risk_override = 7;
+  // The scope to approve; unset for none.
+  IntentScope scope = 8;
 }
 message CreateIntentResponse {
   Intent intent = 1;
@@ -52,8 +62,8 @@ message UpdateIntentRequest {
   string request_id = 1;
   // The intent, by `name`, with the fields to change. Required.
   Intent intent = 2;
-  // Which of `title`, `body`, `status`, `parent` and `risk_override` to
-  // change; a masked field left empty is cleared. Required.
+  // Which of `title`, `body`, `status`, `parent`, `risk_override` and
+  // `scope` to change; a masked field left empty is cleared. Required.
   google.protobuf.FieldMask update_mask = 3;
   // The etag read; empty means no condition.
   string etag = 4;
@@ -101,4 +111,39 @@ message ScoredIntent {
 }
 message FindSimilarIntentsResponse {
   repeated ScoredIntent results = 1;
+}
+
+message ApproveIntentRequest {
+  string request_id = 1;
+  // `…/intents/{intent}`. Required.
+  string name = 2;
+  // The revision being approved; refused when it is not current.
+  uint32 revision = 3;
+}
+message ApproveIntentResponse {
+  Intent intent = 1;
+}
+
+message RevokeIntentApprovalRequest {
+  string request_id = 1;
+  // `…/intents/{intent}`. Required.
+  string name = 2;
+}
+message RevokeIntentApprovalResponse {
+  Intent intent = 1;
+}
+
+message ExplainIntentScopeRequest {
+  // `…/changes/{change}`. Required.
+  string change = 1;
+}
+message ExplainIntentScopeResponse {
+  // The linked intent, `…/intents/{intent}`; empty when there is none.
+  string intent = 1;
+  bool approved = 2;
+  bool in_scope = 3;
+  // Why the change is not in scope.
+  repeated string reasons = 4;
+  // Scope directories still short of approvals.
+  repeated string missing_approvals = 5;
 }

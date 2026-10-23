@@ -95,6 +95,24 @@ impl RepoStore {
         }
     }
 
+    /// Store `intent` only while the stored record is still `expected`;
+    /// [`crate::Error::Conflict`] when another write came first.
+    pub async fn put_intent_if(
+        &self,
+        intent: &Intent,
+        expected: &Intent,
+        actor: &Principal,
+    ) -> Result<()> {
+        let key = self.keys().intent(&intent.id);
+        let mut tx = Transaction::new()
+            .expect(key.clone(), Some(encode_record(expected)?))
+            .set(key, encode_record(intent)?);
+        tx.mutations
+            .extend(self.event_by(actor, EventKind::IntentChanged { intent: intent.id })?);
+        self.meta().transact(tx).await?;
+        Ok(())
+    }
+
     pub async fn put_intent(&self, intent: &Intent, actor: &Principal) -> Result<()> {
         let mut tx = Transaction::new().set(self.keys().intent(&intent.id), encode_record(intent)?);
         tx.mutations

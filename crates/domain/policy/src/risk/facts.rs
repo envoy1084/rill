@@ -6,6 +6,7 @@ use rill_types::{IntentKind, Principal, Provenance, RepoPathBuf, RiskClass};
 use serde::{Deserialize, Serialize};
 
 use crate::directory::Person;
+use crate::intents::IntentFacts;
 use crate::owners::OwnerSet;
 
 /// What happened to one path in the change.
@@ -122,6 +123,8 @@ pub struct ChangeFacts {
     /// What the directory says about the people involved (author, voters),
     /// keyed by their display form.
     pub people: BTreeMap<String, Person>,
+    /// The linked intent's approval and whether the change is in its scope.
+    pub intent: Option<IntentFacts>,
 }
 
 impl ChangeFacts {
@@ -141,6 +144,7 @@ impl ChangeFacts {
             stack_depth: 0,
             owner_sets: Vec::new(),
             people: BTreeMap::new(),
+            intent: None,
         }
     }
 

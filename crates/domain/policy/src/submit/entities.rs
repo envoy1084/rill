@@ -108,6 +108,25 @@ pub fn change_entity(change: &ChangeFacts, review: &SubmitFacts) -> Result<(Enti
             "owners_covered",
             RestrictedExpression::new_bool(review.owners_covered()),
         ),
+        (
+            "intent_approved",
+            RestrictedExpression::new_bool(change.intent.as_ref().is_some_and(|i| i.approved)),
+        ),
+        (
+            "intent_in_scope",
+            RestrictedExpression::new_bool(change.intent.as_ref().is_some_and(|i| i.in_scope)),
+        ),
+        (
+            "intent_agent_quorum",
+            long(
+                change
+                    .intent
+                    .as_ref()
+                    .and_then(|i| i.agent_quorum)
+                    .unwrap_or(0)
+                    .into(),
+            ),
+        ),
     ]
     .into_iter()
     .map(|(k, v)| (k.to_string(), v));

@@ -22,11 +22,15 @@ impl IntentClient {
         IntentClient { client, repo }
     }
 
-    fn svc(&self) -> crate::client::IntentSvc {
+    pub(crate) fn svc(&self) -> crate::client::IntentSvc {
         self.client.intent_svc()
     }
 
-    fn name(&self, id: &IntentId) -> String {
+    pub(crate) fn repo_name(&self) -> &str {
+        &self.repo
+    }
+
+    pub(crate) fn name(&self, id: &IntentId) -> String {
         names::intent(&self.repo, id)
     }
 
@@ -45,6 +49,7 @@ impl IntentClient {
             kind: pb::IntentKind::from(intent.kind).into(),
             parent_intent: intent.parent.map(|p| self.name(&p)).unwrap_or_default(),
             risk_override: intent.risk_override.map(|r| pb::RiskClass::from(r).into()),
+            scope: intent.scope.as_ref().map(pb::IntentScope::from).into(),
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());

@@ -53,6 +53,10 @@ impl ReviewService {
         if !owners.is_empty() {
             facts.owner_sets = owners.sets_for_all(facts.paths.iter().map(|p| p.path.as_path()));
         }
+        let linked = self.derive.change(&version).await?.intent.or(state.intent);
+        if let Some(intent) = linked {
+            facts.intent = self.intent_facts(&intent, &facts, &owners).await?;
+        }
         let people = std::iter::once(&state.owner)
             .chain(std::iter::once(&facts.author))
             .chain(state.current_votes().map(|v| &v.voter))

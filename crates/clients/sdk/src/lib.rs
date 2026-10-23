@@ -38,6 +38,7 @@ pub mod filter;
 pub mod grants;
 pub mod identity;
 pub mod intent;
+mod intent_scope;
 pub mod names;
 pub mod operations;
 mod ownership;

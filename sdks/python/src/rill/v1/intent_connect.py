@@ -35,6 +35,15 @@ class IntentService(Protocol):
     async def find_similar_intents(self, request: rill_dot_v1_dot_intent__pb2.FindSimilarIntentsRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.FindSimilarIntentsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def approve_intent(self, request: rill_dot_v1_dot_intent__pb2.ApproveIntentRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.ApproveIntentResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def revoke_intent_approval(self, request: rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def explain_intent_scope(self, request: rill_dot_v1_dot_intent__pb2.ExplainIntentScopeRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.ExplainIntentScopeResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class IntentServiceASGIApplication(ConnectASGIApplication[IntentService]):
     def __init__(self, service: IntentService | AsyncGenerator[IntentService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None) -> None:
@@ -100,6 +109,36 @@ class IntentServiceASGIApplication(ConnectASGIApplication[IntentService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.find_similar_intents,
+                ),
+                "/rill.v1.IntentService/ApproveIntent": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ApproveIntent",
+                        service_name="rill.v1.IntentService",
+                        input=rill_dot_v1_dot_intent__pb2.ApproveIntentRequest,
+                        output=rill_dot_v1_dot_intent__pb2.ApproveIntentResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.approve_intent,
+                ),
+                "/rill.v1.IntentService/RevokeIntentApproval": Endpoint.unary(
+                    method=MethodInfo(
+                        name="RevokeIntentApproval",
+                        service_name="rill.v1.IntentService",
+                        input=rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalRequest,
+                        output=rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.revoke_intent_approval,
+                ),
+                "/rill.v1.IntentService/ExplainIntentScope": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ExplainIntentScope",
+                        service_name="rill.v1.IntentService",
+                        input=rill_dot_v1_dot_intent__pb2.ExplainIntentScopeRequest,
+                        output=rill_dot_v1_dot_intent__pb2.ExplainIntentScopeResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.explain_intent_scope,
                 ),
             },
             interceptors=interceptors,
@@ -234,6 +273,66 @@ class IntentServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def approve_intent(
+        self,
+        request: rill_dot_v1_dot_intent__pb2.ApproveIntentRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_intent__pb2.ApproveIntentResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ApproveIntent",
+                service_name="rill.v1.IntentService",
+                input=rill_dot_v1_dot_intent__pb2.ApproveIntentRequest,
+                output=rill_dot_v1_dot_intent__pb2.ApproveIntentResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def revoke_intent_approval(
+        self,
+        request: rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="RevokeIntentApproval",
+                service_name="rill.v1.IntentService",
+                input=rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalRequest,
+                output=rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def explain_intent_scope(
+        self,
+        request: rill_dot_v1_dot_intent__pb2.ExplainIntentScopeRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_intent__pb2.ExplainIntentScopeResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ExplainIntentScope",
+                service_name="rill.v1.IntentService",
+                input=rill_dot_v1_dot_intent__pb2.ExplainIntentScopeRequest,
+                output=rill_dot_v1_dot_intent__pb2.ExplainIntentScopeResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 class IntentServiceSync(Protocol):
     def create_intent(self, request: rill_dot_v1_dot_intent__pb2.CreateIntentRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.CreateIntentResponse:
@@ -247,6 +346,12 @@ class IntentServiceSync(Protocol):
     def link_change(self, request: rill_dot_v1_dot_intent__pb2.LinkChangeRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.LinkChangeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def find_similar_intents(self, request: rill_dot_v1_dot_intent__pb2.FindSimilarIntentsRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.FindSimilarIntentsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def approve_intent(self, request: rill_dot_v1_dot_intent__pb2.ApproveIntentRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.ApproveIntentResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def revoke_intent_approval(self, request: rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def explain_intent_scope(self, request: rill_dot_v1_dot_intent__pb2.ExplainIntentScopeRequest, ctx: RequestContext) -> rill_dot_v1_dot_intent__pb2.ExplainIntentScopeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -313,6 +418,36 @@ class IntentServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.find_similar_intents,
+                ),
+                "/rill.v1.IntentService/ApproveIntent": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ApproveIntent",
+                        service_name="rill.v1.IntentService",
+                        input=rill_dot_v1_dot_intent__pb2.ApproveIntentRequest,
+                        output=rill_dot_v1_dot_intent__pb2.ApproveIntentResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.approve_intent,
+                ),
+                "/rill.v1.IntentService/RevokeIntentApproval": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="RevokeIntentApproval",
+                        service_name="rill.v1.IntentService",
+                        input=rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalRequest,
+                        output=rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.revoke_intent_approval,
+                ),
+                "/rill.v1.IntentService/ExplainIntentScope": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ExplainIntentScope",
+                        service_name="rill.v1.IntentService",
+                        input=rill_dot_v1_dot_intent__pb2.ExplainIntentScopeRequest,
+                        output=rill_dot_v1_dot_intent__pb2.ExplainIntentScopeResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.explain_intent_scope,
                 ),
             },
             interceptors=interceptors,
@@ -441,6 +576,66 @@ class IntentServiceClientSync(ConnectClientSync):
                 service_name="rill.v1.IntentService",
                 input=rill_dot_v1_dot_intent__pb2.FindSimilarIntentsRequest,
                 output=rill_dot_v1_dot_intent__pb2.FindSimilarIntentsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def approve_intent(
+        self,
+        request: rill_dot_v1_dot_intent__pb2.ApproveIntentRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_intent__pb2.ApproveIntentResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ApproveIntent",
+                service_name="rill.v1.IntentService",
+                input=rill_dot_v1_dot_intent__pb2.ApproveIntentRequest,
+                output=rill_dot_v1_dot_intent__pb2.ApproveIntentResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def revoke_intent_approval(
+        self,
+        request: rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="RevokeIntentApproval",
+                service_name="rill.v1.IntentService",
+                input=rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalRequest,
+                output=rill_dot_v1_dot_intent__pb2.RevokeIntentApprovalResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def explain_intent_scope(
+        self,
+        request: rill_dot_v1_dot_intent__pb2.ExplainIntentScopeRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_intent__pb2.ExplainIntentScopeResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ExplainIntentScope",
+                service_name="rill.v1.IntentService",
+                input=rill_dot_v1_dot_intent__pb2.ExplainIntentScopeRequest,
+                output=rill_dot_v1_dot_intent__pb2.ExplainIntentScopeResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

@@ -10,6 +10,7 @@ mod commands;
 mod doctor;
 mod human;
 mod import;
+mod intents;
 mod keycloak;
 mod landing;
 mod login;

@@ -121,6 +121,7 @@ pub(crate) struct Clients {
     pub(crate) review: ReviewServiceClient<Svc>,
     pub(crate) admin: AdminServiceClient<Svc>,
     pub(crate) secrets: SecretServiceClient<Svc>,
+    pub(crate) intents: IntentServiceClient<Svc>,
 }
 
 pub(crate) async fn clients(server: &TestServer, token: Option<&str>) -> Clients {
@@ -145,7 +146,8 @@ pub(crate) async fn clients_at(endpoint: &str, token: Option<&str>) -> Clients {
         workspace: WorkspaceServiceClient::authed(channel.clone(), bearer.clone()),
         review: ReviewServiceClient::authed(channel.clone(), bearer.clone()),
         admin: AdminServiceClient::authed(channel.clone(), bearer.clone()),
-        secrets: SecretServiceClient::authed(channel, bearer),
+        secrets: SecretServiceClient::authed(channel.clone(), bearer.clone()),
+        intents: IntentServiceClient::authed(channel, bearer),
     }
 }
 

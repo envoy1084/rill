@@ -248,6 +248,42 @@ message Intent {
   repeated bytes changes = 9;
   int64 created_at = 10;
   int64 updated_at = 11;
+  // What changes under the intent may do once approved; unset for none.
+  IntentScope scope = 14;
+  // Bumped whenever the scope changes; approvals are of one revision.
+  uint32 revision = 15;
+  repeated IntentApproval approvals = 16;
+}
+
+// The bounds of an approved intent: changes inside them inherit its
+// approval, anything outside falls back to normal review.
+message IntentScope {
+  // Globs every touched path must match.
+  repeated string paths = 1;
+  // Globs no touched path may match.
+  repeated string forbid_paths = 2;
+  optional uint32 max_files_per_change = 3;
+  // Changes linked to the intent, at most.
+  optional uint32 max_changes = 4;
+  optional int64 expires = 5;
+  // Independent agent approvals each change needs.
+  optional uint32 agent_quorum = 6;
+  // Share of landed changes sampled for human audit, in thousandths.
+  optional uint32 human_sample_permille = 7;
+  // Changes linked per UTC day, at most.
+  optional uint32 changes_per_day = 8;
+  // Changes landed per UTC day, at most.
+  optional uint32 lands_per_day = 9;
+}
+
+// One approval of an intent's scope.
+message IntentApproval {
+  Principal by = 1;
+  int64 at = 2;
+  // The scope revision approved.
+  uint32 revision = 3;
+  // The scope directories the approver owns.
+  repeated string owns = 4;
 }
 
 // A typed vote range on a change.

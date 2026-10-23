@@ -10,7 +10,7 @@ import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegen
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { FieldMask } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_field_mask } from "@bufbuild/protobuf/wkt";
-import type { Intent, IntentKind, RiskClass } from "./types_pb.js";
+import type { Intent, IntentKind, IntentScope, RiskClass } from "./types_pb.js";
 import { file_rill_v1_types } from "./types_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -18,7 +18,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file rill/v1/intent.proto.
  */
 export const file_rill_v1_intent: GenFile = /*@__PURE__*/
-  fileDesc("ChRyaWxsL3YxL2ludGVudC5wcm90bxIHcmlsbC52MSLSAQoTQ3JlYXRlSW50ZW50UmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBnBhcmVudBgCIAEoCRINCgV0aXRsZRgDIAEoCRIMCgRib2R5GAQgASgJEiEKBGtpbmQYBSABKA4yEy5yaWxsLnYxLkludGVudEtpbmQSFQoNcGFyZW50X2ludGVudBgGIAEoCRIuCg1yaXNrX292ZXJyaWRlGAcgASgOMhIucmlsbC52MS5SaXNrQ2xhc3NIAIgBAUIQCg5fcmlza19vdmVycmlkZSI3ChRDcmVhdGVJbnRlbnRSZXNwb25zZRIfCgZpbnRlbnQYASABKAsyDy5yaWxsLnYxLkludGVudCIgChBHZXRJbnRlbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkiNAoRR2V0SW50ZW50UmVzcG9uc2USHwoGaW50ZW50GAEgASgLMg8ucmlsbC52MS5JbnRlbnQiiQEKE1VwZGF0ZUludGVudFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIfCgZpbnRlbnQYAiABKAsyDy5yaWxsLnYxLkludGVudBIvCgt1cGRhdGVfbWFzaxgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2sSDAoEZXRhZxgEIAEoCSI3ChRVcGRhdGVJbnRlbnRSZXNwb25zZRIfCgZpbnRlbnQYASABKAsyDy5yaWxsLnYxLkludGVudCJbChJMaXN0SW50ZW50c1JlcXVlc3QSDgoGcGFyZW50GAEgASgJEhEKCXBhZ2Vfc2l6ZRgCIAEoBRISCgpwYWdlX3Rva2VuGAMgASgJEg4KBmZpbHRlchgEIAEoCSJQChNMaXN0SW50ZW50c1Jlc3BvbnNlEiAKB2ludGVudHMYASADKAsyDy5yaWxsLnYxLkludGVudBIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiRQoRTGlua0NoYW5nZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg4KBmNoYW5nZRgDIAEoCSI1ChJMaW5rQ2hhbmdlUmVzcG9uc2USHwoGaW50ZW50GAEgASgLMg8ucmlsbC52MS5JbnRlbnQiXQoZRmluZFNpbWlsYXJJbnRlbnRzUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSDQoFdGl0bGUYAiABKAkSDAoEYm9keRgDIAEoCRITCgttYXhfcmVzdWx0cxgEIAEoBSI+CgxTY29yZWRJbnRlbnQSHwoGaW50ZW50GAEgASgLMg8ucmlsbC52MS5JbnRlbnQSDQoFc2NvcmUYAiABKAIiRAoaRmluZFNpbWlsYXJJbnRlbnRzUmVzcG9uc2USJgoHcmVzdWx0cxgBIAMoCzIVLnJpbGwudjEuU2NvcmVkSW50ZW50Mt0DCg1JbnRlbnRTZXJ2aWNlEksKDENyZWF0ZUludGVudBIcLnJpbGwudjEuQ3JlYXRlSW50ZW50UmVxdWVzdBodLnJpbGwudjEuQ3JlYXRlSW50ZW50UmVzcG9uc2USQgoJR2V0SW50ZW50EhkucmlsbC52MS5HZXRJbnRlbnRSZXF1ZXN0GhoucmlsbC52MS5HZXRJbnRlbnRSZXNwb25zZRJLCgxVcGRhdGVJbnRlbnQSHC5yaWxsLnYxLlVwZGF0ZUludGVudFJlcXVlc3QaHS5yaWxsLnYxLlVwZGF0ZUludGVudFJlc3BvbnNlEkgKC0xpc3RJbnRlbnRzEhsucmlsbC52MS5MaXN0SW50ZW50c1JlcXVlc3QaHC5yaWxsLnYxLkxpc3RJbnRlbnRzUmVzcG9uc2USRQoKTGlua0NoYW5nZRIaLnJpbGwudjEuTGlua0NoYW5nZVJlcXVlc3QaGy5yaWxsLnYxLkxpbmtDaGFuZ2VSZXNwb25zZRJdChJGaW5kU2ltaWxhckludGVudHMSIi5yaWxsLnYxLkZpbmRTaW1pbGFySW50ZW50c1JlcXVlc3QaIy5yaWxsLnYxLkZpbmRTaW1pbGFySW50ZW50c1Jlc3BvbnNlYgZwcm90bzM", [file_google_protobuf_field_mask, file_rill_v1_types]);
+  fileDesc("ChRyaWxsL3YxL2ludGVudC5wcm90bxIHcmlsbC52MSL3AQoTQ3JlYXRlSW50ZW50UmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBnBhcmVudBgCIAEoCRINCgV0aXRsZRgDIAEoCRIMCgRib2R5GAQgASgJEiEKBGtpbmQYBSABKA4yEy5yaWxsLnYxLkludGVudEtpbmQSFQoNcGFyZW50X2ludGVudBgGIAEoCRIuCg1yaXNrX292ZXJyaWRlGAcgASgOMhIucmlsbC52MS5SaXNrQ2xhc3NIAIgBARIjCgVzY29wZRgIIAEoCzIULnJpbGwudjEuSW50ZW50U2NvcGVCEAoOX3Jpc2tfb3ZlcnJpZGUiNwoUQ3JlYXRlSW50ZW50UmVzcG9uc2USHwoGaW50ZW50GAEgASgLMg8ucmlsbC52MS5JbnRlbnQiIAoQR2V0SW50ZW50UmVxdWVzdBIMCgRuYW1lGAEgASgJIjQKEUdldEludGVudFJlc3BvbnNlEh8KBmludGVudBgBIAEoCzIPLnJpbGwudjEuSW50ZW50IokBChNVcGRhdGVJbnRlbnRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSHwoGaW50ZW50GAIgASgLMg8ucmlsbC52MS5JbnRlbnQSLwoLdXBkYXRlX21hc2sYAyABKAsyGi5nb29nbGUucHJvdG9idWYuRmllbGRNYXNrEgwKBGV0YWcYBCABKAkiNwoUVXBkYXRlSW50ZW50UmVzcG9uc2USHwoGaW50ZW50GAEgASgLMg8ucmlsbC52MS5JbnRlbnQiWwoSTGlzdEludGVudHNSZXF1ZXN0Eg4KBnBhcmVudBgBIAEoCRIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCRIOCgZmaWx0ZXIYBCABKAkiUAoTTGlzdEludGVudHNSZXNwb25zZRIgCgdpbnRlbnRzGAEgAygLMg8ucmlsbC52MS5JbnRlbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIkUKEUxpbmtDaGFuZ2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIOCgZjaGFuZ2UYAyABKAkiNQoSTGlua0NoYW5nZVJlc3BvbnNlEh8KBmludGVudBgBIAEoCzIPLnJpbGwudjEuSW50ZW50Il0KGUZpbmRTaW1pbGFySW50ZW50c1JlcXVlc3QSDgoGcGFyZW50GAEgASgJEg0KBXRpdGxlGAIgASgJEgwKBGJvZHkYAyABKAkSEwoLbWF4X3Jlc3VsdHMYBCABKAUiPgoMU2NvcmVkSW50ZW50Eh8KBmludGVudBgBIAEoCzIPLnJpbGwudjEuSW50ZW50Eg0KBXNjb3JlGAIgASgCIkQKGkZpbmRTaW1pbGFySW50ZW50c1Jlc3BvbnNlEiYKB3Jlc3VsdHMYASADKAsyFS5yaWxsLnYxLlNjb3JlZEludGVudCJKChRBcHByb3ZlSW50ZW50UmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkSEAoIcmV2aXNpb24YAyABKA0iOAoVQXBwcm92ZUludGVudFJlc3BvbnNlEh8KBmludGVudBgBIAEoCzIPLnJpbGwudjEuSW50ZW50Ij8KG1Jldm9rZUludGVudEFwcHJvdmFsUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkiPwocUmV2b2tlSW50ZW50QXBwcm92YWxSZXNwb25zZRIfCgZpbnRlbnQYASABKAsyDy5yaWxsLnYxLkludGVudCIrChlFeHBsYWluSW50ZW50U2NvcGVSZXF1ZXN0Eg4KBmNoYW5nZRgBIAEoCSJ8ChpFeHBsYWluSW50ZW50U2NvcGVSZXNwb25zZRIOCgZpbnRlbnQYASABKAkSEAoIYXBwcm92ZWQYAiABKAgSEAoIaW5fc2NvcGUYAyABKAgSDwoHcmVhc29ucxgEIAMoCRIZChFtaXNzaW5nX2FwcHJvdmFscxgFIAMoCTLxBQoNSW50ZW50U2VydmljZRJLCgxDcmVhdGVJbnRlbnQSHC5yaWxsLnYxLkNyZWF0ZUludGVudFJlcXVlc3QaHS5yaWxsLnYxLkNyZWF0ZUludGVudFJlc3BvbnNlEkIKCUdldEludGVudBIZLnJpbGwudjEuR2V0SW50ZW50UmVxdWVzdBoaLnJpbGwudjEuR2V0SW50ZW50UmVzcG9uc2USSwoMVXBkYXRlSW50ZW50EhwucmlsbC52MS5VcGRhdGVJbnRlbnRSZXF1ZXN0Gh0ucmlsbC52MS5VcGRhdGVJbnRlbnRSZXNwb25zZRJICgtMaXN0SW50ZW50cxIbLnJpbGwudjEuTGlzdEludGVudHNSZXF1ZXN0GhwucmlsbC52MS5MaXN0SW50ZW50c1Jlc3BvbnNlEkUKCkxpbmtDaGFuZ2USGi5yaWxsLnYxLkxpbmtDaGFuZ2VSZXF1ZXN0GhsucmlsbC52MS5MaW5rQ2hhbmdlUmVzcG9uc2USXQoSRmluZFNpbWlsYXJJbnRlbnRzEiIucmlsbC52MS5GaW5kU2ltaWxhckludGVudHNSZXF1ZXN0GiMucmlsbC52MS5GaW5kU2ltaWxhckludGVudHNSZXNwb25zZRJOCg1BcHByb3ZlSW50ZW50Eh0ucmlsbC52MS5BcHByb3ZlSW50ZW50UmVxdWVzdBoeLnJpbGwudjEuQXBwcm92ZUludGVudFJlc3BvbnNlEmMKFFJldm9rZUludGVudEFwcHJvdmFsEiQucmlsbC52MS5SZXZva2VJbnRlbnRBcHByb3ZhbFJlcXVlc3QaJS5yaWxsLnYxLlJldm9rZUludGVudEFwcHJvdmFsUmVzcG9uc2USXQoSRXhwbGFpbkludGVudFNjb3BlEiIucmlsbC52MS5FeHBsYWluSW50ZW50U2NvcGVSZXF1ZXN0GiMucmlsbC52MS5FeHBsYWluSW50ZW50U2NvcGVSZXNwb25zZWIGcHJvdG8z", [file_google_protobuf_field_mask, file_rill_v1_types]);
 
 /**
  * @generated from message rill.v1.CreateIntentRequest
@@ -64,6 +64,13 @@ export type CreateIntentRequest = Message<"rill.v1.CreateIntentRequest"> & {
    * @generated from field: optional rill.v1.RiskClass risk_override = 7;
    */
   riskOverride?: RiskClass | undefined;
+
+  /**
+   * The scope to approve; unset for none.
+   *
+   * @generated from field: rill.v1.IntentScope scope = 8;
+   */
+  scope?: IntentScope | undefined;
 };
 
 /**
@@ -143,8 +150,8 @@ export type UpdateIntentRequest = Message<"rill.v1.UpdateIntentRequest"> & {
   intent?: Intent | undefined;
 
   /**
-   * Which of `title`, `body`, `status`, `parent` and `risk_override` to
-   * change; a masked field left empty is cleared. Required.
+   * Which of `title`, `body`, `status`, `parent`, `risk_override` and
+   * `scope` to change; a masked field left empty is cleared. Required.
    *
    * @generated from field: google.protobuf.FieldMask update_mask = 3;
    */
@@ -365,6 +372,157 @@ export const FindSimilarIntentsResponseSchema: GenMessage<FindSimilarIntentsResp
   messageDesc(file_rill_v1_intent, 12);
 
 /**
+ * @generated from message rill.v1.ApproveIntentRequest
+ */
+export type ApproveIntentRequest = Message<"rill.v1.ApproveIntentRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * `…/intents/{intent}`. Required.
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * The revision being approved; refused when it is not current.
+   *
+   * @generated from field: uint32 revision = 3;
+   */
+  revision: number;
+};
+
+/**
+ * Describes the message rill.v1.ApproveIntentRequest.
+ * Use `create(ApproveIntentRequestSchema)` to create a new message.
+ */
+export const ApproveIntentRequestSchema: GenMessage<ApproveIntentRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_intent, 13);
+
+/**
+ * @generated from message rill.v1.ApproveIntentResponse
+ */
+export type ApproveIntentResponse = Message<"rill.v1.ApproveIntentResponse"> & {
+  /**
+   * @generated from field: rill.v1.Intent intent = 1;
+   */
+  intent?: Intent | undefined;
+};
+
+/**
+ * Describes the message rill.v1.ApproveIntentResponse.
+ * Use `create(ApproveIntentResponseSchema)` to create a new message.
+ */
+export const ApproveIntentResponseSchema: GenMessage<ApproveIntentResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_intent, 14);
+
+/**
+ * @generated from message rill.v1.RevokeIntentApprovalRequest
+ */
+export type RevokeIntentApprovalRequest = Message<"rill.v1.RevokeIntentApprovalRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * `…/intents/{intent}`. Required.
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message rill.v1.RevokeIntentApprovalRequest.
+ * Use `create(RevokeIntentApprovalRequestSchema)` to create a new message.
+ */
+export const RevokeIntentApprovalRequestSchema: GenMessage<RevokeIntentApprovalRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_intent, 15);
+
+/**
+ * @generated from message rill.v1.RevokeIntentApprovalResponse
+ */
+export type RevokeIntentApprovalResponse = Message<"rill.v1.RevokeIntentApprovalResponse"> & {
+  /**
+   * @generated from field: rill.v1.Intent intent = 1;
+   */
+  intent?: Intent | undefined;
+};
+
+/**
+ * Describes the message rill.v1.RevokeIntentApprovalResponse.
+ * Use `create(RevokeIntentApprovalResponseSchema)` to create a new message.
+ */
+export const RevokeIntentApprovalResponseSchema: GenMessage<RevokeIntentApprovalResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_intent, 16);
+
+/**
+ * @generated from message rill.v1.ExplainIntentScopeRequest
+ */
+export type ExplainIntentScopeRequest = Message<"rill.v1.ExplainIntentScopeRequest"> & {
+  /**
+   * `…/changes/{change}`. Required.
+   *
+   * @generated from field: string change = 1;
+   */
+  change: string;
+};
+
+/**
+ * Describes the message rill.v1.ExplainIntentScopeRequest.
+ * Use `create(ExplainIntentScopeRequestSchema)` to create a new message.
+ */
+export const ExplainIntentScopeRequestSchema: GenMessage<ExplainIntentScopeRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_intent, 17);
+
+/**
+ * @generated from message rill.v1.ExplainIntentScopeResponse
+ */
+export type ExplainIntentScopeResponse = Message<"rill.v1.ExplainIntentScopeResponse"> & {
+  /**
+   * The linked intent, `…/intents/{intent}`; empty when there is none.
+   *
+   * @generated from field: string intent = 1;
+   */
+  intent: string;
+
+  /**
+   * @generated from field: bool approved = 2;
+   */
+  approved: boolean;
+
+  /**
+   * @generated from field: bool in_scope = 3;
+   */
+  inScope: boolean;
+
+  /**
+   * Why the change is not in scope.
+   *
+   * @generated from field: repeated string reasons = 4;
+   */
+  reasons: string[];
+
+  /**
+   * Scope directories still short of approvals.
+   *
+   * @generated from field: repeated string missing_approvals = 5;
+   */
+  missingApprovals: string[];
+};
+
+/**
+ * Describes the message rill.v1.ExplainIntentScopeResponse.
+ * Use `create(ExplainIntentScopeResponseSchema)` to create a new message.
+ */
+export const ExplainIntentScopeResponseSchema: GenMessage<ExplainIntentScopeResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_intent, 18);
+
+/**
  * Intents and the changes linked to them.
  *
  * @generated from service rill.v1.IntentService
@@ -391,7 +549,8 @@ export const IntentService: GenService<{
     output: typeof GetIntentResponseSchema;
   },
   /**
-   * Change an intent's title, body, status, parent or risk override.
+   * Change an intent's title, body, status, parent, risk override or
+   * scope. Changing the scope starts a new revision, which needs approving.
    *
    * @generated from rpc rill.v1.IntentService.UpdateIntent
    */
@@ -429,6 +588,37 @@ export const IntentService: GenService<{
     methodKind: "unary";
     input: typeof FindSimilarIntentsRequestSchema;
     output: typeof FindSimilarIntentsResponseSchema;
+  },
+  /**
+   * Approve the intent's current scope revision, for the scope directories
+   * the caller owns.
+   *
+   * @generated from rpc rill.v1.IntentService.ApproveIntent
+   */
+  approveIntent: {
+    methodKind: "unary";
+    input: typeof ApproveIntentRequestSchema;
+    output: typeof ApproveIntentResponseSchema;
+  },
+  /**
+   * Withdraw the caller's approval.
+   *
+   * @generated from rpc rill.v1.IntentService.RevokeIntentApproval
+   */
+  revokeIntentApproval: {
+    methodKind: "unary";
+    input: typeof RevokeIntentApprovalRequestSchema;
+    output: typeof RevokeIntentApprovalResponseSchema;
+  },
+  /**
+   * Whether a change's intent is approved and the change inside its scope.
+   *
+   * @generated from rpc rill.v1.IntentService.ExplainIntentScope
+   */
+  explainIntentScope: {
+    methodKind: "unary";
+    input: typeof ExplainIntentScopeRequestSchema;
+    output: typeof ExplainIntentScopeResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_rill_v1_intent, 0);

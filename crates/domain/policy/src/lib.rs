@@ -15,6 +15,7 @@ pub mod directory;
 pub mod error;
 pub mod grants;
 pub mod identity;
+pub mod intents;
 pub mod owners;
 pub mod rebac;
 pub mod risk;

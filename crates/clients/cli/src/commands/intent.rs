@@ -1,4 +1,5 @@
-//! `rill intent`: create, list, show, update, link, similar.
+//! `rill intent`: create, list, show, update, link, similar; scope and
+//! approvals are in [`super::intent_scope`].
 
 use clap::{Args, Subcommand};
 use rill_mcp::json;
@@ -27,6 +28,15 @@ pub enum IntentCmd {
     Link(LinkArgs),
     /// Find intents similar to some text.
     Similar(SimilarArgs),
+    /// Set the scope changes may inherit the intent's approval within (a
+    /// new revision, which its owners approve).
+    Scope(super::intent_scope::ScopeArgs),
+    /// Approve the intent's scope for the directories you own.
+    Approve(super::intent_scope::ApproveArgs),
+    /// Withdraw your approval.
+    Revoke(IdArg),
+    /// Whether a change inherits its intent's approval, and why not.
+    Explain(super::intent_scope::ExplainArgs),
 }
 
 /// A command taking an intent id.
@@ -113,7 +123,7 @@ pub struct SimilarArgs {
     pub limit: u32,
 }
 
-fn parse_id(text: &str) -> Result<IntentId> {
+pub(super) fn parse_id(text: &str) -> Result<IntentId> {
     text.parse()
         .map_err(|e| CliError::usage(format!("invalid intent id {text:?}: {e}")))
 }
@@ -165,6 +175,20 @@ fn print_intent(out: &mut Out<'_>, i: &Intent) -> std::io::Result<()> {
         ),
         ("updated", when(&i.updated_at)),
     ])?;
+    if let Some(scope) = &i.scope {
+        let approvers: Vec<String> = i
+            .approvals
+            .iter()
+            .filter(|a| a.revision == i.revision)
+            .map(|a| format!("{} ({})", a.by, a.owns.join(", ")))
+            .collect();
+        out.kv(&[
+            ("scope", scope.paths.join(" ")),
+            ("forbids", scope.forbid_paths.join(" ")),
+            ("revision", i.revision.to_string()),
+            ("approved by", approvers.join(", ")),
+        ])?;
+    }
     if !i.body.is_empty() {
         out.blank()?;
         for line in i.body.lines() {
@@ -183,6 +207,10 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IntentCmd) -> Result<()> {
         IntentCmd::Update(args) => update(ctx, args).await,
         IntentCmd::Link(args) => link(ctx, args).await,
         IntentCmd::Similar(args) => similar(ctx, args).await,
+        IntentCmd::Scope(args) => super::intent_scope::scope(ctx, args).await,
+        IntentCmd::Approve(args) => super::intent_scope::approve(ctx, args).await,
+        IntentCmd::Revoke(args) => super::intent_scope::revoke(ctx, &args.id).await,
+        IntentCmd::Explain(args) => super::intent_scope::explain(ctx, args).await,
     }
 }
 
@@ -263,6 +291,7 @@ async fn update(ctx: &mut Ctx<'_>, args: UpdateArgs) -> Result<()> {
             (None, false) => FieldUpdate::Keep,
         },
         risk_override: FieldUpdate::Keep,
+        scope: FieldUpdate::Keep,
     };
     let intent = intents.update(parse_id(&args.id)?, update).await?;
     ctx.emit(json::intent(&intent), |out| print_intent(out, &intent))

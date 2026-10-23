@@ -53,6 +53,12 @@ namespace Rill {
         "owner_sets": Long,
         "owner_sets_missing": Long,
         "owners_covered": Bool,
+        // The linked intent is approved; the change is inside its approved
+        // scope and budgets; the independent agent approvals it asks for
+        // (0 when none or no intent).
+        "intent_approved": Bool,
+        "intent_in_scope": Bool,
+        "intent_agent_quorum": Long,
         // Names of the labels present as tags, for `.contains` checks.
         "label_names": Set<String>,
     } tags VoteSummary;

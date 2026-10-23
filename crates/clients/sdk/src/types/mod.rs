@@ -22,7 +22,9 @@ pub use diff::{DiffFormat, DiffLine, DiffOp, DiffOptions, DiffResult, FileDiff, 
 pub(crate) use edit::set_content_proto;
 pub use edit::{ApplyOptions, Edit, EditBase, MergeOptions, Resolution, VersionResult};
 pub use event::{EventQuery, LoggedEvent};
-pub use intent::{FieldUpdate, IntentFilter, IntentUpdate, NewIntent, ScoredIntent};
+pub use intent::{
+    FieldUpdate, IntentFilter, IntentScopeExplanation, IntentUpdate, NewIntent, ScoredIntent,
+};
 pub use ownership::{OwnerSet, OwnerSetStatus, Ownership};
 pub use page::Page;
 pub use repo::{

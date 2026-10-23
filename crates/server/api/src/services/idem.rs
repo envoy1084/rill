@@ -78,6 +78,8 @@ idempotent!(
     CreateIntentRequest,
     UpdateIntentRequest,
     LinkChangeRequest,
+    ApproveIntentRequest,
+    RevokeIntentApprovalRequest,
     CreateQuarantineRequest,
     DeleteQuarantineRequest,
     IssueTokenRequest,

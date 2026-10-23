@@ -87,7 +87,15 @@ impl ChangeSvc {
         if let Some(pred) = base.predecessor {
             builder = builder.predecessor(pred);
         }
-        if let Some(intent) = names::intent(&req.intent)? {
+        // An amend keeps the change's intent unless the request names one.
+        let intent = match names::intent(&req.intent)? {
+            Some(intent) => Some(intent),
+            None => match base.predecessor {
+                Some(pred) => ctx.derive.change(&pred).await?.intent,
+                None => None,
+            },
+        };
+        if let Some(intent) = intent {
             builder = builder.intent(intent);
         }
         if let Some(carried) = &base.carried {

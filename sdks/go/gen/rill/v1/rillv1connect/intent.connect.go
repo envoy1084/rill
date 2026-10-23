@@ -54,6 +54,15 @@ const (
 	// IntentServiceFindSimilarIntentsProcedure is the fully-qualified name of the IntentService's
 	// FindSimilarIntents RPC.
 	IntentServiceFindSimilarIntentsProcedure = "/rill.v1.IntentService/FindSimilarIntents"
+	// IntentServiceApproveIntentProcedure is the fully-qualified name of the IntentService's
+	// ApproveIntent RPC.
+	IntentServiceApproveIntentProcedure = "/rill.v1.IntentService/ApproveIntent"
+	// IntentServiceRevokeIntentApprovalProcedure is the fully-qualified name of the IntentService's
+	// RevokeIntentApproval RPC.
+	IntentServiceRevokeIntentApprovalProcedure = "/rill.v1.IntentService/RevokeIntentApproval"
+	// IntentServiceExplainIntentScopeProcedure is the fully-qualified name of the IntentService's
+	// ExplainIntentScope RPC.
+	IntentServiceExplainIntentScopeProcedure = "/rill.v1.IntentService/ExplainIntentScope"
 )
 
 // IntentServiceClient is a client for the rill.v1.IntentService service.
@@ -62,7 +71,8 @@ type IntentServiceClient interface {
 	CreateIntent(context.Context, *connect.Request[v1.CreateIntentRequest]) (*connect.Response[v1.CreateIntentResponse], error)
 	// One intent.
 	GetIntent(context.Context, *connect.Request[v1.GetIntentRequest]) (*connect.Response[v1.GetIntentResponse], error)
-	// Change an intent's title, body, status, parent or risk override.
+	// Change an intent's title, body, status, parent, risk override or
+	// scope. Changing the scope starts a new revision, which needs approving.
 	UpdateIntent(context.Context, *connect.Request[v1.UpdateIntentRequest]) (*connect.Response[v1.UpdateIntentResponse], error)
 	// A repository's intents, most recently updated first.
 	ListIntents(context.Context, *connect.Request[v1.ListIntentsRequest]) (*connect.Response[v1.ListIntentsResponse], error)
@@ -70,6 +80,13 @@ type IntentServiceClient interface {
 	LinkChange(context.Context, *connect.Request[v1.LinkChangeRequest]) (*connect.Response[v1.LinkChangeResponse], error)
 	// Intents whose words overlap a title and body, best first.
 	FindSimilarIntents(context.Context, *connect.Request[v1.FindSimilarIntentsRequest]) (*connect.Response[v1.FindSimilarIntentsResponse], error)
+	// Approve the intent's current scope revision, for the scope directories
+	// the caller owns.
+	ApproveIntent(context.Context, *connect.Request[v1.ApproveIntentRequest]) (*connect.Response[v1.ApproveIntentResponse], error)
+	// Withdraw the caller's approval.
+	RevokeIntentApproval(context.Context, *connect.Request[v1.RevokeIntentApprovalRequest]) (*connect.Response[v1.RevokeIntentApprovalResponse], error)
+	// Whether a change's intent is approved and the change inside its scope.
+	ExplainIntentScope(context.Context, *connect.Request[v1.ExplainIntentScopeRequest]) (*connect.Response[v1.ExplainIntentScopeResponse], error)
 }
 
 // NewIntentServiceClient constructs a client for the rill.v1.IntentService service. By default, it
@@ -119,17 +136,38 @@ func NewIntentServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(intentServiceMethods.ByName("FindSimilarIntents")),
 			connect.WithClientOptions(opts...),
 		),
+		approveIntent: connect.NewClient[v1.ApproveIntentRequest, v1.ApproveIntentResponse](
+			httpClient,
+			baseURL+IntentServiceApproveIntentProcedure,
+			connect.WithSchema(intentServiceMethods.ByName("ApproveIntent")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeIntentApproval: connect.NewClient[v1.RevokeIntentApprovalRequest, v1.RevokeIntentApprovalResponse](
+			httpClient,
+			baseURL+IntentServiceRevokeIntentApprovalProcedure,
+			connect.WithSchema(intentServiceMethods.ByName("RevokeIntentApproval")),
+			connect.WithClientOptions(opts...),
+		),
+		explainIntentScope: connect.NewClient[v1.ExplainIntentScopeRequest, v1.ExplainIntentScopeResponse](
+			httpClient,
+			baseURL+IntentServiceExplainIntentScopeProcedure,
+			connect.WithSchema(intentServiceMethods.ByName("ExplainIntentScope")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // intentServiceClient implements IntentServiceClient.
 type intentServiceClient struct {
-	createIntent       *connect.Client[v1.CreateIntentRequest, v1.CreateIntentResponse]
-	getIntent          *connect.Client[v1.GetIntentRequest, v1.GetIntentResponse]
-	updateIntent       *connect.Client[v1.UpdateIntentRequest, v1.UpdateIntentResponse]
-	listIntents        *connect.Client[v1.ListIntentsRequest, v1.ListIntentsResponse]
-	linkChange         *connect.Client[v1.LinkChangeRequest, v1.LinkChangeResponse]
-	findSimilarIntents *connect.Client[v1.FindSimilarIntentsRequest, v1.FindSimilarIntentsResponse]
+	createIntent         *connect.Client[v1.CreateIntentRequest, v1.CreateIntentResponse]
+	getIntent            *connect.Client[v1.GetIntentRequest, v1.GetIntentResponse]
+	updateIntent         *connect.Client[v1.UpdateIntentRequest, v1.UpdateIntentResponse]
+	listIntents          *connect.Client[v1.ListIntentsRequest, v1.ListIntentsResponse]
+	linkChange           *connect.Client[v1.LinkChangeRequest, v1.LinkChangeResponse]
+	findSimilarIntents   *connect.Client[v1.FindSimilarIntentsRequest, v1.FindSimilarIntentsResponse]
+	approveIntent        *connect.Client[v1.ApproveIntentRequest, v1.ApproveIntentResponse]
+	revokeIntentApproval *connect.Client[v1.RevokeIntentApprovalRequest, v1.RevokeIntentApprovalResponse]
+	explainIntentScope   *connect.Client[v1.ExplainIntentScopeRequest, v1.ExplainIntentScopeResponse]
 }
 
 // CreateIntent calls rill.v1.IntentService.CreateIntent.
@@ -162,13 +200,29 @@ func (c *intentServiceClient) FindSimilarIntents(ctx context.Context, req *conne
 	return c.findSimilarIntents.CallUnary(ctx, req)
 }
 
+// ApproveIntent calls rill.v1.IntentService.ApproveIntent.
+func (c *intentServiceClient) ApproveIntent(ctx context.Context, req *connect.Request[v1.ApproveIntentRequest]) (*connect.Response[v1.ApproveIntentResponse], error) {
+	return c.approveIntent.CallUnary(ctx, req)
+}
+
+// RevokeIntentApproval calls rill.v1.IntentService.RevokeIntentApproval.
+func (c *intentServiceClient) RevokeIntentApproval(ctx context.Context, req *connect.Request[v1.RevokeIntentApprovalRequest]) (*connect.Response[v1.RevokeIntentApprovalResponse], error) {
+	return c.revokeIntentApproval.CallUnary(ctx, req)
+}
+
+// ExplainIntentScope calls rill.v1.IntentService.ExplainIntentScope.
+func (c *intentServiceClient) ExplainIntentScope(ctx context.Context, req *connect.Request[v1.ExplainIntentScopeRequest]) (*connect.Response[v1.ExplainIntentScopeResponse], error) {
+	return c.explainIntentScope.CallUnary(ctx, req)
+}
+
 // IntentServiceHandler is an implementation of the rill.v1.IntentService service.
 type IntentServiceHandler interface {
 	// Record a new intent.
 	CreateIntent(context.Context, *connect.Request[v1.CreateIntentRequest]) (*connect.Response[v1.CreateIntentResponse], error)
 	// One intent.
 	GetIntent(context.Context, *connect.Request[v1.GetIntentRequest]) (*connect.Response[v1.GetIntentResponse], error)
-	// Change an intent's title, body, status, parent or risk override.
+	// Change an intent's title, body, status, parent, risk override or
+	// scope. Changing the scope starts a new revision, which needs approving.
 	UpdateIntent(context.Context, *connect.Request[v1.UpdateIntentRequest]) (*connect.Response[v1.UpdateIntentResponse], error)
 	// A repository's intents, most recently updated first.
 	ListIntents(context.Context, *connect.Request[v1.ListIntentsRequest]) (*connect.Response[v1.ListIntentsResponse], error)
@@ -176,6 +230,13 @@ type IntentServiceHandler interface {
 	LinkChange(context.Context, *connect.Request[v1.LinkChangeRequest]) (*connect.Response[v1.LinkChangeResponse], error)
 	// Intents whose words overlap a title and body, best first.
 	FindSimilarIntents(context.Context, *connect.Request[v1.FindSimilarIntentsRequest]) (*connect.Response[v1.FindSimilarIntentsResponse], error)
+	// Approve the intent's current scope revision, for the scope directories
+	// the caller owns.
+	ApproveIntent(context.Context, *connect.Request[v1.ApproveIntentRequest]) (*connect.Response[v1.ApproveIntentResponse], error)
+	// Withdraw the caller's approval.
+	RevokeIntentApproval(context.Context, *connect.Request[v1.RevokeIntentApprovalRequest]) (*connect.Response[v1.RevokeIntentApprovalResponse], error)
+	// Whether a change's intent is approved and the change inside its scope.
+	ExplainIntentScope(context.Context, *connect.Request[v1.ExplainIntentScopeRequest]) (*connect.Response[v1.ExplainIntentScopeResponse], error)
 }
 
 // NewIntentServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -221,6 +282,24 @@ func NewIntentServiceHandler(svc IntentServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(intentServiceMethods.ByName("FindSimilarIntents")),
 		connect.WithHandlerOptions(opts...),
 	)
+	intentServiceApproveIntentHandler := connect.NewUnaryHandler(
+		IntentServiceApproveIntentProcedure,
+		svc.ApproveIntent,
+		connect.WithSchema(intentServiceMethods.ByName("ApproveIntent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	intentServiceRevokeIntentApprovalHandler := connect.NewUnaryHandler(
+		IntentServiceRevokeIntentApprovalProcedure,
+		svc.RevokeIntentApproval,
+		connect.WithSchema(intentServiceMethods.ByName("RevokeIntentApproval")),
+		connect.WithHandlerOptions(opts...),
+	)
+	intentServiceExplainIntentScopeHandler := connect.NewUnaryHandler(
+		IntentServiceExplainIntentScopeProcedure,
+		svc.ExplainIntentScope,
+		connect.WithSchema(intentServiceMethods.ByName("ExplainIntentScope")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/rill.v1.IntentService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case IntentServiceCreateIntentProcedure:
@@ -235,6 +314,12 @@ func NewIntentServiceHandler(svc IntentServiceHandler, opts ...connect.HandlerOp
 			intentServiceLinkChangeHandler.ServeHTTP(w, r)
 		case IntentServiceFindSimilarIntentsProcedure:
 			intentServiceFindSimilarIntentsHandler.ServeHTTP(w, r)
+		case IntentServiceApproveIntentProcedure:
+			intentServiceApproveIntentHandler.ServeHTTP(w, r)
+		case IntentServiceRevokeIntentApprovalProcedure:
+			intentServiceRevokeIntentApprovalHandler.ServeHTTP(w, r)
+		case IntentServiceExplainIntentScopeProcedure:
+			intentServiceExplainIntentScopeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -266,4 +351,16 @@ func (UnimplementedIntentServiceHandler) LinkChange(context.Context, *connect.Re
 
 func (UnimplementedIntentServiceHandler) FindSimilarIntents(context.Context, *connect.Request[v1.FindSimilarIntentsRequest]) (*connect.Response[v1.FindSimilarIntentsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.IntentService.FindSimilarIntents is not implemented"))
+}
+
+func (UnimplementedIntentServiceHandler) ApproveIntent(context.Context, *connect.Request[v1.ApproveIntentRequest]) (*connect.Response[v1.ApproveIntentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.IntentService.ApproveIntent is not implemented"))
+}
+
+func (UnimplementedIntentServiceHandler) RevokeIntentApproval(context.Context, *connect.Request[v1.RevokeIntentApprovalRequest]) (*connect.Response[v1.RevokeIntentApprovalResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.IntentService.RevokeIntentApproval is not implemented"))
+}
+
+func (UnimplementedIntentServiceHandler) ExplainIntentScope(context.Context, *connect.Request[v1.ExplainIntentScopeRequest]) (*connect.Response[v1.ExplainIntentScopeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.IntentService.ExplainIntentScope is not implemented"))
 }

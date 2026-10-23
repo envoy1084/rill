@@ -42,7 +42,9 @@ pub use objects::change::{
 };
 pub use objects::event::{Event, EventKind};
 pub use objects::health::{HealthState, Incident, IncidentState, Resolution, TrunkHealth};
-pub use objects::intent::{Intent, IntentKind, IntentStatus, RiskClass};
+pub use objects::intent::{
+    Intent, IntentApproval, IntentKind, IntentScope, IntentStatus, RiskClass,
+};
 pub use objects::land_request::{
     GroupMode, LandGroup, LandRequest, LandRequestRecord, LandStatus, LandTicket, Lane, VerifyMode,
 };

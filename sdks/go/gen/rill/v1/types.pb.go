@@ -595,7 +595,7 @@ func (x DiffLine_Op) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DiffLine_Op.Descriptor instead.
 func (DiffLine_Op) EnumDescriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{30, 0}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{32, 0}
 }
 
 // A 256-bit BLAKE3 content hash wrapped as a message, for use where a
@@ -1884,18 +1884,23 @@ type Intent struct {
 	// `orgs/{org}/repos/{repo}/intents/{intent}`. Output only.
 	Name string `protobuf:"bytes,12,opt,name=name,proto3" json:"name,omitempty"`
 	// Output only.
-	Etag          string       `protobuf:"bytes,13,opt,name=etag,proto3" json:"etag,omitempty"`
-	Id            []byte       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Title         string       `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Body          string       `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
-	Kind          IntentKind   `protobuf:"varint,4,opt,name=kind,proto3,enum=rill.v1.IntentKind" json:"kind,omitempty"`
-	Status        IntentStatus `protobuf:"varint,5,opt,name=status,proto3,enum=rill.v1.IntentStatus" json:"status,omitempty"`
-	Owner         *Principal   `protobuf:"bytes,6,opt,name=owner,proto3" json:"owner,omitempty"`
-	Parent        []byte       `protobuf:"bytes,7,opt,name=parent,proto3,oneof" json:"parent,omitempty"`
-	RiskOverride  *RiskClass   `protobuf:"varint,8,opt,name=risk_override,json=riskOverride,proto3,enum=rill.v1.RiskClass,oneof" json:"risk_override,omitempty"`
-	Changes       [][]byte     `protobuf:"bytes,9,rep,name=changes,proto3" json:"changes,omitempty"`
-	CreatedAt     int64        `protobuf:"varint,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     int64        `protobuf:"varint,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Etag         string       `protobuf:"bytes,13,opt,name=etag,proto3" json:"etag,omitempty"`
+	Id           []byte       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title        string       `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Body         string       `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	Kind         IntentKind   `protobuf:"varint,4,opt,name=kind,proto3,enum=rill.v1.IntentKind" json:"kind,omitempty"`
+	Status       IntentStatus `protobuf:"varint,5,opt,name=status,proto3,enum=rill.v1.IntentStatus" json:"status,omitempty"`
+	Owner        *Principal   `protobuf:"bytes,6,opt,name=owner,proto3" json:"owner,omitempty"`
+	Parent       []byte       `protobuf:"bytes,7,opt,name=parent,proto3,oneof" json:"parent,omitempty"`
+	RiskOverride *RiskClass   `protobuf:"varint,8,opt,name=risk_override,json=riskOverride,proto3,enum=rill.v1.RiskClass,oneof" json:"risk_override,omitempty"`
+	Changes      [][]byte     `protobuf:"bytes,9,rep,name=changes,proto3" json:"changes,omitempty"`
+	CreatedAt    int64        `protobuf:"varint,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt    int64        `protobuf:"varint,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// What changes under the intent may do once approved; unset for none.
+	Scope *IntentScope `protobuf:"bytes,14,opt,name=scope,proto3" json:"scope,omitempty"`
+	// Bumped whenever the scope changes; approvals are of one revision.
+	Revision      uint32            `protobuf:"varint,15,opt,name=revision,proto3" json:"revision,omitempty"`
+	Approvals     []*IntentApproval `protobuf:"bytes,16,rep,name=approvals,proto3" json:"approvals,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2021,6 +2026,215 @@ func (x *Intent) GetUpdatedAt() int64 {
 	return 0
 }
 
+func (x *Intent) GetScope() *IntentScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *Intent) GetRevision() uint32 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *Intent) GetApprovals() []*IntentApproval {
+	if x != nil {
+		return x.Approvals
+	}
+	return nil
+}
+
+// The bounds of an approved intent: changes inside them inherit its
+// approval, anything outside falls back to normal review.
+type IntentScope struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Globs every touched path must match.
+	Paths []string `protobuf:"bytes,1,rep,name=paths,proto3" json:"paths,omitempty"`
+	// Globs no touched path may match.
+	ForbidPaths       []string `protobuf:"bytes,2,rep,name=forbid_paths,json=forbidPaths,proto3" json:"forbid_paths,omitempty"`
+	MaxFilesPerChange *uint32  `protobuf:"varint,3,opt,name=max_files_per_change,json=maxFilesPerChange,proto3,oneof" json:"max_files_per_change,omitempty"`
+	// Changes linked to the intent, at most.
+	MaxChanges *uint32 `protobuf:"varint,4,opt,name=max_changes,json=maxChanges,proto3,oneof" json:"max_changes,omitempty"`
+	Expires    *int64  `protobuf:"varint,5,opt,name=expires,proto3,oneof" json:"expires,omitempty"`
+	// Independent agent approvals each change needs.
+	AgentQuorum *uint32 `protobuf:"varint,6,opt,name=agent_quorum,json=agentQuorum,proto3,oneof" json:"agent_quorum,omitempty"`
+	// Share of landed changes sampled for human audit, in thousandths.
+	HumanSamplePermille *uint32 `protobuf:"varint,7,opt,name=human_sample_permille,json=humanSamplePermille,proto3,oneof" json:"human_sample_permille,omitempty"`
+	// Changes linked per UTC day, at most.
+	ChangesPerDay *uint32 `protobuf:"varint,8,opt,name=changes_per_day,json=changesPerDay,proto3,oneof" json:"changes_per_day,omitempty"`
+	// Changes landed per UTC day, at most.
+	LandsPerDay   *uint32 `protobuf:"varint,9,opt,name=lands_per_day,json=landsPerDay,proto3,oneof" json:"lands_per_day,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IntentScope) Reset() {
+	*x = IntentScope{}
+	mi := &file_rill_v1_types_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IntentScope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IntentScope) ProtoMessage() {}
+
+func (x *IntentScope) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_types_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IntentScope.ProtoReflect.Descriptor instead.
+func (*IntentScope) Descriptor() ([]byte, []int) {
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *IntentScope) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *IntentScope) GetForbidPaths() []string {
+	if x != nil {
+		return x.ForbidPaths
+	}
+	return nil
+}
+
+func (x *IntentScope) GetMaxFilesPerChange() uint32 {
+	if x != nil && x.MaxFilesPerChange != nil {
+		return *x.MaxFilesPerChange
+	}
+	return 0
+}
+
+func (x *IntentScope) GetMaxChanges() uint32 {
+	if x != nil && x.MaxChanges != nil {
+		return *x.MaxChanges
+	}
+	return 0
+}
+
+func (x *IntentScope) GetExpires() int64 {
+	if x != nil && x.Expires != nil {
+		return *x.Expires
+	}
+	return 0
+}
+
+func (x *IntentScope) GetAgentQuorum() uint32 {
+	if x != nil && x.AgentQuorum != nil {
+		return *x.AgentQuorum
+	}
+	return 0
+}
+
+func (x *IntentScope) GetHumanSamplePermille() uint32 {
+	if x != nil && x.HumanSamplePermille != nil {
+		return *x.HumanSamplePermille
+	}
+	return 0
+}
+
+func (x *IntentScope) GetChangesPerDay() uint32 {
+	if x != nil && x.ChangesPerDay != nil {
+		return *x.ChangesPerDay
+	}
+	return 0
+}
+
+func (x *IntentScope) GetLandsPerDay() uint32 {
+	if x != nil && x.LandsPerDay != nil {
+		return *x.LandsPerDay
+	}
+	return 0
+}
+
+// One approval of an intent's scope.
+type IntentApproval struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	By    *Principal             `protobuf:"bytes,1,opt,name=by,proto3" json:"by,omitempty"`
+	At    int64                  `protobuf:"varint,2,opt,name=at,proto3" json:"at,omitempty"`
+	// The scope revision approved.
+	Revision uint32 `protobuf:"varint,3,opt,name=revision,proto3" json:"revision,omitempty"`
+	// The scope directories the approver owns.
+	Owns          []string `protobuf:"bytes,4,rep,name=owns,proto3" json:"owns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IntentApproval) Reset() {
+	*x = IntentApproval{}
+	mi := &file_rill_v1_types_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IntentApproval) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IntentApproval) ProtoMessage() {}
+
+func (x *IntentApproval) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_types_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IntentApproval.ProtoReflect.Descriptor instead.
+func (*IntentApproval) Descriptor() ([]byte, []int) {
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *IntentApproval) GetBy() *Principal {
+	if x != nil {
+		return x.By
+	}
+	return nil
+}
+
+func (x *IntentApproval) GetAt() int64 {
+	if x != nil {
+		return x.At
+	}
+	return 0
+}
+
+func (x *IntentApproval) GetRevision() uint32 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *IntentApproval) GetOwns() []string {
+	if x != nil {
+		return x.Owns
+	}
+	return nil
+}
+
 // A typed vote range on a change.
 type Label struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
@@ -2035,7 +2249,7 @@ type Label struct {
 
 func (x *Label) Reset() {
 	*x = Label{}
-	mi := &file_rill_v1_types_proto_msgTypes[18]
+	mi := &file_rill_v1_types_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2047,7 +2261,7 @@ func (x *Label) String() string {
 func (*Label) ProtoMessage() {}
 
 func (x *Label) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[18]
+	mi := &file_rill_v1_types_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2060,7 +2274,7 @@ func (x *Label) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Label.ProtoReflect.Descriptor instead.
 func (*Label) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{18}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Label) GetName() string {
@@ -2113,7 +2327,7 @@ type LabelVote struct {
 
 func (x *LabelVote) Reset() {
 	*x = LabelVote{}
-	mi := &file_rill_v1_types_proto_msgTypes[19]
+	mi := &file_rill_v1_types_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2125,7 +2339,7 @@ func (x *LabelVote) String() string {
 func (*LabelVote) ProtoMessage() {}
 
 func (x *LabelVote) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[19]
+	mi := &file_rill_v1_types_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2138,7 +2352,7 @@ func (x *LabelVote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelVote.ProtoReflect.Descriptor instead.
 func (*LabelVote) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{19}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *LabelVote) GetLabel() string {
@@ -2198,7 +2412,7 @@ type ThreadAnchor struct {
 
 func (x *ThreadAnchor) Reset() {
 	*x = ThreadAnchor{}
-	mi := &file_rill_v1_types_proto_msgTypes[20]
+	mi := &file_rill_v1_types_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2210,7 +2424,7 @@ func (x *ThreadAnchor) String() string {
 func (*ThreadAnchor) ProtoMessage() {}
 
 func (x *ThreadAnchor) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[20]
+	mi := &file_rill_v1_types_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2223,7 +2437,7 @@ func (x *ThreadAnchor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadAnchor.ProtoReflect.Descriptor instead.
 func (*ThreadAnchor) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{20}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ThreadAnchor) GetAnchor() isThreadAnchor_Anchor {
@@ -2296,7 +2510,7 @@ type Comment struct {
 
 func (x *Comment) Reset() {
 	*x = Comment{}
-	mi := &file_rill_v1_types_proto_msgTypes[21]
+	mi := &file_rill_v1_types_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2308,7 +2522,7 @@ func (x *Comment) String() string {
 func (*Comment) ProtoMessage() {}
 
 func (x *Comment) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[21]
+	mi := &file_rill_v1_types_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2321,7 +2535,7 @@ func (x *Comment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Comment.ProtoReflect.Descriptor instead.
 func (*Comment) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{21}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Comment) GetAuthor() *Principal {
@@ -2374,7 +2588,7 @@ type Thread struct {
 
 func (x *Thread) Reset() {
 	*x = Thread{}
-	mi := &file_rill_v1_types_proto_msgTypes[22]
+	mi := &file_rill_v1_types_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2386,7 +2600,7 @@ func (x *Thread) String() string {
 func (*Thread) ProtoMessage() {}
 
 func (x *Thread) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[22]
+	mi := &file_rill_v1_types_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2399,7 +2613,7 @@ func (x *Thread) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Thread.ProtoReflect.Descriptor instead.
 func (*Thread) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{22}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Thread) GetName() string {
@@ -2469,7 +2683,7 @@ type ReviewState struct {
 
 func (x *ReviewState) Reset() {
 	*x = ReviewState{}
-	mi := &file_rill_v1_types_proto_msgTypes[23]
+	mi := &file_rill_v1_types_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2481,7 +2695,7 @@ func (x *ReviewState) String() string {
 func (*ReviewState) ProtoMessage() {}
 
 func (x *ReviewState) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[23]
+	mi := &file_rill_v1_types_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2494,7 +2708,7 @@ func (x *ReviewState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewState.ProtoReflect.Descriptor instead.
 func (*ReviewState) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{23}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ReviewState) GetName() string {
@@ -2613,7 +2827,7 @@ type SparseProfile struct {
 
 func (x *SparseProfile) Reset() {
 	*x = SparseProfile{}
-	mi := &file_rill_v1_types_proto_msgTypes[24]
+	mi := &file_rill_v1_types_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2625,7 +2839,7 @@ func (x *SparseProfile) String() string {
 func (*SparseProfile) ProtoMessage() {}
 
 func (x *SparseProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[24]
+	mi := &file_rill_v1_types_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2638,7 +2852,7 @@ func (x *SparseProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SparseProfile.ProtoReflect.Descriptor instead.
 func (*SparseProfile) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{24}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SparseProfile) GetInclude() []string {
@@ -2688,7 +2902,7 @@ type Workspace struct {
 
 func (x *Workspace) Reset() {
 	*x = Workspace{}
-	mi := &file_rill_v1_types_proto_msgTypes[25]
+	mi := &file_rill_v1_types_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2700,7 +2914,7 @@ func (x *Workspace) String() string {
 func (*Workspace) ProtoMessage() {}
 
 func (x *Workspace) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[25]
+	mi := &file_rill_v1_types_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2713,7 +2927,7 @@ func (x *Workspace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Workspace.ProtoReflect.Descriptor instead.
 func (*Workspace) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{25}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *Workspace) GetName() string {
@@ -2828,7 +3042,7 @@ type OperationKind struct {
 
 func (x *OperationKind) Reset() {
 	*x = OperationKind{}
-	mi := &file_rill_v1_types_proto_msgTypes[26]
+	mi := &file_rill_v1_types_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2840,7 +3054,7 @@ func (x *OperationKind) String() string {
 func (*OperationKind) ProtoMessage() {}
 
 func (x *OperationKind) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[26]
+	mi := &file_rill_v1_types_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2853,7 +3067,7 @@ func (x *OperationKind) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind.ProtoReflect.Descriptor instead.
 func (*OperationKind) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *OperationKind) GetKind() isOperationKind_Kind {
@@ -3036,7 +3250,7 @@ type WorkspaceOperation struct {
 
 func (x *WorkspaceOperation) Reset() {
 	*x = WorkspaceOperation{}
-	mi := &file_rill_v1_types_proto_msgTypes[27]
+	mi := &file_rill_v1_types_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3048,7 +3262,7 @@ func (x *WorkspaceOperation) String() string {
 func (*WorkspaceOperation) ProtoMessage() {}
 
 func (x *WorkspaceOperation) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[27]
+	mi := &file_rill_v1_types_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3061,7 +3275,7 @@ func (x *WorkspaceOperation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspaceOperation.ProtoReflect.Descriptor instead.
 func (*WorkspaceOperation) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{27}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *WorkspaceOperation) GetName() string {
@@ -3137,7 +3351,7 @@ type Ref struct {
 
 func (x *Ref) Reset() {
 	*x = Ref{}
-	mi := &file_rill_v1_types_proto_msgTypes[28]
+	mi := &file_rill_v1_types_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3149,7 +3363,7 @@ func (x *Ref) String() string {
 func (*Ref) ProtoMessage() {}
 
 func (x *Ref) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[28]
+	mi := &file_rill_v1_types_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3162,7 +3376,7 @@ func (x *Ref) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ref.ProtoReflect.Descriptor instead.
 func (*Ref) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{28}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Ref) GetName() string {
@@ -3213,7 +3427,7 @@ type Landing struct {
 
 func (x *Landing) Reset() {
 	*x = Landing{}
-	mi := &file_rill_v1_types_proto_msgTypes[29]
+	mi := &file_rill_v1_types_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3225,7 +3439,7 @@ func (x *Landing) String() string {
 func (*Landing) ProtoMessage() {}
 
 func (x *Landing) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[29]
+	mi := &file_rill_v1_types_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3238,7 +3452,7 @@ func (x *Landing) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Landing.ProtoReflect.Descriptor instead.
 func (*Landing) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{29}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Landing) GetName() string {
@@ -3308,7 +3522,7 @@ type DiffLine struct {
 
 func (x *DiffLine) Reset() {
 	*x = DiffLine{}
-	mi := &file_rill_v1_types_proto_msgTypes[30]
+	mi := &file_rill_v1_types_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3320,7 +3534,7 @@ func (x *DiffLine) String() string {
 func (*DiffLine) ProtoMessage() {}
 
 func (x *DiffLine) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[30]
+	mi := &file_rill_v1_types_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3333,7 +3547,7 @@ func (x *DiffLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiffLine.ProtoReflect.Descriptor instead.
 func (*DiffLine) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{30}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DiffLine) GetOp() DiffLine_Op {
@@ -3364,7 +3578,7 @@ type DiffHunk struct {
 
 func (x *DiffHunk) Reset() {
 	*x = DiffHunk{}
-	mi := &file_rill_v1_types_proto_msgTypes[31]
+	mi := &file_rill_v1_types_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3376,7 +3590,7 @@ func (x *DiffHunk) String() string {
 func (*DiffHunk) ProtoMessage() {}
 
 func (x *DiffHunk) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[31]
+	mi := &file_rill_v1_types_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3389,7 +3603,7 @@ func (x *DiffHunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiffHunk.ProtoReflect.Descriptor instead.
 func (*DiffHunk) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{31}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DiffHunk) GetBeforeStart() uint32 {
@@ -3446,7 +3660,7 @@ type FileDiff struct {
 
 func (x *FileDiff) Reset() {
 	*x = FileDiff{}
-	mi := &file_rill_v1_types_proto_msgTypes[32]
+	mi := &file_rill_v1_types_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3458,7 +3672,7 @@ func (x *FileDiff) String() string {
 func (*FileDiff) ProtoMessage() {}
 
 func (x *FileDiff) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[32]
+	mi := &file_rill_v1_types_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3471,7 +3685,7 @@ func (x *FileDiff) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileDiff.ProtoReflect.Descriptor instead.
 func (*FileDiff) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{32}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *FileDiff) GetPath() string {
@@ -3548,7 +3762,7 @@ type Repo struct {
 
 func (x *Repo) Reset() {
 	*x = Repo{}
-	mi := &file_rill_v1_types_proto_msgTypes[33]
+	mi := &file_rill_v1_types_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3560,7 +3774,7 @@ func (x *Repo) String() string {
 func (*Repo) ProtoMessage() {}
 
 func (x *Repo) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[33]
+	mi := &file_rill_v1_types_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3573,7 +3787,7 @@ func (x *Repo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Repo.ProtoReflect.Descriptor instead.
 func (*Repo) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{33}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Repo) GetName() string {
@@ -3646,7 +3860,7 @@ type Org struct {
 
 func (x *Org) Reset() {
 	*x = Org{}
-	mi := &file_rill_v1_types_proto_msgTypes[34]
+	mi := &file_rill_v1_types_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3658,7 +3872,7 @@ func (x *Org) String() string {
 func (*Org) ProtoMessage() {}
 
 func (x *Org) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[34]
+	mi := &file_rill_v1_types_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3671,7 +3885,7 @@ func (x *Org) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Org.ProtoReflect.Descriptor instead.
 func (*Org) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{34}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Org) GetName() string {
@@ -3713,7 +3927,7 @@ type FileChange_Set struct {
 
 func (x *FileChange_Set) Reset() {
 	*x = FileChange_Set{}
-	mi := &file_rill_v1_types_proto_msgTypes[36]
+	mi := &file_rill_v1_types_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3725,7 +3939,7 @@ func (x *FileChange_Set) String() string {
 func (*FileChange_Set) ProtoMessage() {}
 
 func (x *FileChange_Set) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[36]
+	mi := &file_rill_v1_types_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3770,7 +3984,7 @@ type FileChange_Delete struct {
 
 func (x *FileChange_Delete) Reset() {
 	*x = FileChange_Delete{}
-	mi := &file_rill_v1_types_proto_msgTypes[37]
+	mi := &file_rill_v1_types_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3782,7 +3996,7 @@ func (x *FileChange_Delete) String() string {
 func (*FileChange_Delete) ProtoMessage() {}
 
 func (x *FileChange_Delete) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[37]
+	mi := &file_rill_v1_types_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3808,7 +4022,7 @@ type SubtreeChange_Copy struct {
 
 func (x *SubtreeChange_Copy) Reset() {
 	*x = SubtreeChange_Copy{}
-	mi := &file_rill_v1_types_proto_msgTypes[38]
+	mi := &file_rill_v1_types_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3820,7 +4034,7 @@ func (x *SubtreeChange_Copy) String() string {
 func (*SubtreeChange_Copy) ProtoMessage() {}
 
 func (x *SubtreeChange_Copy) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[38]
+	mi := &file_rill_v1_types_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3858,7 +4072,7 @@ type SubtreeChange_Delete struct {
 
 func (x *SubtreeChange_Delete) Reset() {
 	*x = SubtreeChange_Delete{}
-	mi := &file_rill_v1_types_proto_msgTypes[39]
+	mi := &file_rill_v1_types_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3870,7 +4084,7 @@ func (x *SubtreeChange_Delete) String() string {
 func (*SubtreeChange_Delete) ProtoMessage() {}
 
 func (x *SubtreeChange_Delete) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[39]
+	mi := &file_rill_v1_types_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3896,7 +4110,7 @@ type TreeEntry_File struct {
 
 func (x *TreeEntry_File) Reset() {
 	*x = TreeEntry_File{}
-	mi := &file_rill_v1_types_proto_msgTypes[43]
+	mi := &file_rill_v1_types_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3908,7 +4122,7 @@ func (x *TreeEntry_File) String() string {
 func (*TreeEntry_File) ProtoMessage() {}
 
 func (x *TreeEntry_File) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[43]
+	mi := &file_rill_v1_types_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3948,7 +4162,7 @@ type TreeEntry_Dir struct {
 
 func (x *TreeEntry_Dir) Reset() {
 	*x = TreeEntry_Dir{}
-	mi := &file_rill_v1_types_proto_msgTypes[44]
+	mi := &file_rill_v1_types_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3960,7 +4174,7 @@ func (x *TreeEntry_Dir) String() string {
 func (*TreeEntry_Dir) ProtoMessage() {}
 
 func (x *TreeEntry_Dir) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[44]
+	mi := &file_rill_v1_types_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3998,7 +4212,7 @@ type ThreadAnchor_Change struct {
 
 func (x *ThreadAnchor_Change) Reset() {
 	*x = ThreadAnchor_Change{}
-	mi := &file_rill_v1_types_proto_msgTypes[46]
+	mi := &file_rill_v1_types_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4010,7 +4224,7 @@ func (x *ThreadAnchor_Change) String() string {
 func (*ThreadAnchor_Change) ProtoMessage() {}
 
 func (x *ThreadAnchor_Change) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[46]
+	mi := &file_rill_v1_types_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4023,7 +4237,7 @@ func (x *ThreadAnchor_Change) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadAnchor_Change.ProtoReflect.Descriptor instead.
 func (*ThreadAnchor_Change) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{20, 0}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{22, 0}
 }
 
 type ThreadAnchor_Lines struct {
@@ -4039,7 +4253,7 @@ type ThreadAnchor_Lines struct {
 
 func (x *ThreadAnchor_Lines) Reset() {
 	*x = ThreadAnchor_Lines{}
-	mi := &file_rill_v1_types_proto_msgTypes[47]
+	mi := &file_rill_v1_types_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4051,7 +4265,7 @@ func (x *ThreadAnchor_Lines) String() string {
 func (*ThreadAnchor_Lines) ProtoMessage() {}
 
 func (x *ThreadAnchor_Lines) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[47]
+	mi := &file_rill_v1_types_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4064,7 +4278,7 @@ func (x *ThreadAnchor_Lines) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadAnchor_Lines.ProtoReflect.Descriptor instead.
 func (*ThreadAnchor_Lines) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{20, 1}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{22, 1}
 }
 
 func (x *ThreadAnchor_Lines) GetVersion() []byte {
@@ -4112,7 +4326,7 @@ type ThreadAnchor_File struct {
 
 func (x *ThreadAnchor_File) Reset() {
 	*x = ThreadAnchor_File{}
-	mi := &file_rill_v1_types_proto_msgTypes[48]
+	mi := &file_rill_v1_types_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4124,7 +4338,7 @@ func (x *ThreadAnchor_File) String() string {
 func (*ThreadAnchor_File) ProtoMessage() {}
 
 func (x *ThreadAnchor_File) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[48]
+	mi := &file_rill_v1_types_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4137,7 +4351,7 @@ func (x *ThreadAnchor_File) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadAnchor_File.ProtoReflect.Descriptor instead.
 func (*ThreadAnchor_File) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{20, 2}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{22, 2}
 }
 
 func (x *ThreadAnchor_File) GetVersion() []byte {
@@ -4162,7 +4376,7 @@ type OperationKind_Create struct {
 
 func (x *OperationKind_Create) Reset() {
 	*x = OperationKind_Create{}
-	mi := &file_rill_v1_types_proto_msgTypes[50]
+	mi := &file_rill_v1_types_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4174,7 +4388,7 @@ func (x *OperationKind_Create) String() string {
 func (*OperationKind_Create) ProtoMessage() {}
 
 func (x *OperationKind_Create) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[50]
+	mi := &file_rill_v1_types_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4187,7 +4401,7 @@ func (x *OperationKind_Create) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_Create.ProtoReflect.Descriptor instead.
 func (*OperationKind_Create) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 0}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 0}
 }
 
 type OperationKind_Snapshot struct {
@@ -4199,7 +4413,7 @@ type OperationKind_Snapshot struct {
 
 func (x *OperationKind_Snapshot) Reset() {
 	*x = OperationKind_Snapshot{}
-	mi := &file_rill_v1_types_proto_msgTypes[51]
+	mi := &file_rill_v1_types_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4211,7 +4425,7 @@ func (x *OperationKind_Snapshot) String() string {
 func (*OperationKind_Snapshot) ProtoMessage() {}
 
 func (x *OperationKind_Snapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[51]
+	mi := &file_rill_v1_types_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4224,7 +4438,7 @@ func (x *OperationKind_Snapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_Snapshot.ProtoReflect.Descriptor instead.
 func (*OperationKind_Snapshot) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 1}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 1}
 }
 
 func (x *OperationKind_Snapshot) GetTree() []byte {
@@ -4244,7 +4458,7 @@ type OperationKind_NewChange struct {
 
 func (x *OperationKind_NewChange) Reset() {
 	*x = OperationKind_NewChange{}
-	mi := &file_rill_v1_types_proto_msgTypes[52]
+	mi := &file_rill_v1_types_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4256,7 +4470,7 @@ func (x *OperationKind_NewChange) String() string {
 func (*OperationKind_NewChange) ProtoMessage() {}
 
 func (x *OperationKind_NewChange) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[52]
+	mi := &file_rill_v1_types_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4269,7 +4483,7 @@ func (x *OperationKind_NewChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_NewChange.ProtoReflect.Descriptor instead.
 func (*OperationKind_NewChange) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 2}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 2}
 }
 
 func (x *OperationKind_NewChange) GetChange() []byte {
@@ -4295,7 +4509,7 @@ type OperationKind_Describe struct {
 
 func (x *OperationKind_Describe) Reset() {
 	*x = OperationKind_Describe{}
-	mi := &file_rill_v1_types_proto_msgTypes[53]
+	mi := &file_rill_v1_types_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4307,7 +4521,7 @@ func (x *OperationKind_Describe) String() string {
 func (*OperationKind_Describe) ProtoMessage() {}
 
 func (x *OperationKind_Describe) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[53]
+	mi := &file_rill_v1_types_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4320,7 +4534,7 @@ func (x *OperationKind_Describe) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_Describe.ProtoReflect.Descriptor instead.
 func (*OperationKind_Describe) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 3}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 3}
 }
 
 func (x *OperationKind_Describe) GetVersion() []byte {
@@ -4340,7 +4554,7 @@ type OperationKind_Rebase struct {
 
 func (x *OperationKind_Rebase) Reset() {
 	*x = OperationKind_Rebase{}
-	mi := &file_rill_v1_types_proto_msgTypes[54]
+	mi := &file_rill_v1_types_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4352,7 +4566,7 @@ func (x *OperationKind_Rebase) String() string {
 func (*OperationKind_Rebase) ProtoMessage() {}
 
 func (x *OperationKind_Rebase) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[54]
+	mi := &file_rill_v1_types_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4365,7 +4579,7 @@ func (x *OperationKind_Rebase) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_Rebase.ProtoReflect.Descriptor instead.
 func (*OperationKind_Rebase) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 4}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 4}
 }
 
 func (x *OperationKind_Rebase) GetFrom() []byte {
@@ -4391,7 +4605,7 @@ type OperationKind_Resolve struct {
 
 func (x *OperationKind_Resolve) Reset() {
 	*x = OperationKind_Resolve{}
-	mi := &file_rill_v1_types_proto_msgTypes[55]
+	mi := &file_rill_v1_types_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4403,7 +4617,7 @@ func (x *OperationKind_Resolve) String() string {
 func (*OperationKind_Resolve) ProtoMessage() {}
 
 func (x *OperationKind_Resolve) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[55]
+	mi := &file_rill_v1_types_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4416,7 +4630,7 @@ func (x *OperationKind_Resolve) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_Resolve.ProtoReflect.Descriptor instead.
 func (*OperationKind_Resolve) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 5}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 5}
 }
 
 func (x *OperationKind_Resolve) GetVersion() []byte {
@@ -4435,7 +4649,7 @@ type OperationKind_SetSparse struct {
 
 func (x *OperationKind_SetSparse) Reset() {
 	*x = OperationKind_SetSparse{}
-	mi := &file_rill_v1_types_proto_msgTypes[56]
+	mi := &file_rill_v1_types_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4447,7 +4661,7 @@ func (x *OperationKind_SetSparse) String() string {
 func (*OperationKind_SetSparse) ProtoMessage() {}
 
 func (x *OperationKind_SetSparse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[56]
+	mi := &file_rill_v1_types_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4460,7 +4674,7 @@ func (x *OperationKind_SetSparse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_SetSparse.ProtoReflect.Descriptor instead.
 func (*OperationKind_SetSparse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 6}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 6}
 }
 
 func (x *OperationKind_SetSparse) GetProfile() *SparseProfile {
@@ -4479,7 +4693,7 @@ type OperationKind_Handoff struct {
 
 func (x *OperationKind_Handoff) Reset() {
 	*x = OperationKind_Handoff{}
-	mi := &file_rill_v1_types_proto_msgTypes[57]
+	mi := &file_rill_v1_types_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4491,7 +4705,7 @@ func (x *OperationKind_Handoff) String() string {
 func (*OperationKind_Handoff) ProtoMessage() {}
 
 func (x *OperationKind_Handoff) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[57]
+	mi := &file_rill_v1_types_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4504,7 +4718,7 @@ func (x *OperationKind_Handoff) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_Handoff.ProtoReflect.Descriptor instead.
 func (*OperationKind_Handoff) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 7}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 7}
 }
 
 func (x *OperationKind_Handoff) GetTo() *Principal {
@@ -4523,7 +4737,7 @@ type OperationKind_Undo struct {
 
 func (x *OperationKind_Undo) Reset() {
 	*x = OperationKind_Undo{}
-	mi := &file_rill_v1_types_proto_msgTypes[58]
+	mi := &file_rill_v1_types_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4535,7 +4749,7 @@ func (x *OperationKind_Undo) String() string {
 func (*OperationKind_Undo) ProtoMessage() {}
 
 func (x *OperationKind_Undo) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[58]
+	mi := &file_rill_v1_types_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4548,7 +4762,7 @@ func (x *OperationKind_Undo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_Undo.ProtoReflect.Descriptor instead.
 func (*OperationKind_Undo) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 8}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 8}
 }
 
 func (x *OperationKind_Undo) GetUndone() []byte {
@@ -4567,7 +4781,7 @@ type OperationKind_Other struct {
 
 func (x *OperationKind_Other) Reset() {
 	*x = OperationKind_Other{}
-	mi := &file_rill_v1_types_proto_msgTypes[59]
+	mi := &file_rill_v1_types_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4579,7 +4793,7 @@ func (x *OperationKind_Other) String() string {
 func (*OperationKind_Other) ProtoMessage() {}
 
 func (x *OperationKind_Other) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_types_proto_msgTypes[59]
+	mi := &file_rill_v1_types_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4592,7 +4806,7 @@ func (x *OperationKind_Other) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationKind_Other.ProtoReflect.Descriptor instead.
 func (*OperationKind_Other) Descriptor() ([]byte, []int) {
-	return file_rill_v1_types_proto_rawDescGZIP(), []int{26, 9}
+	return file_rill_v1_types_proto_rawDescGZIP(), []int{28, 9}
 }
 
 func (x *OperationKind_Other) GetDescription() string {
@@ -4763,7 +4977,7 @@ const file_rill_v1_types_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x12.rill.v1.TreeEntryR\x05value:\x028\x01\"N\n" +
 	"\x0eNamedTreeEntry\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12(\n" +
-	"\x05entry\x18\x02 \x01(\v2\x12.rill.v1.TreeEntryR\x05entry\"\xbc\x03\n" +
+	"\x05entry\x18\x02 \x01(\v2\x12.rill.v1.TreeEntryR\x05entry\"\xbb\x04\n" +
 	"\x06Intent\x12\x12\n" +
 	"\x04name\x18\f \x01(\tR\x04name\x12\x12\n" +
 	"\x04etag\x18\r \x01(\tR\x04etag\x12\x0e\n" +
@@ -4780,9 +4994,36 @@ const file_rill_v1_types_proto_rawDesc = "" +
 	"created_at\x18\n" +
 	" \x01(\x03R\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\v \x01(\x03R\tupdatedAtB\t\n" +
+	"updated_at\x18\v \x01(\x03R\tupdatedAt\x12*\n" +
+	"\x05scope\x18\x0e \x01(\v2\x14.rill.v1.IntentScopeR\x05scope\x12\x1a\n" +
+	"\brevision\x18\x0f \x01(\rR\brevision\x125\n" +
+	"\tapprovals\x18\x10 \x03(\v2\x17.rill.v1.IntentApprovalR\tapprovalsB\t\n" +
 	"\a_parentB\x10\n" +
-	"\x0e_risk_override\"\xa2\x01\n" +
+	"\x0e_risk_override\"\xfe\x03\n" +
+	"\vIntentScope\x12\x14\n" +
+	"\x05paths\x18\x01 \x03(\tR\x05paths\x12!\n" +
+	"\fforbid_paths\x18\x02 \x03(\tR\vforbidPaths\x124\n" +
+	"\x14max_files_per_change\x18\x03 \x01(\rH\x00R\x11maxFilesPerChange\x88\x01\x01\x12$\n" +
+	"\vmax_changes\x18\x04 \x01(\rH\x01R\n" +
+	"maxChanges\x88\x01\x01\x12\x1d\n" +
+	"\aexpires\x18\x05 \x01(\x03H\x02R\aexpires\x88\x01\x01\x12&\n" +
+	"\fagent_quorum\x18\x06 \x01(\rH\x03R\vagentQuorum\x88\x01\x01\x127\n" +
+	"\x15human_sample_permille\x18\a \x01(\rH\x04R\x13humanSamplePermille\x88\x01\x01\x12+\n" +
+	"\x0fchanges_per_day\x18\b \x01(\rH\x05R\rchangesPerDay\x88\x01\x01\x12'\n" +
+	"\rlands_per_day\x18\t \x01(\rH\x06R\vlandsPerDay\x88\x01\x01B\x17\n" +
+	"\x15_max_files_per_changeB\x0e\n" +
+	"\f_max_changesB\n" +
+	"\n" +
+	"\b_expiresB\x0f\n" +
+	"\r_agent_quorumB\x18\n" +
+	"\x16_human_sample_permilleB\x12\n" +
+	"\x10_changes_per_dayB\x10\n" +
+	"\x0e_lands_per_day\"t\n" +
+	"\x0eIntentApproval\x12\"\n" +
+	"\x02by\x18\x01 \x01(\v2\x12.rill.v1.PrincipalR\x02by\x12\x0e\n" +
+	"\x02at\x18\x02 \x01(\x03R\x02at\x12\x1a\n" +
+	"\brevision\x18\x03 \x01(\rR\brevision\x12\x12\n" +
+	"\x04owns\x18\x04 \x03(\tR\x04owns\"\xa2\x01\n" +
 	"\x05Label\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
 	"\x03min\x18\x02 \x01(\x05R\x03min\x12\x10\n" +
@@ -5067,7 +5308,7 @@ func file_rill_v1_types_proto_rawDescGZIP() []byte {
 }
 
 var file_rill_v1_types_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
-var file_rill_v1_types_proto_msgTypes = make([]protoimpl.MessageInfo, 60)
+var file_rill_v1_types_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
 var file_rill_v1_types_proto_goTypes = []any{
 	(ObjectKind)(0),                 // 0: rill.v1.ObjectKind
 	(PrincipalKind)(0),              // 1: rill.v1.PrincipalKind
@@ -5097,132 +5338,137 @@ var file_rill_v1_types_proto_goTypes = []any{
 	(*Tree)(nil),                    // 25: rill.v1.Tree
 	(*NamedTreeEntry)(nil),          // 26: rill.v1.NamedTreeEntry
 	(*Intent)(nil),                  // 27: rill.v1.Intent
-	(*Label)(nil),                   // 28: rill.v1.Label
-	(*LabelVote)(nil),               // 29: rill.v1.LabelVote
-	(*ThreadAnchor)(nil),            // 30: rill.v1.ThreadAnchor
-	(*Comment)(nil),                 // 31: rill.v1.Comment
-	(*Thread)(nil),                  // 32: rill.v1.Thread
-	(*ReviewState)(nil),             // 33: rill.v1.ReviewState
-	(*SparseProfile)(nil),           // 34: rill.v1.SparseProfile
-	(*Workspace)(nil),               // 35: rill.v1.Workspace
-	(*OperationKind)(nil),           // 36: rill.v1.OperationKind
-	(*WorkspaceOperation)(nil),      // 37: rill.v1.WorkspaceOperation
-	(*Ref)(nil),                     // 38: rill.v1.Ref
-	(*Landing)(nil),                 // 39: rill.v1.Landing
-	(*DiffLine)(nil),                // 40: rill.v1.DiffLine
-	(*DiffHunk)(nil),                // 41: rill.v1.DiffHunk
-	(*FileDiff)(nil),                // 42: rill.v1.FileDiff
-	(*Repo)(nil),                    // 43: rill.v1.Repo
-	(*Org)(nil),                     // 44: rill.v1.Org
-	nil,                             // 45: rill.v1.Provenance.ExtraEntry
-	(*FileChange_Set)(nil),          // 46: rill.v1.FileChange.Set
-	(*FileChange_Delete)(nil),       // 47: rill.v1.FileChange.Delete
-	(*SubtreeChange_Copy)(nil),      // 48: rill.v1.SubtreeChange.Copy
-	(*SubtreeChange_Delete)(nil),    // 49: rill.v1.SubtreeChange.Delete
-	nil,                             // 50: rill.v1.ChangeVersion.SubtreeChangesEntry
-	nil,                             // 51: rill.v1.ChangeVersion.FileChangesEntry
-	nil,                             // 52: rill.v1.ChangeVersion.ExtraEntry
-	(*TreeEntry_File)(nil),          // 53: rill.v1.TreeEntry.File
-	(*TreeEntry_Dir)(nil),           // 54: rill.v1.TreeEntry.Dir
-	nil,                             // 55: rill.v1.Tree.EntriesEntry
-	(*ThreadAnchor_Change)(nil),     // 56: rill.v1.ThreadAnchor.Change
-	(*ThreadAnchor_Lines)(nil),      // 57: rill.v1.ThreadAnchor.Lines
-	(*ThreadAnchor_File)(nil),       // 58: rill.v1.ThreadAnchor.File
-	nil,                             // 59: rill.v1.ReviewState.ExtraEntry
-	(*OperationKind_Create)(nil),    // 60: rill.v1.OperationKind.Create
-	(*OperationKind_Snapshot)(nil),  // 61: rill.v1.OperationKind.Snapshot
-	(*OperationKind_NewChange)(nil), // 62: rill.v1.OperationKind.NewChange
-	(*OperationKind_Describe)(nil),  // 63: rill.v1.OperationKind.Describe
-	(*OperationKind_Rebase)(nil),    // 64: rill.v1.OperationKind.Rebase
-	(*OperationKind_Resolve)(nil),   // 65: rill.v1.OperationKind.Resolve
-	(*OperationKind_SetSparse)(nil), // 66: rill.v1.OperationKind.SetSparse
-	(*OperationKind_Handoff)(nil),   // 67: rill.v1.OperationKind.Handoff
-	(*OperationKind_Undo)(nil),      // 68: rill.v1.OperationKind.Undo
-	(*OperationKind_Other)(nil),     // 69: rill.v1.OperationKind.Other
+	(*IntentScope)(nil),             // 28: rill.v1.IntentScope
+	(*IntentApproval)(nil),          // 29: rill.v1.IntentApproval
+	(*Label)(nil),                   // 30: rill.v1.Label
+	(*LabelVote)(nil),               // 31: rill.v1.LabelVote
+	(*ThreadAnchor)(nil),            // 32: rill.v1.ThreadAnchor
+	(*Comment)(nil),                 // 33: rill.v1.Comment
+	(*Thread)(nil),                  // 34: rill.v1.Thread
+	(*ReviewState)(nil),             // 35: rill.v1.ReviewState
+	(*SparseProfile)(nil),           // 36: rill.v1.SparseProfile
+	(*Workspace)(nil),               // 37: rill.v1.Workspace
+	(*OperationKind)(nil),           // 38: rill.v1.OperationKind
+	(*WorkspaceOperation)(nil),      // 39: rill.v1.WorkspaceOperation
+	(*Ref)(nil),                     // 40: rill.v1.Ref
+	(*Landing)(nil),                 // 41: rill.v1.Landing
+	(*DiffLine)(nil),                // 42: rill.v1.DiffLine
+	(*DiffHunk)(nil),                // 43: rill.v1.DiffHunk
+	(*FileDiff)(nil),                // 44: rill.v1.FileDiff
+	(*Repo)(nil),                    // 45: rill.v1.Repo
+	(*Org)(nil),                     // 46: rill.v1.Org
+	nil,                             // 47: rill.v1.Provenance.ExtraEntry
+	(*FileChange_Set)(nil),          // 48: rill.v1.FileChange.Set
+	(*FileChange_Delete)(nil),       // 49: rill.v1.FileChange.Delete
+	(*SubtreeChange_Copy)(nil),      // 50: rill.v1.SubtreeChange.Copy
+	(*SubtreeChange_Delete)(nil),    // 51: rill.v1.SubtreeChange.Delete
+	nil,                             // 52: rill.v1.ChangeVersion.SubtreeChangesEntry
+	nil,                             // 53: rill.v1.ChangeVersion.FileChangesEntry
+	nil,                             // 54: rill.v1.ChangeVersion.ExtraEntry
+	(*TreeEntry_File)(nil),          // 55: rill.v1.TreeEntry.File
+	(*TreeEntry_Dir)(nil),           // 56: rill.v1.TreeEntry.Dir
+	nil,                             // 57: rill.v1.Tree.EntriesEntry
+	(*ThreadAnchor_Change)(nil),     // 58: rill.v1.ThreadAnchor.Change
+	(*ThreadAnchor_Lines)(nil),      // 59: rill.v1.ThreadAnchor.Lines
+	(*ThreadAnchor_File)(nil),       // 60: rill.v1.ThreadAnchor.File
+	nil,                             // 61: rill.v1.ReviewState.ExtraEntry
+	(*OperationKind_Create)(nil),    // 62: rill.v1.OperationKind.Create
+	(*OperationKind_Snapshot)(nil),  // 63: rill.v1.OperationKind.Snapshot
+	(*OperationKind_NewChange)(nil), // 64: rill.v1.OperationKind.NewChange
+	(*OperationKind_Describe)(nil),  // 65: rill.v1.OperationKind.Describe
+	(*OperationKind_Rebase)(nil),    // 66: rill.v1.OperationKind.Rebase
+	(*OperationKind_Resolve)(nil),   // 67: rill.v1.OperationKind.Resolve
+	(*OperationKind_SetSparse)(nil), // 68: rill.v1.OperationKind.SetSparse
+	(*OperationKind_Handoff)(nil),   // 69: rill.v1.OperationKind.Handoff
+	(*OperationKind_Undo)(nil),      // 70: rill.v1.OperationKind.Undo
+	(*OperationKind_Other)(nil),     // 71: rill.v1.OperationKind.Other
 }
 var file_rill_v1_types_proto_depIdxs = []int32{
 	1,  // 0: rill.v1.Principal.kind:type_name -> rill.v1.PrincipalKind
 	11, // 1: rill.v1.Provenance.sponsor:type_name -> rill.v1.Principal
-	45, // 2: rill.v1.Provenance.extra:type_name -> rill.v1.Provenance.ExtraEntry
+	47, // 2: rill.v1.Provenance.extra:type_name -> rill.v1.Provenance.ExtraEntry
 	14, // 3: rill.v1.ContentRef.blob:type_name -> rill.v1.BlobRef
 	14, // 4: rill.v1.ContentRef.chunked:type_name -> rill.v1.BlobRef
 	13, // 5: rill.v1.FileState.content:type_name -> rill.v1.ContentRef
 	2,  // 6: rill.v1.FileState.kind:type_name -> rill.v1.FileKind
 	15, // 7: rill.v1.MergeTerms.terms:type_name -> rill.v1.FileState
-	46, // 8: rill.v1.FileChange.set:type_name -> rill.v1.FileChange.Set
-	47, // 9: rill.v1.FileChange.delete:type_name -> rill.v1.FileChange.Delete
+	48, // 8: rill.v1.FileChange.set:type_name -> rill.v1.FileChange.Set
+	49, // 9: rill.v1.FileChange.delete:type_name -> rill.v1.FileChange.Delete
 	16, // 10: rill.v1.FileChange.conflict:type_name -> rill.v1.MergeTerms
-	48, // 11: rill.v1.SubtreeChange.copy:type_name -> rill.v1.SubtreeChange.Copy
-	49, // 12: rill.v1.SubtreeChange.delete:type_name -> rill.v1.SubtreeChange.Delete
-	50, // 13: rill.v1.ChangeVersion.subtree_changes:type_name -> rill.v1.ChangeVersion.SubtreeChangesEntry
-	51, // 14: rill.v1.ChangeVersion.file_changes:type_name -> rill.v1.ChangeVersion.FileChangesEntry
+	50, // 11: rill.v1.SubtreeChange.copy:type_name -> rill.v1.SubtreeChange.Copy
+	51, // 12: rill.v1.SubtreeChange.delete:type_name -> rill.v1.SubtreeChange.Delete
+	52, // 13: rill.v1.ChangeVersion.subtree_changes:type_name -> rill.v1.ChangeVersion.SubtreeChangesEntry
+	53, // 14: rill.v1.ChangeVersion.file_changes:type_name -> rill.v1.ChangeVersion.FileChangesEntry
 	11, // 15: rill.v1.ChangeVersion.author:type_name -> rill.v1.Principal
 	12, // 16: rill.v1.ChangeVersion.provenance:type_name -> rill.v1.Provenance
-	52, // 17: rill.v1.ChangeVersion.extra:type_name -> rill.v1.ChangeVersion.ExtraEntry
+	54, // 17: rill.v1.ChangeVersion.extra:type_name -> rill.v1.ChangeVersion.ExtraEntry
 	11, // 18: rill.v1.ChangeInfo.author:type_name -> rill.v1.Principal
 	12, // 19: rill.v1.ChangeInfo.provenance:type_name -> rill.v1.Provenance
 	11, // 20: rill.v1.Signature.signer:type_name -> rill.v1.Principal
-	53, // 21: rill.v1.TreeEntry.file:type_name -> rill.v1.TreeEntry.File
-	54, // 22: rill.v1.TreeEntry.dir:type_name -> rill.v1.TreeEntry.Dir
-	55, // 23: rill.v1.Tree.entries:type_name -> rill.v1.Tree.EntriesEntry
+	55, // 21: rill.v1.TreeEntry.file:type_name -> rill.v1.TreeEntry.File
+	56, // 22: rill.v1.TreeEntry.dir:type_name -> rill.v1.TreeEntry.Dir
+	57, // 23: rill.v1.Tree.entries:type_name -> rill.v1.Tree.EntriesEntry
 	24, // 24: rill.v1.NamedTreeEntry.entry:type_name -> rill.v1.TreeEntry
 	4,  // 25: rill.v1.Intent.kind:type_name -> rill.v1.IntentKind
 	5,  // 26: rill.v1.Intent.status:type_name -> rill.v1.IntentStatus
 	11, // 27: rill.v1.Intent.owner:type_name -> rill.v1.Principal
 	3,  // 28: rill.v1.Intent.risk_override:type_name -> rill.v1.RiskClass
-	11, // 29: rill.v1.LabelVote.voter:type_name -> rill.v1.Principal
-	56, // 30: rill.v1.ThreadAnchor.change:type_name -> rill.v1.ThreadAnchor.Change
-	57, // 31: rill.v1.ThreadAnchor.lines:type_name -> rill.v1.ThreadAnchor.Lines
-	58, // 32: rill.v1.ThreadAnchor.file:type_name -> rill.v1.ThreadAnchor.File
-	11, // 33: rill.v1.Comment.author:type_name -> rill.v1.Principal
-	6,  // 34: rill.v1.Comment.category:type_name -> rill.v1.CommentCategory
-	30, // 35: rill.v1.Thread.anchor:type_name -> rill.v1.ThreadAnchor
-	31, // 36: rill.v1.Thread.comments:type_name -> rill.v1.Comment
-	11, // 37: rill.v1.Thread.to:type_name -> rill.v1.Principal
-	7,  // 38: rill.v1.ReviewState.status:type_name -> rill.v1.ReviewStatus
-	11, // 39: rill.v1.ReviewState.owner:type_name -> rill.v1.Principal
-	29, // 40: rill.v1.ReviewState.votes:type_name -> rill.v1.LabelVote
-	32, // 41: rill.v1.ReviewState.threads:type_name -> rill.v1.Thread
-	3,  // 42: rill.v1.ReviewState.risk:type_name -> rill.v1.RiskClass
-	59, // 43: rill.v1.ReviewState.extra:type_name -> rill.v1.ReviewState.ExtraEntry
-	11, // 44: rill.v1.Workspace.owner:type_name -> rill.v1.Principal
-	34, // 45: rill.v1.Workspace.sparse:type_name -> rill.v1.SparseProfile
-	60, // 46: rill.v1.OperationKind.create:type_name -> rill.v1.OperationKind.Create
-	61, // 47: rill.v1.OperationKind.snapshot:type_name -> rill.v1.OperationKind.Snapshot
-	62, // 48: rill.v1.OperationKind.new_change:type_name -> rill.v1.OperationKind.NewChange
-	63, // 49: rill.v1.OperationKind.describe:type_name -> rill.v1.OperationKind.Describe
-	64, // 50: rill.v1.OperationKind.rebase:type_name -> rill.v1.OperationKind.Rebase
-	65, // 51: rill.v1.OperationKind.resolve:type_name -> rill.v1.OperationKind.Resolve
-	66, // 52: rill.v1.OperationKind.set_sparse:type_name -> rill.v1.OperationKind.SetSparse
-	67, // 53: rill.v1.OperationKind.handoff:type_name -> rill.v1.OperationKind.Handoff
-	68, // 54: rill.v1.OperationKind.undo:type_name -> rill.v1.OperationKind.Undo
-	69, // 55: rill.v1.OperationKind.other:type_name -> rill.v1.OperationKind.Other
-	11, // 56: rill.v1.WorkspaceOperation.actor:type_name -> rill.v1.Principal
-	36, // 57: rill.v1.WorkspaceOperation.kind:type_name -> rill.v1.OperationKind
-	35, // 58: rill.v1.WorkspaceOperation.resulting:type_name -> rill.v1.Workspace
-	11, // 59: rill.v1.Landing.landed_by:type_name -> rill.v1.Principal
-	9,  // 60: rill.v1.DiffLine.op:type_name -> rill.v1.DiffLine.Op
-	40, // 61: rill.v1.DiffHunk.lines:type_name -> rill.v1.DiffLine
-	15, // 62: rill.v1.FileDiff.before:type_name -> rill.v1.FileState
-	15, // 63: rill.v1.FileDiff.after:type_name -> rill.v1.FileState
-	41, // 64: rill.v1.FileDiff.hunks:type_name -> rill.v1.DiffHunk
-	16, // 65: rill.v1.FileDiff.conflict:type_name -> rill.v1.MergeTerms
-	13, // 66: rill.v1.FileChange.Set.content:type_name -> rill.v1.ContentRef
-	2,  // 67: rill.v1.FileChange.Set.kind:type_name -> rill.v1.FileKind
-	17, // 68: rill.v1.FileChange.Set.copy_from:type_name -> rill.v1.CopySource
-	19, // 69: rill.v1.ChangeVersion.SubtreeChangesEntry.value:type_name -> rill.v1.SubtreeChange
-	18, // 70: rill.v1.ChangeVersion.FileChangesEntry.value:type_name -> rill.v1.FileChange
-	13, // 71: rill.v1.TreeEntry.File.content:type_name -> rill.v1.ContentRef
-	2,  // 72: rill.v1.TreeEntry.File.kind:type_name -> rill.v1.FileKind
-	23, // 73: rill.v1.TreeEntry.Dir.summary:type_name -> rill.v1.DirSummary
-	24, // 74: rill.v1.Tree.EntriesEntry.value:type_name -> rill.v1.TreeEntry
-	34, // 75: rill.v1.OperationKind.SetSparse.profile:type_name -> rill.v1.SparseProfile
-	11, // 76: rill.v1.OperationKind.Handoff.to:type_name -> rill.v1.Principal
-	77, // [77:77] is the sub-list for method output_type
-	77, // [77:77] is the sub-list for method input_type
-	77, // [77:77] is the sub-list for extension type_name
-	77, // [77:77] is the sub-list for extension extendee
-	0,  // [0:77] is the sub-list for field type_name
+	28, // 29: rill.v1.Intent.scope:type_name -> rill.v1.IntentScope
+	29, // 30: rill.v1.Intent.approvals:type_name -> rill.v1.IntentApproval
+	11, // 31: rill.v1.IntentApproval.by:type_name -> rill.v1.Principal
+	11, // 32: rill.v1.LabelVote.voter:type_name -> rill.v1.Principal
+	58, // 33: rill.v1.ThreadAnchor.change:type_name -> rill.v1.ThreadAnchor.Change
+	59, // 34: rill.v1.ThreadAnchor.lines:type_name -> rill.v1.ThreadAnchor.Lines
+	60, // 35: rill.v1.ThreadAnchor.file:type_name -> rill.v1.ThreadAnchor.File
+	11, // 36: rill.v1.Comment.author:type_name -> rill.v1.Principal
+	6,  // 37: rill.v1.Comment.category:type_name -> rill.v1.CommentCategory
+	32, // 38: rill.v1.Thread.anchor:type_name -> rill.v1.ThreadAnchor
+	33, // 39: rill.v1.Thread.comments:type_name -> rill.v1.Comment
+	11, // 40: rill.v1.Thread.to:type_name -> rill.v1.Principal
+	7,  // 41: rill.v1.ReviewState.status:type_name -> rill.v1.ReviewStatus
+	11, // 42: rill.v1.ReviewState.owner:type_name -> rill.v1.Principal
+	31, // 43: rill.v1.ReviewState.votes:type_name -> rill.v1.LabelVote
+	34, // 44: rill.v1.ReviewState.threads:type_name -> rill.v1.Thread
+	3,  // 45: rill.v1.ReviewState.risk:type_name -> rill.v1.RiskClass
+	61, // 46: rill.v1.ReviewState.extra:type_name -> rill.v1.ReviewState.ExtraEntry
+	11, // 47: rill.v1.Workspace.owner:type_name -> rill.v1.Principal
+	36, // 48: rill.v1.Workspace.sparse:type_name -> rill.v1.SparseProfile
+	62, // 49: rill.v1.OperationKind.create:type_name -> rill.v1.OperationKind.Create
+	63, // 50: rill.v1.OperationKind.snapshot:type_name -> rill.v1.OperationKind.Snapshot
+	64, // 51: rill.v1.OperationKind.new_change:type_name -> rill.v1.OperationKind.NewChange
+	65, // 52: rill.v1.OperationKind.describe:type_name -> rill.v1.OperationKind.Describe
+	66, // 53: rill.v1.OperationKind.rebase:type_name -> rill.v1.OperationKind.Rebase
+	67, // 54: rill.v1.OperationKind.resolve:type_name -> rill.v1.OperationKind.Resolve
+	68, // 55: rill.v1.OperationKind.set_sparse:type_name -> rill.v1.OperationKind.SetSparse
+	69, // 56: rill.v1.OperationKind.handoff:type_name -> rill.v1.OperationKind.Handoff
+	70, // 57: rill.v1.OperationKind.undo:type_name -> rill.v1.OperationKind.Undo
+	71, // 58: rill.v1.OperationKind.other:type_name -> rill.v1.OperationKind.Other
+	11, // 59: rill.v1.WorkspaceOperation.actor:type_name -> rill.v1.Principal
+	38, // 60: rill.v1.WorkspaceOperation.kind:type_name -> rill.v1.OperationKind
+	37, // 61: rill.v1.WorkspaceOperation.resulting:type_name -> rill.v1.Workspace
+	11, // 62: rill.v1.Landing.landed_by:type_name -> rill.v1.Principal
+	9,  // 63: rill.v1.DiffLine.op:type_name -> rill.v1.DiffLine.Op
+	42, // 64: rill.v1.DiffHunk.lines:type_name -> rill.v1.DiffLine
+	15, // 65: rill.v1.FileDiff.before:type_name -> rill.v1.FileState
+	15, // 66: rill.v1.FileDiff.after:type_name -> rill.v1.FileState
+	43, // 67: rill.v1.FileDiff.hunks:type_name -> rill.v1.DiffHunk
+	16, // 68: rill.v1.FileDiff.conflict:type_name -> rill.v1.MergeTerms
+	13, // 69: rill.v1.FileChange.Set.content:type_name -> rill.v1.ContentRef
+	2,  // 70: rill.v1.FileChange.Set.kind:type_name -> rill.v1.FileKind
+	17, // 71: rill.v1.FileChange.Set.copy_from:type_name -> rill.v1.CopySource
+	19, // 72: rill.v1.ChangeVersion.SubtreeChangesEntry.value:type_name -> rill.v1.SubtreeChange
+	18, // 73: rill.v1.ChangeVersion.FileChangesEntry.value:type_name -> rill.v1.FileChange
+	13, // 74: rill.v1.TreeEntry.File.content:type_name -> rill.v1.ContentRef
+	2,  // 75: rill.v1.TreeEntry.File.kind:type_name -> rill.v1.FileKind
+	23, // 76: rill.v1.TreeEntry.Dir.summary:type_name -> rill.v1.DirSummary
+	24, // 77: rill.v1.Tree.EntriesEntry.value:type_name -> rill.v1.TreeEntry
+	36, // 78: rill.v1.OperationKind.SetSparse.profile:type_name -> rill.v1.SparseProfile
+	11, // 79: rill.v1.OperationKind.Handoff.to:type_name -> rill.v1.Principal
+	80, // [80:80] is the sub-list for method output_type
+	80, // [80:80] is the sub-list for method input_type
+	80, // [80:80] is the sub-list for extension type_name
+	80, // [80:80] is the sub-list for extension extendee
+	0,  // [0:80] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_types_proto_init() }
@@ -5254,17 +5500,18 @@ func file_rill_v1_types_proto_init() {
 		(*TreeEntry_Dir_)(nil),
 	}
 	file_rill_v1_types_proto_msgTypes[17].OneofWrappers = []any{}
-	file_rill_v1_types_proto_msgTypes[19].OneofWrappers = []any{}
-	file_rill_v1_types_proto_msgTypes[20].OneofWrappers = []any{
+	file_rill_v1_types_proto_msgTypes[18].OneofWrappers = []any{}
+	file_rill_v1_types_proto_msgTypes[21].OneofWrappers = []any{}
+	file_rill_v1_types_proto_msgTypes[22].OneofWrappers = []any{
 		(*ThreadAnchor_Change_)(nil),
 		(*ThreadAnchor_Lines_)(nil),
 		(*ThreadAnchor_File_)(nil),
 	}
-	file_rill_v1_types_proto_msgTypes[21].OneofWrappers = []any{}
-	file_rill_v1_types_proto_msgTypes[22].OneofWrappers = []any{}
 	file_rill_v1_types_proto_msgTypes[23].OneofWrappers = []any{}
+	file_rill_v1_types_proto_msgTypes[24].OneofWrappers = []any{}
 	file_rill_v1_types_proto_msgTypes[25].OneofWrappers = []any{}
-	file_rill_v1_types_proto_msgTypes[26].OneofWrappers = []any{
+	file_rill_v1_types_proto_msgTypes[27].OneofWrappers = []any{}
+	file_rill_v1_types_proto_msgTypes[28].OneofWrappers = []any{
 		(*OperationKind_Create_)(nil),
 		(*OperationKind_Snapshot_)(nil),
 		(*OperationKind_NewChange_)(nil),
@@ -5276,20 +5523,20 @@ func file_rill_v1_types_proto_init() {
 		(*OperationKind_Undo_)(nil),
 		(*OperationKind_Other_)(nil),
 	}
-	file_rill_v1_types_proto_msgTypes[27].OneofWrappers = []any{}
-	file_rill_v1_types_proto_msgTypes[28].OneofWrappers = []any{}
 	file_rill_v1_types_proto_msgTypes[29].OneofWrappers = []any{}
-	file_rill_v1_types_proto_msgTypes[32].OneofWrappers = []any{}
-	file_rill_v1_types_proto_msgTypes[33].OneofWrappers = []any{}
+	file_rill_v1_types_proto_msgTypes[30].OneofWrappers = []any{}
+	file_rill_v1_types_proto_msgTypes[31].OneofWrappers = []any{}
 	file_rill_v1_types_proto_msgTypes[34].OneofWrappers = []any{}
+	file_rill_v1_types_proto_msgTypes[35].OneofWrappers = []any{}
 	file_rill_v1_types_proto_msgTypes[36].OneofWrappers = []any{}
+	file_rill_v1_types_proto_msgTypes[38].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_types_proto_rawDesc), len(file_rill_v1_types_proto_rawDesc)),
 			NumEnums:      10,
-			NumMessages:   60,
+			NumMessages:   62,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

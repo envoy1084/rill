@@ -296,6 +296,43 @@ A task, spec, bug or plan that changes link to.
 | `changes` | [bytes](#bytes) | repeated |  |
 | `created_at` | [int64](#int64) |  |  |
 | `updated_at` | [int64](#int64) |  |  |
+| `scope` | [IntentScope](#rill-v1-IntentScope) |  | What changes under the intent may do once approved; unset for none. |
+| `revision` | [uint32](#uint32) |  | Bumped whenever the scope changes; approvals are of one revision. |
+| `approvals` | [IntentApproval](#rill-v1-IntentApproval) | repeated |  |
+
+
+<a name="rill-v1-IntentApproval"></a>
+
+### IntentApproval
+
+One approval of an intent's scope.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `by` | [Principal](#rill-v1-Principal) |  |  |
+| `at` | [int64](#int64) |  |  |
+| `revision` | [uint32](#uint32) |  | The scope revision approved. |
+| `owns` | [string](#string) | repeated | The scope directories the approver owns. |
+
+
+<a name="rill-v1-IntentScope"></a>
+
+### IntentScope
+
+The bounds of an approved intent: changes inside them inherit its
+approval, anything outside falls back to normal review.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `paths` | [string](#string) | repeated | Globs every touched path must match. |
+| `forbid_paths` | [string](#string) | repeated | Globs no touched path may match. |
+| `max_files_per_change` | [uint32](#uint32) | optional |  |
+| `max_changes` | [uint32](#uint32) | optional | Changes linked to the intent, at most. |
+| `expires` | [int64](#int64) | optional |  |
+| `agent_quorum` | [uint32](#uint32) | optional | Independent agent approvals each change needs. |
+| `human_sample_permille` | [uint32](#uint32) | optional | Share of landed changes sampled for human audit, in thousandths. |
+| `changes_per_day` | [uint32](#uint32) | optional | Changes linked per UTC day, at most. |
+| `lands_per_day` | [uint32](#uint32) | optional | Changes landed per UTC day, at most. |
 
 
 <a name="rill-v1-Label"></a>
@@ -3987,11 +4024,38 @@ Intents and the changes linked to them.
 | --- | --- | --- | --- |
 | `CreateIntent` | [CreateIntentRequest](#rill-v1-CreateIntentRequest) | [CreateIntentResponse](#rill-v1-CreateIntentResponse) | Record a new intent. |
 | `GetIntent` | [GetIntentRequest](#rill-v1-GetIntentRequest) | [GetIntentResponse](#rill-v1-GetIntentResponse) | One intent. |
-| `UpdateIntent` | [UpdateIntentRequest](#rill-v1-UpdateIntentRequest) | [UpdateIntentResponse](#rill-v1-UpdateIntentResponse) | Change an intent's title, body, status, parent or risk override. |
+| `UpdateIntent` | [UpdateIntentRequest](#rill-v1-UpdateIntentRequest) | [UpdateIntentResponse](#rill-v1-UpdateIntentResponse) | Change an intent's title, body, status, parent, risk override or scope. Changing the scope starts a new revision, which needs approving. |
 | `ListIntents` | [ListIntentsRequest](#rill-v1-ListIntentsRequest) | [ListIntentsResponse](#rill-v1-ListIntentsResponse) | A repository's intents, most recently updated first. |
 | `LinkChange` | [LinkChangeRequest](#rill-v1-LinkChangeRequest) | [LinkChangeResponse](#rill-v1-LinkChangeResponse) | Link a change to an intent, on both the intent and the change's review. |
 | `FindSimilarIntents` | [FindSimilarIntentsRequest](#rill-v1-FindSimilarIntentsRequest) | [FindSimilarIntentsResponse](#rill-v1-FindSimilarIntentsResponse) | Intents whose words overlap a title and body, best first. |
+| `ApproveIntent` | [ApproveIntentRequest](#rill-v1-ApproveIntentRequest) | [ApproveIntentResponse](#rill-v1-ApproveIntentResponse) | Approve the intent's current scope revision, for the scope directories the caller owns. |
+| `RevokeIntentApproval` | [RevokeIntentApprovalRequest](#rill-v1-RevokeIntentApprovalRequest) | [RevokeIntentApprovalResponse](#rill-v1-RevokeIntentApprovalResponse) | Withdraw the caller's approval. |
+| `ExplainIntentScope` | [ExplainIntentScopeRequest](#rill-v1-ExplainIntentScopeRequest) | [ExplainIntentScopeResponse](#rill-v1-ExplainIntentScopeResponse) | Whether a change's intent is approved and the change inside its scope. |
 
+
+
+<a name="rill-v1-ApproveIntentRequest"></a>
+
+### ApproveIntentRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `name` | [string](#string) |  | `…/intents/{intent}`. Required. |
+| `revision` | [uint32](#uint32) |  | The revision being approved; refused when it is not current. |
+
+
+<a name="rill-v1-ApproveIntentResponse"></a>
+
+### ApproveIntentResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `intent` | [Intent](#rill-v1-Intent) |  |  |
 
 
 <a name="rill-v1-CreateIntentRequest"></a>
@@ -4009,6 +4073,7 @@ Intents and the changes linked to them.
 | `kind` | [IntentKind](#rill-v1-IntentKind) |  |  |
 | `parent_intent` | [string](#string) |  | The parent intent, `…/intents/{intent}`. |
 | `risk_override` | [RiskClass](#rill-v1-RiskClass) | optional |  |
+| `scope` | [IntentScope](#rill-v1-IntentScope) |  | The scope to approve; unset for none. |
 
 
 <a name="rill-v1-CreateIntentResponse"></a>
@@ -4020,6 +4085,32 @@ Intents and the changes linked to them.
 | Field | Type | Label | Description |
 | --- | --- | --- | --- |
 | `intent` | [Intent](#rill-v1-Intent) |  |  |
+
+
+<a name="rill-v1-ExplainIntentScopeRequest"></a>
+
+### ExplainIntentScopeRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `change` | [string](#string) |  | `…/changes/{change}`. Required. |
+
+
+<a name="rill-v1-ExplainIntentScopeResponse"></a>
+
+### ExplainIntentScopeResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `intent` | [string](#string) |  | The linked intent, `…/intents/{intent}`; empty when there is none. |
+| `approved` | [bool](#bool) |  |  |
+| `in_scope` | [bool](#bool) |  |  |
+| `reasons` | [string](#string) | repeated | Why the change is not in scope. |
+| `missing_approvals` | [string](#string) | repeated | Scope directories still short of approvals. |
 
 
 <a name="rill-v1-FindSimilarIntentsRequest"></a>
@@ -4119,6 +4210,29 @@ Intents and the changes linked to them.
 | `next_page_token` | [string](#string) |  |  |
 
 
+<a name="rill-v1-RevokeIntentApprovalRequest"></a>
+
+### RevokeIntentApprovalRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `name` | [string](#string) |  | `…/intents/{intent}`. Required. |
+
+
+<a name="rill-v1-RevokeIntentApprovalResponse"></a>
+
+### RevokeIntentApprovalResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `intent` | [Intent](#rill-v1-Intent) |  |  |
+
+
 <a name="rill-v1-ScoredIntent"></a>
 
 ### ScoredIntent
@@ -4141,7 +4255,7 @@ Intents and the changes linked to them.
 | --- | --- | --- | --- |
 | `request_id` | [string](#string) |  |  |
 | `intent` | [Intent](#rill-v1-Intent) |  | The intent, by `name`, with the fields to change. Required. |
-| `update_mask` | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | Which of `title`, `body`, `status`, `parent` and `risk_override` to change; a masked field left empty is cleared. Required. |
+| `update_mask` | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | Which of `title`, `body`, `status`, `parent`, `risk_override` and `scope` to change; a masked field left empty is cleared. Required. |
 | `etag` | [string](#string) |  | The etag read; empty means no condition. |
 
 

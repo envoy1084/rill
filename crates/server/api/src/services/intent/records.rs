@@ -4,7 +4,7 @@ use rill_proto::convert::{
     intent_kind_from_proto, intent_status_from_proto, opt_id_from_proto, risk_from_proto,
 };
 use rill_proto::rill::v1 as pb;
-use rill_types::{Intent, IntentId, IntentKind, IntentStatus, RepoPathBuf, Timestamp};
+use rill_types::{Intent, IntentId, IntentKind, IntentScope, IntentStatus, RepoPathBuf, Timestamp};
 
 use super::IntentSvc;
 use crate::listing::{FieldValue, Filter, Kind, Page, Record};
@@ -14,7 +14,14 @@ use rill_runtime::error::{Error, Result};
 use rill_runtime::state::RepoContext;
 
 /// The fields `UpdateIntent` may change.
-const MASKABLE: &[&str] = &["title", "body", "status", "parent", "risk_override"];
+const MASKABLE: &[&str] = &[
+    "title",
+    "body",
+    "status",
+    "parent",
+    "risk_override",
+    "scope",
+];
 
 /// The wire form of an intent, with its name and etag.
 pub(super) fn intent_proto(ctx: &RepoContext, intent: Intent) -> pb::Intent {
@@ -25,7 +32,7 @@ pub(super) fn intent_proto(ctx: &RepoContext, intent: Intent) -> pb::Intent {
     out
 }
 
-async fn load(opened: &Opened, name: &str) -> Result<Intent> {
+pub(super) async fn load(opened: &Opened, name: &str) -> Result<Intent> {
     let id = names::intent_in(&opened.repo, name)?;
     opened
         .repo
@@ -33,6 +40,36 @@ async fn load(opened: &Opened, name: &str) -> Result<Intent> {
         .get_intent(&id)
         .await?
         .ok_or_else(|| Error::not_found(format!("intent {id}")))
+}
+
+/// A scope from the wire, its globs checked.
+fn checked_scope(scope: pb::IntentScope) -> Result<IntentScope> {
+    let scope = IntentScope::from(scope);
+    rill_policy::intents::validate_scope(&scope).map_err(|e| Error::invalid(e.to_string()))?;
+    Ok(scope)
+}
+
+/// `parent` must exist and must not have `id` among its ancestors.
+async fn check_parent(opened: &Opened, id: IntentId, parent: IntentId) -> Result<()> {
+    let mut at = Some(parent);
+    let mut steps = 0;
+    while let Some(current) = at {
+        if current == id {
+            return Err(Error::invalid("an intent cannot be its own ancestor"));
+        }
+        let record = opened
+            .repo
+            .repo
+            .get_intent(&current)
+            .await?
+            .ok_or_else(|| Error::invalid(format!("parent intent {current} does not exist")))?;
+        at = record.parent;
+        steps += 1;
+        if steps > 1_000 {
+            return Err(Error::invalid("the parent chain is too long"));
+        }
+    }
+    Ok(())
 }
 
 impl IntentSvc {
@@ -57,6 +94,10 @@ impl IntentSvc {
             .risk_override
             .map(|r| risk_from_proto("risk_override", r))
             .transpose()?;
+        if let Some(scope) = req.scope.into_option() {
+            intent.scope = Some(checked_scope(scope)?);
+            intent.revision = 1;
+        }
         opened
             .repo
             .repo
@@ -103,13 +144,14 @@ impl IntentSvc {
                 MASKABLE.join(", ")
             )));
         }
-        let mut intent = load(&opened, &given.name).await?;
+        let loaded = load(&opened, &given.name).await?;
         etag::check(
-            &intent_proto(&opened.repo, intent.clone()).etag,
+            &intent_proto(&opened.repo, loaded.clone()).etag,
             &req.etag,
             "the intent",
         )?;
-        opened.permit().owns_or_admin(&intent.owner).await?;
+        opened.permit().owns_or_admin(&loaded.owner).await?;
+        let mut intent = loaded.clone();
         for path in &mask {
             match path.as_str() {
                 "title" => intent.title = given.title.clone(),
@@ -118,10 +160,19 @@ impl IntentSvc {
                 "parent" => {
                     let parent: Option<IntentId> =
                         opt_id_from_proto("parent", given.parent.as_ref())?;
-                    if parent == Some(intent.id) {
-                        return Err(Error::invalid("an intent cannot be its own parent"));
+                    if let Some(parent) = parent {
+                        check_parent(&opened, intent.id, parent).await?;
                     }
                     intent.parent = parent;
+                }
+                "scope" => {
+                    intent.scope = given
+                        .scope
+                        .clone()
+                        .into_option()
+                        .map(checked_scope)
+                        .transpose()?;
+                    intent.revision += 1;
                 }
                 _ => {
                     intent.risk_override = given
@@ -132,10 +183,11 @@ impl IntentSvc {
             }
         }
         intent.updated_at = Timestamp::now();
+        // Written only if nothing changed since the etag was checked.
         opened
             .repo
             .repo
-            .put_intent(&intent, opened.principal())
+            .put_intent_if(&intent, &loaded, opened.principal())
             .await?;
         Ok(pb::UpdateIntentResponse {
             intent: intent_proto(&opened.repo, intent).into(),

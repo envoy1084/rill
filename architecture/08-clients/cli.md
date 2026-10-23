@@ -46,7 +46,7 @@ Global options work in any position: `--endpoint`, `--token`, `--repo`,
 | Owners | `owners show <path>` (the owner sets covering it), `owners explain [change]` (approvals and escalation per set) |
 | Releases | `release cut <name> [--at SEQ]` (repository owners), `release list`; land on one with `land --onto release/<name>` or `stack land --onto` |
 | Checks | `checks runs [--of-version]`, `checks run <id> [--watch]`, `checks log <run> <step> [--stderr] [--tail]`, `checks artifact <run> <step> <path> [-o]`, `checks nonhermetic`, `checks flaky [--min-score] [--limit]`, `checks history <target>`, `checks quarantine list/add/release` ([checks](../06-services/checks.md)) |
-| Intents | `intent create/list/show/update/link/similar` |
+| Intents | `intent create/list/show/update/link/similar`, `intent scope <id> --path … [--forbid …] [--max-files] [--max-changes] [--expires] [--agent-quorum] [--human-sample] [--changes-per-day] [--lands-per-day]`, `intent approve <id> [--revision]`, `intent revoke <id>`, `intent explain [change]` |
 | Workspaces, refs | `ws create/list/show/handoff/delete`, `ref list/show/set/delete` |
 | Sign-in | `login [--org] [--provider]` (device flow through the org's identity provider), `logout`, `whoami`, `auth token` (an attenuated capability token for scripts) |
 | Agents | `agent register/list/suspend/activate` |

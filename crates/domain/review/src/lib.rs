@@ -18,6 +18,7 @@ mod content;
 pub mod error;
 pub mod evaluate;
 pub mod facts;
+mod intents;
 pub mod lifecycle;
 mod owners;
 pub mod service;

@@ -1,6 +1,6 @@
 //! Intent and risk conversions.
 
-use rill_types::{Intent, IntentKind, IntentStatus, RiskClass};
+use rill_types::{Intent, IntentApproval, IntentKind, IntentScope, IntentStatus, RiskClass};
 
 use crate::convert::primitives::{
     enum_from_proto, id_from_proto, id_to_proto, ids_from_proto, opt_id_from_proto, required,
@@ -123,7 +123,66 @@ impl From<&Intent> for pb::Intent {
             changes: i.changes.iter().map(id_to_proto).collect(),
             created_at: timestamp_to_proto(i.created_at),
             updated_at: timestamp_to_proto(i.updated_at),
+            scope: i.scope.as_ref().map(pb::IntentScope::from).into(),
+            revision: i.revision,
+            approvals: i.approvals.iter().map(pb::IntentApproval::from).collect(),
         }
+    }
+}
+
+impl From<&IntentScope> for pb::IntentScope {
+    fn from(s: &IntentScope) -> Self {
+        pb::IntentScope {
+            paths: s.paths.clone(),
+            forbid_paths: s.forbid_paths.clone(),
+            max_files_per_change: s.max_files_per_change,
+            max_changes: s.max_changes,
+            expires: s.expires.map(timestamp_to_proto),
+            agent_quorum: s.agent_quorum,
+            human_sample_permille: s.human_sample_permille,
+            changes_per_day: s.changes_per_day,
+            lands_per_day: s.lands_per_day,
+        }
+    }
+}
+
+impl From<pb::IntentScope> for IntentScope {
+    fn from(s: pb::IntentScope) -> Self {
+        IntentScope {
+            paths: s.paths,
+            forbid_paths: s.forbid_paths,
+            max_files_per_change: s.max_files_per_change,
+            max_changes: s.max_changes,
+            expires: s.expires.map(timestamp_from_proto),
+            agent_quorum: s.agent_quorum,
+            human_sample_permille: s.human_sample_permille,
+            changes_per_day: s.changes_per_day,
+            lands_per_day: s.lands_per_day,
+        }
+    }
+}
+
+impl From<&IntentApproval> for pb::IntentApproval {
+    fn from(a: &IntentApproval) -> Self {
+        pb::IntentApproval {
+            by: pb::Principal::from(&a.by).into(),
+            at: timestamp_to_proto(a.at),
+            revision: a.revision,
+            owns: a.owns.clone(),
+        }
+    }
+}
+
+impl TryFrom<pb::IntentApproval> for IntentApproval {
+    type Error = ConvertError;
+
+    fn try_from(a: pb::IntentApproval) -> Result<Self> {
+        Ok(IntentApproval {
+            by: required("intent_approval.by", a.by)?.try_into()?,
+            at: timestamp_from_proto(a.at),
+            revision: a.revision,
+            owns: a.owns,
+        })
     }
 }
 
@@ -152,6 +211,13 @@ impl TryFrom<pb::Intent> for Intent {
             changes: ids_from_proto("intent.changes", &i.changes)?,
             created_at: timestamp_from_proto(i.created_at),
             updated_at: timestamp_from_proto(i.updated_at),
+            scope: i.scope.into_option().map(IntentScope::from),
+            revision: i.revision,
+            approvals: i
+                .approvals
+                .into_iter()
+                .map(IntentApproval::try_from)
+                .collect::<Result<_>>()?,
         })
     }
 }
@@ -175,6 +241,21 @@ mod tests {
             changes: vec![ChangeId::derived("t", "a"), ChangeId::derived("t", "b")],
             created_at: Timestamp::from_millis(1),
             updated_at: Timestamp::from_millis(2),
+            scope: Some(IntentScope {
+                paths: vec!["svc/**".into()],
+                forbid_paths: vec!["**/secrets/**".into()],
+                max_files_per_change: Some(40),
+                expires: Some(Timestamp::from_millis(9)),
+                human_sample_permille: Some(50),
+                ..IntentScope::default()
+            }),
+            revision: 3,
+            approvals: vec![IntentApproval {
+                by: Principal::human("bob"),
+                at: Timestamp::from_millis(5),
+                revision: 3,
+                owns: vec!["svc".into()],
+            }],
         };
         assert_eq!(Intent::try_from(pb::Intent::from(&intent)).unwrap(), intent);
 
@@ -182,6 +263,8 @@ mod tests {
         minimal.parent = None;
         minimal.risk_override = None;
         minimal.changes.clear();
+        minimal.scope = None;
+        minimal.approvals.clear();
         assert_eq!(
             Intent::try_from(pb::Intent::from(&minimal)).unwrap(),
             minimal

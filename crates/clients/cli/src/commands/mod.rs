@@ -22,6 +22,7 @@ pub mod history;
 pub mod identity;
 pub mod import;
 pub mod intent;
+pub mod intent_scope;
 pub mod land;
 pub mod log;
 pub mod man;

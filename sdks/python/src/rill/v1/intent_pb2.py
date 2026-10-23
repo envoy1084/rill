@@ -26,7 +26,7 @@ from google.protobuf import field_mask_pb2 as google_dot_protobuf_dot_field__mas
 from rill.v1 import types_pb2 as rill_dot_v1_dot_types__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14rill/v1/intent.proto\x12\x07rill.v1\x1a google/protobuf/field_mask.proto\x1a\x13rill/v1/types.proto\"\x94\x02\n\x13\x43reateIntentRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x16\n\x06parent\x18\x02 \x01(\tR\x06parent\x12\x14\n\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n\x04\x62ody\x18\x04 \x01(\tR\x04\x62ody\x12\'\n\x04kind\x18\x05 \x01(\x0e\x32\x13.rill.v1.IntentKindR\x04kind\x12#\n\rparent_intent\x18\x06 \x01(\tR\x0cparentIntent\x12<\n\rrisk_override\x18\x07 \x01(\x0e\x32\x12.rill.v1.RiskClassH\x00R\x0criskOverride\x88\x01\x01\x42\x10\n\x0e_risk_override\"?\n\x14\x43reateIntentResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"&\n\x10GetIntentRequest\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\"<\n\x11GetIntentResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"\xae\x01\n\x13UpdateIntentRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\'\n\x06intent\x18\x02 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\x12;\n\x0bupdate_mask\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskR\nupdateMask\x12\x12\n\x04\x65tag\x18\x04 \x01(\tR\x04\x65tag\"?\n\x14UpdateIntentResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"\x80\x01\n\x12ListIntentsRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1b\n\tpage_size\x18\x02 \x01(\x05R\x08pageSize\x12\x1d\n\npage_token\x18\x03 \x01(\tR\tpageToken\x12\x16\n\x06\x66ilter\x18\x04 \x01(\tR\x06\x66ilter\"h\n\x13ListIntentsResponse\x12)\n\x07intents\x18\x01 \x03(\x0b\x32\x0f.rill.v1.IntentR\x07intents\x12&\n\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"^\n\x11LinkChangeRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n\x06\x63hange\x18\x03 \x01(\tR\x06\x63hange\"=\n\x12LinkChangeResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"~\n\x19\x46indSimilarIntentsRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x14\n\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n\x04\x62ody\x18\x03 \x01(\tR\x04\x62ody\x12\x1f\n\x0bmax_results\x18\x04 \x01(\x05R\nmaxResults\"M\n\x0cScoredIntent\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\x12\x14\n\x05score\x18\x02 \x01(\x02R\x05score\"M\n\x1a\x46indSimilarIntentsResponse\x12/\n\x07results\x18\x01 \x03(\x0b\x32\x15.rill.v1.ScoredIntentR\x07results2\xdd\x03\n\rIntentService\x12K\n\x0c\x43reateIntent\x12\x1c.rill.v1.CreateIntentRequest\x1a\x1d.rill.v1.CreateIntentResponse\x12\x42\n\tGetIntent\x12\x19.rill.v1.GetIntentRequest\x1a\x1a.rill.v1.GetIntentResponse\x12K\n\x0cUpdateIntent\x12\x1c.rill.v1.UpdateIntentRequest\x1a\x1d.rill.v1.UpdateIntentResponse\x12H\n\x0bListIntents\x12\x1b.rill.v1.ListIntentsRequest\x1a\x1c.rill.v1.ListIntentsResponse\x12\x45\n\nLinkChange\x12\x1a.rill.v1.LinkChangeRequest\x1a\x1b.rill.v1.LinkChangeResponse\x12]\n\x12\x46indSimilarIntents\x12\".rill.v1.FindSimilarIntentsRequest\x1a#.rill.v1.FindSimilarIntentsResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14rill/v1/intent.proto\x12\x07rill.v1\x1a google/protobuf/field_mask.proto\x1a\x13rill/v1/types.proto\"\xc0\x02\n\x13\x43reateIntentRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x16\n\x06parent\x18\x02 \x01(\tR\x06parent\x12\x14\n\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n\x04\x62ody\x18\x04 \x01(\tR\x04\x62ody\x12\'\n\x04kind\x18\x05 \x01(\x0e\x32\x13.rill.v1.IntentKindR\x04kind\x12#\n\rparent_intent\x18\x06 \x01(\tR\x0cparentIntent\x12<\n\rrisk_override\x18\x07 \x01(\x0e\x32\x12.rill.v1.RiskClassH\x00R\x0criskOverride\x88\x01\x01\x12*\n\x05scope\x18\x08 \x01(\x0b\x32\x14.rill.v1.IntentScopeR\x05scopeB\x10\n\x0e_risk_override\"?\n\x14\x43reateIntentResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"&\n\x10GetIntentRequest\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\"<\n\x11GetIntentResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"\xae\x01\n\x13UpdateIntentRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\'\n\x06intent\x18\x02 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\x12;\n\x0bupdate_mask\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskR\nupdateMask\x12\x12\n\x04\x65tag\x18\x04 \x01(\tR\x04\x65tag\"?\n\x14UpdateIntentResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"\x80\x01\n\x12ListIntentsRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1b\n\tpage_size\x18\x02 \x01(\x05R\x08pageSize\x12\x1d\n\npage_token\x18\x03 \x01(\tR\tpageToken\x12\x16\n\x06\x66ilter\x18\x04 \x01(\tR\x06\x66ilter\"h\n\x13ListIntentsResponse\x12)\n\x07intents\x18\x01 \x03(\x0b\x32\x0f.rill.v1.IntentR\x07intents\x12&\n\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"^\n\x11LinkChangeRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n\x06\x63hange\x18\x03 \x01(\tR\x06\x63hange\"=\n\x12LinkChangeResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"~\n\x19\x46indSimilarIntentsRequest\x12\x16\n\x06parent\x18\x01 \x01(\tR\x06parent\x12\x14\n\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n\x04\x62ody\x18\x03 \x01(\tR\x04\x62ody\x12\x1f\n\x0bmax_results\x18\x04 \x01(\x05R\nmaxResults\"M\n\x0cScoredIntent\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\x12\x14\n\x05score\x18\x02 \x01(\x02R\x05score\"M\n\x1a\x46indSimilarIntentsResponse\x12/\n\x07results\x18\x01 \x03(\x0b\x32\x15.rill.v1.ScoredIntentR\x07results\"e\n\x14\x41pproveIntentRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n\x08revision\x18\x03 \x01(\rR\x08revision\"@\n\x15\x41pproveIntentResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"P\n\x1bRevokeIntentApprovalRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\"G\n\x1cRevokeIntentApprovalResponse\x12\'\n\x06intent\x18\x01 \x01(\x0b\x32\x0f.rill.v1.IntentR\x06intent\"3\n\x19\x45xplainIntentScopeRequest\x12\x16\n\x06\x63hange\x18\x01 \x01(\tR\x06\x63hange\"\xb2\x01\n\x1a\x45xplainIntentScopeResponse\x12\x16\n\x06intent\x18\x01 \x01(\tR\x06intent\x12\x1a\n\x08\x61pproved\x18\x02 \x01(\x08R\x08\x61pproved\x12\x19\n\x08in_scope\x18\x03 \x01(\x08R\x07inScope\x12\x18\n\x07reasons\x18\x04 \x03(\tR\x07reasons\x12+\n\x11missing_approvals\x18\x05 \x03(\tR\x10missingApprovals2\xf1\x05\n\rIntentService\x12K\n\x0c\x43reateIntent\x12\x1c.rill.v1.CreateIntentRequest\x1a\x1d.rill.v1.CreateIntentResponse\x12\x42\n\tGetIntent\x12\x19.rill.v1.GetIntentRequest\x1a\x1a.rill.v1.GetIntentResponse\x12K\n\x0cUpdateIntent\x12\x1c.rill.v1.UpdateIntentRequest\x1a\x1d.rill.v1.UpdateIntentResponse\x12H\n\x0bListIntents\x12\x1b.rill.v1.ListIntentsRequest\x1a\x1c.rill.v1.ListIntentsResponse\x12\x45\n\nLinkChange\x12\x1a.rill.v1.LinkChangeRequest\x1a\x1b.rill.v1.LinkChangeResponse\x12]\n\x12\x46indSimilarIntents\x12\".rill.v1.FindSimilarIntentsRequest\x1a#.rill.v1.FindSimilarIntentsResponse\x12N\n\rApproveIntent\x12\x1d.rill.v1.ApproveIntentRequest\x1a\x1e.rill.v1.ApproveIntentResponse\x12\x63\n\x14RevokeIntentApproval\x12$.rill.v1.RevokeIntentApprovalRequest\x1a%.rill.v1.RevokeIntentApprovalResponse\x12]\n\x12\x45xplainIntentScope\x12\".rill.v1.ExplainIntentScopeRequest\x1a#.rill.v1.ExplainIntentScopeResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,31 +34,43 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'rill.v1.intent_pb2', _globa
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_CREATEINTENTREQUEST']._serialized_start=89
-  _globals['_CREATEINTENTREQUEST']._serialized_end=365
-  _globals['_CREATEINTENTRESPONSE']._serialized_start=367
-  _globals['_CREATEINTENTRESPONSE']._serialized_end=430
-  _globals['_GETINTENTREQUEST']._serialized_start=432
-  _globals['_GETINTENTREQUEST']._serialized_end=470
-  _globals['_GETINTENTRESPONSE']._serialized_start=472
-  _globals['_GETINTENTRESPONSE']._serialized_end=532
-  _globals['_UPDATEINTENTREQUEST']._serialized_start=535
-  _globals['_UPDATEINTENTREQUEST']._serialized_end=709
-  _globals['_UPDATEINTENTRESPONSE']._serialized_start=711
-  _globals['_UPDATEINTENTRESPONSE']._serialized_end=774
-  _globals['_LISTINTENTSREQUEST']._serialized_start=777
-  _globals['_LISTINTENTSREQUEST']._serialized_end=905
-  _globals['_LISTINTENTSRESPONSE']._serialized_start=907
-  _globals['_LISTINTENTSRESPONSE']._serialized_end=1011
-  _globals['_LINKCHANGEREQUEST']._serialized_start=1013
-  _globals['_LINKCHANGEREQUEST']._serialized_end=1107
-  _globals['_LINKCHANGERESPONSE']._serialized_start=1109
-  _globals['_LINKCHANGERESPONSE']._serialized_end=1170
-  _globals['_FINDSIMILARINTENTSREQUEST']._serialized_start=1172
-  _globals['_FINDSIMILARINTENTSREQUEST']._serialized_end=1298
-  _globals['_SCOREDINTENT']._serialized_start=1300
-  _globals['_SCOREDINTENT']._serialized_end=1377
-  _globals['_FINDSIMILARINTENTSRESPONSE']._serialized_start=1379
-  _globals['_FINDSIMILARINTENTSRESPONSE']._serialized_end=1456
-  _globals['_INTENTSERVICE']._serialized_start=1459
-  _globals['_INTENTSERVICE']._serialized_end=1936
+  _globals['_CREATEINTENTREQUEST']._serialized_end=409
+  _globals['_CREATEINTENTRESPONSE']._serialized_start=411
+  _globals['_CREATEINTENTRESPONSE']._serialized_end=474
+  _globals['_GETINTENTREQUEST']._serialized_start=476
+  _globals['_GETINTENTREQUEST']._serialized_end=514
+  _globals['_GETINTENTRESPONSE']._serialized_start=516
+  _globals['_GETINTENTRESPONSE']._serialized_end=576
+  _globals['_UPDATEINTENTREQUEST']._serialized_start=579
+  _globals['_UPDATEINTENTREQUEST']._serialized_end=753
+  _globals['_UPDATEINTENTRESPONSE']._serialized_start=755
+  _globals['_UPDATEINTENTRESPONSE']._serialized_end=818
+  _globals['_LISTINTENTSREQUEST']._serialized_start=821
+  _globals['_LISTINTENTSREQUEST']._serialized_end=949
+  _globals['_LISTINTENTSRESPONSE']._serialized_start=951
+  _globals['_LISTINTENTSRESPONSE']._serialized_end=1055
+  _globals['_LINKCHANGEREQUEST']._serialized_start=1057
+  _globals['_LINKCHANGEREQUEST']._serialized_end=1151
+  _globals['_LINKCHANGERESPONSE']._serialized_start=1153
+  _globals['_LINKCHANGERESPONSE']._serialized_end=1214
+  _globals['_FINDSIMILARINTENTSREQUEST']._serialized_start=1216
+  _globals['_FINDSIMILARINTENTSREQUEST']._serialized_end=1342
+  _globals['_SCOREDINTENT']._serialized_start=1344
+  _globals['_SCOREDINTENT']._serialized_end=1421
+  _globals['_FINDSIMILARINTENTSRESPONSE']._serialized_start=1423
+  _globals['_FINDSIMILARINTENTSRESPONSE']._serialized_end=1500
+  _globals['_APPROVEINTENTREQUEST']._serialized_start=1502
+  _globals['_APPROVEINTENTREQUEST']._serialized_end=1603
+  _globals['_APPROVEINTENTRESPONSE']._serialized_start=1605
+  _globals['_APPROVEINTENTRESPONSE']._serialized_end=1669
+  _globals['_REVOKEINTENTAPPROVALREQUEST']._serialized_start=1671
+  _globals['_REVOKEINTENTAPPROVALREQUEST']._serialized_end=1751
+  _globals['_REVOKEINTENTAPPROVALRESPONSE']._serialized_start=1753
+  _globals['_REVOKEINTENTAPPROVALRESPONSE']._serialized_end=1824
+  _globals['_EXPLAININTENTSCOPEREQUEST']._serialized_start=1826
+  _globals['_EXPLAININTENTSCOPEREQUEST']._serialized_end=1877
+  _globals['_EXPLAININTENTSCOPERESPONSE']._serialized_start=1880
+  _globals['_EXPLAININTENTSCOPERESPONSE']._serialized_end=2058
+  _globals['_INTENTSERVICE']._serialized_start=2061
+  _globals['_INTENTSERVICE']._serialized_end=2814
 # @@protoc_insertion_point(module_scope)

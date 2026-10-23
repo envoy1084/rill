@@ -13,6 +13,7 @@ mod follower;
 mod hooks;
 mod idempotency;
 mod indexer;
+pub mod intents;
 mod leader;
 mod local_exec;
 mod regenerator;

@@ -46,6 +46,8 @@ pub struct NewIntent {
     pub parent: Option<IntentId>,
     /// Owner-set risk override.
     pub risk_override: Option<RiskClass>,
+    /// The scope changes under it may inherit its approval within.
+    pub scope: Option<rill_types::IntentScope>,
 }
 
 impl NewIntent {
@@ -57,7 +59,14 @@ impl NewIntent {
             kind,
             parent: None,
             risk_override: None,
+            scope: None,
         }
+    }
+
+    /// Set the scope.
+    pub fn with_scope(mut self, scope: rill_types::IntentScope) -> Self {
+        self.scope = Some(scope);
+        self
     }
 
     /// Set the body.
@@ -80,6 +89,8 @@ pub struct IntentUpdate {
     pub parent: FieldUpdate<IntentId>,
     /// Risk override change.
     pub risk_override: FieldUpdate<RiskClass>,
+    /// Scope change; a new scope is a new revision, needing approval.
+    pub scope: FieldUpdate<rill_types::IntentScope>,
 }
 
 /// Filters for listing intents.
@@ -157,8 +168,27 @@ impl IntentUpdate {
                 .map(|r| pb::RiskClass::from(*r).into());
             mask.push("risk_override".to_string());
         }
+        if self.scope != FieldUpdate::Keep {
+            intent.scope = self.scope.value().map(pb::IntentScope::from).into();
+            mask.push("scope".to_string());
+        }
         (intent, mask)
     }
+}
+
+/// Whether a change inherits its intent's approval.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IntentScopeExplanation {
+    /// The linked intent, if any.
+    pub intent: Option<rill_types::IntentId>,
+    /// Every scope directory has its owners' approvals.
+    pub approved: bool,
+    /// Approved, and the change inside the scope and its budgets.
+    pub in_scope: bool,
+    /// Why the change is not in scope.
+    pub reasons: Vec<String>,
+    /// Scope directories still short of approvals.
+    pub missing_approvals: Vec<String>,
 }
 
 /// A similarity search hit.

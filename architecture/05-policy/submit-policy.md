@@ -43,7 +43,7 @@ any label by name without the schema listing them.
 | Entity | Attributes |
 | --- | --- |
 | `Rill::Principal` | `kind`, `name` |
-| `Rill::Change` | `risk`, `author_kind`, `intent_kind` (or `none`), `unresolved_threads`, `unresolved_blocking_threads`, `touches_sensitive`, `has_agent_resolution`, `label_names: Set<String>`, `owner_sets`, `owner_sets_missing`, `owners_covered` ([code owners](../04-workflow/ownership.md)); tags of type `VoteSummary` |
+| `Rill::Change` | `risk`, `author_kind`, `intent_kind` (or `none`), `unresolved_threads`, `unresolved_blocking_threads`, `touches_sensitive`, `has_agent_resolution`, `label_names: Set<String>`, `owner_sets`, `owner_sets_missing`, `owners_covered` ([code owners](../04-workflow/ownership.md)), `intent_approved`, `intent_in_scope`, `intent_agent_quorum` ([intents](../04-workflow/intents.md)); tags of type `VoteSummary` |
 | `Rill::VoteSummary` | the eight `VoteSummary` counters, as `Long` |
 
 [`entities.rs`](../../crates/domain/policy/src/submit/entities.rs) builds

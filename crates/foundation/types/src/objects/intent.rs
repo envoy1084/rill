@@ -101,6 +101,47 @@ pub struct Intent {
     pub changes: Vec<ChangeId>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    /// What changes under the intent may do once it is approved.
+    #[serde(default)]
+    pub scope: Option<IntentScope>,
+    /// Bumped whenever the scope changes; approvals are of one revision.
+    #[serde(default)]
+    pub revision: u32,
+    #[serde(default)]
+    pub approvals: Vec<IntentApproval>,
+}
+
+/// The bounds of an approved intent: changes inside them inherit its
+/// approval; anything outside falls back to normal review.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IntentScope {
+    /// Globs every touched path must match.
+    pub paths: Vec<String>,
+    /// Globs no touched path may match.
+    pub forbid_paths: Vec<String>,
+    pub max_files_per_change: Option<u32>,
+    /// Changes linked to the intent, at most.
+    pub max_changes: Option<u32>,
+    pub expires: Option<Timestamp>,
+    /// Independent agent approvals each change needs.
+    pub agent_quorum: Option<u32>,
+    /// Share of landed changes sampled for human audit, in thousandths.
+    pub human_sample_permille: Option<u32>,
+    /// Changes linked per UTC day, at most.
+    pub changes_per_day: Option<u32>,
+    /// Changes landed per UTC day, at most.
+    pub lands_per_day: Option<u32>,
+}
+
+/// One approval of an intent's scope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IntentApproval {
+    pub by: Principal,
+    pub at: Timestamp,
+    /// The scope revision approved.
+    pub revision: u32,
+    /// The scope directories the approver owns, checked when approving.
+    pub owns: Vec<String>,
 }
 
 impl Intent {
@@ -118,6 +159,9 @@ impl Intent {
             changes: Vec::new(),
             created_at: now,
             updated_at: now,
+            scope: None,
+            revision: 0,
+            approvals: Vec::new(),
         }
     }
 }

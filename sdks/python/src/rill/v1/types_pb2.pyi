@@ -402,7 +402,7 @@ class NamedTreeEntry(_message.Message):
     def __init__(self, name: _Optional[str] = ..., entry: _Optional[_Union[TreeEntry, _Mapping]] = ...) -> None: ...
 
 class Intent(_message.Message):
-    __slots__ = ("name", "etag", "id", "title", "body", "kind", "status", "owner", "parent", "risk_override", "changes", "created_at", "updated_at")
+    __slots__ = ("name", "etag", "id", "title", "body", "kind", "status", "owner", "parent", "risk_override", "changes", "created_at", "updated_at", "scope", "revision", "approvals")
     NAME_FIELD_NUMBER: _ClassVar[int]
     ETAG_FIELD_NUMBER: _ClassVar[int]
     ID_FIELD_NUMBER: _ClassVar[int]
@@ -416,6 +416,9 @@ class Intent(_message.Message):
     CHANGES_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    SCOPE_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    APPROVALS_FIELD_NUMBER: _ClassVar[int]
     name: str
     etag: str
     id: bytes
@@ -429,7 +432,44 @@ class Intent(_message.Message):
     changes: _containers.RepeatedScalarFieldContainer[bytes]
     created_at: int
     updated_at: int
-    def __init__(self, name: _Optional[str] = ..., etag: _Optional[str] = ..., id: _Optional[bytes] = ..., title: _Optional[str] = ..., body: _Optional[str] = ..., kind: _Optional[_Union[IntentKind, str]] = ..., status: _Optional[_Union[IntentStatus, str]] = ..., owner: _Optional[_Union[Principal, _Mapping]] = ..., parent: _Optional[bytes] = ..., risk_override: _Optional[_Union[RiskClass, str]] = ..., changes: _Optional[_Iterable[bytes]] = ..., created_at: _Optional[int] = ..., updated_at: _Optional[int] = ...) -> None: ...
+    scope: IntentScope
+    revision: int
+    approvals: _containers.RepeatedCompositeFieldContainer[IntentApproval]
+    def __init__(self, name: _Optional[str] = ..., etag: _Optional[str] = ..., id: _Optional[bytes] = ..., title: _Optional[str] = ..., body: _Optional[str] = ..., kind: _Optional[_Union[IntentKind, str]] = ..., status: _Optional[_Union[IntentStatus, str]] = ..., owner: _Optional[_Union[Principal, _Mapping]] = ..., parent: _Optional[bytes] = ..., risk_override: _Optional[_Union[RiskClass, str]] = ..., changes: _Optional[_Iterable[bytes]] = ..., created_at: _Optional[int] = ..., updated_at: _Optional[int] = ..., scope: _Optional[_Union[IntentScope, _Mapping]] = ..., revision: _Optional[int] = ..., approvals: _Optional[_Iterable[_Union[IntentApproval, _Mapping]]] = ...) -> None: ...
+
+class IntentScope(_message.Message):
+    __slots__ = ("paths", "forbid_paths", "max_files_per_change", "max_changes", "expires", "agent_quorum", "human_sample_permille", "changes_per_day", "lands_per_day")
+    PATHS_FIELD_NUMBER: _ClassVar[int]
+    FORBID_PATHS_FIELD_NUMBER: _ClassVar[int]
+    MAX_FILES_PER_CHANGE_FIELD_NUMBER: _ClassVar[int]
+    MAX_CHANGES_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_FIELD_NUMBER: _ClassVar[int]
+    AGENT_QUORUM_FIELD_NUMBER: _ClassVar[int]
+    HUMAN_SAMPLE_PERMILLE_FIELD_NUMBER: _ClassVar[int]
+    CHANGES_PER_DAY_FIELD_NUMBER: _ClassVar[int]
+    LANDS_PER_DAY_FIELD_NUMBER: _ClassVar[int]
+    paths: _containers.RepeatedScalarFieldContainer[str]
+    forbid_paths: _containers.RepeatedScalarFieldContainer[str]
+    max_files_per_change: int
+    max_changes: int
+    expires: int
+    agent_quorum: int
+    human_sample_permille: int
+    changes_per_day: int
+    lands_per_day: int
+    def __init__(self, paths: _Optional[_Iterable[str]] = ..., forbid_paths: _Optional[_Iterable[str]] = ..., max_files_per_change: _Optional[int] = ..., max_changes: _Optional[int] = ..., expires: _Optional[int] = ..., agent_quorum: _Optional[int] = ..., human_sample_permille: _Optional[int] = ..., changes_per_day: _Optional[int] = ..., lands_per_day: _Optional[int] = ...) -> None: ...
+
+class IntentApproval(_message.Message):
+    __slots__ = ("by", "at", "revision", "owns")
+    BY_FIELD_NUMBER: _ClassVar[int]
+    AT_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    OWNS_FIELD_NUMBER: _ClassVar[int]
+    by: Principal
+    at: int
+    revision: int
+    owns: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, by: _Optional[_Union[Principal, _Mapping]] = ..., at: _Optional[int] = ..., revision: _Optional[int] = ..., owns: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class Label(_message.Message):
     __slots__ = ("name", "min", "max", "copy_on_trivial_rebase", "max_requires_human")

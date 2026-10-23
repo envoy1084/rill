@@ -25,7 +25,7 @@ pub use history::{
     blame_line, change_info, change_version, dir_entry, file_change, land_event, log_page,
     path_history_entry, path_history_page, ref_event, ref_info, repo_info, version_result,
 };
-pub use intent::{intent, scored_intent};
+pub use intent::{intent, intent_scope, intent_scope_explanation, scored_intent};
 pub use lander::{
     bisect_result, landing, revert_result, trunk_status, verification_record, verification_report,
 };

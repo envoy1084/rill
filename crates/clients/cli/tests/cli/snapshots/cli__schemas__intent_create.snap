@@ -27,6 +27,9 @@ expression: doc
     "updated_at": {
       "rfc3339": "[time]",
       "millis": 0
-    }
+    },
+    "scope": null,
+    "revision": 0,
+    "approvals": []
   }
 }

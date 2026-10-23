@@ -86,6 +86,45 @@ impl IntentService for IntentSvc {
         )
     }
 
+    async fn approve_intent(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ApproveIntentRequest>,
+    ) -> GrpcResult<pb::ApproveIntentResponse> {
+        let request = Call::new(ctx, request);
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(self.approve_intent_impl(r).await?))
+            })
+            .await?,
+        )
+    }
+
+    async fn revoke_intent_approval(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::RevokeIntentApprovalRequest>,
+    ) -> GrpcResult<pb::RevokeIntentApprovalResponse> {
+        let request = Call::new(ctx, request);
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(self.revoke_intent_approval_impl(r).await?))
+            })
+            .await?,
+        )
+    }
+
+    async fn explain_intent_scope(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ExplainIntentScopeRequest>,
+    ) -> GrpcResult<pb::ExplainIntentScopeResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(
+            self.explain_intent_scope_impl(request).await?,
+        ))
+    }
+
     async fn find_similar_intents(
         &self,
         ctx: RequestContext,
