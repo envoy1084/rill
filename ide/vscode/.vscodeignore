@@ -1,6 +1,4 @@
-src/**
-test/**
-out/test/**
-**/*.map
-tsconfig.json
-node_modules/**
+**
+!dist/extension.cjs
+!package.json
+!README.md

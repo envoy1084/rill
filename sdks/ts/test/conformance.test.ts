@@ -3,16 +3,16 @@
 
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { test } from "node:test";
+import { test } from "vitest";
 
 import { Code, ConnectError } from "@connectrpc/connect";
 
-import { FileKind } from "../gen/rill/v1/types_pb.js";
-import { LandStatus } from "../gen/rill/v1/landing_pb.js";
-import { createRillClient, isReason, names, retry, type RillClient } from "../index.js";
+import { FileKind } from "../src/gen/rill/v1/types_pb.js";
+import { LandStatus } from "../src/gen/rill/v1/landing_pb.js";
+import { createRillClient, isReason, names, retry, type RillClient } from "../src/index.js";
 
 const endpoint = process.env.RILL_ENDPOINT;
-const skip = endpoint ? false : "RILL_ENDPOINT is not set";
+const live = test.skipIf(!endpoint);
 
 async function setup(): Promise<[RillClient, string]> {
   const client = createRillClient(endpoint!);
@@ -43,7 +43,7 @@ async function rejection(call: Promise<unknown>): Promise<ConnectError> {
   assert.fail("the call succeeded");
 }
 
-test("resources and errors", { skip }, async () => {
+live("resources and errors", async () => {
   const [client, repo] = await setup();
   const got = await client.repos.getRepo({ name: repo });
   assert.equal(got.repo?.name, repo);
@@ -52,7 +52,7 @@ test("resources and errors", { skip }, async () => {
   assert.ok(isReason(err, "NOT_FOUND"));
 });
 
-test("writes read back and retries are idempotent", { skip }, async () => {
+live("writes read back and retries are idempotent", async () => {
   const [client, repo] = await setup();
   const requestId = names.requestId();
   const write = (message: string) =>
@@ -76,7 +76,7 @@ test("writes read back and retries are idempotent", { skip }, async () => {
   assert.ok(isReason(reused, "REQUEST_ID_REUSED"));
 });
 
-test("histories page", { skip }, async () => {
+live("histories page", async () => {
   const [client, repo] = await setup();
   const first = await client.changes.applyEdits({
     parent: repo,
@@ -104,7 +104,7 @@ test("histories page", { skip }, async () => {
   assert.equal(rest.nextPageToken, "");
 });
 
-test("a reviewed change lands and filters find it", { skip }, async () => {
+live("a reviewed change lands and filters find it", async () => {
   const [client, repo] = await setup();
   const written = await client.changes.applyEdits({
     parent: repo,
@@ -136,7 +136,7 @@ test("a reviewed change lands and filters find it", { skip }, async () => {
   assert.ok(isReason(bad, "INVALID_FILTER"));
 });
 
-test("etags guard updates", { skip }, async () => {
+live("etags guard updates", async () => {
   const [client, repo] = await setup();
   const { policy } = await client.policies.getPolicy({ name: names.policy(repo, "submit") });
   assert.ok(policy?.etag);

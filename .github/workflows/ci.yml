@@ -32,9 +32,14 @@ jobs:
         with:
           go-version: "1.24"
           cache: false
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+      # The TypeScript workspace: the SDK and the VS Code extension build,
+      # typecheck and pass their offline tests.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck && pnpm -r build && pnpm -r test
       - uses: astral-sh/setup-uv@v6
       - name: Install buf, protoc and the protoc plugins
         env:

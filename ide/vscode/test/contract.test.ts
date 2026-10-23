@@ -4,7 +4,7 @@
 import { strict as assert } from "node:assert";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { test } from "node:test";
+import { test } from "vitest";
 
 import { parseDoc } from "../src/cli/run";
 import type { Blame, Conflicts, Land, Status, Threads, TrunkHealth } from "../src/cli/schema";
@@ -13,7 +13,7 @@ import { healthView } from "../src/model/health";
 import { fileGroups } from "../src/model/status";
 import { placedThreads } from "../src/model/threads";
 
-const SNAPSHOTS = path.join(__dirname, "../../../../crates/clients/cli/tests/snapshots");
+const SNAPSHOTS = path.join(__dirname, "../../../crates/clients/cli/tests/snapshots");
 
 function snapshot<T>(name: string, schema: string): T {
   const text = fs.readFileSync(path.join(SNAPSHOTS, `schemas__${name}.snap`), "utf8");

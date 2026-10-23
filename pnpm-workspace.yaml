@@ -1,0 +1,25 @@
+# TypeScript packages share one lockfile and one set of tool versions.
+packages:
+  - sdks/ts
+  - ide/vscode
+
+# `@types/vscode` is pinned in ide/vscode/package.json instead: vsce reads
+# it to check `engines.vscode` and cannot resolve `catalog:`.
+catalog:
+  "@bufbuild/protobuf": 2.16.0
+  "@bufbuild/protoc-gen-es": 2.16.0
+  "@connectrpc/connect": 2.2.0
+  "@connectrpc/connect-node": 2.2.0
+  "@types/node": 26.6.5
+  "@vscode/vsce": 4.0.0
+  tsdown: 0.23.2
+  typescript: 7.0.2
+  vitest: 5.0.5
+
+minimumReleaseAgeExclude:
+  - tsdown@0.23.2
+
+# Install scripts run only when listed here. vsce-sign's fetches a
+# Marketplace signing tool that local packaging does not use.
+allowBuilds:
+  "@vscode/vsce-sign": false

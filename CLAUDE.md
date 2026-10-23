@@ -124,8 +124,12 @@ Tiered, so a phase spends its time on work rather than rebuilds:
   `cargo clippy -p <touched crates> --all-targets -- -D warnings`.
 * **When a `.proto` changes:** `sdks/generate.sh` (lints, regenerates the
   API reference and the SDKs' code; needs `buf`, `protoc` 36.2,
-  `protoc-gen-doc`, `protoc-gen-go`, `protoc-gen-connect-go`, Node and
-  `uv`), then `sdks/conformance/run.sh`.
+  `protoc-gen-doc`, `protoc-gen-go`, `protoc-gen-connect-go`, Node with
+  pnpm, and `uv`), then `sdks/conformance/run.sh`.
+* **When TypeScript changes** (`sdks/ts`, `ide/vscode`, one pnpm
+  workspace at the root): `pnpm -r typecheck && pnpm -r build && pnpm -r test`.
+  Tool versions live in the `pnpm-workspace.yaml` catalog; use pnpm, never
+  npm, and add dependencies with `catalog:` versions.
 * **End of a work item:** `cargo clippy --workspace --all-targets -- -D warnings`.
 * **End of a phase (the full sweep):** `cargo fmt --check`,
   `cargo nextest run --workspace`, `cargo test --workspace --doc`, clippy

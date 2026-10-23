@@ -9,3 +9,6 @@ research/
 # TLC output
 spec/**/states/
 spec/**/*_TTrace_*.tla
+
+# The pnpm workspace.
+node_modules/

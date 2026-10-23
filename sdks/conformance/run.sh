@@ -27,7 +27,7 @@ for lang in $langs; do
     rust) cargo test -q -p rill-sdk --features testing --test conformance \
       --manifest-path "$root/Cargo.toml" ;;
     go) (cd "$root/sdks/go" && go test -count=1 -v ./rill | grep -E "^(--- |ok|FAIL)") ;;
-    ts) (cd "$root/sdks/ts" && npm ci --silent && npm test --silent) ;;
+    ts) (cd "$root" && pnpm install --frozen-lockfile --silent && pnpm --filter @rill/sdk test) ;;
     python) (cd "$root/sdks/python" && uv run --frozen pytest -q) ;;
     *) echo "unknown language $lang" >&2; exit 2 ;;
   esac

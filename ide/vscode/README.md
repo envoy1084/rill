@@ -24,7 +24,9 @@ server and the client daemon. Set `rill.path` if `rill` is not on your
 
 ## Development
 
-    npm install
-    npm test                                  # unit and contract tests
-    RILL_BIN=../../target/debug/rill npm test # plus the end-to-end test
-    npm run package                           # rill-<version>.vsix
+From the repository root (one pnpm workspace):
+
+    pnpm install
+    pnpm --filter rill test                                   # unit and contract tests
+    RILL_BIN=$PWD/target/debug/rill pnpm --filter rill test   # plus the end-to-end test
+    pnpm --filter rill package                                # rill-<version>.vsix

@@ -11,74 +11,197 @@
   "categories": [
     "SCM Providers"
   ],
-  "main": "./out/src/extension.js",
+  "main": "./dist/extension.cjs",
   "activationEvents": [
     "workspaceContains:.rill/mount.json"
   ],
   "contributes": {
     "commands": [
-      { "command": "rill.refresh", "title": "Refresh", "category": "Rill", "icon": "$(refresh)" },
-      { "command": "rill.commit", "title": "Commit", "category": "Rill", "icon": "$(check)" },
-      { "command": "rill.describe", "title": "Describe Working Change", "category": "Rill" },
-      { "command": "rill.submit", "title": "Submit for Review", "category": "Rill" },
-      { "command": "rill.land", "title": "Land", "category": "Rill", "icon": "$(rocket)" },
-      { "command": "rill.sync", "title": "Sync onto Trunk", "category": "Rill", "icon": "$(sync)" },
-      { "command": "rill.markResolved", "title": "Mark Resolved", "category": "Rill" },
-      { "command": "rill.resolveInteractive", "title": "Resolve Conflicts Interactively", "category": "Rill" },
-      { "command": "rill.toggleBlame", "title": "Toggle Inline Blame", "category": "Rill" },
-      { "command": "rill.reviewOpen", "title": "Open Review in Terminal", "category": "Rill" },
-      { "command": "rill.reply", "title": "Reply", "category": "Rill" },
-      { "command": "rill.resolveThread", "title": "Resolve Thread", "category": "Rill" },
-      { "command": "rill.reopenThread", "title": "Reopen Thread", "category": "Rill" }
+      {
+        "command": "rill.refresh",
+        "title": "Refresh",
+        "category": "Rill",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "rill.commit",
+        "title": "Commit",
+        "category": "Rill",
+        "icon": "$(check)"
+      },
+      {
+        "command": "rill.describe",
+        "title": "Describe Working Change",
+        "category": "Rill"
+      },
+      {
+        "command": "rill.submit",
+        "title": "Submit for Review",
+        "category": "Rill"
+      },
+      {
+        "command": "rill.land",
+        "title": "Land",
+        "category": "Rill",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "rill.sync",
+        "title": "Sync onto Trunk",
+        "category": "Rill",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "rill.markResolved",
+        "title": "Mark Resolved",
+        "category": "Rill"
+      },
+      {
+        "command": "rill.resolveInteractive",
+        "title": "Resolve Conflicts Interactively",
+        "category": "Rill"
+      },
+      {
+        "command": "rill.toggleBlame",
+        "title": "Toggle Inline Blame",
+        "category": "Rill"
+      },
+      {
+        "command": "rill.reviewOpen",
+        "title": "Open Review in Terminal",
+        "category": "Rill"
+      },
+      {
+        "command": "rill.reply",
+        "title": "Reply",
+        "category": "Rill"
+      },
+      {
+        "command": "rill.resolveThread",
+        "title": "Resolve Thread",
+        "category": "Rill"
+      },
+      {
+        "command": "rill.reopenThread",
+        "title": "Reopen Thread",
+        "category": "Rill"
+      }
     ],
     "views": {
       "scm": [
-        { "id": "rill.inbox", "name": "Rill Inbox", "when": "rill.active" }
+        {
+          "id": "rill.inbox",
+          "name": "Rill Inbox",
+          "when": "rill.active"
+        }
       ]
     },
     "menus": {
       "scm/title": [
-        { "command": "rill.commit", "group": "navigation", "when": "scmProvider == rill" },
-        { "command": "rill.sync", "group": "navigation", "when": "scmProvider == rill" },
-        { "command": "rill.land", "group": "navigation", "when": "scmProvider == rill" },
-        { "command": "rill.refresh", "group": "navigation", "when": "scmProvider == rill" },
-        { "command": "rill.submit", "when": "scmProvider == rill" },
-        { "command": "rill.describe", "when": "scmProvider == rill" },
-        { "command": "rill.resolveInteractive", "when": "scmProvider == rill" },
-        { "command": "rill.reviewOpen", "when": "scmProvider == rill" }
+        {
+          "command": "rill.commit",
+          "group": "navigation",
+          "when": "scmProvider == rill"
+        },
+        {
+          "command": "rill.sync",
+          "group": "navigation",
+          "when": "scmProvider == rill"
+        },
+        {
+          "command": "rill.land",
+          "group": "navigation",
+          "when": "scmProvider == rill"
+        },
+        {
+          "command": "rill.refresh",
+          "group": "navigation",
+          "when": "scmProvider == rill"
+        },
+        {
+          "command": "rill.submit",
+          "when": "scmProvider == rill"
+        },
+        {
+          "command": "rill.describe",
+          "when": "scmProvider == rill"
+        },
+        {
+          "command": "rill.resolveInteractive",
+          "when": "scmProvider == rill"
+        },
+        {
+          "command": "rill.reviewOpen",
+          "when": "scmProvider == rill"
+        }
       ],
       "scm/resourceState/context": [
-        { "command": "rill.markResolved", "when": "scmProvider == rill && scmResourceGroup == conflicts" }
+        {
+          "command": "rill.markResolved",
+          "when": "scmProvider == rill && scmResourceGroup == conflicts"
+        }
       ],
       "view/title": [
-        { "command": "rill.refresh", "group": "navigation", "when": "view == rill.inbox" }
+        {
+          "command": "rill.refresh",
+          "group": "navigation",
+          "when": "view == rill.inbox"
+        }
       ],
       "comments/commentThread/context": [
-        { "command": "rill.reply", "group": "inline", "when": "commentController == rill" }
+        {
+          "command": "rill.reply",
+          "group": "inline",
+          "when": "commentController == rill"
+        }
       ],
       "comments/commentThread/title": [
-        { "command": "rill.resolveThread", "group": "inline", "when": "commentController == rill && commentThread == open" },
-        { "command": "rill.reopenThread", "group": "inline", "when": "commentController == rill && commentThread == resolved" }
+        {
+          "command": "rill.resolveThread",
+          "group": "inline",
+          "when": "commentController == rill && commentThread == open"
+        },
+        {
+          "command": "rill.reopenThread",
+          "group": "inline",
+          "when": "commentController == rill && commentThread == resolved"
+        }
       ]
     },
     "configuration": {
       "title": "Rill",
       "properties": {
-        "rill.path": { "type": "string", "default": "rill", "description": "The rill command." },
-        "rill.blame.enabled": { "type": "boolean", "default": true, "description": "Show who last changed the current line." },
-        "rill.refreshSeconds": { "type": "number", "default": 30, "minimum": 5, "description": "How often to refresh trunk health, the inbox and review threads." }
+        "rill.path": {
+          "type": "string",
+          "default": "rill",
+          "description": "The rill command."
+        },
+        "rill.blame.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show who last changed the current line."
+        },
+        "rill.refreshSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "description": "How often to refresh trunk health, the inbox and review threads."
+        }
       }
     }
   },
   "scripts": {
-    "compile": "tsc -p .",
-    "test": "tsc -p . && node --test \"out/test/*.test.js\"",
-    "package": "vsce package --no-dependencies --skip-license"
+    "build": "tsdown",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "vitest run",
+    "package": "tsdown && vsce package --no-dependencies --skip-license"
   },
   "devDependencies": {
-    "@types/node": "22.19.1",
+    "@types/node": "catalog:",
     "@types/vscode": "1.100.0",
-    "@vscode/vsce": "4.0.0",
-    "typescript": "5.9.3"
+    "@vscode/vsce": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

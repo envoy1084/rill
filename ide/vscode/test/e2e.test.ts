@@ -8,7 +8,7 @@ import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
-import { after, before, test } from "node:test";
+import { afterAll, beforeAll, test } from "vitest";
 import { promisify } from "node:util";
 
 import { Rill } from "../src/cli/rill";
@@ -34,7 +34,7 @@ async function rill(...args: string[]): Promise<string> {
   return (await exec(BIN!, ["--json", ...args], { cwd: dir, env })).stdout;
 }
 
-before(async () => {
+beforeAll(async () => {
   if (!BIN) {
     return;
   }
@@ -65,7 +65,7 @@ before(async () => {
   }
 });
 
-after(async () => {
+afterAll(async () => {
   if (!BIN) {
     return;
   }
@@ -74,7 +74,7 @@ after(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("the extension's commands work against a real checkout", { skip: !BIN && "set RILL_BIN" }, async () => {
+test.skipIf(!BIN)("the extension's commands work against a real checkout", async () => {
   await rill("repo", "create", "e2e");
   await rill("clone", "e2e", path.join(dir, "co"), "--eager");
   const co = path.join(dir, "co");

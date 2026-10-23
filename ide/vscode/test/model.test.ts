@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { test } from "node:test";
+import { test } from "vitest";
 
 import type { Blame, Threads } from "../src/cli/schema";
 import { annotation, blameFor } from "../src/model/blame";

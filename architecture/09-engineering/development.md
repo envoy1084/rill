@@ -19,7 +19,8 @@ it builds, and what CI checks. The crate dependency rules are on
 | `crates/<group>/<name>/tests` | cross-module tests ([testing](testing.md)) |
 | `crates/foundation/proto/proto/rill/v1` | the `.proto` sources |
 | `tools/` | `sim`, `bench`, `load`; `fuzz/` is a separate `cargo-fuzz` workspace |
-| `ide/` | editor extensions over the CLI's JSON ([IDE extensions](../08-clients/ide.md)); `vscode/` is an npm package |
+| `ide/` | editor extensions over the CLI's JSON ([IDE extensions](../08-clients/ide.md)); `vscode/` is a package of the root pnpm workspace |
+| `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` | the TypeScript workspace (`sdks/ts`, `ide/vscode`) |
 | `deploy/` | the Docker image, Helm chart, staging compose cluster, dashboards, test identity providers |
 | `spec/` | TLA+ specifications checked with TLC |
 | `.github/workflows/ci.yml` | the CI pipeline |
@@ -46,8 +47,17 @@ breaking-change rules, which are not enforced while Rill is pre-release.
 runs it and fails when the committed output differs. It needs `buf`,
 `protoc` 36.2 and, from `go install`, `protoc-gen-doc@v1.5.1`,
 `protoc-gen-go@v1.36.12` and `protoc-gen-connect-go@v1.21.1`; the
-TypeScript and Python generators come from those SDKs' lockfiles (Node
-and `uv`).
+TypeScript generator comes from the pnpm workspace's lockfile and the
+Python one from `uv.lock`.
+
+The TypeScript packages (`sdks/ts`, `ide/vscode`) form one pnpm workspace
+at the root: `package.json` pins `packageManager` (pnpm 12), and
+`pnpm-workspace.yaml` lists the packages and holds a version catalog
+(`catalog:` in each package) for TypeScript 7, `tsdown`, `vitest` and the
+shared dependencies. Dependencies' install scripts run only when
+`allowBuilds` names them. `pnpm install` once, then `pnpm -r typecheck`,
+`pnpm -r build` (tsdown) and `pnpm -r test` (vitest); `--filter <name>`
+picks one package. Node 24.
 
 ## Build profiles
 

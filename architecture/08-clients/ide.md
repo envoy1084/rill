@@ -18,8 +18,10 @@ flowchart LR
 
 ## VS Code
 
-The extension lives in [`ide/vscode`](../../ide/vscode). It is TypeScript,
-compiled with `tsc`, and has no runtime dependencies. It activates in a
+The extension lives in [`ide/vscode`](../../ide/vscode), a package of the
+root pnpm workspace. It is TypeScript with no runtime dependencies;
+`tsdown` bundles it into one `dist/extension.cjs` (`vscode` external), so
+the `.vsix` carries a single file. It activates in a
 workspace folder holding `.rill/mount.json`.
 
 | Feature | How |
@@ -49,7 +51,8 @@ Code is layered so most of it tests without VS Code:
 
 ### Tests
 
-`npm test` compiles the extension and runs `node --test`:
+`pnpm --filter rill test` runs vitest (and `pnpm -r typecheck` runs
+TypeScript 7 over the sources and tests):
 
 - unit tests of the models, including the marker parser, against the
   formats `materialize.rs` writes;
@@ -61,8 +64,7 @@ With `RILL_BIN` set to a built `rill`, an end-to-end test also runs. It
 starts `rill dev --memory` on free ports, with an isolated `HOME`, config
 and daemon directory. It clones eagerly, then drives every command the
 extension uses: status, commit, describe, submit, comment, reply, resolve,
-inbox, land, health, blame, cat and sync. `npm run package` builds the
-`.vsix`.
+inbox, land, health, blame, cat and sync. `pnpm --filter rill package` bundles and builds the `.vsix`.
 
 ## Limitations
 
