@@ -148,28 +148,20 @@ fn print_run(ctx: &mut Ctx<'_>, run: &pb::VerifyRun) -> Result<()> {
 
 /// `rill checks runs`.
 pub async fn list(ctx: &mut Ctx<'_>, a: RunsArgs) -> Result<()> {
-    let repo = rill_sdk::names::repo(&ctx.repo_name()?);
-    let version = match &a.of_version {
-        Some(v) => {
-            let hash: rill_types::ChangeVersionHash = v
-                .parse()
-                .map_err(|_| CliError::usage(format!("invalid version {v:?}")))?;
-            rill_sdk::names::version(&repo, &hash)
-        }
-        None => String::new(),
-    };
-    let runs = ctx
-        .client()?
-        .checks_svc()
-        .list_runs(pb::ListRunsRequest {
-            parent: repo,
-            page_size: a.limit as i32,
-            page_token: String::new(),
-            version,
+    let version = a
+        .of_version
+        .as_deref()
+        .map(|v| {
+            v.parse::<rill_types::ChangeVersionHash>()
+                .map_err(|_| CliError::usage(format!("invalid version {v:?}")))
         })
+        .transpose()?;
+    let runs = ctx
+        .repo()?
+        .checks()
+        .runs(version.as_ref(), a.limit, None)
         .await?
-        .into_owned()
-        .runs;
+        .items;
     ctx.emit(
         j!({ "runs": runs.iter().map(run_json).collect::<Vec<_>>() }),
         |out| {
@@ -192,36 +184,16 @@ pub async fn list(ctx: &mut Ctx<'_>, a: RunsArgs) -> Result<()> {
 
 /// `rill checks run`.
 pub async fn show(ctx: &mut Ctx<'_>, a: RunArgs) -> Result<()> {
-    let name = run_name(ctx, &a.run)?;
-    let svc = ctx.client()?.checks_svc();
+    let checks = ctx.repo()?.checks();
     if !a.watch {
-        let run = svc
-            .get_run(pb::GetRunRequest { name })
-            .await?
-            .into_owned()
-            .run
-            .into_option()
-            .unwrap_or_default();
+        let run = checks.run(&a.run).await?;
         return print_run(ctx, &run);
     }
-    let mut stream = svc.watch_run(pb::WatchRunRequest { name }).await?;
-    while let Some(update) = stream.message::<pb::WatchRunResponse>().await? {
-        let run = update
-            .to_owned_message()
-            .run
-            .into_option()
-            .unwrap_or_default();
-        print_run(ctx, &run)?;
+    let mut stream = checks.watch_run(&a.run).await?;
+    while let Some(run) = futures::StreamExt::next(&mut stream).await {
+        print_run(ctx, &run?)?;
     }
     Ok(())
-}
-
-/// The resource name of run `id` in the current repository.
-fn run_name(ctx: &mut Ctx<'_>, id: &str) -> Result<String> {
-    Ok(format!(
-        "{}/runs/{id}",
-        rill_sdk::names::repo(&ctx.repo_name()?)
-    ))
 }
 
 /// Write every byte `read(offset)` returns, from `start`, to `out`.
@@ -245,28 +217,15 @@ where
 
 /// `rill checks log`.
 pub async fn log(ctx: &mut Ctx<'_>, a: LogArgs) -> Result<()> {
-    let run = run_name(ctx, &a.run)?;
-    let svc = ctx.client()?.checks_svc();
-    let stream = if a.stderr {
-        pb::LogStream::Stderr
-    } else {
-        pb::LogStream::Stdout
-    };
+    let checks = ctx.repo()?.checks();
     let start = a.tail.map_or(0, |t| -(t as i64));
     let mut stdout = std::io::stdout().lock();
     copy(
         start,
         |offset| {
-            let svc = svc.clone();
-            let request = pb::ReadLogRequest {
-                run: run.clone(),
-                step: a.step,
-                stream: stream.into(),
-                offset,
-                limit: 0,
-            };
+            let (checks, run) = (checks.clone(), a.run.clone());
             async move {
-                let r = svc.read_log(request).await?.into_owned();
+                let r = checks.read_log(&run, a.step, a.stderr, offset, 0).await?;
                 Ok((r.data, r.offset, r.size))
             }
         },
@@ -277,8 +236,7 @@ pub async fn log(ctx: &mut Ctx<'_>, a: LogArgs) -> Result<()> {
 
 /// `rill checks artifact`.
 pub async fn artifact(ctx: &mut Ctx<'_>, a: ArtifactArgs) -> Result<()> {
-    let run = run_name(ctx, &a.run)?;
-    let svc = ctx.client()?.checks_svc();
+    let checks = ctx.repo()?.checks();
     let mut out: Box<dyn Write> = match &a.out {
         Some(path) => Box::new(
             std::fs::File::create(path)
@@ -289,16 +247,9 @@ pub async fn artifact(ctx: &mut Ctx<'_>, a: ArtifactArgs) -> Result<()> {
     copy(
         0,
         |offset| {
-            let svc = svc.clone();
-            let request = pb::ReadArtifactRequest {
-                run: run.clone(),
-                step: a.step,
-                path: a.path.clone(),
-                offset,
-                limit: 0,
-            };
+            let (checks, run, path) = (checks.clone(), a.run.clone(), a.path.clone());
             async move {
-                let r = svc.read_artifact(request).await?.into_owned();
+                let r = checks.read_artifact(&run, a.step, &path, offset, 0).await?;
                 Ok((r.data, r.offset, r.size))
             }
         },

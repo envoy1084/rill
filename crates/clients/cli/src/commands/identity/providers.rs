@@ -91,52 +91,36 @@ fn info_json(p: &pb::IdentityProviderInfo) -> serde_json::Value {
 
 /// Run `rill admin idp`.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
-    let svc = ctx.client()?.identity_svc();
+    let client = ctx.client()?;
     match cmd {
         IdpCmd::Add(a) => {
             let saml_metadata = match &a.saml_metadata {
                 Some(path) => Some(std::fs::read_to_string(path)?),
                 None => None,
             };
-            let saved = svc
-                .update_identity_provider(pb::UpdateIdentityProviderRequest {
-                    request_id: String::new(),
-                    allow_missing: true,
-                    provider: (pb::IdentityProviderSpec {
-                        org: a.org.org,
-                        name: a.name,
-                        issuer: a.issuer.unwrap_or_default(),
-                        client_id: a.client_id.unwrap_or_default(),
-                        client_secret: a.client_secret,
-                        cli_client_id: a.cli_client_id,
-                        scopes: a.scopes,
-                        username_claim: a.username_claim,
-                        groups_claim: a.groups_claim,
-                        auto_provision: a.auto_provision,
-                        saml_metadata,
-                        saml_sp_entity_id: a.saml_sp_entity_id,
-                    })
-                    .into(),
+            let saved = client
+                .identity(&a.org.org)
+                .put_identity_provider(pb::IdentityProviderSpec {
+                    org: a.org.org.clone(),
+                    name: a.name,
+                    issuer: a.issuer.unwrap_or_default(),
+                    client_id: a.client_id.unwrap_or_default(),
+                    client_secret: a.client_secret,
+                    cli_client_id: a.cli_client_id,
+                    scopes: a.scopes,
+                    username_claim: a.username_claim,
+                    groups_claim: a.groups_claim,
+                    auto_provision: a.auto_provision,
+                    saml_metadata,
+                    saml_sp_entity_id: a.saml_sp_entity_id,
                 })
-                .await?
-                .into_owned()
-                .provider
-                .into_option()
-                .unwrap_or_default();
+                .await?;
             ctx.emit(info_json(&saved), |out| {
                 out.line(format!("provider {}/{} saved", saved.org, saved.name))
             })
         }
         IdpCmd::List(o) => {
-            let providers = svc
-                .list_identity_providers(pb::ListIdentityProvidersRequest {
-                    parent: rill_sdk::names::org(&o.org),
-                    page_size: 1000,
-                    page_token: String::new(),
-                })
-                .await?
-                .into_owned()
-                .providers;
+            let providers = client.identity(&o.org).identity_providers().await?;
             ctx.emit(
                 json!(providers.iter().map(info_json).collect::<Vec<_>>()),
                 |out| {
@@ -154,15 +138,10 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: IdpCmd) -> Result<()> {
             )
         }
         IdpCmd::Remove(a) => {
-            svc.delete_identity_provider(pb::DeleteIdentityProviderRequest {
-                request_id: String::new(),
-                name: format!(
-                    "{}/identityProviders/{}",
-                    rill_sdk::names::org(&a.org.org),
-                    a.name
-                ),
-            })
-            .await?;
+            client
+                .identity(&a.org.org)
+                .delete_identity_provider(&a.name)
+                .await?;
             ctx.emit(json!({ "deleted": true }), |out| {
                 out.line(format!("removed {}", a.name))
             })

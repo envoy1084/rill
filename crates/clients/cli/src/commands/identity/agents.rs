@@ -142,7 +142,7 @@ fn agent_json(a: &pb::Agent) -> serde_json::Value {
 
 /// Run `rill agent`.
 pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
-    let mut svc = ctx.client()?.identity_svc();
+    let client = ctx.client()?;
     let agent = match cmd {
         AgentCmd::Register(a) => {
             let workloads = a
@@ -159,11 +159,10 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;
-            svc.create_agent(pb::CreateAgentRequest {
-                request_id: String::new(),
-                parent: rill_sdk::names::org(&a.org.org),
-                agent: (pb::AgentSpec {
-                    org: a.org.org,
+            client
+                .identity(&a.org.org)
+                .create_agent(pb::AgentSpec {
+                    org: a.org.org.clone(),
                     name: a.name,
                     sponsor: a.sponsor,
                     purpose: a.purpose,
@@ -180,22 +179,10 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                     workloads,
                     expires_at: None,
                 })
-                .into(),
-            })
-            .await?
-            .into_owned()
-            .agent
+                .await?
         }
         AgentCmd::List(o) => {
-            let agents = svc
-                .list_agents(pb::ListAgentsRequest {
-                    parent: rill_sdk::names::org(&o.org),
-                    page_size: 1000,
-                    ..Default::default()
-                })
-                .await?
-                .into_owned()
-                .agents;
+            let agents = client.identity(&o.org).agents("").await?;
             return ctx.emit(
                 json!(agents.iter().map(agent_json).collect::<Vec<_>>()),
                 |out| {
@@ -213,11 +200,19 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
                 },
             );
         }
-        AgentCmd::Suspend(a) => update(&mut svc, a, true).await?.into(),
-        AgentCmd::Activate(a) => update(&mut svc, a, false).await?.into(),
-    }
-    .into_option()
-    .unwrap_or_default();
+        AgentCmd::Suspend(a) => {
+            client
+                .identity(&a.org.org)
+                .set_agent_suspended(&a.name, true)
+                .await?
+        }
+        AgentCmd::Activate(a) => {
+            client
+                .identity(&a.org.org)
+                .set_agent_suspended(&a.name, false)
+                .await?
+        }
+    };
     let value = agent_json(&agent);
     ctx.emit(value, |out| {
         let spec = agent.spec.clone().into_option().unwrap_or_default();
@@ -228,36 +223,9 @@ pub async fn agent(ctx: &mut Ctx<'_>, cmd: AgentCmd) -> Result<()> {
     })
 }
 
-async fn update(
-    svc: &mut rill_sdk::client::IdentitySvc,
-    a: AgentArg,
-    suspended: bool,
-) -> Result<Option<pb::Agent>> {
-    Ok((svc
-        .update_agent(pb::UpdateAgentRequest {
-            request_id: String::new(),
-            agent: pb::Agent {
-                name: format!("{}/agents/{}", rill_sdk::names::org(&a.org.org), a.name),
-                status: if suspended { "suspended" } else { "active" }.into(),
-                ..Default::default()
-            }
-            .into(),
-            update_mask: rill_proto::FieldMask {
-                paths: vec!["status".into()],
-                ..Default::default()
-            }
-            .into(),
-            etag: String::new(),
-        })
-        .await?
-        .into_owned()
-        .agent)
-        .into_option())
-}
-
 /// Run `rill admin trust`.
 pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
-    let svc = ctx.client()?.identity_svc();
+    let client = ctx.client()?;
     match cmd {
         TrustCmd::Add(a) => {
             let keys = match (a.jwks_uri, a.jwks_file) {
@@ -267,40 +235,24 @@ pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
                 }
                 (None, None) => pb::workload_issuer_spec::Keys::Discovery(true),
             };
-            let saved = svc
-                .update_workload_issuer(pb::UpdateWorkloadIssuerRequest {
-                    request_id: String::new(),
-                    allow_missing: true,
-                    issuer: (pb::WorkloadIssuerSpec {
-                        org: a.org.org,
-                        name: a.name,
-                        issuer: a.issuer,
-                        keys: Some(keys),
-                        audiences: a.audiences,
-                        ..Default::default()
-                    })
-                    .into(),
+            let saved = client
+                .identity(&a.org.org)
+                .put_workload_issuer(pb::WorkloadIssuerSpec {
+                    org: a.org.org.clone(),
+                    name: a.name,
+                    issuer: a.issuer,
+                    keys: Some(keys),
+                    audiences: a.audiences,
+                    ..Default::default()
                 })
-                .await?
-                .into_owned()
-                .issuer
-                .into_option()
-                .unwrap_or_default();
+                .await?;
             ctx.emit(
                 json!({ "name": saved.name, "issuer": saved.issuer }),
                 |out| out.line(format!("trusting {} as {}", saved.issuer, saved.name)),
             )
         }
         TrustCmd::List(o) => {
-            let issuers = svc
-                .list_workload_issuers(pb::ListWorkloadIssuersRequest {
-                    parent: rill_sdk::names::org(&o.org),
-                    page_size: 1000,
-                    page_token: String::new(),
-                })
-                .await?
-                .into_owned()
-                .issuers;
+            let issuers = client.identity(&o.org).workload_issuers().await?;
             let value = json!(issuers
                 .iter()
                 .map(|i| json!({ "name": i.name, "issuer": i.issuer, "audiences": i.audiences }))
@@ -318,15 +270,10 @@ pub async fn trust(ctx: &mut Ctx<'_>, cmd: TrustCmd) -> Result<()> {
             })
         }
         TrustCmd::Remove(a) => {
-            svc.delete_workload_issuer(pb::DeleteWorkloadIssuerRequest {
-                request_id: String::new(),
-                name: format!(
-                    "{}/workloadIssuers/{}",
-                    rill_sdk::names::org(&a.org.org),
-                    a.name
-                ),
-            })
-            .await?;
+            client
+                .identity(&a.org.org)
+                .delete_workload_issuer(&a.name)
+                .await?;
             ctx.emit(json!({ "deleted": true }), |out| out.line("removed"))
         }
     }
@@ -348,15 +295,9 @@ pub async fn kill(ctx: &mut Ctx<'_>, a: KillArgs) -> Result<()> {
     };
     let done = ctx
         .client()?
-        .identity_svc()
-        .kill_switch(pb::KillSwitchRequest {
-            request_id: String::new(),
-            parent: rill_sdk::names::org(&a.org.org),
-            target: Some(target),
-            reason: a.reason,
-        })
-        .await?
-        .into_owned();
+        .identity(&a.org.org)
+        .kill_switch(target, &a.reason)
+        .await?;
     ctx.emit(
         json!({
             "agents_suspended": done.agents_suspended,

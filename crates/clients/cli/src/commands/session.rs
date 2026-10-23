@@ -1,7 +1,6 @@
 //! `rill login` and `rill logout`.
 
 use clap::Args;
-use rill_proto::rill::v1 as pb;
 use rill_sdk::auth::{DeviceAuthorization, LoginPrompt};
 use serde_json::json;
 
@@ -78,11 +77,8 @@ pub async fn logout(ctx: &mut Ctx<'_>) -> Result<()> {
     };
     let client = ctx.client()?;
     let ended = client
-        .identity_svc()
-        .revoke_session(pb::RevokeSessionRequest {
-            request_id: String::new(),
-            session: credentials.session.clone(),
-        })
+        .identity("")
+        .revoke_session(&credentials.session)
         .await;
     if let Err(e) = &ended {
         tracing::warn!(error = %e, "ending the session on the server failed");

@@ -2,7 +2,6 @@
 //! landings nor make trunk red.
 
 use clap::{Args, Subcommand};
-use rill_proto::rill::v1 as pb;
 use rill_types::Timestamp;
 use serde_json::json as j;
 
@@ -40,19 +39,10 @@ pub struct TargetArg {
 
 /// Run a quarantine subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
-    let repo = rill_sdk::names::repo(&ctx.repo_name()?);
-    let svc = ctx.client()?.checks_svc();
+    let checks = ctx.repo()?.checks();
     match cmd {
         QuarantineCmd::List => {
-            let targets = svc
-                .list_quarantines(pb::ListQuarantinesRequest {
-                    parent: repo,
-                    page_size: 1000,
-                    page_token: String::new(),
-                })
-                .await?
-                .into_owned()
-                .quarantines;
+            let targets = checks.quarantines().await?;
             ctx.emit(
                 j!({ "targets": targets.iter().map(|t| j!({
                     "target": t.target,
@@ -76,27 +66,13 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: QuarantineCmd) -> Result<()> {
             )
         }
         QuarantineCmd::Add(args) => {
-            svc.create_quarantine(pb::CreateQuarantineRequest {
-                request_id: String::new(),
-                parent: repo,
-                quarantine: pb::Quarantine {
-                    target: args.target.clone(),
-                    reason: args.reason,
-                    ..Default::default()
-                }
-                .into(),
-            })
-            .await?;
+            checks.quarantine(&args.target, &args.reason).await?;
             ctx.emit(j!({ "target": args.target, "added": true }), |out| {
                 out.line(format!("quarantined {}", args.target))
             })
         }
         QuarantineCmd::Release(args) => {
-            svc.delete_quarantine(pb::DeleteQuarantineRequest {
-                request_id: String::new(),
-                name: format!("{repo}/quarantines/{}", args.target),
-            })
-            .await?;
+            checks.release_quarantine(&args.target).await?;
             ctx.emit(j!({ "target": args.target, "released": true }), |out| {
                 out.line(format!("lifted the quarantine of {}", args.target))
             })

@@ -110,45 +110,28 @@ fn show(ctx: &mut Ctx<'_>, record: Option<pb::Redaction>) -> Result<()> {
 
 /// Run a protection subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
-    let svc = ctx.client()?.protection_svc();
+    let client = ctx.client()?;
     match cmd {
         ProtectCmd::Redact(a) => {
             let kind: ObjectKind = a
                 .kind
                 .parse()
                 .map_err(|_| CliError::usage(format!("unknown object kind {:?}", a.kind)))?;
-            let response = svc
-                .create_redaction(pb::CreateRedactionRequest {
-                    request_id: String::new(),
-                    parent: rill_sdk::names::org(&a.org.org),
-                    kind: (kind as i32).into(),
-                    hash: hash(&a.hash)?.as_bytes().to_vec().into(),
-                    reason: a.reason,
-                })
-                .await?
-                .into_owned();
-            show(ctx, response.redaction.into_option())
+            let redaction = client
+                .protection(&a.org.org)
+                .request_redaction(kind, hash(&a.hash)?, &a.reason)
+                .await?;
+            show(ctx, Some(redaction))
         }
         ProtectCmd::Approve(a) => {
-            let response = svc
-                .approve_redaction(pb::ApproveRedactionRequest {
-                    request_id: String::new(),
-                    name: format!("{}/redactions/{}", rill_sdk::names::org(&a.org.org), a.id),
-                })
-                .await?
-                .into_owned();
-            show(ctx, response.redaction.into_option())
+            let redaction = client
+                .protection(&a.org.org)
+                .approve_redaction(&a.id)
+                .await?;
+            show(ctx, Some(redaction))
         }
         ProtectCmd::Redactions(o) => {
-            let list = svc
-                .list_redactions(pb::ListRedactionsRequest {
-                    parent: rill_sdk::names::org(&o.org),
-                    page_size: 1000,
-                    page_token: String::new(),
-                })
-                .await?
-                .into_owned()
-                .redactions;
+            let list = client.protection(&o.org).redactions().await?;
             ctx.emit(
                 j!({ "redactions": list.iter().map(record_json).collect::<Vec<_>>() }),
                 |out| {
@@ -174,24 +157,19 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ProtectCmd) -> Result<()> {
         }
         ProtectCmd::Release(a) => {
             let version = hash(&a.held)?;
-            svc.release_version(pb::ReleaseVersionRequest {
-                request_id: String::new(),
-                version: rill_sdk::names::version(&rill_sdk::names::repo(&a.repo), &version),
-            })
-            .await?;
+            client
+                .protection("")
+                .release_version(&a.repo, &version)
+                .await?;
             ctx.emit(j!({ "released": version.to_hex() }), |out| {
                 out.line(format!("released {version}"))
             })
         }
         ProtectCmd::RotateKey(a) => {
-            let response = svc
-                .rotate_data_keys(pb::RotateDataKeysRequest {
-                    request_id: String::new(),
-                    parent: rill_sdk::names::org(&a.org.org),
-                    rewrap: a.rewrap,
-                })
-                .await?
-                .into_owned();
+            let response = client
+                .protection(&a.org.org)
+                .rotate_data_keys(a.rewrap)
+                .await?;
             ctx.emit(
                 j!({ "key_id": response.key_id, "active_from": response.active_from, "rewrapped": response.rewrapped }),
                 |out| match (a.rewrap, response.key_id) {

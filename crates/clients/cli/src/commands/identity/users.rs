@@ -60,38 +60,12 @@ async fn update(
     suspended: Option<bool>,
     roles: Option<Vec<String>>,
 ) -> Result<()> {
-    let user = ctx
-        .client()?
-        .identity_svc()
-        .update_user(pb::UpdateUserRequest {
-            request_id: String::new(),
-            user: pb::User {
-                name: format!("{}/users/{name}", rill_sdk::names::org(&org)),
-                status: match suspended {
-                    Some(true) => "suspended",
-                    _ => "active",
-                }
-                .into(),
-                roles: roles.clone().unwrap_or_default(),
-                ..Default::default()
-            }
-            .into(),
-            update_mask: rill_proto::FieldMask {
-                paths: match (suspended.is_some(), roles.is_some()) {
-                    (true, true) => vec!["status".into(), "roles".into()],
-                    (true, false) => vec!["status".into()],
-                    _ => vec!["roles".into()],
-                },
-                ..Default::default()
-            }
-            .into(),
-            etag: String::new(),
-        })
-        .await?
-        .into_owned()
-        .user
-        .into_option()
-        .unwrap_or_default();
+    let identity = ctx.client()?.identity(&org);
+    let user = match (suspended, roles) {
+        (Some(suspended), _) => identity.set_user_suspended(&name, suspended).await?,
+        (None, Some(roles)) => identity.set_user_roles(&name, roles).await?,
+        (None, None) => return Err(crate::error::CliError::usage("nothing to change")),
+    };
     ctx.emit(user_json(&user), |out| {
         out.line(format!(
             "{} is {} ({})",
@@ -113,17 +87,7 @@ async fn update(
 pub async fn run(ctx: &mut Ctx<'_>, cmd: UserCmd) -> Result<()> {
     match cmd {
         UserCmd::List(o) => {
-            let users = ctx
-                .client()?
-                .identity_svc()
-                .list_users(pb::ListUsersRequest {
-                    parent: rill_sdk::names::org(&o.org),
-                    page_size: 1000,
-                    ..Default::default()
-                })
-                .await?
-                .into_owned()
-                .users;
+            let users = ctx.client()?.identity(&o.org).users("").await?;
             ctx.emit(
                 json!(users.iter().map(user_json).collect::<Vec<_>>()),
                 |out| {

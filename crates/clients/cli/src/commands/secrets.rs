@@ -93,41 +93,20 @@ fn read_value(from_file: Option<PathBuf>) -> Result<Vec<u8>> {
 
 /// Run a secret subcommand.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
-    let svc = ctx.client()?.secret_svc();
+    let client = ctx.client()?;
     match cmd {
         SecretCmd::Set(a) => {
             let value = read_value(a.from_file)?;
-            let secret = svc
-                .update_secret(pb::UpdateSecretRequest {
-                    request_id: String::new(),
-                    secret: pb::Secret {
-                        name: format!("{}/secrets/{}", rill_sdk::names::org(&a.org.org), a.name),
-                        repos: a.repos,
-                        trunk_only: a.trunk_only,
-                        ..Default::default()
-                    }
-                    .into(),
-                    value: value.into(),
-                    allow_missing: true,
-                })
-                .await?
-                .into_owned()
-                .secret
-                .ok_or_else(|| CliError::conflict("the server returned no secret"))?;
+            let secret = client
+                .secrets(&a.org.org)
+                .set(&a.name, &value, a.repos, a.trunk_only)
+                .await?;
             ctx.emit(secret_json(&secret), |out| {
                 out.line(format!("secret {} set", short(&secret.name)))
             })
         }
         SecretCmd::List(o) => {
-            let list = svc
-                .list_secrets(pb::ListSecretsRequest {
-                    parent: rill_sdk::names::org(&o.org),
-                    page_size: 1000,
-                    page_token: String::new(),
-                })
-                .await?
-                .into_owned()
-                .secrets;
+            let list = client.secrets(&o.org).list().await?;
             ctx.emit(
                 j!({ "secrets": list.iter().map(secret_json).collect::<Vec<_>>() }),
                 |out| {
@@ -153,11 +132,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: SecretCmd) -> Result<()> {
             )
         }
         SecretCmd::Delete(a) => {
-            svc.delete_secret(pb::DeleteSecretRequest {
-                request_id: String::new(),
-                name: format!("{}/secrets/{}", rill_sdk::names::org(&a.org.org), a.name),
-            })
-            .await?;
+            client.secrets(&a.org.org).delete(&a.name).await?;
             ctx.emit(j!({ "deleted": true }), |out| {
                 out.line(format!("secret {} deleted", a.name))
             })

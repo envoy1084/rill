@@ -25,14 +25,10 @@ fn ts(ms: i64) -> String {
 
 /// Run `rill admin key`.
 pub async fn run(ctx: &mut Ctx<'_>, cmd: KeyCmd) -> Result<()> {
-    let svc = ctx.client()?.identity_svc();
+    let identity = ctx.client()?.identity("");
     match cmd {
         KeyCmd::List => {
-            let keys = svc
-                .list_token_keys(pb::ListTokenKeysRequest {})
-                .await?
-                .into_owned()
-                .keys;
+            let keys = identity.token_keys().await?;
             let value = json!(keys
                 .iter()
                 .map(|k| json!({
@@ -55,12 +51,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: KeyCmd) -> Result<()> {
             })
         }
         KeyCmd::Rotate => {
-            let rotated = svc
-                .rotate_token_keys(pb::RotateTokenKeysRequest {
-                    request_id: String::new(),
-                })
-                .await?
-                .into_owned();
+            let rotated = identity.rotate_token_keys().await?;
             ctx.emit(
                 json!({ "key_id": rotated.key_id, "active_from": rotated.active_from }),
                 |out| match rotated.key_id {
@@ -76,7 +67,7 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: KeyCmd) -> Result<()> {
 
 /// Run `rill admin revoke`.
 pub async fn revoke(ctx: &mut Ctx<'_>, cmd: RevokeCmd) -> Result<()> {
-    let svc = ctx.client()?.identity_svc();
+    let identity = ctx.client()?.identity("");
     match cmd {
         RevokeCmd::Token(args) => {
             let target = match args.token_id {
@@ -88,24 +79,13 @@ pub async fn revoke(ctx: &mut Ctx<'_>, cmd: RevokeCmd) -> Result<()> {
                     pb::revoke_token_request::Target::Token(token)
                 }
             };
-            let revoked = svc
-                .revoke_token(pb::RevokeTokenRequest {
-                    request_id: String::new(),
-                    target: Some(target),
-                    reason: args.reason,
-                })
-                .await?
-                .into_owned();
-            ctx.emit(json!({ "revoked": revoked.token_id }), |out| {
-                out.line(format!("revoked {}", revoked.token_id))
+            let revoked = identity.revoke_token(target, &args.reason).await?;
+            ctx.emit(json!({ "revoked": revoked }), |out| {
+                out.line(format!("revoked {revoked}"))
             })
         }
         RevokeCmd::Session(args) => {
-            svc.revoke_session(pb::RevokeSessionRequest {
-                request_id: String::new(),
-                session: args.session.clone(),
-            })
-            .await?;
+            identity.revoke_session(&args.session).await?;
             ctx.emit(json!({ "ended": args.session }), |out| {
                 out.line(format!("ended {}", args.session))
             })

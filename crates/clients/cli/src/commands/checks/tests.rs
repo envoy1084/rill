@@ -55,18 +55,12 @@ fn flaky_json(t: &pb::FlakyTest) -> serde_json::Value {
 
 /// `rill checks flaky`.
 pub async fn flaky(ctx: &mut Ctx<'_>, a: FlakyArgs) -> Result<()> {
-    let repo = ctx.repo_name()?;
-    let svc = ctx.client()?.checks_svc();
-    let tests = svc
-        .list_flaky_tests(pb::ListFlakyTestsRequest {
-            parent: rill_sdk::names::repo(&repo),
-            page_size: a.limit as i32,
-            page_token: String::new(),
-            min_score: Some(a.min_score),
-        })
+    let tests = ctx
+        .repo()?
+        .checks()
+        .flaky_tests(Some(a.min_score), a.limit, None)
         .await?
-        .into_owned()
-        .tests;
+        .items;
     ctx.emit(
         j!({ "tests": tests.iter().map(flaky_json).collect::<Vec<_>>() }),
         |out| {
@@ -87,16 +81,11 @@ pub async fn flaky(ctx: &mut Ctx<'_>, a: FlakyArgs) -> Result<()> {
 
 /// `rill checks history`.
 pub async fn history(ctx: &mut Ctx<'_>, a: HistoryArgs) -> Result<()> {
-    let repo = ctx.repo_name()?;
-    let svc = ctx.client()?.checks_svc();
-    let response = svc
-        .get_test_history(pb::GetTestHistoryRequest {
-            parent: rill_sdk::names::repo(&repo),
-            target: a.target,
-            max_results: a.limit as i32,
-        })
-        .await?
-        .into_owned();
+    let response = ctx
+        .repo()?
+        .checks()
+        .test_history(&a.target, a.limit)
+        .await?;
     let runs = response.runs;
     ctx.emit(
         j!({
@@ -138,18 +127,7 @@ pub async fn history(ctx: &mut Ctx<'_>, a: HistoryArgs) -> Result<()> {
 
 /// `rill checks nonhermetic`.
 pub async fn nonhermetic(ctx: &mut Ctx<'_>) -> Result<()> {
-    let repo = ctx.repo_name()?;
-    let steps = ctx
-        .client()?
-        .checks_svc()
-        .list_nonhermetic_steps(pb::ListNonhermeticStepsRequest {
-            parent: rill_sdk::names::repo(&repo),
-            page_size: 1000,
-            page_token: String::new(),
-        })
-        .await?
-        .into_owned()
-        .steps;
+    let steps = ctx.repo()?.checks().nonhermetic_steps().await?;
     ctx.emit(
         j!({ "steps": steps.iter().map(|s| j!({
             "step": s.step,
