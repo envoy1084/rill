@@ -6,7 +6,8 @@
 #   docker build -f deploy/docker/Dockerfile -t rill .   (from the repository root)
 #   docker run rill api --config /etc/rill/rill.toml
 
-ARG RUST_VERSION=1.99
+# The image's rustup installs the exact toolchain rust-toolchain.toml pins.
+ARG RUST_VERSION=1.96.0
 
 FROM rust:${RUST_VERSION}-bookworm AS build
 ARG TARGETARCH

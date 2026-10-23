@@ -189,6 +189,15 @@ lto = "thin"
 codegen-units = 4
 debug = 1
 
+# What ships (the image, release archives): smallest and fastest, no debug
+# info. `release` keeps line tables for load runs and profiling.
+[profile.dist]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+debug = false
+strip = true
+
 [profile.dev]
 opt-level = 1
 # Line tables only: full debuginfo makes each test binary several hundred MB.
@@ -197,5 +206,8 @@ debug = "line-tables-only"
 [profile.test]
 debug = "line-tables-only"
 
+# Dependencies: optimized, without debug info. Rill's own crates keep line
+# tables, so backtraces stay readable while test binaries stay small.
 [profile.dev.package."*"]
 opt-level = 2
+debug = false

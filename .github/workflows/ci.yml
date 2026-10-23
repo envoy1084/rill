@@ -14,9 +14,8 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      # The toolchain and components rust-toolchain.toml pins.
+      - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       # Licences (ADR 015), advisories and sources, per deny.toml.
@@ -74,9 +73,7 @@ jobs:
       FDB_SERVER_SHA256: 789f1ed4cbacc0fd7043da2217c9e57516e4ec94fa7140853ec22a7e715785cc
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
         with:
           key: fdb
