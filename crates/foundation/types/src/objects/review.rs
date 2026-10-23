@@ -114,6 +114,10 @@ pub struct Comment {
     /// usually do not.
     #[serde(default)]
     pub confidence: Option<u8>,
+    /// Replacement text for the anchored lines, which the change's author
+    /// can apply as a new version.
+    #[serde(default)]
+    pub suggestion: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +129,10 @@ pub struct Thread {
     /// Who the thread is directed at, if anyone.
     #[serde(default)]
     pub to: Option<Principal>,
+    /// Its anchor could not be found on the current version: it still
+    /// points at the version it was last placed on.
+    #[serde(default)]
+    pub outdated: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -252,6 +260,7 @@ pub struct ThreadHeader {
     pub anchor: ThreadAnchor,
     pub resolved: bool,
     pub to: Option<Principal>,
+    pub outdated: bool,
 }
 
 impl crate::Record for ThreadHeader {
@@ -266,6 +275,7 @@ impl Thread {
             anchor: self.anchor.clone(),
             resolved: self.resolved,
             to: self.to.clone(),
+            outdated: self.outdated,
         }
     }
 
@@ -277,6 +287,7 @@ impl Thread {
             comments,
             resolved: header.resolved,
             to: header.to,
+            outdated: header.outdated,
         }
     }
 }

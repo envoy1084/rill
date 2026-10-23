@@ -126,6 +126,9 @@ impl ReviewService for MockReview {
         evaluate_landing(pb::EvaluateLandingRequest) -> pb::EvaluateLandingResponse;
         abandon_change(pb::AbandonChangeRequest) -> pb::AbandonChangeResponse;
         watch_review(pb::WatchReviewRequest) -> ServiceStream<pb::WatchReviewResponse>;
+        get_interdiff(pb::GetInterdiffRequest) -> pb::GetInterdiffResponse;
+        apply_suggestion(pb::ApplySuggestionRequest) -> pb::ApplySuggestionResponse;
+        reopen_change(pb::ReopenChangeRequest) -> pb::ReopenChangeResponse;
     }
 }
 

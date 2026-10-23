@@ -116,6 +116,15 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
             ..Default::default()
         }
         .encode_to_vec(),
+        "ReviewService/ApplySuggestion" => pb::ApplySuggestionRequest {
+            thread: format!(
+                "{}/changes/{}/review/threads/probe",
+                repo(),
+                rill_types::ChangeId::new()
+            ),
+            ..Default::default()
+        }
+        .encode_to_vec(),
         "AttentionService/ListSimilarChanges" => pb::ListSimilarChangesRequest {
             intent: format!("{}/intents/{}", repo(), rill_types::IntentId::new()),
         }

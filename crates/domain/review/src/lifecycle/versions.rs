@@ -1,7 +1,9 @@
 //! Recording new versions of a change under review.
 
 use rill_store::repo::ReviewSnapshot;
-use rill_types::{ChangeId, ChangeVersionHash, LabelVote, ReviewState, ReviewStatus, Timestamp};
+use rill_types::{
+    ChangeId, ChangeVersion, ChangeVersionHash, LabelVote, ReviewState, ReviewStatus, Timestamp,
+};
 
 use super::interdiff::VersionRelation;
 use super::retry::service_actor;
@@ -108,6 +110,7 @@ impl ReviewService {
         next.intent = cv.intent;
         let votes_copied = copy_votes(&mut next, &self.labels, old_version, new_version, relation);
         self.reanchor(&mut next, new_version).await?;
+        self.check_stack_link(&mut next, &cv).await?;
         let facts = self.change_facts(&next).await?;
         self.apply_risk(&mut next, &facts);
         let transition = self.refresh_status(&mut next, &facts)?;
@@ -170,6 +173,34 @@ fn copy_votes(
     let any = !copied.is_empty();
     state.votes.extend(copied);
     any
+}
+
+/// The review note that says a change no longer sits on the change below
+/// it in its declared stack.
+pub const STACK_NOTE: &str = "stack";
+
+impl ReviewService {
+    /// Note on `next` whether its new version `cv` still sits on the
+    /// current version of the change below it in its stack.
+    async fn check_stack_link(&self, next: &mut ReviewState, cv: &ChangeVersion) -> Result<()> {
+        let Some(pos) = next.stack.iter().position(|c| *c == next.change_id) else {
+            return Ok(());
+        };
+        let Some(below) = pos.checked_sub(1).map(|i| next.stack[i]) else {
+            next.extra.remove(STACK_NOTE);
+            return Ok(());
+        };
+        let below_version = self.get(&below).await?.current_version();
+        if cv.first_parent().is_some() && cv.first_parent() == below_version {
+            next.extra.remove(STACK_NOTE);
+        } else {
+            next.extra.insert(
+                STACK_NOTE.into(),
+                format!("not based on {below}'s current version; restack the stack"),
+            );
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

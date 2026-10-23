@@ -11,7 +11,7 @@ import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegen
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { LandRequest } from "./landing_pb.js";
 import { file_rill_v1_landing } from "./landing_pb.js";
-import type { CommentCategory, Label, LabelVote, Principal, ReviewState, ReviewStatus, RiskClass, Thread, ThreadAnchor } from "./types_pb.js";
+import type { ChangeInfo, CommentCategory, Label, LabelVote, Principal, ReviewState, ReviewStatus, RiskClass, Thread, ThreadAnchor } from "./types_pb.js";
 import { file_rill_v1_types } from "./types_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file rill/v1/review.proto.
  */
 export const file_rill_v1_review: GenFile = /*@__PURE__*/
-  fileDesc("ChRyaWxsL3YxL3Jldmlldy5wcm90bxIHcmlsbC52MSIgChBHZXRSZXZpZXdSZXF1ZXN0EgwKBG5hbWUYASABKAkiWQoRR2V0UmV2aWV3UmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZRIeCgZsYWJlbHMYAiADKAsyDi5yaWxsLnYxLkxhYmVsIjcKFkJhdGNoR2V0UmV2aWV3c1JlcXVlc3QSDgoGcGFyZW50GAEgASgJEg0KBW5hbWVzGAIgAygJIkAKF0JhdGNoR2V0UmV2aWV3c1Jlc3BvbnNlEiUKB3Jldmlld3MYASADKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIlsKEkxpc3RSZXZpZXdzUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSDgoGZmlsdGVyGAQgASgJIlUKE0xpc3RSZXZpZXdzUmVzcG9uc2USJQoHcmV2aWV3cxgBIAMoCzIULnJpbGwudjEuUmV2aWV3U3RhdGUSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjkKE1N1Ym1pdENoYW5nZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZjaGFuZ2UYAiABKAkiPAoUU3VibWl0Q2hhbmdlUmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZSKAAQoLVm90ZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZyZXZpZXcYAiABKAkSDQoFbGFiZWwYAyABKAkSDQoFdmFsdWUYBCABKAUSEwoGcmVhc29uGAUgASgJSACIAQESDwoHdmVyc2lvbhgGIAEoCUIJCgdfcmVhc29uIjQKDFZvdGVSZXNwb25zZRIkCgZyZXZpZXcYASABKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIoACChNDcmVhdGVUaHJlYWRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGcGFyZW50GAIgASgJEiUKBmFuY2hvchgDIAEoCzIVLnJpbGwudjEuVGhyZWFkQW5jaG9yEgwKBGJvZHkYBCABKAkSLwoIY2F0ZWdvcnkYBSABKA4yGC5yaWxsLnYxLkNvbW1lbnRDYXRlZ29yeUgAiAEBEhcKCmNvbmZpZGVuY2UYBiABKA1IAYgBARIjCgJ0bxgHIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsSAKIAQFCCwoJX2NhdGVnb3J5Qg0KC19jb25maWRlbmNlQgUKA190byI3ChRDcmVhdGVUaHJlYWRSZXNwb25zZRIfCgZ0aHJlYWQYASABKAsyDy5yaWxsLnYxLlRocmVhZCKqAQoSUmVwbHlUaHJlYWRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgRib2R5GAMgASgJEi8KCGNhdGVnb3J5GAQgASgOMhgucmlsbC52MS5Db21tZW50Q2F0ZWdvcnlIAIgBARIXCgpjb25maWRlbmNlGAUgASgNSAGIAQFCCwoJX2NhdGVnb3J5Qg0KC19jb25maWRlbmNlIjYKE1JlcGx5VGhyZWFkUmVzcG9uc2USHwoGdGhyZWFkGAEgASgLMg8ucmlsbC52MS5UaHJlYWQiSgoUUmVzb2x2ZVRocmVhZFJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHJlc29sdmVkGAMgASgIIjgKFVJlc29sdmVUaHJlYWRSZXNwb25zZRIfCgZ0aHJlYWQYASABKAsyDy5yaWxsLnYxLlRocmVhZCJJChJVcGRhdGVTdGFja1JlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZwYXJlbnQYAiABKAkSDwoHY2hhbmdlcxgDIAMoCSI8ChNVcGRhdGVTdGFja1Jlc3BvbnNlEiUKB3Jldmlld3MYASADKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIigKFkV2YWx1YXRlTGFuZGluZ1JlcXVlc3QSDgoGY2hhbmdlGAEgASgJIoQBCg5TdWJtaXREZWNpc2lvbhIPCgdhbGxvd2VkGAEgASgIEg8KB3JlYXNvbnMYAiADKAkSGAoQbWF0Y2hlZF9wb2xpY2llcxgDIAMoCRIgCgRyaXNrGAQgASgOMhIucmlsbC52MS5SaXNrQ2xhc3MSFAoMcmlza19yZWFzb25zGAUgAygJIkQKF0V2YWx1YXRlTGFuZGluZ1Jlc3BvbnNlEikKCGRlY2lzaW9uGAEgASgLMhcucmlsbC52MS5TdWJtaXREZWNpc2lvbiJaChRBYmFuZG9uQ2hhbmdlUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBmNoYW5nZRgCIAEoCRITCgZyZWFzb24YAyABKAlIAIgBAUIJCgdfcmVhc29uIj0KFUFiYW5kb25DaGFuZ2VSZXNwb25zZRIkCgZyZXZpZXcYASABKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIiIKEldhdGNoUmV2aWV3UmVxdWVzdBIMCgRuYW1lGAEgASgJIoICChNXYXRjaFJldmlld1Jlc3BvbnNlEhEKCWNoYW5nZV9pZBgBIAEoDBIKCgJhdBgCIAEoAxIvCg5zdGF0dXNfY2hhbmdlZBgDIAEoDjIVLnJpbGwudjEuUmV2aWV3U3RhdHVzSAASIwoFdm90ZWQYBCABKAsyEi5yaWxsLnYxLkxhYmVsVm90ZUgAEikKDnRocmVhZF91cGRhdGVkGAUgASgLMg8ucmlsbC52MS5UaHJlYWRIABIVCgtuZXdfdmVyc2lvbhgGIAEoDEgAEisKC2xhbmRfdXBkYXRlGAcgASgLMhQucmlsbC52MS5MYW5kUmVxdWVzdEgAQgcKBWV2ZW50IqIBCghPd25lclNldBIKCgJpZBgBIAEoCRILCgNkaXIYAiABKAkSDgoGb3duZXJzGAMgAygJEhAKCHJlcXVpcmVkGAQgASgNEhEKCXNlbnNpdGl2ZRgFIAEoCBITCgZzbGFfbXMYBiABKANIAIgBARIYCgtlc2NhbGF0ZV90bxgHIAEoCUgBiAEBQgkKB19zbGFfbXNCDgoMX2VzY2FsYXRlX3RvIi4KEEdldE93bmVyc1JlcXVlc3QSDAoEcmVwbxgBIAEoCRIMCgRwYXRoGAIgASgJIjQKEUdldE93bmVyc1Jlc3BvbnNlEh8KBHNldHMYASADKAsyES5yaWxsLnYxLk93bmVyU2V0IikKF0V4cGxhaW5Pd25lcnNoaXBSZXF1ZXN0Eg4KBmNoYW5nZRgBIAEoCSKVAQoOT3duZXJTZXRTdGF0dXMSHgoDc2V0GAEgASgLMhEucmlsbC52MS5Pd25lclNldBIRCglhcHByb3ZhbHMYAiABKA0SDwoHY292ZXJlZBgDIAEoCBIZCgxlc2NhbGF0ZWRfdG8YBCABKAlIAIgBARITCgtlc2NhbGF0aW9ucxgFIAEoDUIPCg1fZXNjYWxhdGVkX3RvIlIKGEV4cGxhaW5Pd25lcnNoaXBSZXNwb25zZRIlCgRzZXRzGAEgAygLMhcucmlsbC52MS5Pd25lclNldFN0YXR1cxIPCgdjb3ZlcmVkGAIgASgIMrUICg1SZXZpZXdTZXJ2aWNlEkIKCUdldFJldmlldxIZLnJpbGwudjEuR2V0UmV2aWV3UmVxdWVzdBoaLnJpbGwudjEuR2V0UmV2aWV3UmVzcG9uc2USVAoPQmF0Y2hHZXRSZXZpZXdzEh8ucmlsbC52MS5CYXRjaEdldFJldmlld3NSZXF1ZXN0GiAucmlsbC52MS5CYXRjaEdldFJldmlld3NSZXNwb25zZRJICgtMaXN0UmV2aWV3cxIbLnJpbGwudjEuTGlzdFJldmlld3NSZXF1ZXN0GhwucmlsbC52MS5MaXN0UmV2aWV3c1Jlc3BvbnNlEksKDFN1Ym1pdENoYW5nZRIcLnJpbGwudjEuU3VibWl0Q2hhbmdlUmVxdWVzdBodLnJpbGwudjEuU3VibWl0Q2hhbmdlUmVzcG9uc2USMwoEVm90ZRIULnJpbGwudjEuVm90ZVJlcXVlc3QaFS5yaWxsLnYxLlZvdGVSZXNwb25zZRJLCgxDcmVhdGVUaHJlYWQSHC5yaWxsLnYxLkNyZWF0ZVRocmVhZFJlcXVlc3QaHS5yaWxsLnYxLkNyZWF0ZVRocmVhZFJlc3BvbnNlEkgKC1JlcGx5VGhyZWFkEhsucmlsbC52MS5SZXBseVRocmVhZFJlcXVlc3QaHC5yaWxsLnYxLlJlcGx5VGhyZWFkUmVzcG9uc2USTgoNUmVzb2x2ZVRocmVhZBIdLnJpbGwudjEuUmVzb2x2ZVRocmVhZFJlcXVlc3QaHi5yaWxsLnYxLlJlc29sdmVUaHJlYWRSZXNwb25zZRJICgtVcGRhdGVTdGFjaxIbLnJpbGwudjEuVXBkYXRlU3RhY2tSZXF1ZXN0GhwucmlsbC52MS5VcGRhdGVTdGFja1Jlc3BvbnNlElQKD0V2YWx1YXRlTGFuZGluZxIfLnJpbGwudjEuRXZhbHVhdGVMYW5kaW5nUmVxdWVzdBogLnJpbGwudjEuRXZhbHVhdGVMYW5kaW5nUmVzcG9uc2USTgoNQWJhbmRvbkNoYW5nZRIdLnJpbGwudjEuQWJhbmRvbkNoYW5nZVJlcXVlc3QaHi5yaWxsLnYxLkFiYW5kb25DaGFuZ2VSZXNwb25zZRJKCgtXYXRjaFJldmlldxIbLnJpbGwudjEuV2F0Y2hSZXZpZXdSZXF1ZXN0GhwucmlsbC52MS5XYXRjaFJldmlld1Jlc3BvbnNlMAESQgoJR2V0T3duZXJzEhkucmlsbC52MS5HZXRPd25lcnNSZXF1ZXN0GhoucmlsbC52MS5HZXRPd25lcnNSZXNwb25zZRJXChBFeHBsYWluT3duZXJzaGlwEiAucmlsbC52MS5FeHBsYWluT3duZXJzaGlwUmVxdWVzdBohLnJpbGwudjEuRXhwbGFpbk93bmVyc2hpcFJlc3BvbnNlYgZwcm90bzM", [file_rill_v1_landing, file_rill_v1_types]);
+  fileDesc("ChRyaWxsL3YxL3Jldmlldy5wcm90bxIHcmlsbC52MSIgChBHZXRSZXZpZXdSZXF1ZXN0EgwKBG5hbWUYASABKAkiWQoRR2V0UmV2aWV3UmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZRIeCgZsYWJlbHMYAiADKAsyDi5yaWxsLnYxLkxhYmVsIjcKFkJhdGNoR2V0UmV2aWV3c1JlcXVlc3QSDgoGcGFyZW50GAEgASgJEg0KBW5hbWVzGAIgAygJIkAKF0JhdGNoR2V0UmV2aWV3c1Jlc3BvbnNlEiUKB3Jldmlld3MYASADKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIlsKEkxpc3RSZXZpZXdzUmVxdWVzdBIOCgZwYXJlbnQYASABKAkSEQoJcGFnZV9zaXplGAIgASgFEhIKCnBhZ2VfdG9rZW4YAyABKAkSDgoGZmlsdGVyGAQgASgJIlUKE0xpc3RSZXZpZXdzUmVzcG9uc2USJQoHcmV2aWV3cxgBIAMoCzIULnJpbGwudjEuUmV2aWV3U3RhdGUSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjkKE1N1Ym1pdENoYW5nZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZjaGFuZ2UYAiABKAkiPAoUU3VibWl0Q2hhbmdlUmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZSKAAQoLVm90ZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZyZXZpZXcYAiABKAkSDQoFbGFiZWwYAyABKAkSDQoFdmFsdWUYBCABKAUSEwoGcmVhc29uGAUgASgJSACIAQESDwoHdmVyc2lvbhgGIAEoCUIJCgdfcmVhc29uIjQKDFZvdGVSZXNwb25zZRIkCgZyZXZpZXcYASABKAsyFC5yaWxsLnYxLlJldmlld1N0YXRlIqgCChNDcmVhdGVUaHJlYWRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGcGFyZW50GAIgASgJEiUKBmFuY2hvchgDIAEoCzIVLnJpbGwudjEuVGhyZWFkQW5jaG9yEgwKBGJvZHkYBCABKAkSLwoIY2F0ZWdvcnkYBSABKA4yGC5yaWxsLnYxLkNvbW1lbnRDYXRlZ29yeUgAiAEBEhcKCmNvbmZpZGVuY2UYBiABKA1IAYgBARIjCgJ0bxgHIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsSAKIAQESFwoKc3VnZ2VzdGlvbhgIIAEoCUgDiAEBQgsKCV9jYXRlZ29yeUINCgtfY29uZmlkZW5jZUIFCgNfdG9CDQoLX3N1Z2dlc3Rpb24iNwoUQ3JlYXRlVGhyZWFkUmVzcG9uc2USHwoGdGhyZWFkGAEgASgLMg8ucmlsbC52MS5UaHJlYWQiqgEKElJlcGx5VGhyZWFkUmVxdWVzdBISCgpyZXF1ZXN0X2lkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEYm9keRgDIAEoCRIvCghjYXRlZ29yeRgEIAEoDjIYLnJpbGwudjEuQ29tbWVudENhdGVnb3J5SACIAQESFwoKY29uZmlkZW5jZRgFIAEoDUgBiAEBQgsKCV9jYXRlZ29yeUINCgtfY29uZmlkZW5jZSI2ChNSZXBseVRocmVhZFJlc3BvbnNlEh8KBnRocmVhZBgBIAEoCzIPLnJpbGwudjEuVGhyZWFkIkoKFFJlc29sdmVUaHJlYWRSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCghyZXNvbHZlZBgDIAEoCCI4ChVSZXNvbHZlVGhyZWFkUmVzcG9uc2USHwoGdGhyZWFkGAEgASgLMg8ucmlsbC52MS5UaHJlYWQiSQoSVXBkYXRlU3RhY2tSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGcGFyZW50GAIgASgJEg8KB2NoYW5nZXMYAyADKAkiPAoTVXBkYXRlU3RhY2tSZXNwb25zZRIlCgdyZXZpZXdzGAEgAygLMhQucmlsbC52MS5SZXZpZXdTdGF0ZSIoChZFdmFsdWF0ZUxhbmRpbmdSZXF1ZXN0Eg4KBmNoYW5nZRgBIAEoCSKEAQoOU3VibWl0RGVjaXNpb24SDwoHYWxsb3dlZBgBIAEoCBIPCgdyZWFzb25zGAIgAygJEhgKEG1hdGNoZWRfcG9saWNpZXMYAyADKAkSIAoEcmlzaxgEIAEoDjISLnJpbGwudjEuUmlza0NsYXNzEhQKDHJpc2tfcmVhc29ucxgFIAMoCSJEChdFdmFsdWF0ZUxhbmRpbmdSZXNwb25zZRIpCghkZWNpc2lvbhgBIAEoCzIXLnJpbGwudjEuU3VibWl0RGVjaXNpb24iWgoUQWJhbmRvbkNoYW5nZVJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZjaGFuZ2UYAiABKAkSEwoGcmVhc29uGAMgASgJSACIAQFCCQoHX3JlYXNvbiI9ChVBYmFuZG9uQ2hhbmdlUmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQucmlsbC52MS5SZXZpZXdTdGF0ZSIiChJXYXRjaFJldmlld1JlcXVlc3QSDAoEbmFtZRgBIAEoCSKCAgoTV2F0Y2hSZXZpZXdSZXNwb25zZRIRCgljaGFuZ2VfaWQYASABKAwSCgoCYXQYAiABKAMSLwoOc3RhdHVzX2NoYW5nZWQYAyABKA4yFS5yaWxsLnYxLlJldmlld1N0YXR1c0gAEiMKBXZvdGVkGAQgASgLMhIucmlsbC52MS5MYWJlbFZvdGVIABIpCg50aHJlYWRfdXBkYXRlZBgFIAEoCzIPLnJpbGwudjEuVGhyZWFkSAASFQoLbmV3X3ZlcnNpb24YBiABKAxIABIrCgtsYW5kX3VwZGF0ZRgHIAEoCzIULnJpbGwudjEuTGFuZFJlcXVlc3RIAEIHCgVldmVudCKiAQoIT3duZXJTZXQSCgoCaWQYASABKAkSCwoDZGlyGAIgASgJEg4KBm93bmVycxgDIAMoCRIQCghyZXF1aXJlZBgEIAEoDRIRCglzZW5zaXRpdmUYBSABKAgSEwoGc2xhX21zGAYgASgDSACIAQESGAoLZXNjYWxhdGVfdG8YByABKAlIAYgBAUIJCgdfc2xhX21zQg4KDF9lc2NhbGF0ZV90byIuChBHZXRPd25lcnNSZXF1ZXN0EgwKBHJlcG8YASABKAkSDAoEcGF0aBgCIAEoCSI0ChFHZXRPd25lcnNSZXNwb25zZRIfCgRzZXRzGAEgAygLMhEucmlsbC52MS5Pd25lclNldCIpChdFeHBsYWluT3duZXJzaGlwUmVxdWVzdBIOCgZjaGFuZ2UYASABKAkilQEKDk93bmVyU2V0U3RhdHVzEh4KA3NldBgBIAEoCzIRLnJpbGwudjEuT3duZXJTZXQSEQoJYXBwcm92YWxzGAIgASgNEg8KB2NvdmVyZWQYAyABKAgSGQoMZXNjYWxhdGVkX3RvGAQgASgJSACIAQESEwoLZXNjYWxhdGlvbnMYBSABKA1CDwoNX2VzY2FsYXRlZF90byJSChhFeHBsYWluT3duZXJzaGlwUmVzcG9uc2USJQoEc2V0cxgBIAMoCzIXLnJpbGwudjEuT3duZXJTZXRTdGF0dXMSDwoHY292ZXJlZBgCIAEoCCI/ChNHZXRJbnRlcmRpZmZSZXF1ZXN0Eg4KBmNoYW5nZRgBIAEoCRIMCgRmcm9tGAIgASgJEgoKAnRvGAMgASgJIk4KDUludGVyZGlmZkZpbGUSDAoEcGF0aBgBIAEoCRIPCgd1bmlmaWVkGAIgASgJEg0KBWFkZGVkGAMgASgIEg8KB2RlbGV0ZWQYBCABKAgiaAoUR2V0SW50ZXJkaWZmUmVzcG9uc2USDAoEZnJvbRgBIAEoCRIKCgJ0bxgCIAEoCRIlCgVmaWxlcxgDIAMoCzIWLnJpbGwudjEuSW50ZXJkaWZmRmlsZRIPCgdyZWJhc2VkGAQgAygJIjwKFkFwcGx5U3VnZ2VzdGlvblJlcXVlc3QSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZ0aHJlYWQYAiABKAkiPAoXQXBwbHlTdWdnZXN0aW9uUmVzcG9uc2USIQoEaW5mbxgBIAEoCzITLnJpbGwudjEuQ2hhbmdlSW5mbyI5ChNSZW9wZW5DaGFuZ2VSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGY2hhbmdlGAIgASgJIjwKFFJlb3BlbkNoYW5nZVJlc3BvbnNlEiQKBnJldmlldxgBIAEoCzIULnJpbGwudjEuUmV2aWV3U3RhdGUypQoKDVJldmlld1NlcnZpY2USQgoJR2V0UmV2aWV3EhkucmlsbC52MS5HZXRSZXZpZXdSZXF1ZXN0GhoucmlsbC52MS5HZXRSZXZpZXdSZXNwb25zZRJUCg9CYXRjaEdldFJldmlld3MSHy5yaWxsLnYxLkJhdGNoR2V0UmV2aWV3c1JlcXVlc3QaIC5yaWxsLnYxLkJhdGNoR2V0UmV2aWV3c1Jlc3BvbnNlEkgKC0xpc3RSZXZpZXdzEhsucmlsbC52MS5MaXN0UmV2aWV3c1JlcXVlc3QaHC5yaWxsLnYxLkxpc3RSZXZpZXdzUmVzcG9uc2USSwoMU3VibWl0Q2hhbmdlEhwucmlsbC52MS5TdWJtaXRDaGFuZ2VSZXF1ZXN0Gh0ucmlsbC52MS5TdWJtaXRDaGFuZ2VSZXNwb25zZRIzCgRWb3RlEhQucmlsbC52MS5Wb3RlUmVxdWVzdBoVLnJpbGwudjEuVm90ZVJlc3BvbnNlEksKDENyZWF0ZVRocmVhZBIcLnJpbGwudjEuQ3JlYXRlVGhyZWFkUmVxdWVzdBodLnJpbGwudjEuQ3JlYXRlVGhyZWFkUmVzcG9uc2USSAoLUmVwbHlUaHJlYWQSGy5yaWxsLnYxLlJlcGx5VGhyZWFkUmVxdWVzdBocLnJpbGwudjEuUmVwbHlUaHJlYWRSZXNwb25zZRJOCg1SZXNvbHZlVGhyZWFkEh0ucmlsbC52MS5SZXNvbHZlVGhyZWFkUmVxdWVzdBoeLnJpbGwudjEuUmVzb2x2ZVRocmVhZFJlc3BvbnNlEkgKC1VwZGF0ZVN0YWNrEhsucmlsbC52MS5VcGRhdGVTdGFja1JlcXVlc3QaHC5yaWxsLnYxLlVwZGF0ZVN0YWNrUmVzcG9uc2USVAoPRXZhbHVhdGVMYW5kaW5nEh8ucmlsbC52MS5FdmFsdWF0ZUxhbmRpbmdSZXF1ZXN0GiAucmlsbC52MS5FdmFsdWF0ZUxhbmRpbmdSZXNwb25zZRJOCg1BYmFuZG9uQ2hhbmdlEh0ucmlsbC52MS5BYmFuZG9uQ2hhbmdlUmVxdWVzdBoeLnJpbGwudjEuQWJhbmRvbkNoYW5nZVJlc3BvbnNlEkoKC1dhdGNoUmV2aWV3EhsucmlsbC52MS5XYXRjaFJldmlld1JlcXVlc3QaHC5yaWxsLnYxLldhdGNoUmV2aWV3UmVzcG9uc2UwARJCCglHZXRPd25lcnMSGS5yaWxsLnYxLkdldE93bmVyc1JlcXVlc3QaGi5yaWxsLnYxLkdldE93bmVyc1Jlc3BvbnNlElcKEEV4cGxhaW5Pd25lcnNoaXASIC5yaWxsLnYxLkV4cGxhaW5Pd25lcnNoaXBSZXF1ZXN0GiEucmlsbC52MS5FeHBsYWluT3duZXJzaGlwUmVzcG9uc2USSwoMR2V0SW50ZXJkaWZmEhwucmlsbC52MS5HZXRJbnRlcmRpZmZSZXF1ZXN0Gh0ucmlsbC52MS5HZXRJbnRlcmRpZmZSZXNwb25zZRJUCg9BcHBseVN1Z2dlc3Rpb24SHy5yaWxsLnYxLkFwcGx5U3VnZ2VzdGlvblJlcXVlc3QaIC5yaWxsLnYxLkFwcGx5U3VnZ2VzdGlvblJlc3BvbnNlEksKDFJlb3BlbkNoYW5nZRIcLnJpbGwudjEuUmVvcGVuQ2hhbmdlUmVxdWVzdBodLnJpbGwudjEuUmVvcGVuQ2hhbmdlUmVzcG9uc2ViBnByb3RvMw", [file_rill_v1_landing, file_rill_v1_types]);
 
 /**
  * @generated from message rill.v1.GetReviewRequest
@@ -314,6 +314,14 @@ export type CreateThreadRequest = Message<"rill.v1.CreateThreadRequest"> & {
    * @generated from field: optional rill.v1.Principal to = 7;
    */
   to?: Principal | undefined;
+
+  /**
+   * Replacement text for the anchored lines (a `lines` anchor on the
+   * current version), which the change's author can apply.
+   *
+   * @generated from field: optional string suggestion = 8;
+   */
+  suggestion?: string | undefined;
 };
 
 /**
@@ -879,6 +887,188 @@ export const ExplainOwnershipResponseSchema: GenMessage<ExplainOwnershipResponse
   messageDesc(file_rill_v1_review, 30);
 
 /**
+ * @generated from message rill.v1.GetInterdiffRequest
+ */
+export type GetInterdiffRequest = Message<"rill.v1.GetInterdiffRequest"> & {
+  /**
+   * `…/changes/{change}`. Required.
+   *
+   * @generated from field: string change = 1;
+   */
+  change: string;
+
+  /**
+   * The versions compared; empty `to` is the current version, empty
+   * `from` the one before it.
+   *
+   * @generated from field: string from = 2;
+   */
+  from: string;
+
+  /**
+   * @generated from field: string to = 3;
+   */
+  to: string;
+};
+
+/**
+ * Describes the message rill.v1.GetInterdiffRequest.
+ * Use `create(GetInterdiffRequestSchema)` to create a new message.
+ */
+export const GetInterdiffRequestSchema: GenMessage<GetInterdiffRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 31);
+
+/**
+ * @generated from message rill.v1.InterdiffFile
+ */
+export type InterdiffFile = Message<"rill.v1.InterdiffFile"> & {
+  /**
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * Unified diff from the old version's content to the new one's.
+   *
+   * @generated from field: string unified = 2;
+   */
+  unified: string;
+
+  /**
+   * @generated from field: bool added = 3;
+   */
+  added: boolean;
+
+  /**
+   * @generated from field: bool deleted = 4;
+   */
+  deleted: boolean;
+};
+
+/**
+ * Describes the message rill.v1.InterdiffFile.
+ * Use `create(InterdiffFileSchema)` to create a new message.
+ */
+export const InterdiffFileSchema: GenMessage<InterdiffFile> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 32);
+
+/**
+ * @generated from message rill.v1.GetInterdiffResponse
+ */
+export type GetInterdiffResponse = Message<"rill.v1.GetInterdiffResponse"> & {
+  /**
+   * @generated from field: string from = 1;
+   */
+  from: string;
+
+  /**
+   * @generated from field: string to = 2;
+   */
+  to: string;
+
+  /**
+   * @generated from field: repeated rill.v1.InterdiffFile files = 3;
+   */
+  files: InterdiffFile[];
+
+  /**
+   * Paths whose patch is the same in both: they moved with the base only.
+   *
+   * @generated from field: repeated string rebased = 4;
+   */
+  rebased: string[];
+};
+
+/**
+ * Describes the message rill.v1.GetInterdiffResponse.
+ * Use `create(GetInterdiffResponseSchema)` to create a new message.
+ */
+export const GetInterdiffResponseSchema: GenMessage<GetInterdiffResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 33);
+
+/**
+ * @generated from message rill.v1.ApplySuggestionRequest
+ */
+export type ApplySuggestionRequest = Message<"rill.v1.ApplySuggestionRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * `…/review/threads/{thread}`. Required.
+   *
+   * @generated from field: string thread = 2;
+   */
+  thread: string;
+};
+
+/**
+ * Describes the message rill.v1.ApplySuggestionRequest.
+ * Use `create(ApplySuggestionRequestSchema)` to create a new message.
+ */
+export const ApplySuggestionRequestSchema: GenMessage<ApplySuggestionRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 34);
+
+/**
+ * @generated from message rill.v1.ApplySuggestionResponse
+ */
+export type ApplySuggestionResponse = Message<"rill.v1.ApplySuggestionResponse"> & {
+  /**
+   * @generated from field: rill.v1.ChangeInfo info = 1;
+   */
+  info?: ChangeInfo | undefined;
+};
+
+/**
+ * Describes the message rill.v1.ApplySuggestionResponse.
+ * Use `create(ApplySuggestionResponseSchema)` to create a new message.
+ */
+export const ApplySuggestionResponseSchema: GenMessage<ApplySuggestionResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 35);
+
+/**
+ * @generated from message rill.v1.ReopenChangeRequest
+ */
+export type ReopenChangeRequest = Message<"rill.v1.ReopenChangeRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * `…/changes/{change}`. Required.
+   *
+   * @generated from field: string change = 2;
+   */
+  change: string;
+};
+
+/**
+ * Describes the message rill.v1.ReopenChangeRequest.
+ * Use `create(ReopenChangeRequestSchema)` to create a new message.
+ */
+export const ReopenChangeRequestSchema: GenMessage<ReopenChangeRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 36);
+
+/**
+ * @generated from message rill.v1.ReopenChangeResponse
+ */
+export type ReopenChangeResponse = Message<"rill.v1.ReopenChangeResponse"> & {
+  /**
+   * @generated from field: rill.v1.ReviewState review = 1;
+   */
+  review?: ReviewState | undefined;
+};
+
+/**
+ * Describes the message rill.v1.ReopenChangeResponse.
+ * Use `create(ReopenChangeResponseSchema)` to create a new message.
+ */
+export const ReopenChangeResponseSchema: GenMessage<ReopenChangeResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_review, 37);
+
+/**
  * Reviews of changes.
  *
  * @generated from service rill.v1.ReviewService
@@ -1023,6 +1213,37 @@ export const ReviewService: GenService<{
     methodKind: "unary";
     input: typeof ExplainOwnershipRequestSchema;
     output: typeof ExplainOwnershipResponseSchema;
+  },
+  /**
+   * What the author changed between two versions of a change, with paths
+   * that only moved with a rebase listed apart.
+   *
+   * @generated from rpc rill.v1.ReviewService.GetInterdiff
+   */
+  getInterdiff: {
+    methodKind: "unary";
+    input: typeof GetInterdiffRequestSchema;
+    output: typeof GetInterdiffResponseSchema;
+  },
+  /**
+   * Apply a thread's suggested edit as a new version (the change's owner).
+   *
+   * @generated from rpc rill.v1.ReviewService.ApplySuggestion
+   */
+  applySuggestion: {
+    methodKind: "unary";
+    input: typeof ApplySuggestionRequestSchema;
+    output: typeof ApplySuggestionResponseSchema;
+  },
+  /**
+   * Reopen an abandoned change.
+   *
+   * @generated from rpc rill.v1.ReviewService.ReopenChange
+   */
+  reopenChange: {
+    methodKind: "unary";
+    input: typeof ReopenChangeRequestSchema;
+    output: typeof ReopenChangeResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_rill_v1_review, 0);

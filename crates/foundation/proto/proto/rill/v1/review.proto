@@ -39,6 +39,13 @@ service ReviewService {
   rpc GetOwners(GetOwnersRequest) returns (GetOwnersResponse);
   // Each owner set a change touches, with its approvals and escalation.
   rpc ExplainOwnership(ExplainOwnershipRequest) returns (ExplainOwnershipResponse);
+  // What the author changed between two versions of a change, with paths
+  // that only moved with a rebase listed apart.
+  rpc GetInterdiff(GetInterdiffRequest) returns (GetInterdiffResponse);
+  // Apply a thread's suggested edit as a new version (the change's owner).
+  rpc ApplySuggestion(ApplySuggestionRequest) returns (ApplySuggestionResponse);
+  // Reopen an abandoned change.
+  rpc ReopenChange(ReopenChangeRequest) returns (ReopenChangeResponse);
 }
 
 message GetReviewRequest {
@@ -109,6 +116,9 @@ message CreateThreadRequest {
   optional CommentCategory category = 5;
   optional uint32 confidence = 6;
   optional Principal to = 7;
+  // Replacement text for the anchored lines (a `lines` anchor on the
+  // current version), which the change's author can apply.
+  optional string suggestion = 8;
 }
 message CreateThreadResponse {
   Thread thread = 1;
@@ -238,3 +248,44 @@ message ExplainOwnershipResponse {
   bool covered = 2;
 }
 
+
+message GetInterdiffRequest {
+  // `…/changes/{change}`. Required.
+  string change = 1;
+  // The versions compared; empty `to` is the current version, empty
+  // `from` the one before it.
+  string from = 2;
+  string to = 3;
+}
+message InterdiffFile {
+  string path = 1;
+  // Unified diff from the old version's content to the new one's.
+  string unified = 2;
+  bool added = 3;
+  bool deleted = 4;
+}
+message GetInterdiffResponse {
+  string from = 1;
+  string to = 2;
+  repeated InterdiffFile files = 3;
+  // Paths whose patch is the same in both: they moved with the base only.
+  repeated string rebased = 4;
+}
+
+message ApplySuggestionRequest {
+  string request_id = 1;
+  // `…/review/threads/{thread}`. Required.
+  string thread = 2;
+}
+message ApplySuggestionResponse {
+  ChangeInfo info = 1;
+}
+
+message ReopenChangeRequest {
+  string request_id = 1;
+  // `…/changes/{change}`. Required.
+  string change = 2;
+}
+message ReopenChangeResponse {
+  ReviewState review = 1;
+}

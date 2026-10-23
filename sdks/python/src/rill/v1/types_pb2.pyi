@@ -535,34 +535,38 @@ class ThreadAnchor(_message.Message):
     def __init__(self, change: _Optional[_Union[ThreadAnchor.Change, _Mapping]] = ..., lines: _Optional[_Union[ThreadAnchor.Lines, _Mapping]] = ..., file: _Optional[_Union[ThreadAnchor.File, _Mapping]] = ...) -> None: ...
 
 class Comment(_message.Message):
-    __slots__ = ("author", "body", "created_at", "category", "confidence")
+    __slots__ = ("author", "body", "created_at", "category", "confidence", "suggestion")
     AUTHOR_FIELD_NUMBER: _ClassVar[int]
     BODY_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     CONFIDENCE_FIELD_NUMBER: _ClassVar[int]
+    SUGGESTION_FIELD_NUMBER: _ClassVar[int]
     author: Principal
     body: str
     created_at: int
     category: CommentCategory
     confidence: int
-    def __init__(self, author: _Optional[_Union[Principal, _Mapping]] = ..., body: _Optional[str] = ..., created_at: _Optional[int] = ..., category: _Optional[_Union[CommentCategory, str]] = ..., confidence: _Optional[int] = ...) -> None: ...
+    suggestion: str
+    def __init__(self, author: _Optional[_Union[Principal, _Mapping]] = ..., body: _Optional[str] = ..., created_at: _Optional[int] = ..., category: _Optional[_Union[CommentCategory, str]] = ..., confidence: _Optional[int] = ..., suggestion: _Optional[str] = ...) -> None: ...
 
 class Thread(_message.Message):
-    __slots__ = ("name", "id", "anchor", "comments", "resolved", "to")
+    __slots__ = ("name", "id", "anchor", "comments", "resolved", "to", "outdated")
     NAME_FIELD_NUMBER: _ClassVar[int]
     ID_FIELD_NUMBER: _ClassVar[int]
     ANCHOR_FIELD_NUMBER: _ClassVar[int]
     COMMENTS_FIELD_NUMBER: _ClassVar[int]
     RESOLVED_FIELD_NUMBER: _ClassVar[int]
     TO_FIELD_NUMBER: _ClassVar[int]
+    OUTDATED_FIELD_NUMBER: _ClassVar[int]
     name: str
     id: str
     anchor: ThreadAnchor
     comments: _containers.RepeatedCompositeFieldContainer[Comment]
     resolved: bool
     to: Principal
-    def __init__(self, name: _Optional[str] = ..., id: _Optional[str] = ..., anchor: _Optional[_Union[ThreadAnchor, _Mapping]] = ..., comments: _Optional[_Iterable[_Union[Comment, _Mapping]]] = ..., resolved: _Optional[bool] = ..., to: _Optional[_Union[Principal, _Mapping]] = ...) -> None: ...
+    outdated: bool
+    def __init__(self, name: _Optional[str] = ..., id: _Optional[str] = ..., anchor: _Optional[_Union[ThreadAnchor, _Mapping]] = ..., comments: _Optional[_Iterable[_Union[Comment, _Mapping]]] = ..., resolved: _Optional[bool] = ..., to: _Optional[_Union[Principal, _Mapping]] = ..., outdated: _Optional[bool] = ...) -> None: ...
 
 class ReviewState(_message.Message):
     __slots__ = ("name", "change_id", "versions", "status", "intent", "owner", "votes", "threads", "risk", "risk_reasons", "stack", "landed_seq", "created_at", "updated_at", "extra")

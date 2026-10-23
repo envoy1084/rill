@@ -37,14 +37,28 @@ impl ReviewService {
         confidence: Option<u8>,
         to: Option<Principal>,
     ) -> Result<String> {
+        let first = comment(author, body.into(), category, confidence);
+        self.open_thread(change_id, author, anchor, first, to).await
+    }
+
+    /// Open a thread whose first comment is `first`.
+    pub(crate) async fn open_thread(
+        &self,
+        change_id: &ChangeId,
+        author: &Principal,
+        anchor: ThreadAnchor,
+        first: Comment,
+        to: Option<Principal>,
+    ) -> Result<String> {
         let anchor = self.fill_context_hash(anchor).await?;
         let thread_id = new_thread_id();
         let thread = Thread {
             id: thread_id.clone(),
             anchor,
-            comments: vec![comment(author, body.into(), category, confidence)],
+            comments: vec![first],
             resolved: false,
             to,
+            outdated: false,
         };
         self.update(change_id, author, |s| {
             s.threads.push(thread.clone());
@@ -134,7 +148,7 @@ impl ReviewService {
         Ok(state)
     }
 
-    async fn fill_context_hash(&self, anchor: ThreadAnchor) -> Result<ThreadAnchor> {
+    pub(crate) async fn fill_context_hash(&self, anchor: ThreadAnchor) -> Result<ThreadAnchor> {
         match anchor {
             ThreadAnchor::Lines {
                 version,
@@ -158,7 +172,7 @@ impl ReviewService {
     }
 }
 
-fn comment(
+pub(crate) fn comment(
     author: &Principal,
     body: String,
     category: Option<CommentCategory>,
@@ -170,6 +184,7 @@ fn comment(
         created_at: Timestamp::now(),
         category,
         confidence: confidence.map(|c| c.min(100)),
+        suggestion: None,
     }
 }
 

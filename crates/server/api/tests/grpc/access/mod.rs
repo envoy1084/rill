@@ -6,6 +6,7 @@ mod grants;
 mod holes;
 mod intents;
 mod matrix;
+mod mechanics;
 mod owners;
 mod policy_code;
 mod raw;

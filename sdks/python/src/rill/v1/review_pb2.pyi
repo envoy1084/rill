@@ -93,7 +93,7 @@ class VoteResponse(_message.Message):
     def __init__(self, review: _Optional[_Union[_types_pb2.ReviewState, _Mapping]] = ...) -> None: ...
 
 class CreateThreadRequest(_message.Message):
-    __slots__ = ("request_id", "parent", "anchor", "body", "category", "confidence", "to")
+    __slots__ = ("request_id", "parent", "anchor", "body", "category", "confidence", "to", "suggestion")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     PARENT_FIELD_NUMBER: _ClassVar[int]
     ANCHOR_FIELD_NUMBER: _ClassVar[int]
@@ -101,6 +101,7 @@ class CreateThreadRequest(_message.Message):
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     CONFIDENCE_FIELD_NUMBER: _ClassVar[int]
     TO_FIELD_NUMBER: _ClassVar[int]
+    SUGGESTION_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     parent: str
     anchor: _types_pb2.ThreadAnchor
@@ -108,7 +109,8 @@ class CreateThreadRequest(_message.Message):
     category: _types_pb2.CommentCategory
     confidence: int
     to: _types_pb2.Principal
-    def __init__(self, request_id: _Optional[str] = ..., parent: _Optional[str] = ..., anchor: _Optional[_Union[_types_pb2.ThreadAnchor, _Mapping]] = ..., body: _Optional[str] = ..., category: _Optional[_Union[_types_pb2.CommentCategory, str]] = ..., confidence: _Optional[int] = ..., to: _Optional[_Union[_types_pb2.Principal, _Mapping]] = ...) -> None: ...
+    suggestion: str
+    def __init__(self, request_id: _Optional[str] = ..., parent: _Optional[str] = ..., anchor: _Optional[_Union[_types_pb2.ThreadAnchor, _Mapping]] = ..., body: _Optional[str] = ..., category: _Optional[_Union[_types_pb2.CommentCategory, str]] = ..., confidence: _Optional[int] = ..., to: _Optional[_Union[_types_pb2.Principal, _Mapping]] = ..., suggestion: _Optional[str] = ...) -> None: ...
 
 class CreateThreadResponse(_message.Message):
     __slots__ = ("thread",)
@@ -293,3 +295,63 @@ class ExplainOwnershipResponse(_message.Message):
     sets: _containers.RepeatedCompositeFieldContainer[OwnerSetStatus]
     covered: bool
     def __init__(self, sets: _Optional[_Iterable[_Union[OwnerSetStatus, _Mapping]]] = ..., covered: _Optional[bool] = ...) -> None: ...
+
+class GetInterdiffRequest(_message.Message):
+    __slots__ = ("change", "to")
+    CHANGE_FIELD_NUMBER: _ClassVar[int]
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    change: str
+    to: str
+    def __init__(self, change: _Optional[str] = ..., to: _Optional[str] = ..., **kwargs) -> None: ...
+
+class InterdiffFile(_message.Message):
+    __slots__ = ("path", "unified", "added", "deleted")
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    UNIFIED_FIELD_NUMBER: _ClassVar[int]
+    ADDED_FIELD_NUMBER: _ClassVar[int]
+    DELETED_FIELD_NUMBER: _ClassVar[int]
+    path: str
+    unified: str
+    added: bool
+    deleted: bool
+    def __init__(self, path: _Optional[str] = ..., unified: _Optional[str] = ..., added: _Optional[bool] = ..., deleted: _Optional[bool] = ...) -> None: ...
+
+class GetInterdiffResponse(_message.Message):
+    __slots__ = ("to", "files", "rebased")
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    FILES_FIELD_NUMBER: _ClassVar[int]
+    REBASED_FIELD_NUMBER: _ClassVar[int]
+    to: str
+    files: _containers.RepeatedCompositeFieldContainer[InterdiffFile]
+    rebased: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, to: _Optional[str] = ..., files: _Optional[_Iterable[_Union[InterdiffFile, _Mapping]]] = ..., rebased: _Optional[_Iterable[str]] = ..., **kwargs) -> None: ...
+
+class ApplySuggestionRequest(_message.Message):
+    __slots__ = ("request_id", "thread")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    THREAD_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    thread: str
+    def __init__(self, request_id: _Optional[str] = ..., thread: _Optional[str] = ...) -> None: ...
+
+class ApplySuggestionResponse(_message.Message):
+    __slots__ = ("info",)
+    INFO_FIELD_NUMBER: _ClassVar[int]
+    info: _types_pb2.ChangeInfo
+    def __init__(self, info: _Optional[_Union[_types_pb2.ChangeInfo, _Mapping]] = ...) -> None: ...
+
+class ReopenChangeRequest(_message.Message):
+    __slots__ = ("request_id", "change")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    CHANGE_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    change: str
+    def __init__(self, request_id: _Optional[str] = ..., change: _Optional[str] = ...) -> None: ...
+
+class ReopenChangeResponse(_message.Message):
+    __slots__ = ("review",)
+    REVIEW_FIELD_NUMBER: _ClassVar[int]
+    review: _types_pb2.ReviewState
+    def __init__(self, review: _Optional[_Union[_types_pb2.ReviewState, _Mapping]] = ...) -> None: ...

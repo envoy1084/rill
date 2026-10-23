@@ -73,9 +73,10 @@ pub struct NewComment {
     pub confidence: Option<u8>,
     /// Who the thread is directed at.
     pub to: Option<Principal>,
+    /// Replacement text for the anchored lines, which the change's owner
+    /// can apply.
+    pub suggestion: Option<String>,
 }
-
-impl NewComment {}
 
 /// A reply on an existing thread.
 #[derive(Debug, Clone, PartialEq, Eq)]

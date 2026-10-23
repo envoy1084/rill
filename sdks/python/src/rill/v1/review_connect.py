@@ -59,6 +59,15 @@ class ReviewService(Protocol):
     async def explain_ownership(self, request: rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_interdiff(self, request: rill_dot_v1_dot_review__pb2.GetInterdiffRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.GetInterdiffResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def apply_suggestion(self, request: rill_dot_v1_dot_review__pb2.ApplySuggestionRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.ApplySuggestionResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def reopen_change(self, request: rill_dot_v1_dot_review__pb2.ReopenChangeRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.ReopenChangeResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class ReviewServiceASGIApplication(ConnectASGIApplication[ReviewService]):
     def __init__(self, service: ReviewService | AsyncGenerator[ReviewService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None) -> None:
@@ -204,6 +213,36 @@ class ReviewServiceASGIApplication(ConnectASGIApplication[ReviewService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.explain_ownership,
+                ),
+                "/rill.v1.ReviewService/GetInterdiff": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetInterdiff",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.GetInterdiffRequest,
+                        output=rill_dot_v1_dot_review__pb2.GetInterdiffResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_interdiff,
+                ),
+                "/rill.v1.ReviewService/ApplySuggestion": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ApplySuggestion",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.ApplySuggestionRequest,
+                        output=rill_dot_v1_dot_review__pb2.ApplySuggestionResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.apply_suggestion,
+                ),
+                "/rill.v1.ReviewService/ReopenChange": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ReopenChange",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.ReopenChangeRequest,
+                        output=rill_dot_v1_dot_review__pb2.ReopenChangeResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.reopen_change,
                 ),
             },
             interceptors=interceptors,
@@ -498,6 +537,66 @@ class ReviewServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_interdiff(
+        self,
+        request: rill_dot_v1_dot_review__pb2.GetInterdiffRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.GetInterdiffResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetInterdiff",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.GetInterdiffRequest,
+                output=rill_dot_v1_dot_review__pb2.GetInterdiffResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def apply_suggestion(
+        self,
+        request: rill_dot_v1_dot_review__pb2.ApplySuggestionRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.ApplySuggestionResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ApplySuggestion",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.ApplySuggestionRequest,
+                output=rill_dot_v1_dot_review__pb2.ApplySuggestionResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def reopen_change(
+        self,
+        request: rill_dot_v1_dot_review__pb2.ReopenChangeRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.ReopenChangeResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ReopenChange",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.ReopenChangeRequest,
+                output=rill_dot_v1_dot_review__pb2.ReopenChangeResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 class ReviewServiceSync(Protocol):
     def get_review(self, request: rill_dot_v1_dot_review__pb2.GetReviewRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.GetReviewResponse:
@@ -527,6 +626,12 @@ class ReviewServiceSync(Protocol):
     def get_owners(self, request: rill_dot_v1_dot_review__pb2.GetOwnersRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.GetOwnersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def explain_ownership(self, request: rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_interdiff(self, request: rill_dot_v1_dot_review__pb2.GetInterdiffRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.GetInterdiffResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def apply_suggestion(self, request: rill_dot_v1_dot_review__pb2.ApplySuggestionRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.ApplySuggestionResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def reopen_change(self, request: rill_dot_v1_dot_review__pb2.ReopenChangeRequest, ctx: RequestContext) -> rill_dot_v1_dot_review__pb2.ReopenChangeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -673,6 +778,36 @@ class ReviewServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.explain_ownership,
+                ),
+                "/rill.v1.ReviewService/GetInterdiff": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetInterdiff",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.GetInterdiffRequest,
+                        output=rill_dot_v1_dot_review__pb2.GetInterdiffResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_interdiff,
+                ),
+                "/rill.v1.ReviewService/ApplySuggestion": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ApplySuggestion",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.ApplySuggestionRequest,
+                        output=rill_dot_v1_dot_review__pb2.ApplySuggestionResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.apply_suggestion,
+                ),
+                "/rill.v1.ReviewService/ReopenChange": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ReopenChange",
+                        service_name="rill.v1.ReviewService",
+                        input=rill_dot_v1_dot_review__pb2.ReopenChangeRequest,
+                        output=rill_dot_v1_dot_review__pb2.ReopenChangeResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.reopen_change,
                 ),
             },
             interceptors=interceptors,
@@ -961,6 +1096,66 @@ class ReviewServiceClientSync(ConnectClientSync):
                 service_name="rill.v1.ReviewService",
                 input=rill_dot_v1_dot_review__pb2.ExplainOwnershipRequest,
                 output=rill_dot_v1_dot_review__pb2.ExplainOwnershipResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_interdiff(
+        self,
+        request: rill_dot_v1_dot_review__pb2.GetInterdiffRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.GetInterdiffResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetInterdiff",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.GetInterdiffRequest,
+                output=rill_dot_v1_dot_review__pb2.GetInterdiffResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def apply_suggestion(
+        self,
+        request: rill_dot_v1_dot_review__pb2.ApplySuggestionRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.ApplySuggestionResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ApplySuggestion",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.ApplySuggestionRequest,
+                output=rill_dot_v1_dot_review__pb2.ApplySuggestionResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def reopen_change(
+        self,
+        request: rill_dot_v1_dot_review__pb2.ReopenChangeRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_review__pb2.ReopenChangeResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ReopenChange",
+                service_name="rill.v1.ReviewService",
+                input=rill_dot_v1_dot_review__pb2.ReopenChangeRequest,
+                output=rill_dot_v1_dot_review__pb2.ReopenChangeResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

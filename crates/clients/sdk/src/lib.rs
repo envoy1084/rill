@@ -49,6 +49,7 @@ pub mod protection;
 pub mod read_stats;
 pub mod repo;
 pub mod review;
+mod review_mechanics;
 pub mod reviewers;
 pub mod secrets;
 pub mod stack;

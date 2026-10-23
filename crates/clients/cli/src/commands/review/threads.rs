@@ -27,7 +27,7 @@ pub async fn comment(ctx: &mut Ctx<'_>, args: CommentArgs) -> Result<()> {
                     version,
                     path,
                     start: line,
-                    end: line,
+                    end: args.end_line.unwrap_or(line).max(line),
                     context_hash: String::new(),
                 },
             }
@@ -39,6 +39,7 @@ pub async fn comment(ctx: &mut Ctx<'_>, args: CommentArgs) -> Result<()> {
         category: None,
         confidence: None,
         to: None,
+        suggestion: args.suggest,
     };
     let thread = repo.reviews().comment(id, new).await?;
     ctx.emit(json::new_thread(&thread), |out| {

@@ -28,5 +28,8 @@ pub async fn run(ctx: &mut Ctx<'_>, cmd: ReviewCmd) -> Result<()> {
         ReviewCmd::Audits => super::attention::audits(ctx).await,
         ReviewCmd::Audit(args) => super::attention::audit(ctx, args).await,
         ReviewCmd::Batch(args) => super::attention::batch(ctx, args).await,
+        ReviewCmd::Interdiff(args) => super::mechanics::interdiff(ctx, args).await,
+        ReviewCmd::Apply(args) => super::mechanics::apply(ctx, args).await,
+        ReviewCmd::Reopen(args) => super::mechanics::reopen(ctx, args).await,
     }
 }

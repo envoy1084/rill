@@ -187,4 +187,41 @@ impl ReviewService for ReviewSvc {
         let request = Call::new(ctx, request);
         Ok(Response::new(self.watch_review_impl(request).await?))
     }
+
+    async fn get_interdiff(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GetInterdiffRequest>,
+    ) -> GrpcResult<pb::GetInterdiffResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.get_interdiff_impl(request).await?))
+    }
+
+    async fn apply_suggestion(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ApplySuggestionRequest>,
+    ) -> GrpcResult<pb::ApplySuggestionResponse> {
+        let request = Call::new(ctx, request);
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(self.apply_suggestion_impl(r).await?))
+            })
+            .await?,
+        )
+    }
+
+    async fn reopen_change(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ReopenChangeRequest>,
+    ) -> GrpcResult<pb::ReopenChangeResponse> {
+        let request = Call::new(ctx, request);
+        Ok(
+            crate::services::idem::once(&self.state, request, |r| async move {
+                Ok(Response::new(self.reopen_change_impl(r).await?))
+            })
+            .await?,
+        )
+    }
 }

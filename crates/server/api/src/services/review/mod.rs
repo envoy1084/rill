@@ -2,6 +2,7 @@
 //! with resource names and pages.
 
 mod feedback;
+mod mechanics;
 mod owners;
 mod ownership;
 mod reviews;

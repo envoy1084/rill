@@ -44,9 +44,16 @@ impl Consumer for Recorder {
         let Some(digest) = landing.policy else {
             return Ok(());
         };
-        let Some(state) = ctx.repo.get_review(change).await? else {
+        let Some(mut state) = ctx.repo.get_review(change).await? else {
             return Ok(());
         };
+        // The review ends on the landed version; the decision was made on
+        // the version requested.
+        if landing.requested_version != landing.version
+            && state.current_version() == Some(landing.version)
+        {
+            state.versions.pop();
+        }
         let review = ctx.review();
         let text = policy_text(&ctx.repo, &digest).await?;
         let policy = match &text {

@@ -182,6 +182,7 @@ impl From<&Comment> for pb::Comment {
             created_at: timestamp_to_proto(c.created_at),
             category: c.category.map(|c| pb::CommentCategory::from(c).into()),
             confidence: c.confidence.map(u32::from),
+            suggestion: c.suggestion.clone(),
         }
     }
 }
@@ -202,6 +203,7 @@ impl TryFrom<pb::Comment> for Comment {
                 .confidence
                 .map(|v| confidence_from_proto("comment.confidence", v))
                 .transpose()?,
+            suggestion: c.suggestion,
         })
     }
 }
@@ -215,6 +217,7 @@ impl From<&Thread> for pb::Thread {
             comments: t.comments.iter().map(pb::Comment::from).collect(),
             resolved: t.resolved,
             to: t.to.as_ref().map(pb::Principal::from).into(),
+            outdated: t.outdated,
         }
     }
 }
@@ -233,6 +236,7 @@ impl TryFrom<pb::Thread> for Thread {
                 .collect::<Result<_>>()?,
             resolved: t.resolved,
             to: t.to.map(Principal::try_from).transpose()?,
+            outdated: t.outdated,
         })
     }
 }

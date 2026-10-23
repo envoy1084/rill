@@ -77,6 +77,15 @@ const (
 	// ReviewServiceExplainOwnershipProcedure is the fully-qualified name of the ReviewService's
 	// ExplainOwnership RPC.
 	ReviewServiceExplainOwnershipProcedure = "/rill.v1.ReviewService/ExplainOwnership"
+	// ReviewServiceGetInterdiffProcedure is the fully-qualified name of the ReviewService's
+	// GetInterdiff RPC.
+	ReviewServiceGetInterdiffProcedure = "/rill.v1.ReviewService/GetInterdiff"
+	// ReviewServiceApplySuggestionProcedure is the fully-qualified name of the ReviewService's
+	// ApplySuggestion RPC.
+	ReviewServiceApplySuggestionProcedure = "/rill.v1.ReviewService/ApplySuggestion"
+	// ReviewServiceReopenChangeProcedure is the fully-qualified name of the ReviewService's
+	// ReopenChange RPC.
+	ReviewServiceReopenChangeProcedure = "/rill.v1.ReviewService/ReopenChange"
 )
 
 // ReviewServiceClient is a client for the rill.v1.ReviewService service.
@@ -109,6 +118,13 @@ type ReviewServiceClient interface {
 	GetOwners(context.Context, *connect.Request[v1.GetOwnersRequest]) (*connect.Response[v1.GetOwnersResponse], error)
 	// Each owner set a change touches, with its approvals and escalation.
 	ExplainOwnership(context.Context, *connect.Request[v1.ExplainOwnershipRequest]) (*connect.Response[v1.ExplainOwnershipResponse], error)
+	// What the author changed between two versions of a change, with paths
+	// that only moved with a rebase listed apart.
+	GetInterdiff(context.Context, *connect.Request[v1.GetInterdiffRequest]) (*connect.Response[v1.GetInterdiffResponse], error)
+	// Apply a thread's suggested edit as a new version (the change's owner).
+	ApplySuggestion(context.Context, *connect.Request[v1.ApplySuggestionRequest]) (*connect.Response[v1.ApplySuggestionResponse], error)
+	// Reopen an abandoned change.
+	ReopenChange(context.Context, *connect.Request[v1.ReopenChangeRequest]) (*connect.Response[v1.ReopenChangeResponse], error)
 }
 
 // NewReviewServiceClient constructs a client for the rill.v1.ReviewService service. By default, it
@@ -206,6 +222,24 @@ func NewReviewServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(reviewServiceMethods.ByName("ExplainOwnership")),
 			connect.WithClientOptions(opts...),
 		),
+		getInterdiff: connect.NewClient[v1.GetInterdiffRequest, v1.GetInterdiffResponse](
+			httpClient,
+			baseURL+ReviewServiceGetInterdiffProcedure,
+			connect.WithSchema(reviewServiceMethods.ByName("GetInterdiff")),
+			connect.WithClientOptions(opts...),
+		),
+		applySuggestion: connect.NewClient[v1.ApplySuggestionRequest, v1.ApplySuggestionResponse](
+			httpClient,
+			baseURL+ReviewServiceApplySuggestionProcedure,
+			connect.WithSchema(reviewServiceMethods.ByName("ApplySuggestion")),
+			connect.WithClientOptions(opts...),
+		),
+		reopenChange: connect.NewClient[v1.ReopenChangeRequest, v1.ReopenChangeResponse](
+			httpClient,
+			baseURL+ReviewServiceReopenChangeProcedure,
+			connect.WithSchema(reviewServiceMethods.ByName("ReopenChange")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -225,6 +259,9 @@ type reviewServiceClient struct {
 	watchReview      *connect.Client[v1.WatchReviewRequest, v1.WatchReviewResponse]
 	getOwners        *connect.Client[v1.GetOwnersRequest, v1.GetOwnersResponse]
 	explainOwnership *connect.Client[v1.ExplainOwnershipRequest, v1.ExplainOwnershipResponse]
+	getInterdiff     *connect.Client[v1.GetInterdiffRequest, v1.GetInterdiffResponse]
+	applySuggestion  *connect.Client[v1.ApplySuggestionRequest, v1.ApplySuggestionResponse]
+	reopenChange     *connect.Client[v1.ReopenChangeRequest, v1.ReopenChangeResponse]
 }
 
 // GetReview calls rill.v1.ReviewService.GetReview.
@@ -297,6 +334,21 @@ func (c *reviewServiceClient) ExplainOwnership(ctx context.Context, req *connect
 	return c.explainOwnership.CallUnary(ctx, req)
 }
 
+// GetInterdiff calls rill.v1.ReviewService.GetInterdiff.
+func (c *reviewServiceClient) GetInterdiff(ctx context.Context, req *connect.Request[v1.GetInterdiffRequest]) (*connect.Response[v1.GetInterdiffResponse], error) {
+	return c.getInterdiff.CallUnary(ctx, req)
+}
+
+// ApplySuggestion calls rill.v1.ReviewService.ApplySuggestion.
+func (c *reviewServiceClient) ApplySuggestion(ctx context.Context, req *connect.Request[v1.ApplySuggestionRequest]) (*connect.Response[v1.ApplySuggestionResponse], error) {
+	return c.applySuggestion.CallUnary(ctx, req)
+}
+
+// ReopenChange calls rill.v1.ReviewService.ReopenChange.
+func (c *reviewServiceClient) ReopenChange(ctx context.Context, req *connect.Request[v1.ReopenChangeRequest]) (*connect.Response[v1.ReopenChangeResponse], error) {
+	return c.reopenChange.CallUnary(ctx, req)
+}
+
 // ReviewServiceHandler is an implementation of the rill.v1.ReviewService service.
 type ReviewServiceHandler interface {
 	// A change's review and the labels it is voted on.
@@ -327,6 +379,13 @@ type ReviewServiceHandler interface {
 	GetOwners(context.Context, *connect.Request[v1.GetOwnersRequest]) (*connect.Response[v1.GetOwnersResponse], error)
 	// Each owner set a change touches, with its approvals and escalation.
 	ExplainOwnership(context.Context, *connect.Request[v1.ExplainOwnershipRequest]) (*connect.Response[v1.ExplainOwnershipResponse], error)
+	// What the author changed between two versions of a change, with paths
+	// that only moved with a rebase listed apart.
+	GetInterdiff(context.Context, *connect.Request[v1.GetInterdiffRequest]) (*connect.Response[v1.GetInterdiffResponse], error)
+	// Apply a thread's suggested edit as a new version (the change's owner).
+	ApplySuggestion(context.Context, *connect.Request[v1.ApplySuggestionRequest]) (*connect.Response[v1.ApplySuggestionResponse], error)
+	// Reopen an abandoned change.
+	ReopenChange(context.Context, *connect.Request[v1.ReopenChangeRequest]) (*connect.Response[v1.ReopenChangeResponse], error)
 }
 
 // NewReviewServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -420,6 +479,24 @@ func NewReviewServiceHandler(svc ReviewServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(reviewServiceMethods.ByName("ExplainOwnership")),
 		connect.WithHandlerOptions(opts...),
 	)
+	reviewServiceGetInterdiffHandler := connect.NewUnaryHandler(
+		ReviewServiceGetInterdiffProcedure,
+		svc.GetInterdiff,
+		connect.WithSchema(reviewServiceMethods.ByName("GetInterdiff")),
+		connect.WithHandlerOptions(opts...),
+	)
+	reviewServiceApplySuggestionHandler := connect.NewUnaryHandler(
+		ReviewServiceApplySuggestionProcedure,
+		svc.ApplySuggestion,
+		connect.WithSchema(reviewServiceMethods.ByName("ApplySuggestion")),
+		connect.WithHandlerOptions(opts...),
+	)
+	reviewServiceReopenChangeHandler := connect.NewUnaryHandler(
+		ReviewServiceReopenChangeProcedure,
+		svc.ReopenChange,
+		connect.WithSchema(reviewServiceMethods.ByName("ReopenChange")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/rill.v1.ReviewService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ReviewServiceGetReviewProcedure:
@@ -450,6 +527,12 @@ func NewReviewServiceHandler(svc ReviewServiceHandler, opts ...connect.HandlerOp
 			reviewServiceGetOwnersHandler.ServeHTTP(w, r)
 		case ReviewServiceExplainOwnershipProcedure:
 			reviewServiceExplainOwnershipHandler.ServeHTTP(w, r)
+		case ReviewServiceGetInterdiffProcedure:
+			reviewServiceGetInterdiffHandler.ServeHTTP(w, r)
+		case ReviewServiceApplySuggestionProcedure:
+			reviewServiceApplySuggestionHandler.ServeHTTP(w, r)
+		case ReviewServiceReopenChangeProcedure:
+			reviewServiceReopenChangeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -513,4 +596,16 @@ func (UnimplementedReviewServiceHandler) GetOwners(context.Context, *connect.Req
 
 func (UnimplementedReviewServiceHandler) ExplainOwnership(context.Context, *connect.Request[v1.ExplainOwnershipRequest]) (*connect.Response[v1.ExplainOwnershipResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ReviewService.ExplainOwnership is not implemented"))
+}
+
+func (UnimplementedReviewServiceHandler) GetInterdiff(context.Context, *connect.Request[v1.GetInterdiffRequest]) (*connect.Response[v1.GetInterdiffResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ReviewService.GetInterdiff is not implemented"))
+}
+
+func (UnimplementedReviewServiceHandler) ApplySuggestion(context.Context, *connect.Request[v1.ApplySuggestionRequest]) (*connect.Response[v1.ApplySuggestionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ReviewService.ApplySuggestion is not implemented"))
+}
+
+func (UnimplementedReviewServiceHandler) ReopenChange(context.Context, *connect.Request[v1.ReopenChangeRequest]) (*connect.Response[v1.ReopenChangeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ReviewService.ReopenChange is not implemented"))
 }

@@ -2503,7 +2503,10 @@ type Comment struct {
 	CreatedAt int64                  `protobuf:"varint,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	Category  *CommentCategory       `protobuf:"varint,4,opt,name=category,proto3,enum=rill.v1.CommentCategory,oneof" json:"category,omitempty"`
 	// Reviewer confidence as a percentage 0-100.
-	Confidence    *uint32 `protobuf:"varint,5,opt,name=confidence,proto3,oneof" json:"confidence,omitempty"`
+	Confidence *uint32 `protobuf:"varint,5,opt,name=confidence,proto3,oneof" json:"confidence,omitempty"`
+	// Replacement text for the anchored lines, which the change's author
+	// can apply.
+	Suggestion    *string `protobuf:"bytes,6,opt,name=suggestion,proto3,oneof" json:"suggestion,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2573,15 +2576,24 @@ func (x *Comment) GetConfidence() uint32 {
 	return 0
 }
 
+func (x *Comment) GetSuggestion() string {
+	if x != nil && x.Suggestion != nil {
+		return *x.Suggestion
+	}
+	return ""
+}
+
 type Thread struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// `…/changes/{change}/review/threads/{thread}`. Output only.
-	Name          string        `protobuf:"bytes,6,opt,name=name,proto3" json:"name,omitempty"`
-	Id            string        `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Anchor        *ThreadAnchor `protobuf:"bytes,2,opt,name=anchor,proto3" json:"anchor,omitempty"`
-	Comments      []*Comment    `protobuf:"bytes,3,rep,name=comments,proto3" json:"comments,omitempty"`
-	Resolved      bool          `protobuf:"varint,4,opt,name=resolved,proto3" json:"resolved,omitempty"`
-	To            *Principal    `protobuf:"bytes,5,opt,name=to,proto3,oneof" json:"to,omitempty"`
+	Name     string        `protobuf:"bytes,6,opt,name=name,proto3" json:"name,omitempty"`
+	Id       string        `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Anchor   *ThreadAnchor `protobuf:"bytes,2,opt,name=anchor,proto3" json:"anchor,omitempty"`
+	Comments []*Comment    `protobuf:"bytes,3,rep,name=comments,proto3" json:"comments,omitempty"`
+	Resolved bool          `protobuf:"varint,4,opt,name=resolved,proto3" json:"resolved,omitempty"`
+	To       *Principal    `protobuf:"bytes,5,opt,name=to,proto3,oneof" json:"to,omitempty"`
+	// The anchor was not found on the current version.
+	Outdated      bool `protobuf:"varint,7,opt,name=outdated,proto3" json:"outdated,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2656,6 +2668,13 @@ func (x *Thread) GetTo() *Principal {
 		return x.To
 	}
 	return nil
+}
+
+func (x *Thread) GetOutdated() bool {
+	if x != nil {
+		return x.Outdated
+	}
+	return false
 }
 
 // The review state of a change, keyed by its stable change id.
@@ -5052,7 +5071,7 @@ const file_rill_v1_types_proto_rawDesc = "" +
 	"\x04File\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\fR\aversion\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04pathB\b\n" +
-	"\x06anchor\"\xe4\x01\n" +
+	"\x06anchor\"\x98\x02\n" +
 	"\aComment\x12*\n" +
 	"\x06author\x18\x01 \x01(\v2\x12.rill.v1.PrincipalR\x06author\x12\x12\n" +
 	"\x04body\x18\x02 \x01(\tR\x04body\x12\x1d\n" +
@@ -5061,16 +5080,21 @@ const file_rill_v1_types_proto_rawDesc = "" +
 	"\bcategory\x18\x04 \x01(\x0e2\x18.rill.v1.CommentCategoryH\x00R\bcategory\x88\x01\x01\x12#\n" +
 	"\n" +
 	"confidence\x18\x05 \x01(\rH\x01R\n" +
-	"confidence\x88\x01\x01B\v\n" +
+	"confidence\x88\x01\x01\x12#\n" +
+	"\n" +
+	"suggestion\x18\x06 \x01(\tH\x02R\n" +
+	"suggestion\x88\x01\x01B\v\n" +
 	"\t_categoryB\r\n" +
-	"\v_confidence\"\xd5\x01\n" +
+	"\v_confidenceB\r\n" +
+	"\v_suggestion\"\xf1\x01\n" +
 	"\x06Thread\x12\x12\n" +
 	"\x04name\x18\x06 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
 	"\x06anchor\x18\x02 \x01(\v2\x15.rill.v1.ThreadAnchorR\x06anchor\x12,\n" +
 	"\bcomments\x18\x03 \x03(\v2\x10.rill.v1.CommentR\bcomments\x12\x1a\n" +
 	"\bresolved\x18\x04 \x01(\bR\bresolved\x12'\n" +
-	"\x02to\x18\x05 \x01(\v2\x12.rill.v1.PrincipalH\x00R\x02to\x88\x01\x01B\x05\n" +
+	"\x02to\x18\x05 \x01(\v2\x12.rill.v1.PrincipalH\x00R\x02to\x88\x01\x01\x12\x1a\n" +
+	"\boutdated\x18\a \x01(\bR\boutdatedB\x05\n" +
 	"\x03_to\"\xf3\x04\n" +
 	"\vReviewState\x12\x12\n" +
 	"\x04name\x18\x0f \x01(\tR\x04name\x12\x1b\n" +

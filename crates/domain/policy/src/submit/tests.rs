@@ -307,9 +307,11 @@ fn facts_from_review_state() {
             created_at: Timestamp::from_millis(0),
             category,
             confidence: None,
+            suggestion: None,
         }],
         resolved,
         to: None,
+        outdated: false,
     };
     let state = ReviewState {
         change_id: ChangeId::derived("t", "c"),

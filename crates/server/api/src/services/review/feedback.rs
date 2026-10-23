@@ -82,19 +82,27 @@ impl ReviewSvc {
             .map(|c| confidence_from_proto("confidence", c))
             .transpose()?;
         let to = req.to.map(Principal::try_from).transpose()?;
-        let thread_id = opened
-            .repo
-            .review()
-            .comment(
-                &id,
-                opened.principal(),
-                anchor,
-                req.body,
-                category,
-                confidence,
-                to,
-            )
-            .await?;
+        let review = opened.repo.review();
+        let thread_id = match req.suggestion {
+            Some(suggestion) => {
+                review
+                    .suggest(&id, opened.principal(), anchor, req.body, suggestion, to)
+                    .await?
+            }
+            None => {
+                review
+                    .comment(
+                        &id,
+                        opened.principal(),
+                        anchor,
+                        req.body,
+                        category,
+                        confidence,
+                        to,
+                    )
+                    .await?
+            }
+        };
         let thread = thread_of(&opened, &id, &thread_id).await?;
         Ok(pb::CreateThreadResponse {
             thread: thread.into(),

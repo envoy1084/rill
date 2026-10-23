@@ -147,6 +147,7 @@ One concrete version of a change; its hash is the version identity.
 | `created_at` | [int64](#int64) |  |  |
 | `category` | [CommentCategory](#rill-v1-CommentCategory) | optional |  |
 | `confidence` | [uint32](#uint32) | optional | Reviewer confidence as a percentage 0-100. |
+| `suggestion` | [string](#string) | optional | Replacement text for the anchored lines, which the change's author can apply. |
 
 
 <a name="rill-v1-ContentRef"></a>
@@ -746,6 +747,7 @@ A whole-directory operation, applied before file changes.
 | `comments` | [Comment](#rill-v1-Comment) | repeated |  |
 | `resolved` | [bool](#bool) |  |  |
 | `to` | [Principal](#rill-v1-Principal) | optional |  |
+| `outdated` | [bool](#bool) |  | The anchor was not found on the current version. |
 
 
 <a name="rill-v1-ThreadAnchor"></a>
@@ -5804,6 +5806,9 @@ Reviews of changes.
 | `WatchReview` | [WatchReviewRequest](#rill-v1-WatchReviewRequest) | [WatchReviewResponse](#rill-v1-WatchReviewResponse) stream | A review's updates as they happen. |
 | `GetOwners` | [GetOwnersRequest](#rill-v1-GetOwnersRequest) | [GetOwnersResponse](#rill-v1-GetOwnersResponse) | The owner sets covering a path, by trunk's `OWNERS.toml` files. |
 | `ExplainOwnership` | [ExplainOwnershipRequest](#rill-v1-ExplainOwnershipRequest) | [ExplainOwnershipResponse](#rill-v1-ExplainOwnershipResponse) | Each owner set a change touches, with its approvals and escalation. |
+| `GetInterdiff` | [GetInterdiffRequest](#rill-v1-GetInterdiffRequest) | [GetInterdiffResponse](#rill-v1-GetInterdiffResponse) | What the author changed between two versions of a change, with paths that only moved with a rebase listed apart. |
+| `ApplySuggestion` | [ApplySuggestionRequest](#rill-v1-ApplySuggestionRequest) | [ApplySuggestionResponse](#rill-v1-ApplySuggestionResponse) | Apply a thread's suggested edit as a new version (the change's owner). |
+| `ReopenChange` | [ReopenChangeRequest](#rill-v1-ReopenChangeRequest) | [ReopenChangeResponse](#rill-v1-ReopenChangeResponse) | Reopen an abandoned change. |
 
 
 
@@ -5829,6 +5834,29 @@ Reviews of changes.
 | Field | Type | Label | Description |
 | --- | --- | --- | --- |
 | `review` | [ReviewState](#rill-v1-ReviewState) |  |  |
+
+
+<a name="rill-v1-ApplySuggestionRequest"></a>
+
+### ApplySuggestionRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `thread` | [string](#string) |  | `…/review/threads/{thread}`. Required. |
+
+
+<a name="rill-v1-ApplySuggestionResponse"></a>
+
+### ApplySuggestionResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `info` | [ChangeInfo](#rill-v1-ChangeInfo) |  |  |
 
 
 <a name="rill-v1-BatchGetReviewsRequest"></a>
@@ -5869,6 +5897,7 @@ Reviews of changes.
 | `category` | [CommentCategory](#rill-v1-CommentCategory) | optional |  |
 | `confidence` | [uint32](#uint32) | optional |  |
 | `to` | [Principal](#rill-v1-Principal) | optional |  |
+| `suggestion` | [string](#string) | optional | Replacement text for the anchored lines (a `lines` anchor on the current version), which the change's author can apply. |
 
 
 <a name="rill-v1-CreateThreadResponse"></a>
@@ -5927,6 +5956,33 @@ Reviews of changes.
 | `covered` | [bool](#bool) |  | Every set is covered (true when the change touches none). |
 
 
+<a name="rill-v1-GetInterdiffRequest"></a>
+
+### GetInterdiffRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `change` | [string](#string) |  | `…/changes/{change}`. Required. |
+| `from` | [string](#string) |  | The versions compared; empty `to` is the current version, empty `from` the one before it. |
+| `to` | [string](#string) |  |  |
+
+
+<a name="rill-v1-GetInterdiffResponse"></a>
+
+### GetInterdiffResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `from` | [string](#string) |  |  |
+| `to` | [string](#string) |  |  |
+| `files` | [InterdiffFile](#rill-v1-InterdiffFile) | repeated |  |
+| `rebased` | [string](#string) | repeated | Paths whose patch is the same in both: they moved with the base only. |
+
+
 <a name="rill-v1-GetOwnersRequest"></a>
 
 ### GetOwnersRequest
@@ -5971,6 +6027,20 @@ Reviews of changes.
 | --- | --- | --- | --- |
 | `review` | [ReviewState](#rill-v1-ReviewState) |  |  |
 | `labels` | [Label](#rill-v1-Label) | repeated |  |
+
+
+<a name="rill-v1-InterdiffFile"></a>
+
+### InterdiffFile
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `path` | [string](#string) |  |  |
+| `unified` | [string](#string) |  | Unified diff from the old version's content to the new one's. |
+| `added` | [bool](#bool) |  |  |
+| `deleted` | [bool](#bool) |  |  |
 
 
 <a name="rill-v1-ListReviewsRequest"></a>
@@ -6030,6 +6100,29 @@ One owner set's state for a change.
 | `covered` | [bool](#bool) |  |  |
 | `escalated_to` | [string](#string) | optional | Where an overdue review was escalated to, and how many times. |
 | `escalations` | [uint32](#uint32) |  |  |
+
+
+<a name="rill-v1-ReopenChangeRequest"></a>
+
+### ReopenChangeRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `request_id` | [string](#string) |  |  |
+| `change` | [string](#string) |  | `…/changes/{change}`. Required. |
+
+
+<a name="rill-v1-ReopenChangeResponse"></a>
+
+### ReopenChangeResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `review` | [ReviewState](#rill-v1-ReviewState) |  |  |
 
 
 <a name="rill-v1-ReplyThreadRequest"></a>

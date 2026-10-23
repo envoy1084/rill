@@ -86,6 +86,7 @@ async fn act(repo: &RepoClient, id: ChangeId, a: &Args) -> ToolResult<Value> {
                 category: a.opt_str("category").map(category).transpose()?,
                 confidence: confidence(a)?,
                 to: None,
+                suggestion: None,
             };
             let t = reviews.comment(id, new).await?;
             json!({ "action": "comment", "thread": t.thread_id })

@@ -86,6 +86,8 @@ idempotent!(
     UpdateGuardrailsRequest,
     RecordAuditRequest,
     BatchVoteRequest,
+    ApplySuggestionRequest,
+    ReopenChangeRequest,
     ApproveIntentRequest,
     RevokeIntentApprovalRequest,
     CreateQuarantineRequest,

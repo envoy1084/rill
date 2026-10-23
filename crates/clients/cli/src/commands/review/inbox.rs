@@ -191,6 +191,7 @@ mod tests {
             comments: vec![],
             resolved: false,
             to: Some(me.clone()),
+            outdated: false,
         });
         assert!(waits_on(&r, &me), "a thread addressed to me");
     }

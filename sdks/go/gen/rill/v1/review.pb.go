@@ -580,10 +580,13 @@ type CreateThreadRequest struct {
 	Parent string        `protobuf:"bytes,2,opt,name=parent,proto3" json:"parent,omitempty"`
 	Anchor *ThreadAnchor `protobuf:"bytes,3,opt,name=anchor,proto3" json:"anchor,omitempty"`
 	// Required.
-	Body          string           `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
-	Category      *CommentCategory `protobuf:"varint,5,opt,name=category,proto3,enum=rill.v1.CommentCategory,oneof" json:"category,omitempty"`
-	Confidence    *uint32          `protobuf:"varint,6,opt,name=confidence,proto3,oneof" json:"confidence,omitempty"`
-	To            *Principal       `protobuf:"bytes,7,opt,name=to,proto3,oneof" json:"to,omitempty"`
+	Body       string           `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	Category   *CommentCategory `protobuf:"varint,5,opt,name=category,proto3,enum=rill.v1.CommentCategory,oneof" json:"category,omitempty"`
+	Confidence *uint32          `protobuf:"varint,6,opt,name=confidence,proto3,oneof" json:"confidence,omitempty"`
+	To         *Principal       `protobuf:"bytes,7,opt,name=to,proto3,oneof" json:"to,omitempty"`
+	// Replacement text for the anchored lines (a `lines` anchor on the
+	// current version), which the change's author can apply.
+	Suggestion    *string `protobuf:"bytes,8,opt,name=suggestion,proto3,oneof" json:"suggestion,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -665,6 +668,13 @@ func (x *CreateThreadRequest) GetTo() *Principal {
 		return x.To
 	}
 	return nil
+}
+
+func (x *CreateThreadRequest) GetSuggestion() string {
+	if x != nil && x.Suggestion != nil {
+		return *x.Suggestion
+	}
+	return ""
 }
 
 type CreateThreadResponse struct {
@@ -1880,6 +1890,401 @@ func (x *ExplainOwnershipResponse) GetCovered() bool {
 	return false
 }
 
+type GetInterdiffRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `…/changes/{change}`. Required.
+	Change string `protobuf:"bytes,1,opt,name=change,proto3" json:"change,omitempty"`
+	// The versions compared; empty `to` is the current version, empty
+	// `from` the one before it.
+	From          string `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
+	To            string `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetInterdiffRequest) Reset() {
+	*x = GetInterdiffRequest{}
+	mi := &file_rill_v1_review_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInterdiffRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInterdiffRequest) ProtoMessage() {}
+
+func (x *GetInterdiffRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInterdiffRequest.ProtoReflect.Descriptor instead.
+func (*GetInterdiffRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *GetInterdiffRequest) GetChange() string {
+	if x != nil {
+		return x.Change
+	}
+	return ""
+}
+
+func (x *GetInterdiffRequest) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *GetInterdiffRequest) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+type InterdiffFile struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Path  string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	// Unified diff from the old version's content to the new one's.
+	Unified       string `protobuf:"bytes,2,opt,name=unified,proto3" json:"unified,omitempty"`
+	Added         bool   `protobuf:"varint,3,opt,name=added,proto3" json:"added,omitempty"`
+	Deleted       bool   `protobuf:"varint,4,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InterdiffFile) Reset() {
+	*x = InterdiffFile{}
+	mi := &file_rill_v1_review_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InterdiffFile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InterdiffFile) ProtoMessage() {}
+
+func (x *InterdiffFile) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InterdiffFile.ProtoReflect.Descriptor instead.
+func (*InterdiffFile) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *InterdiffFile) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *InterdiffFile) GetUnified() string {
+	if x != nil {
+		return x.Unified
+	}
+	return ""
+}
+
+func (x *InterdiffFile) GetAdded() bool {
+	if x != nil {
+		return x.Added
+	}
+	return false
+}
+
+func (x *InterdiffFile) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
+type GetInterdiffResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	From  string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
+	To    string                 `protobuf:"bytes,2,opt,name=to,proto3" json:"to,omitempty"`
+	Files []*InterdiffFile       `protobuf:"bytes,3,rep,name=files,proto3" json:"files,omitempty"`
+	// Paths whose patch is the same in both: they moved with the base only.
+	Rebased       []string `protobuf:"bytes,4,rep,name=rebased,proto3" json:"rebased,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetInterdiffResponse) Reset() {
+	*x = GetInterdiffResponse{}
+	mi := &file_rill_v1_review_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInterdiffResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInterdiffResponse) ProtoMessage() {}
+
+func (x *GetInterdiffResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInterdiffResponse.ProtoReflect.Descriptor instead.
+func (*GetInterdiffResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetInterdiffResponse) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *GetInterdiffResponse) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+func (x *GetInterdiffResponse) GetFiles() []*InterdiffFile {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *GetInterdiffResponse) GetRebased() []string {
+	if x != nil {
+		return x.Rebased
+	}
+	return nil
+}
+
+type ApplySuggestionRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// `…/review/threads/{thread}`. Required.
+	Thread        string `protobuf:"bytes,2,opt,name=thread,proto3" json:"thread,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplySuggestionRequest) Reset() {
+	*x = ApplySuggestionRequest{}
+	mi := &file_rill_v1_review_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplySuggestionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplySuggestionRequest) ProtoMessage() {}
+
+func (x *ApplySuggestionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplySuggestionRequest.ProtoReflect.Descriptor instead.
+func (*ApplySuggestionRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ApplySuggestionRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ApplySuggestionRequest) GetThread() string {
+	if x != nil {
+		return x.Thread
+	}
+	return ""
+}
+
+type ApplySuggestionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Info          *ChangeInfo            `protobuf:"bytes,1,opt,name=info,proto3" json:"info,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplySuggestionResponse) Reset() {
+	*x = ApplySuggestionResponse{}
+	mi := &file_rill_v1_review_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplySuggestionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplySuggestionResponse) ProtoMessage() {}
+
+func (x *ApplySuggestionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplySuggestionResponse.ProtoReflect.Descriptor instead.
+func (*ApplySuggestionResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ApplySuggestionResponse) GetInfo() *ChangeInfo {
+	if x != nil {
+		return x.Info
+	}
+	return nil
+}
+
+type ReopenChangeRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// `…/changes/{change}`. Required.
+	Change        string `protobuf:"bytes,2,opt,name=change,proto3" json:"change,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReopenChangeRequest) Reset() {
+	*x = ReopenChangeRequest{}
+	mi := &file_rill_v1_review_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReopenChangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReopenChangeRequest) ProtoMessage() {}
+
+func (x *ReopenChangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReopenChangeRequest.ProtoReflect.Descriptor instead.
+func (*ReopenChangeRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ReopenChangeRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ReopenChangeRequest) GetChange() string {
+	if x != nil {
+		return x.Change
+	}
+	return ""
+}
+
+type ReopenChangeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Review        *ReviewState           `protobuf:"bytes,1,opt,name=review,proto3" json:"review,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReopenChangeResponse) Reset() {
+	*x = ReopenChangeResponse{}
+	mi := &file_rill_v1_review_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReopenChangeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReopenChangeResponse) ProtoMessage() {}
+
+func (x *ReopenChangeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_review_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReopenChangeResponse.ProtoReflect.Descriptor instead.
+func (*ReopenChangeResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_review_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ReopenChangeResponse) GetReview() *ReviewState {
+	if x != nil {
+		return x.Review
+	}
+	return nil
+}
+
 var File_rill_v1_review_proto protoreflect.FileDescriptor
 
 const file_rill_v1_review_proto_rawDesc = "" +
@@ -1920,7 +2325,7 @@ const file_rill_v1_review_proto_rawDesc = "" +
 	"\aversion\x18\x06 \x01(\tR\aversionB\t\n" +
 	"\a_reason\"<\n" +
 	"\fVoteResponse\x12,\n" +
-	"\x06review\x18\x01 \x01(\v2\x14.rill.v1.ReviewStateR\x06review\"\xbb\x02\n" +
+	"\x06review\x18\x01 \x01(\v2\x14.rill.v1.ReviewStateR\x06review\"\xef\x02\n" +
 	"\x13CreateThreadRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
@@ -1931,10 +2336,14 @@ const file_rill_v1_review_proto_rawDesc = "" +
 	"\n" +
 	"confidence\x18\x06 \x01(\rH\x01R\n" +
 	"confidence\x88\x01\x01\x12'\n" +
-	"\x02to\x18\a \x01(\v2\x12.rill.v1.PrincipalH\x02R\x02to\x88\x01\x01B\v\n" +
+	"\x02to\x18\a \x01(\v2\x12.rill.v1.PrincipalH\x02R\x02to\x88\x01\x01\x12#\n" +
+	"\n" +
+	"suggestion\x18\b \x01(\tH\x03R\n" +
+	"suggestion\x88\x01\x01B\v\n" +
 	"\t_categoryB\r\n" +
 	"\v_confidenceB\x05\n" +
-	"\x03_to\"?\n" +
+	"\x03_toB\r\n" +
+	"\v_suggestion\"?\n" +
 	"\x14CreateThreadResponse\x12'\n" +
 	"\x06thread\x18\x01 \x01(\v2\x0f.rill.v1.ThreadR\x06thread\"\xd7\x01\n" +
 	"\x12ReplyThreadRequest\x12\x1d\n" +
@@ -2022,7 +2431,34 @@ const file_rill_v1_review_proto_rawDesc = "" +
 	"\r_escalated_to\"a\n" +
 	"\x18ExplainOwnershipResponse\x12+\n" +
 	"\x04sets\x18\x01 \x03(\v2\x17.rill.v1.OwnerSetStatusR\x04sets\x12\x18\n" +
-	"\acovered\x18\x02 \x01(\bR\acovered2\xb5\b\n" +
+	"\acovered\x18\x02 \x01(\bR\acovered\"Q\n" +
+	"\x13GetInterdiffRequest\x12\x16\n" +
+	"\x06change\x18\x01 \x01(\tR\x06change\x12\x12\n" +
+	"\x04from\x18\x02 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x03 \x01(\tR\x02to\"m\n" +
+	"\rInterdiffFile\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
+	"\aunified\x18\x02 \x01(\tR\aunified\x12\x14\n" +
+	"\x05added\x18\x03 \x01(\bR\x05added\x12\x18\n" +
+	"\adeleted\x18\x04 \x01(\bR\adeleted\"\x82\x01\n" +
+	"\x14GetInterdiffResponse\x12\x12\n" +
+	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x02 \x01(\tR\x02to\x12,\n" +
+	"\x05files\x18\x03 \x03(\v2\x16.rill.v1.InterdiffFileR\x05files\x12\x18\n" +
+	"\arebased\x18\x04 \x03(\tR\arebased\"O\n" +
+	"\x16ApplySuggestionRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
+	"\x06thread\x18\x02 \x01(\tR\x06thread\"B\n" +
+	"\x17ApplySuggestionResponse\x12'\n" +
+	"\x04info\x18\x01 \x01(\v2\x13.rill.v1.ChangeInfoR\x04info\"L\n" +
+	"\x13ReopenChangeRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
+	"\x06change\x18\x02 \x01(\tR\x06change\"D\n" +
+	"\x14ReopenChangeResponse\x12,\n" +
+	"\x06review\x18\x01 \x01(\v2\x14.rill.v1.ReviewStateR\x06review2\xa5\n" +
+	"\n" +
 	"\rReviewService\x12B\n" +
 	"\tGetReview\x12\x19.rill.v1.GetReviewRequest\x1a\x1a.rill.v1.GetReviewResponse\x12T\n" +
 	"\x0fBatchGetReviews\x12\x1f.rill.v1.BatchGetReviewsRequest\x1a .rill.v1.BatchGetReviewsResponse\x12H\n" +
@@ -2037,7 +2473,10 @@ const file_rill_v1_review_proto_rawDesc = "" +
 	"\rAbandonChange\x12\x1d.rill.v1.AbandonChangeRequest\x1a\x1e.rill.v1.AbandonChangeResponse\x12J\n" +
 	"\vWatchReview\x12\x1b.rill.v1.WatchReviewRequest\x1a\x1c.rill.v1.WatchReviewResponse0\x01\x12B\n" +
 	"\tGetOwners\x12\x19.rill.v1.GetOwnersRequest\x1a\x1a.rill.v1.GetOwnersResponse\x12W\n" +
-	"\x10ExplainOwnership\x12 .rill.v1.ExplainOwnershipRequest\x1a!.rill.v1.ExplainOwnershipResponseB\x8c\x01\n" +
+	"\x10ExplainOwnership\x12 .rill.v1.ExplainOwnershipRequest\x1a!.rill.v1.ExplainOwnershipResponse\x12K\n" +
+	"\fGetInterdiff\x12\x1c.rill.v1.GetInterdiffRequest\x1a\x1d.rill.v1.GetInterdiffResponse\x12T\n" +
+	"\x0fApplySuggestion\x12\x1f.rill.v1.ApplySuggestionRequest\x1a .rill.v1.ApplySuggestionResponse\x12K\n" +
+	"\fReopenChange\x12\x1c.rill.v1.ReopenChangeRequest\x1a\x1d.rill.v1.ReopenChangeResponseB\x8c\x01\n" +
 	"\vcom.rill.v1B\vReviewProtoP\x01Z3github.com/rill-vcs/rill/sdks/go/gen/rill/v1;rillv1\xa2\x02\x03RXX\xaa\x02\aRill.V1\xca\x02\aRill\\V1\xe2\x02\x13Rill\\V1\\GPBMetadata\xea\x02\bRill::V1b\x06proto3"
 
 var (
@@ -2052,7 +2491,7 @@ func file_rill_v1_review_proto_rawDescGZIP() []byte {
 	return file_rill_v1_review_proto_rawDescData
 }
 
-var file_rill_v1_review_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_rill_v1_review_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_rill_v1_review_proto_goTypes = []any{
 	(*GetReviewRequest)(nil),         // 0: rill.v1.GetReviewRequest
 	(*GetReviewResponse)(nil),        // 1: rill.v1.GetReviewResponse
@@ -2085,75 +2524,92 @@ var file_rill_v1_review_proto_goTypes = []any{
 	(*ExplainOwnershipRequest)(nil),  // 28: rill.v1.ExplainOwnershipRequest
 	(*OwnerSetStatus)(nil),           // 29: rill.v1.OwnerSetStatus
 	(*ExplainOwnershipResponse)(nil), // 30: rill.v1.ExplainOwnershipResponse
-	(*ReviewState)(nil),              // 31: rill.v1.ReviewState
-	(*Label)(nil),                    // 32: rill.v1.Label
-	(*ThreadAnchor)(nil),             // 33: rill.v1.ThreadAnchor
-	(CommentCategory)(0),             // 34: rill.v1.CommentCategory
-	(*Principal)(nil),                // 35: rill.v1.Principal
-	(*Thread)(nil),                   // 36: rill.v1.Thread
-	(RiskClass)(0),                   // 37: rill.v1.RiskClass
-	(ReviewStatus)(0),                // 38: rill.v1.ReviewStatus
-	(*LabelVote)(nil),                // 39: rill.v1.LabelVote
-	(*LandRequest)(nil),              // 40: rill.v1.LandRequest
+	(*GetInterdiffRequest)(nil),      // 31: rill.v1.GetInterdiffRequest
+	(*InterdiffFile)(nil),            // 32: rill.v1.InterdiffFile
+	(*GetInterdiffResponse)(nil),     // 33: rill.v1.GetInterdiffResponse
+	(*ApplySuggestionRequest)(nil),   // 34: rill.v1.ApplySuggestionRequest
+	(*ApplySuggestionResponse)(nil),  // 35: rill.v1.ApplySuggestionResponse
+	(*ReopenChangeRequest)(nil),      // 36: rill.v1.ReopenChangeRequest
+	(*ReopenChangeResponse)(nil),     // 37: rill.v1.ReopenChangeResponse
+	(*ReviewState)(nil),              // 38: rill.v1.ReviewState
+	(*Label)(nil),                    // 39: rill.v1.Label
+	(*ThreadAnchor)(nil),             // 40: rill.v1.ThreadAnchor
+	(CommentCategory)(0),             // 41: rill.v1.CommentCategory
+	(*Principal)(nil),                // 42: rill.v1.Principal
+	(*Thread)(nil),                   // 43: rill.v1.Thread
+	(RiskClass)(0),                   // 44: rill.v1.RiskClass
+	(ReviewStatus)(0),                // 45: rill.v1.ReviewStatus
+	(*LabelVote)(nil),                // 46: rill.v1.LabelVote
+	(*LandRequest)(nil),              // 47: rill.v1.LandRequest
+	(*ChangeInfo)(nil),               // 48: rill.v1.ChangeInfo
 }
 var file_rill_v1_review_proto_depIdxs = []int32{
-	31, // 0: rill.v1.GetReviewResponse.review:type_name -> rill.v1.ReviewState
-	32, // 1: rill.v1.GetReviewResponse.labels:type_name -> rill.v1.Label
-	31, // 2: rill.v1.BatchGetReviewsResponse.reviews:type_name -> rill.v1.ReviewState
-	31, // 3: rill.v1.ListReviewsResponse.reviews:type_name -> rill.v1.ReviewState
-	31, // 4: rill.v1.SubmitChangeResponse.review:type_name -> rill.v1.ReviewState
-	31, // 5: rill.v1.VoteResponse.review:type_name -> rill.v1.ReviewState
-	33, // 6: rill.v1.CreateThreadRequest.anchor:type_name -> rill.v1.ThreadAnchor
-	34, // 7: rill.v1.CreateThreadRequest.category:type_name -> rill.v1.CommentCategory
-	35, // 8: rill.v1.CreateThreadRequest.to:type_name -> rill.v1.Principal
-	36, // 9: rill.v1.CreateThreadResponse.thread:type_name -> rill.v1.Thread
-	34, // 10: rill.v1.ReplyThreadRequest.category:type_name -> rill.v1.CommentCategory
-	36, // 11: rill.v1.ReplyThreadResponse.thread:type_name -> rill.v1.Thread
-	36, // 12: rill.v1.ResolveThreadResponse.thread:type_name -> rill.v1.Thread
-	31, // 13: rill.v1.UpdateStackResponse.reviews:type_name -> rill.v1.ReviewState
-	37, // 14: rill.v1.SubmitDecision.risk:type_name -> rill.v1.RiskClass
+	38, // 0: rill.v1.GetReviewResponse.review:type_name -> rill.v1.ReviewState
+	39, // 1: rill.v1.GetReviewResponse.labels:type_name -> rill.v1.Label
+	38, // 2: rill.v1.BatchGetReviewsResponse.reviews:type_name -> rill.v1.ReviewState
+	38, // 3: rill.v1.ListReviewsResponse.reviews:type_name -> rill.v1.ReviewState
+	38, // 4: rill.v1.SubmitChangeResponse.review:type_name -> rill.v1.ReviewState
+	38, // 5: rill.v1.VoteResponse.review:type_name -> rill.v1.ReviewState
+	40, // 6: rill.v1.CreateThreadRequest.anchor:type_name -> rill.v1.ThreadAnchor
+	41, // 7: rill.v1.CreateThreadRequest.category:type_name -> rill.v1.CommentCategory
+	42, // 8: rill.v1.CreateThreadRequest.to:type_name -> rill.v1.Principal
+	43, // 9: rill.v1.CreateThreadResponse.thread:type_name -> rill.v1.Thread
+	41, // 10: rill.v1.ReplyThreadRequest.category:type_name -> rill.v1.CommentCategory
+	43, // 11: rill.v1.ReplyThreadResponse.thread:type_name -> rill.v1.Thread
+	43, // 12: rill.v1.ResolveThreadResponse.thread:type_name -> rill.v1.Thread
+	38, // 13: rill.v1.UpdateStackResponse.reviews:type_name -> rill.v1.ReviewState
+	44, // 14: rill.v1.SubmitDecision.risk:type_name -> rill.v1.RiskClass
 	19, // 15: rill.v1.EvaluateLandingResponse.decision:type_name -> rill.v1.SubmitDecision
-	31, // 16: rill.v1.AbandonChangeResponse.review:type_name -> rill.v1.ReviewState
-	38, // 17: rill.v1.WatchReviewResponse.status_changed:type_name -> rill.v1.ReviewStatus
-	39, // 18: rill.v1.WatchReviewResponse.voted:type_name -> rill.v1.LabelVote
-	36, // 19: rill.v1.WatchReviewResponse.thread_updated:type_name -> rill.v1.Thread
-	40, // 20: rill.v1.WatchReviewResponse.land_update:type_name -> rill.v1.LandRequest
+	38, // 16: rill.v1.AbandonChangeResponse.review:type_name -> rill.v1.ReviewState
+	45, // 17: rill.v1.WatchReviewResponse.status_changed:type_name -> rill.v1.ReviewStatus
+	46, // 18: rill.v1.WatchReviewResponse.voted:type_name -> rill.v1.LabelVote
+	43, // 19: rill.v1.WatchReviewResponse.thread_updated:type_name -> rill.v1.Thread
+	47, // 20: rill.v1.WatchReviewResponse.land_update:type_name -> rill.v1.LandRequest
 	25, // 21: rill.v1.GetOwnersResponse.sets:type_name -> rill.v1.OwnerSet
 	25, // 22: rill.v1.OwnerSetStatus.set:type_name -> rill.v1.OwnerSet
 	29, // 23: rill.v1.ExplainOwnershipResponse.sets:type_name -> rill.v1.OwnerSetStatus
-	0,  // 24: rill.v1.ReviewService.GetReview:input_type -> rill.v1.GetReviewRequest
-	2,  // 25: rill.v1.ReviewService.BatchGetReviews:input_type -> rill.v1.BatchGetReviewsRequest
-	4,  // 26: rill.v1.ReviewService.ListReviews:input_type -> rill.v1.ListReviewsRequest
-	6,  // 27: rill.v1.ReviewService.SubmitChange:input_type -> rill.v1.SubmitChangeRequest
-	8,  // 28: rill.v1.ReviewService.Vote:input_type -> rill.v1.VoteRequest
-	10, // 29: rill.v1.ReviewService.CreateThread:input_type -> rill.v1.CreateThreadRequest
-	12, // 30: rill.v1.ReviewService.ReplyThread:input_type -> rill.v1.ReplyThreadRequest
-	14, // 31: rill.v1.ReviewService.ResolveThread:input_type -> rill.v1.ResolveThreadRequest
-	16, // 32: rill.v1.ReviewService.UpdateStack:input_type -> rill.v1.UpdateStackRequest
-	18, // 33: rill.v1.ReviewService.EvaluateLanding:input_type -> rill.v1.EvaluateLandingRequest
-	21, // 34: rill.v1.ReviewService.AbandonChange:input_type -> rill.v1.AbandonChangeRequest
-	23, // 35: rill.v1.ReviewService.WatchReview:input_type -> rill.v1.WatchReviewRequest
-	26, // 36: rill.v1.ReviewService.GetOwners:input_type -> rill.v1.GetOwnersRequest
-	28, // 37: rill.v1.ReviewService.ExplainOwnership:input_type -> rill.v1.ExplainOwnershipRequest
-	1,  // 38: rill.v1.ReviewService.GetReview:output_type -> rill.v1.GetReviewResponse
-	3,  // 39: rill.v1.ReviewService.BatchGetReviews:output_type -> rill.v1.BatchGetReviewsResponse
-	5,  // 40: rill.v1.ReviewService.ListReviews:output_type -> rill.v1.ListReviewsResponse
-	7,  // 41: rill.v1.ReviewService.SubmitChange:output_type -> rill.v1.SubmitChangeResponse
-	9,  // 42: rill.v1.ReviewService.Vote:output_type -> rill.v1.VoteResponse
-	11, // 43: rill.v1.ReviewService.CreateThread:output_type -> rill.v1.CreateThreadResponse
-	13, // 44: rill.v1.ReviewService.ReplyThread:output_type -> rill.v1.ReplyThreadResponse
-	15, // 45: rill.v1.ReviewService.ResolveThread:output_type -> rill.v1.ResolveThreadResponse
-	17, // 46: rill.v1.ReviewService.UpdateStack:output_type -> rill.v1.UpdateStackResponse
-	20, // 47: rill.v1.ReviewService.EvaluateLanding:output_type -> rill.v1.EvaluateLandingResponse
-	22, // 48: rill.v1.ReviewService.AbandonChange:output_type -> rill.v1.AbandonChangeResponse
-	24, // 49: rill.v1.ReviewService.WatchReview:output_type -> rill.v1.WatchReviewResponse
-	27, // 50: rill.v1.ReviewService.GetOwners:output_type -> rill.v1.GetOwnersResponse
-	30, // 51: rill.v1.ReviewService.ExplainOwnership:output_type -> rill.v1.ExplainOwnershipResponse
-	38, // [38:52] is the sub-list for method output_type
-	24, // [24:38] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	32, // 24: rill.v1.GetInterdiffResponse.files:type_name -> rill.v1.InterdiffFile
+	48, // 25: rill.v1.ApplySuggestionResponse.info:type_name -> rill.v1.ChangeInfo
+	38, // 26: rill.v1.ReopenChangeResponse.review:type_name -> rill.v1.ReviewState
+	0,  // 27: rill.v1.ReviewService.GetReview:input_type -> rill.v1.GetReviewRequest
+	2,  // 28: rill.v1.ReviewService.BatchGetReviews:input_type -> rill.v1.BatchGetReviewsRequest
+	4,  // 29: rill.v1.ReviewService.ListReviews:input_type -> rill.v1.ListReviewsRequest
+	6,  // 30: rill.v1.ReviewService.SubmitChange:input_type -> rill.v1.SubmitChangeRequest
+	8,  // 31: rill.v1.ReviewService.Vote:input_type -> rill.v1.VoteRequest
+	10, // 32: rill.v1.ReviewService.CreateThread:input_type -> rill.v1.CreateThreadRequest
+	12, // 33: rill.v1.ReviewService.ReplyThread:input_type -> rill.v1.ReplyThreadRequest
+	14, // 34: rill.v1.ReviewService.ResolveThread:input_type -> rill.v1.ResolveThreadRequest
+	16, // 35: rill.v1.ReviewService.UpdateStack:input_type -> rill.v1.UpdateStackRequest
+	18, // 36: rill.v1.ReviewService.EvaluateLanding:input_type -> rill.v1.EvaluateLandingRequest
+	21, // 37: rill.v1.ReviewService.AbandonChange:input_type -> rill.v1.AbandonChangeRequest
+	23, // 38: rill.v1.ReviewService.WatchReview:input_type -> rill.v1.WatchReviewRequest
+	26, // 39: rill.v1.ReviewService.GetOwners:input_type -> rill.v1.GetOwnersRequest
+	28, // 40: rill.v1.ReviewService.ExplainOwnership:input_type -> rill.v1.ExplainOwnershipRequest
+	31, // 41: rill.v1.ReviewService.GetInterdiff:input_type -> rill.v1.GetInterdiffRequest
+	34, // 42: rill.v1.ReviewService.ApplySuggestion:input_type -> rill.v1.ApplySuggestionRequest
+	36, // 43: rill.v1.ReviewService.ReopenChange:input_type -> rill.v1.ReopenChangeRequest
+	1,  // 44: rill.v1.ReviewService.GetReview:output_type -> rill.v1.GetReviewResponse
+	3,  // 45: rill.v1.ReviewService.BatchGetReviews:output_type -> rill.v1.BatchGetReviewsResponse
+	5,  // 46: rill.v1.ReviewService.ListReviews:output_type -> rill.v1.ListReviewsResponse
+	7,  // 47: rill.v1.ReviewService.SubmitChange:output_type -> rill.v1.SubmitChangeResponse
+	9,  // 48: rill.v1.ReviewService.Vote:output_type -> rill.v1.VoteResponse
+	11, // 49: rill.v1.ReviewService.CreateThread:output_type -> rill.v1.CreateThreadResponse
+	13, // 50: rill.v1.ReviewService.ReplyThread:output_type -> rill.v1.ReplyThreadResponse
+	15, // 51: rill.v1.ReviewService.ResolveThread:output_type -> rill.v1.ResolveThreadResponse
+	17, // 52: rill.v1.ReviewService.UpdateStack:output_type -> rill.v1.UpdateStackResponse
+	20, // 53: rill.v1.ReviewService.EvaluateLanding:output_type -> rill.v1.EvaluateLandingResponse
+	22, // 54: rill.v1.ReviewService.AbandonChange:output_type -> rill.v1.AbandonChangeResponse
+	24, // 55: rill.v1.ReviewService.WatchReview:output_type -> rill.v1.WatchReviewResponse
+	27, // 56: rill.v1.ReviewService.GetOwners:output_type -> rill.v1.GetOwnersResponse
+	30, // 57: rill.v1.ReviewService.ExplainOwnership:output_type -> rill.v1.ExplainOwnershipResponse
+	33, // 58: rill.v1.ReviewService.GetInterdiff:output_type -> rill.v1.GetInterdiffResponse
+	35, // 59: rill.v1.ReviewService.ApplySuggestion:output_type -> rill.v1.ApplySuggestionResponse
+	37, // 60: rill.v1.ReviewService.ReopenChange:output_type -> rill.v1.ReopenChangeResponse
+	44, // [44:61] is the sub-list for method output_type
+	27, // [27:44] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_review_proto_init() }
@@ -2182,7 +2638,7 @@ func file_rill_v1_review_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_review_proto_rawDesc), len(file_rill_v1_review_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

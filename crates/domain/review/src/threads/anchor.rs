@@ -3,11 +3,13 @@
 //! A `Lines` anchor carries a hash of the lines around its range. When a
 //! new version arrives the same context is searched for in the new file
 //! content, nearest to the original position first, and the anchor moves
-//! with it. An anchor whose context no longer exists is left pointing at
-//! the version it was made on.
+//! with it, following a rename the new version records as a copy. An
+//! anchor whose context no longer exists is left pointing at the version
+//! it was last placed on and marked outdated.
 
 use rill_core::diff::{line_content, split_lines};
-use rill_types::{ChangeVersionHash, ReviewState, ThreadAnchor};
+use rill_types::objects::change::FileChange;
+use rill_types::{ChangeVersionHash, RepoPathBuf, ReviewState, ThreadAnchor};
 
 use crate::error::Result;
 use crate::service::ReviewService;
@@ -61,15 +63,28 @@ pub fn find_context(content: &[u8], start: u32, end: u32, hash: &str) -> Option<
 }
 
 impl ReviewService {
-    /// Move every file-anchored thread onto `new_version` where its context
-    /// can be found. Threads whose anchor cannot be re-found keep their old
-    /// anchor.
+    /// Move every file-anchored thread onto `new_version`: to the same path,
+    /// or to where the version copied that path (a rename), where its
+    /// context can be found. A thread that cannot follow keeps its old
+    /// anchor and is marked outdated.
     pub async fn reanchor(
         &self,
         state: &mut ReviewState,
         new_version: ChangeVersionHash,
     ) -> Result<()> {
         let root = self.root_of(&new_version).await?;
+        let cv = self.derive.change(&new_version).await?;
+        let moved_to = |path: &RepoPathBuf| -> Option<RepoPathBuf> {
+            cv.file_changes
+                .iter()
+                .find_map(|(to, change)| match change {
+                    FileChange::Set {
+                        copy_from: Some(src),
+                        ..
+                    } if src.path == *path && to != path => Some(to.clone()),
+                    _ => None,
+                })
+        };
         for thread in &mut state.threads {
             match &thread.anchor {
                 ThreadAnchor::Lines {
@@ -79,26 +94,47 @@ impl ReviewService {
                     end,
                     context_hash,
                 } if *version != new_version => {
-                    let Some(content) = self.file_at(root, path).await? else {
-                        continue;
-                    };
-                    if let Some((s, e)) = find_context(&content, *start, *end, context_hash) {
-                        thread.anchor = ThreadAnchor::Lines {
-                            version: new_version,
-                            path: path.clone(),
-                            start: s,
-                            end: e,
-                            context_hash: context_hash.clone(),
-                        };
+                    let mut found = None;
+                    for candidate in std::iter::once(path.clone()).chain(moved_to(path)) {
+                        if let Some(content) = self.file_at(root, &candidate).await? {
+                            if let Some(range) = find_context(&content, *start, *end, context_hash)
+                            {
+                                found = Some((candidate, range));
+                                break;
+                            }
+                        }
+                    }
+                    match found {
+                        Some((path, (s, e))) => {
+                            thread.anchor = ThreadAnchor::Lines {
+                                version: new_version,
+                                path,
+                                start: s,
+                                end: e,
+                                context_hash: context_hash.clone(),
+                            };
+                            thread.outdated = false;
+                        }
+                        None => thread.outdated = true,
                     }
                 }
                 ThreadAnchor::File { version, path } if *version != new_version => {
-                    let exists = self.file_at(root, path).await?.is_some();
-                    if exists {
-                        thread.anchor = ThreadAnchor::File {
-                            version: new_version,
-                            path: path.clone(),
-                        };
+                    let mut found = None;
+                    for candidate in std::iter::once(path.clone()).chain(moved_to(path)) {
+                        if self.file_at(root, &candidate).await?.is_some() {
+                            found = Some(candidate);
+                            break;
+                        }
+                    }
+                    match found {
+                        Some(path) => {
+                            thread.anchor = ThreadAnchor::File {
+                                version: new_version,
+                                path,
+                            };
+                            thread.outdated = false;
+                        }
+                        None => thread.outdated = true,
                     }
                 }
                 _ => {}

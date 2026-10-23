@@ -179,6 +179,7 @@ pub async fn open(ctx: &mut Ctx<'_>, id: ChangeId) -> Result<()> {
                                     category: None,
                                     confidence: None,
                                     to: None,
+                                    suggestion: None,
                                 },
                             )
                             .await

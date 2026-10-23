@@ -51,7 +51,7 @@ impl ReviewClient {
         format!("{}/review", self.change(id))
     }
 
-    fn thread(&self, id: &ChangeId, thread: &str) -> String {
+    pub(crate) fn thread(&self, id: &ChangeId, thread: &str) -> String {
         format!("{}/threads/{thread}", self.review(id))
     }
 
@@ -187,6 +187,7 @@ impl ReviewClient {
                 .map(|c| pb::CommentCategory::from(c).into()),
             confidence: comment.confidence.map(u32::from),
             to: comment.to.map(pb::Principal::from).into(),
+            suggestion: comment.suggestion,
         };
         let resp = crate::client::retry_idempotent(|| {
             let (svc, request) = (self.svc(), request.clone());

@@ -155,6 +155,11 @@ impl RepoStore {
                     )));
                 }
                 let mut next = snapshot.state.clone();
+                // The lander may have rebased it: the review ends on the
+                // version that landed.
+                if next.current_version() != Some(entry.version) {
+                    next.versions.push(entry.version);
+                }
                 next.status = ReviewStatus::Landed;
                 next.landed_seq = batch.line.is_trunk().then_some(seq);
                 next.updated_at = now.max(snapshot.state.updated_at);

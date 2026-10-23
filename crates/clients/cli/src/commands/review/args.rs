@@ -41,6 +41,12 @@ pub enum ReviewCmd {
     Audit(super::attention::AuditArgs),
     /// Group an intent's changes by the edit they make; approve a group.
     Batch(super::attention::BatchArgs),
+    /// What the author changed between two versions, without rebase noise.
+    Interdiff(super::mechanics::InterdiffArgs),
+    /// Apply a thread's suggested edit as a new version.
+    Apply(super::mechanics::ApplyArgs),
+    /// Reopen an abandoned change.
+    Reopen(ChangeArg),
 }
 
 /// `rill review request`.
@@ -119,6 +125,12 @@ pub struct CommentArgs {
     /// Anchor to this line (requires --path).
     #[arg(long)]
     pub line: Option<u32>,
+    /// Through this line, for a range.
+    #[arg(long, requires = "line")]
+    pub end_line: Option<u32>,
+    /// Suggest this text in place of the lines (requires --line).
+    #[arg(long, requires = "line")]
+    pub suggest: Option<String>,
 }
 
 /// `rill review reply`.

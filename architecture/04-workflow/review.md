@@ -70,16 +70,33 @@ not count: `SubmitFacts::from_review` summarizes `current_votes()` only.
 
 ## Threads
 
-A `Thread { id, anchor, comments, resolved, to }` is anchored at `Change`,
+A `Thread { id, anchor, comments, resolved, to, outdated }` is anchored at `Change`,
 `File { version, path }` or `Lines { version, path, start, end,
 context_hash }`. When `comment` receives a `Lines` anchor with an empty
 `context_hash`, it computes one: BLAKE3 with the `rill:anchor:` prefix over
 the anchored lines plus `CONTEXT_LINES` (1) on each side, clipped to the
 file.
 
-On each new version, `reanchor` moves `Lines` anchors to the nearest
-same-length window whose context hash matches (`find_context`), and `File`
-anchors when the path still exists. Otherwise the anchor keeps its version.
+On each new version, `reanchor` moves anchors forward:
+
+- **`Lines` anchors** move to the nearest same-length window whose context
+  hash matches (`find_context`).
+- **`File` anchors** move when the file still exists.
+- **Renames:** both kinds look first at the same path, then at a path the
+  new version copied from it (a rename is a copy plus a delete).
+- **Outdated:** an anchor that cannot follow keeps the version it was
+  last placed on, and the thread is marked `outdated`.
+
+**Suggested edits.** A `CreateThread` with `suggestion` (a `Lines`
+anchor on the current version) carries replacement text for those lines.
+`ApplySuggestion` lets the change's owner, or a repository owner, apply
+it. It builds the amended version with the lines replaced
+([`suggested_edit`](../../crates/domain/review/src/threads/suggest.rs)),
+stores it through the normal commit path, and resolves the thread. The
+apply is refused when:
+
+- the thread is resolved or outdated;
+- the thread is anchored on an older version.
 
 An unresolved thread containing any comment with category `Bug` or
 `Security` counts as `unresolved_blocking_threads`. `resolve` and
@@ -109,6 +126,20 @@ For the first two, votes on the old version whose label has
 `copy_on_trivial_rebase` are copied to the new one (`Verified` never is).
 For `Changed`, nothing is copied and the change needs fresh approval.
 
+When the change is in a declared stack, the new version must sit on the
+current version of the change below it. If it does not, the review gets
+the note `stack` ("restack the stack"); the note clears when it does.
+
+**Interdiff.** `GetInterdiff` (`rill review interdiff [--from] [--to]`)
+shows what the author changed between two versions
+([version_diff.rs](../../crates/domain/review/src/lifecycle/version_diff.rs)).
+It defaults to the previous version and the current one.
+- A path whose own patch (its diff against each version's parent) is the
+  same in both only moved with the base. It is listed under `rebased`.
+- Every other path the author touched is diffed from its content in the
+  old version to its content in the new one.
+- Paths the caller may not read are dropped.
+
 ## Status machine
 
 ```mermaid
@@ -129,8 +160,12 @@ stateDiagram-v2
 `refresh_status` evaluates the policy as the owner and only moves between
 `Open` and `Landable`; other statuses are left alone. It runs inside
 `submit`, `vote`, `resolve`, `unresolve`, `add_version` and `set_stack`.
-`mark_landing` accepts only `Landable`; `mark_landed` accepts `Landing` or
-`Landable` and sets `landed_seq`. The lander drives these through
+`mark_landing` accepts only `Landable`. `mark_landed` accepts `Landing`
+or `Landable` and sets `landed_seq`. When the lander rebased the change,
+the landed version is appended to `versions`, so the review ends on what
+reached trunk; the decision recorder evaluates on the version requested.
+`ReopenChange` (`rill review reopen`) reopens an abandoned change, for its
+owner or a repository owner. The lander drives these through
 `ReviewHooks` (see [post-land verification](post-land-verification.md)).
 Invalid transitions fail with `InvalidStatus` (`FailedPrecondition`).
 
@@ -172,10 +207,8 @@ service also still broadcasts a `ReviewEvent` per mutation in process.
   for that write.
 * Assembling a review reads the record, the votes and each thread's
   comments; listing many reviews costs a scan per review.
-* Re-anchoring is line-exact and path-bound; a renamed file loses anchors.
-* `reopen` exists in `ReviewService` but has no RPC.
-* The version the lander lands (often a rebased one) is not appended to
-  `versions`.
+* Re-anchoring is line-exact; renames are followed only when the new
+  version records them as a copy.
 
 ## Code
 

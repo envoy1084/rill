@@ -73,7 +73,7 @@ impl ReviewService {
 
     /// The per-path `(before, after)` content identities of a version's
     /// tree diff against its first parent.
-    async fn effect(&self, cv: &ChangeVersion, root: TreeHash) -> Result<Effect> {
+    pub(crate) async fn effect(&self, cv: &ChangeVersion, root: TreeHash) -> Result<Effect> {
         let parent_root = match cv.first_parent() {
             Some(p) => Some(self.derive.get::<RootTree>(&p).await?),
             None => None,

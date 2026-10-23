@@ -345,6 +345,9 @@ message Comment {
   optional CommentCategory category = 4;
   // Reviewer confidence as a percentage 0-100.
   optional uint32 confidence = 5;
+  // Replacement text for the anchored lines, which the change's author
+  // can apply.
+  optional string suggestion = 6;
 }
 
 message Thread {
@@ -355,6 +358,8 @@ message Thread {
   repeated Comment comments = 3;
   bool resolved = 4;
   optional Principal to = 5;
+  // The anchor was not found on the current version.
+  bool outdated = 7;
 }
 
 enum ReviewStatus {
