@@ -213,4 +213,4 @@ are shared with `rill checks` and `rill grep`.
 - [json/mod.rs](../../crates/clients/mcp/src/json/mod.rs)
 
 ---
-← Previous: [CLI](cli.md) · [Index](../index.md) · Next: [Development](../09-engineering/development.md) →
+← Previous: [CLI](cli.md) · [Index](../index.md) · Next: [IDE extensions](ide.md) →

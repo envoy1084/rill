@@ -93,17 +93,18 @@ Read in this order the first time; each page ends with Previous / Next links.
 50. [Client daemon](08-clients/daemon.md)
 51. [CLI](08-clients/cli.md)
 52. [MCP server](08-clients/mcp.md)
+53. [IDE extensions](08-clients/ide.md)
 
 **09 Engineering**
 
-53. [Development](09-engineering/development.md)
-54. [Testing](09-engineering/testing.md)
-55. [Simulation](09-engineering/simulation.md)
-56. [Performance](09-engineering/performance.md)
+54. [Development](09-engineering/development.md)
+55. [Testing](09-engineering/testing.md)
+56. [Simulation](09-engineering/simulation.md)
+57. [Performance](09-engineering/performance.md)
 
 **10 Decisions**
 
-57. [Architecture decisions](10-decisions/README.md): the nineteen ADRs that
+58. [Architecture decisions](10-decisions/README.md): the nineteen ADRs that
     fix the target (v2) design. They are records, not descriptions of the
     current code, and are reached from that page.
 
@@ -142,7 +143,7 @@ Read in this order the first time; each page ends with Previous / Next links.
 | Server flags, config file, dev mode | [Configuration](07-runtime/configuration.md) |
 | Metrics, logs, traces, health endpoints, dashboards | [Observability](07-runtime/observability.md) |
 | The regional cache in front of the origin | [Cache tier](07-runtime/cache.md) |
-| Client library, `rill` commands, agent tools | [SDK](08-clients/sdk.md), [Client daemon](08-clients/daemon.md), [CLI](08-clients/cli.md), [MCP server](08-clients/mcp.md) |
+| Client library, `rill` commands, agent tools | [SDK](08-clients/sdk.md), [Client daemon](08-clients/daemon.md), [CLI](08-clients/cli.md), [MCP server](08-clients/mcp.md), [IDE extensions](08-clients/ide.md) |
 | Building, CI, tests | [Development](09-engineering/development.md), [Testing](09-engineering/testing.md) |
 | Seeded fault simulation, benchmarks, load | [Simulation](09-engineering/simulation.md), [Performance](09-engineering/performance.md) |
 | Fixed design decisions for v2 | [Architecture decisions](10-decisions/README.md) |

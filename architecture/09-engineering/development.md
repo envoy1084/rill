@@ -19,6 +19,7 @@ it builds, and what CI checks. The crate dependency rules are on
 | `crates/<group>/<name>/tests` | cross-module tests ([testing](testing.md)) |
 | `crates/foundation/proto/proto/rill/v1` | the `.proto` sources |
 | `tools/` | `sim`, `bench`, `load`; `fuzz/` is a separate `cargo-fuzz` workspace |
+| `ide/` | editor extensions over the CLI's JSON ([IDE extensions](../08-clients/ide.md)); `vscode/` is an npm package |
 | `deploy/` | the Docker image, Helm chart, staging compose cluster, dashboards, test identity providers |
 | `spec/` | TLA+ specifications checked with TLC |
 | `.github/workflows/ci.yml` | the CI pipeline |
@@ -183,4 +184,4 @@ logging in all three binaries.
 - [rill-cli/src/server/mod.rs](../../crates/clients/cli/src/server/mod.rs)
 
 ---
-← Previous: [MCP server](../08-clients/mcp.md) · [Index](../index.md) · Next: [Testing](testing.md) →
+← Previous: [IDE extensions](../08-clients/ide.md) · [Index](../index.md) · Next: [Testing](testing.md) →
