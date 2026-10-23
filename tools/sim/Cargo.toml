@@ -17,6 +17,8 @@ rill-review = { workspace = true }
 rill-lander = { workspace = true }
 rill-jobs = { workspace = true }
 rill-runtime = { workspace = true }
+rill-sdk = { workspace = true }
+rill-review-runner = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 async-trait = { workspace = true }
 bytes = { workspace = true }

@@ -22,10 +22,37 @@ struct Args {
     /// Replay one seed and print every violation.
     #[arg(long)]
     seed: Option<u64>,
+    /// Run the review-at-scale gate with this many changes instead.
+    #[arg(long)]
+    review_gate: Option<usize>,
+}
+
+fn review_gate(changes: usize) -> ExitCode {
+    let runtime = tokio::runtime::Runtime::new().expect("a tokio runtime starts");
+    let report = runtime.block_on(rill_sim::review_gate::run_gate(
+        rill_sim::review_gate::GateConfig {
+            changes,
+            ..Default::default()
+        },
+    ));
+    println!("{report:?}");
+    println!(
+        "to humans: {}‰ (gate ≤ 100‰), defects caught: {}‰ (gate ≥ 900‰)",
+        report.human_permille(),
+        report.caught_permille()
+    );
+    if report.passes() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 fn main() -> ExitCode {
     let args = Args::parse();
+    if let Some(changes) = args.review_gate {
+        return review_gate(changes);
+    }
     let Some(scenario) = Scenario::by_name(&args.scenario) else {
         eprintln!("unknown scenario {:?}", args.scenario);
         return ExitCode::from(2);

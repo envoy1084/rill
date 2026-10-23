@@ -5,6 +5,9 @@
 //! chosen by one seed, and checks the invariants in [`oracle`] along the
 //! way. The same seed always replays the same run, so a failing seed is a
 //! reproducible bug report.
+//!
+//! [`review_gate`] is the review-at-scale gate: an agent fleet reviewing
+//! a large agent workload under the default policy.
 
 pub mod actors;
 pub mod approvals;
@@ -15,6 +18,7 @@ pub mod kill;
 pub mod known;
 pub mod oracle;
 pub mod processes;
+pub mod review_gate;
 pub mod rng;
 pub mod run;
 pub mod scenario;

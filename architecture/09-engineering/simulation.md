@@ -146,6 +146,43 @@ cargo run --release -p rill-sim -- --scenario clean --seed 42    # replay one se
 
 A release build runs about 200 faulty seeds a second.
 
+## The review-at-scale gate
+
+[`review_gate`](../../tools/sim/src/review_gate/mod.rs) checks whether
+agent review holds up at the D1 shape. Unlike a seeded run, it has no
+faults. It uses memory stores, the real review service and default
+policy, and a [`StaticDirectory`](../../crates/domain/policy/src/directory.rs).
+
+**The world:**
+
+- 1,000 people and 30,000 agents (each agent is sponsored by a person);
+- a fleet of reviewer agents (two general ones of different model
+  families, and a security reviewer for sensitive changes), sponsored by a
+  team;
+- 200 approved intents over 100 directories, each auditing 50‰ of the
+  landings no human approved.
+
+**Each change:** an agent edits a file under a random intent. 6% fall
+outside every scope and 2% touch `.rill/` (critical). 10% carry a seeded
+`RILL-DEFECT` line. Then:
+
+1. The fleet reviews it with the runner's fake backend (90% detection
+   each, 2% false blocks), and the results are posted through
+   `post_review_result`.
+2. A blocked change goes back to its author.
+3. Otherwise, after a passing verification, the policy either lets it
+   land on agent review or a person must vote.
+
+A defect counts as caught when a reviewer blocked it, or when it landed
+on agents and was sampled for an audit. A defect a person approved
+without the fleet flagging it counts as escaped.
+
+The gate holds at **≤ 100‰ of changes needing a person** and **≥ 900‰ of
+seeded defects caught**. The test (`tests/review_gate.rs`) runs 1,500
+changes (`RILL_GATE_CHANGES` for more), and `rill-sim --review-gate <n>`
+runs it from the command line. A 20,000-change run sends 71‰ to people
+and catches 993‰.
+
 ## Limitations
 
 - Called as a library. There is no network between client and server, and
@@ -157,6 +194,8 @@ A release build runs about 200 faulty seeds a second.
 - Agents never run verification, so the verifier always passes.
 
 ## Code
+
+* [review_gate/](../../tools/sim/src/review_gate/mod.rs): the review-at-scale gate.
 
 - [rill-sim/src/run.rs](../../tools/sim/src/run.rs), [world.rs](../../tools/sim/src/world.rs), [actors/](../../tools/sim/src/actors/mod.rs), [oracle.rs](../../tools/sim/src/oracle.rs), [known.rs](../../tools/sim/src/known.rs), [processes.rs](../../tools/sim/src/processes.rs), [kill.rs](../../tools/sim/src/kill.rs)
 - [rill-sim/src/faults/](../../tools/sim/src/faults/mod.rs), [rill-sim/tests/seeds.rs](../../tools/sim/tests/seeds.rs)
