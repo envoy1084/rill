@@ -125,8 +125,8 @@ impl TryFrom<pb::Verification> for VerificationRecord {
 pub struct TrunkStatus {
     /// Head sequence.
     pub head_seq: TrunkSeq,
-    /// Head version.
-    pub head_hash: ChangeVersionHash,
+    /// Head version; `None` until something lands.
+    pub head_hash: Option<ChangeVersionHash>,
     /// Land requests queued or rebasing, in serve order.
     pub in_flight: Vec<LandTicket>,
     /// Most recent landings, newest first.
@@ -143,7 +143,10 @@ impl TrunkStatus {
     ) -> Result<Self> {
         Ok(TrunkStatus {
             head_seq: trunk_seq_from_proto(r.head_position),
-            head_hash: hash_from_proto("trunk_status.head_hash", &r.head_hash)?,
+            head_hash: match r.head_hash.is_empty() {
+                true => None,
+                false => Some(hash_from_proto("trunk_status.head_hash", &r.head_hash)?),
+            },
             in_flight: r
                 .in_flight
                 .into_iter()

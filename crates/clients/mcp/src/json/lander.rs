@@ -35,7 +35,7 @@ pub fn verification_record(r: &VerificationRecord) -> Value {
 pub fn trunk_status(t: &TrunkStatus) -> Value {
     json!({
         "head_seq": t.head_seq.get(),
-        "head_hash": hash(&t.head_hash),
+        "head_hash": opt(t.head_hash.as_ref(), hash),
         "in_flight": t.in_flight.iter().map(land_ticket).collect::<Vec<_>>(),
         "recent": t.recent.iter().map(land_event).collect::<Vec<_>>(),
         "last_verified_seq": t.last_verified_seq.map(|s| s.get()),

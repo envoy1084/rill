@@ -243,11 +243,10 @@ pub async fn trunk(ctx: &mut Ctx<'_>) -> Result<()> {
         out.kv(&[
             (
                 "head",
-                format!(
-                    "trunk@{} ({})",
-                    status.head_seq.get(),
-                    short(&status.head_hash)
-                ),
+                match &status.head_hash {
+                    Some(head) => format!("trunk@{} ({})", status.head_seq.get(), short(head)),
+                    None => "empty".to_string(),
+                },
             ),
             (
                 "verified",

@@ -74,3 +74,7 @@ required-features = ["testing"]
 [[test]]
 name = "amend"
 required-features = ["testing"]
+
+[[test]]
+name = "trunk_status"
+required-features = ["testing"]
