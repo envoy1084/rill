@@ -25,6 +25,7 @@ connectrpc = { workspace = true }
 uuid = { workspace = true }
 base64 = { workspace = true }
 buffa = { workspace = true }
+buffa-types = { workspace = true }
 http = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
@@ -47,7 +48,6 @@ postcard = { workspace = true }
 
 [dev-dependencies]
 axum = { workspace = true }
-buffa-types = { workspace = true }
 buffa = { workspace = true }
 connectrpc = { workspace = true }
 futures = { workspace = true }

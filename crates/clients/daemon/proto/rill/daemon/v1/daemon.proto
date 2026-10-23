@@ -1,0 +1,237 @@
+// The local daemon every tool on a host shares. It owns the object cache
+// and the working copies (mounts), records local edits in an overlay and
+// syncs them to each mount's server workspace. It listens on a local
+// socket only.
+//
+// A mount is `mounts/{mount}`.
+syntax = "proto3";
+
+package rill.daemon.v1;
+
+// The daemon's mounts, their status and their sync.
+service DaemonService {
+  // The daemon's version and cache statistics.
+  rpc GetDaemon(GetDaemonRequest) returns (GetDaemonResponse);
+  // Check out a revision into a directory.
+  rpc CreateMount(CreateMountRequest) returns (CreateMountResponse);
+  // A mount by name, or the mount containing a path.
+  rpc GetMount(GetMountRequest) returns (GetMountResponse);
+  // Every mount.
+  rpc ListMounts(ListMountsRequest) returns (ListMountsResponse);
+  // Forget a mount. Files of an eager mount stay on disk.
+  rpc DeleteMount(DeleteMountRequest) returns (DeleteMountResponse);
+  // Paths that differ from the mount's base.
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  // Push pending local edits to the server workspace now.
+  rpc SyncMount(SyncMountRequest) returns (SyncMountResponse);
+  // Record the working copy as a change version.
+  rpc CommitMount(CommitMountRequest) returns (CommitMountResponse);
+  // Move the mount onto a new base, merging local edits.
+  rpc UpdateMount(UpdateMountRequest) returns (UpdateMountResponse);
+  // Mark conflicted paths resolved.
+  rpc ResolvePaths(ResolvePathsRequest) returns (ResolvePathsResponse);
+  // Fetch file contents into the cache ahead of use.
+  rpc Prefetch(PrefetchRequest) returns (PrefetchResponse);
+  // Stop the daemon.
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+}
+
+// How a mount presents its files.
+enum MountMode {
+  MOUNT_MODE_UNSPECIFIED = 0;
+  // Files written to disk; a watcher records edits.
+  MOUNT_MODE_EAGER = 1;
+  // A virtual filesystem; contents fetched on first read.
+  MOUNT_MODE_LAZY = 2;
+  // A read-only virtual filesystem of one version, with writes kept in a
+  // scratch overlay that is never synced.
+  MOUNT_MODE_SNAPSHOT = 3;
+}
+
+// A working copy the daemon serves.
+message Mount {
+  // `mounts/{mount}`.
+  string name = 1;
+  // Absolute directory.
+  string path = 2;
+  // Server endpoint.
+  string endpoint = 3;
+  // Repository name.
+  string repo = 4;
+  MountMode mode = 5;
+  // Server workspace id; empty when the mount has none.
+  string workspace = 6;
+  // The revision the base was taken from (`trunk`, a ref, a version).
+  string base = 7;
+  // The change version the base is, as hex; empty for an empty repository.
+  string base_version = 8;
+  // The change commits amend; empty before the first commit.
+  string working_change = 9;
+  // Directory prefixes the mount includes; every path when empty.
+  repeated string sparse = 10;
+  // Local edits not yet synced to the server workspace.
+  uint64 pending = 11;
+  // The last sync failure; empty after a success.
+  string sync_error = 12;
+}
+
+// How a path differs from the base.
+enum ChangeKind {
+  CHANGE_KIND_UNSPECIFIED = 0;
+  CHANGE_KIND_ADDED = 1;
+  CHANGE_KIND_MODIFIED = 2;
+  CHANGE_KIND_DELETED = 3;
+  // Holds conflict markers from an update.
+  CHANGE_KIND_CONFLICT = 4;
+}
+
+// One path that differs from the base.
+message LocalChange {
+  string path = 1;
+  ChangeKind kind = 2;
+}
+
+// Hits and misses of the shared object cache.
+message CacheStats {
+  uint64 objects = 1;
+  uint64 bytes = 2;
+  uint64 budget_bytes = 3;
+  uint64 hits = 4;
+  uint64 misses = 5;
+  uint64 evictions = 6;
+}
+
+message GetDaemonRequest {}
+message GetDaemonResponse {
+  string version = 1;
+  uint32 pid = 2;
+  CacheStats cache = 3;
+  uint32 mounts = 4;
+}
+
+message CreateMountRequest {
+  // Absolute directory; must be empty or absent.
+  string path = 1;
+  string endpoint = 2;
+  // A bearer token for the endpoint; the daemon keeps it in memory only.
+  string token = 3;
+  string repo = 4;
+  // Revision to check out; trunk when empty.
+  string revision = 5;
+  repeated string sparse = 6;
+  MountMode mode = 7;
+  // Do not create a server workspace (edits are local until committed).
+  bool no_workspace = 8;
+}
+message CreateMountResponse {
+  Mount mount = 1;
+  // Files written (eager) or presented (lazy).
+  uint64 files = 2;
+}
+
+message GetMountRequest {
+  // `mounts/{mount}`, or empty to look up `path`.
+  string name = 1;
+  // A path inside the mount.
+  string path = 2;
+  // Refreshes the token the daemon uses for the mount's endpoint.
+  string token = 3;
+}
+message GetMountResponse {
+  Mount mount = 1;
+}
+
+message ListMountsRequest {}
+message ListMountsResponse {
+  repeated Mount mounts = 1;
+}
+
+message DeleteMountRequest {
+  string name = 1;
+}
+message DeleteMountResponse {}
+
+message GetStatusRequest {
+  string name = 1;
+  // Only paths under these prefixes.
+  repeated string prefixes = 2;
+}
+message GetStatusResponse {
+  Mount mount = 1;
+  repeated LocalChange changes = 2;
+}
+
+message SyncMountRequest {
+  string name = 1;
+}
+message SyncMountResponse {
+  Mount mount = 1;
+  // Edits pushed.
+  uint64 pushed = 2;
+}
+
+message CommitMountRequest {
+  string name = 1;
+  string message = 2;
+  // `…/intents/{intent}` or an intent id.
+  string intent = 3;
+  // Start a new change (stacked on the working change if it has not
+  // landed) rather than amending the working change.
+  bool new_change = 4;
+  // Keep the working change's message (amend without one).
+  bool keep_message = 5;
+  // Provenance the CLI or agent records.
+  string tool = 6;
+  string model = 7;
+  string session = 8;
+}
+message CommitMountResponse {
+  Mount mount = 1;
+  // The change version created, as hex.
+  string version = 2;
+  string change = 3;
+  // The change the new one is stacked on, when it is.
+  string stacked_on = 4;
+  // The version's message.
+  string message = 5;
+}
+
+message UpdateMountRequest {
+  string name = 1;
+  // Revision to move onto; trunk when empty.
+  string revision = 2;
+}
+message UpdateMountResponse {
+  Mount mount = 1;
+  // Files changed upstream and taken as they are.
+  repeated string updated = 2;
+  // Files removed upstream.
+  repeated string removed = 3;
+  // Files whose local edits merged cleanly with upstream.
+  repeated string merged = 4;
+  // Files written with conflict markers.
+  repeated string conflicts = 5;
+}
+
+message ResolvePathsRequest {
+  string name = 1;
+  repeated string paths = 2;
+  // Accept files that still look like they hold markers.
+  bool force = 3;
+}
+message ResolvePathsResponse {
+  Mount mount = 1;
+}
+
+message PrefetchRequest {
+  string name = 1;
+  // Directory prefixes; the whole mount when empty.
+  repeated string prefixes = 2;
+}
+message PrefetchResponse {
+  uint64 files = 1;
+  uint64 bytes = 2;
+}
+
+message ShutdownRequest {}
+message ShutdownResponse {}

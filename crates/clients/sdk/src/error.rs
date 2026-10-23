@@ -225,6 +225,70 @@ pub fn reason_name(reason: ErrorReason) -> &'static str {
     name.strip_prefix("ERROR_REASON_").unwrap_or(name)
 }
 
+impl Error {
+    /// The error as a Connect error with the same code, reason, missing
+    /// requirements and retry delay, for a service that relays it.
+    pub fn to_connect(&self) -> connectrpc::ConnectError {
+        let (code, reason, missing, retry_after) = match self {
+            Error::Status {
+                code,
+                reason,
+                missing,
+                retry_after,
+                ..
+            } => (*code, *reason, missing.clone(), *retry_after),
+            Error::Invalid(_) | Error::Convert(_) => (Code::InvalidArgument, None, vec![], None),
+            Error::Conflict { .. } => (Code::FailedPrecondition, None, vec![], None),
+            Error::Timeout(_) => (Code::DeadlineExceeded, None, vec![], None),
+            _ => (Code::Internal, None, vec![], None),
+        };
+        let message = match self {
+            Error::Status { message, .. } => message.clone(),
+            other => other.to_string(),
+        };
+        let mut err = connectrpc::ConnectError::new(code, message);
+        if let Some(reason) = reason {
+            err = err.with_detail(connectrpc::ErrorDetail::from_message(
+                "google.rpc.ErrorInfo",
+                &rpc::ErrorInfo {
+                    reason: reason_name(reason).into(),
+                    domain: rill_proto::ERROR_DOMAIN.into(),
+                    metadata: Default::default(),
+                },
+            ));
+        }
+        if !missing.is_empty() {
+            err = err.with_detail(connectrpc::ErrorDetail::from_message(
+                "google.rpc.PreconditionFailure",
+                &rpc::PreconditionFailure {
+                    violations: missing
+                        .into_iter()
+                        .map(|description| rpc::precondition_failure::Violation {
+                            r#type: "POLICY".into(),
+                            subject: String::new(),
+                            description,
+                        })
+                        .collect(),
+                },
+            ));
+        }
+        if let Some(delay) = retry_after {
+            err = err.with_detail(connectrpc::ErrorDetail::from_message(
+                "google.rpc.RetryInfo",
+                &rpc::RetryInfo {
+                    retry_delay: buffa_types::google::protobuf::Duration {
+                        seconds: delay.as_secs() as i64,
+                        nanos: delay.subsec_nanos() as i32,
+                        ..Default::default()
+                    }
+                    .into(),
+                },
+            ));
+        }
+        err
+    }
+}
+
 /// Result alias used throughout the SDK.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -271,6 +335,13 @@ mod tests {
         assert!(err.is(ErrorReason::PolicyDenied));
         assert_eq!(err.missing(), ["Review +2"]);
         assert_eq!(err.retry_after(), Some(std::time::Duration::from_secs(3)));
+        let relayed = Error::from(err.to_connect());
+        assert!(relayed.is(ErrorReason::PolicyDenied));
+        assert_eq!(relayed.missing(), ["Review +2"]);
+        assert_eq!(
+            relayed.retry_after(),
+            Some(std::time::Duration::from_secs(3))
+        );
     }
 
     #[test]

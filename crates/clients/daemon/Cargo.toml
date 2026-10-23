@@ -1,0 +1,51 @@
+[package]
+name = "rill-daemon"
+description = "The client daemon: shared object cache, working-copy overlay, server sync and filesystem views"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rill-sdk = { workspace = true }
+rill-types = { workspace = true }
+rill-core = { workspace = true }
+rill-merge-syntax = { workspace = true }
+ignore = { workspace = true }
+connectrpc = { workspace = true }
+buffa = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+bytes = { workspace = true }
+http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+postcard = { workspace = true }
+redb = { workspace = true }
+moka = { workspace = true }
+parking_lot = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+dirs = { workspace = true }
+notify = { workspace = true }
+uuid = { workspace = true }
+hex = { workspace = true }
+libc = { workspace = true }
+
+[dev-dependencies]
+rill-sdk = { workspace = true, features = ["testing"] }
+tempfile = { workspace = true }
+proptest = { workspace = true }
+
+[build-dependencies]
+connectrpc-build = { workspace = true }
+buffa-codegen = { workspace = true }
+protox = { workspace = true }
+prost = { workspace = true }
+
+[package.metadata.cargo-machete]
+# Used by the generated code.
+ignored = ["serde_json"]
