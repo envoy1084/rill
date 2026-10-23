@@ -277,6 +277,25 @@ impl pb::DaemonService for DaemonSvc {
             async {
                 let mount = self.daemon.mount(&r.name)?;
                 let onto = revision(&r.revision)?.unwrap_or_else(Root::trunk);
+                if r.keep_files {
+                    let working = match r
+                        .working_change
+                        .rsplit('/')
+                        .next()
+                        .filter(|s| !s.is_empty())
+                    {
+                        Some(id) => Some(
+                            id.parse::<rill_types::ChangeId>()
+                                .map_err(|e| Error::Invalid(format!("change {id:?}: {e}")))?,
+                        ),
+                        None => None,
+                    };
+                    mount.rebase_keeping_files(onto, working).await?;
+                    return Ok(pb::UpdateMountResponse {
+                        mount: mount_to_proto(&mount).into(),
+                        ..Default::default()
+                    });
+                }
                 let report = mount.update(onto).await?;
                 let strs = |v: &[RepoPathBuf]| v.iter().map(|p| p.as_str().to_string()).collect();
                 Ok(pb::UpdateMountResponse {

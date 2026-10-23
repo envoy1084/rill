@@ -214,6 +214,7 @@ async fn update_merges_clean_edits_and_flags_conflicts_until_resolved() {
         .update_mount(pb::UpdateMountRequest {
             name: mount.clone(),
             revision: v2.to_hex(),
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -300,4 +301,40 @@ async fn edits_survive_a_restart_including_those_made_while_stopped() {
         fx.status(&mount).await,
         vec![("a.txt".into(), MODIFIED), ("b.txt".into(), MODIFIED)]
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn moving_the_base_keeping_files_turns_the_difference_into_edits() {
+    let fx = Fixture::start().await;
+    let v1 = fx.repo_with("keep", &[("a.txt", "1\n")]).await;
+    let v2 = fx
+        .version(
+            "keep",
+            Root::Version(v1),
+            &[("a.txt", "2\n"), ("b.txt", "b\n")],
+        )
+        .await;
+    let mount = fx.checkout("keep", v1, "keep").await;
+    let dir = fx.checkout_dir("keep");
+    write(&dir, "c.txt", "c\n");
+    fx.rpc
+        .update_mount(pb::UpdateMountRequest {
+            name: mount.clone(),
+            revision: v2.to_hex(),
+            keep_files: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(read(&dir, "a.txt"), "1\n", "files stay as they were");
+    assert!(!dir.join("b.txt").exists());
+    assert_eq!(
+        fx.status(&mount).await,
+        vec![
+            ("a.txt".into(), MODIFIED),
+            ("b.txt".into(), DELETED),
+            ("c.txt".into(), ADDED),
+        ]
+    );
+    assert_eq!(fx.mount(&mount).await.base_version, v2.to_hex());
 }

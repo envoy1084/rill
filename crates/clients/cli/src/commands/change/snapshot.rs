@@ -12,7 +12,7 @@ use crate::context::{Ctx, TOOL_NAME};
 use crate::error::CliError;
 use crate::Result;
 
-async fn commit(
+pub(super) async fn commit(
     ctx: &mut Ctx<'_>,
     message: Option<String>,
     intent: Option<String>,

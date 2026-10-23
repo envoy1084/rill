@@ -90,6 +90,14 @@ impl ChangeSvc {
         if let Some(intent) = names::intent(&req.intent)? {
             builder = builder.intent(intent);
         }
+        if let Some(carried) = &base.carried {
+            for (path, change) in &carried.subtree_changes {
+                builder = builder.subtree(path.as_str(), change.clone())?;
+            }
+            for (path, change) in &carried.file_changes {
+                builder = builder.change(path.as_str(), change.clone())?;
+            }
+        }
 
         if req.edits.len() > rill_types::limits::MAX_FILES_PER_CHANGE {
             return Err(Error::invalid(format!(
@@ -234,6 +242,9 @@ struct EditBase {
     predecessor: Option<ChangeVersionHash>,
     change_id: Option<ChangeId>,
     root: Option<TreeHash>,
+    /// The amended version's changes, carried into the new version (the
+    /// new edits win per path).
+    carried: Option<ChangeVersion>,
 }
 
 /// Resolve an `EditBase`: a point in history (new change on top of it),
@@ -263,6 +274,7 @@ async fn edit_base(
                 predecessor: Some(current),
                 change_id: Some(amend.unwrap_or(id)),
                 root: Some(common::root_of(ctx, &current).await?),
+                carried: Some(cv),
             })
         }
         other => {
@@ -280,6 +292,7 @@ async fn edit_base(
                 predecessor,
                 change_id: amend,
                 root: Some(resolved.root),
+                carried: None,
             })
         }
     }

@@ -248,6 +248,68 @@ impl Mount {
         }
     }
 
+    /// Move onto `onto` keeping the working copy as it is: each path the
+    /// two bases disagree on, with no local edit, gets the old base's
+    /// content as a local edit; edits that match the new base are
+    /// dropped. Optionally make `working_change` the working change.
+    pub async fn rebase_keeping_files(
+        &self,
+        onto: Root,
+        working_change: Option<rill_types::ChangeId>,
+    ) -> Result<()> {
+        self.settle().await?;
+        let _op = self.ops.lock().await;
+        let mut record = self.record();
+        let (version, tree) = resolve_base(&self.repo, &onto).await?;
+        let old = self.base();
+        let new = old.at(tree);
+        let changed = diff_trees(&old, old.root(), tree, &record.sparse).await?;
+        let mut change = Change::default();
+        for c in changed {
+            match self.entry(&c.path) {
+                Some(entry) => {
+                    let new_file = self.base_file_in(&new, &c.path).await?;
+                    if classify(&entry, new_file.as_ref()).is_none() {
+                        change.overlay.push((c.path, None));
+                    }
+                }
+                None => match &c.old {
+                    Some((content, kind)) => {
+                        let bytes = self.bytes(content).await?;
+                        let size = bytes.len() as u64;
+                        let digest = self.shared.content.put_local(bytes).await?;
+                        change.overlay.push((
+                            c.path,
+                            Some((
+                                OverlayOp::Set {
+                                    digest,
+                                    kind: *kind,
+                                    size,
+                                },
+                                false,
+                            )),
+                        ));
+                    }
+                    None => change
+                        .overlay
+                        .push((c.path, Some((OverlayOp::Delete, false)))),
+                },
+            }
+        }
+        if let Some(ws) = record.workspace {
+            self.follow_on_server(ws, version).await;
+        }
+        record.base = onto.to_string();
+        record.base_version = version;
+        record.base_tree = tree;
+        record.etag = None;
+        if working_change.is_some() {
+            record.working_change = working_change;
+        }
+        change.record = Some(record);
+        self.write(change, Some(tree)).await
+    }
+
     async fn bytes(&self, content: &ContentRef) -> Result<Bytes> {
         self.shared.content.get(&self.repo, content).await
     }

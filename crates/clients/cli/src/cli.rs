@@ -163,6 +163,12 @@ pub enum Command {
     /// Redo what the last undo undid.
     Redo,
 
+    /// Fold the working change into the unlanded change under it.
+    Squash(change::SquashArgs),
+
+    /// Move some paths' edits into a new change under the working change.
+    Split(change::SplitArgs),
+
     /// Reviews waiting on you, and the state of your own.
     Inbox,
 

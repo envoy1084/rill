@@ -75,7 +75,7 @@ impl Targets {
                 | "SyncWorkspace" | "HandoffWorkspace" | "DiffWorkspace",
             ) => self.workspace.clone(),
             ("name", "UndoOperation") => format!("{}/operations/head", self.workspace),
-            ("name", "GetLandRequest") => format!("{repo}/landRequests/1"),
+            ("name", "GetLandRequest" | "CancelLandRequest") => format!("{repo}/landRequests/1"),
             ("name", "GetReview" | "WatchReview") => review,
             ("name", "ReplyThread" | "ResolveThread") => format!("{review}/threads/probe"),
             ("name", "GetIntent" | "LinkChange") => self.intent.clone(),

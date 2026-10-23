@@ -36,6 +36,8 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Checkout(args) => checkout::run(ctx, args).await,
         Command::Commit(args) => change::commit_cmd(ctx, args).await,
         Command::Redo => change::redo(ctx).await,
+        Command::Squash(args) => change::squash(ctx, args).await,
+        Command::Split(args) => change::split(ctx, args).await,
         Command::Inbox => review::inbox(ctx).await,
         Command::Comment(args) => review::comment(ctx, args).await,
         Command::BugReport(args) => bug_report::run(ctx, args).await,

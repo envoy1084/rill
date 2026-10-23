@@ -64,6 +64,7 @@ pub(crate) async fn update_checkout(
         .update_mount(dpb::UpdateMountRequest {
             name: mount.name,
             revision: revision.to_string(),
+            ..Default::default()
         })
         .await;
     spinner.finish();

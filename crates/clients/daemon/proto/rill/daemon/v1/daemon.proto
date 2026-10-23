@@ -233,6 +233,11 @@ message UpdateMountRequest {
   string name = 1;
   // Revision to move onto; trunk when empty.
   string revision = 2;
+  // Keep the working copy exactly as it is: what differs from the new
+  // base becomes local edits (squash, split).
+  bool keep_files = 3;
+  // Make this change the working change (`…/changes/{id}` or an id).
+  string working_change = 4;
 }
 message UpdateMountResponse {
   Mount mount = 1;

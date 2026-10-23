@@ -181,6 +181,7 @@ const MATRIX: &[(&str, Class)] = &[
     ("LandingService/RequestLandStack", Land),
     ("LandingService/GetLandRequest", ReadRoot),
     ("LandingService/ListLandRequests", ReadRoot),
+    ("LandingService/CancelLandRequest", WriteAny),
 ];
 
 pub(super) fn class_of(method: &Method) -> Class {

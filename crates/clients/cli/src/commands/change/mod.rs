@@ -11,6 +11,7 @@
 mod args;
 mod pick;
 mod render;
+mod reshape;
 mod resolve;
 mod snapshot;
 mod sync;
@@ -18,6 +19,7 @@ mod undo;
 
 pub use args::{AmendArgs, CommitArgs, DescribeArgs, NewArgs, ResolveArgs, SyncArgs};
 pub(crate) use render::conflicts_of;
+pub use reshape::{split, squash, SplitArgs, SquashArgs};
 pub use resolve::{conflicts, resolve};
 pub use snapshot::{amend, commit_cmd, describe, new};
 pub use sync::sync;
