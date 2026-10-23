@@ -146,7 +146,8 @@ Tiered, so a phase spends its time on work rather than rebuilds:
 
 ## CI
 
-`.github/workflows/ci.yml` has two jobs. `check` runs `cargo fmt --check`,
+`.github/workflows/ci.yml` runs only when triggered by hand
+(`workflow_dispatch`) and has two jobs. `check` runs `cargo fmt --check`,
 `cargo deny check` (licences, advisories, sources per `deny.toml`),
 `cargo clippy -D warnings`, `cargo test --workspace` (with `fuse3`
 installed, so FUSE tests mount), then regenerates

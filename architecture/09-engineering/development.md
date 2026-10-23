@@ -128,9 +128,12 @@ run`.
 
 ## CI
 
+CI runs only when started by hand (`workflow_dispatch`: the Actions tab,
+or `gh workflow run ci.yml`); pushes and pull requests do not trigger it.
+
 ```mermaid
 flowchart LR
-    Trig[push to main / pull request] --> Fmt[cargo fmt --all --check]
+    Trig[manual run] --> Fmt[cargo fmt --all --check]
     Fmt --> Clippy[cargo clippy --workspace --all-targets]
     Clippy --> Test[cargo test --workspace]
     Trig --> Install[install FoundationDB 7.3.77]
