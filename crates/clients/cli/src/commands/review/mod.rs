@@ -1,5 +1,5 @@
 //! `rill submit`, `rill approve`, `rill reject`, `rill abandon` and
-//! `rill review`: show, list, vote, comment, threads, resolve-thread,
+//! `rill review`: show, list, vote, comment, reply, threads, resolve-thread,
 //! evaluate.
 
 mod args;

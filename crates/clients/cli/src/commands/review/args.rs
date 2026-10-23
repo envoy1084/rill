@@ -23,6 +23,8 @@ pub enum ReviewCmd {
     Vote(VoteArgs),
     /// Open a thread.
     Comment(CommentArgs),
+    /// Reply to a thread.
+    Reply(ReplyArgs),
     /// List threads.
     Threads(ChangeArg),
     /// Resolve (or reopen) a thread.
@@ -97,6 +99,18 @@ pub struct CommentArgs {
     /// Anchor to this line (requires --path).
     #[arg(long)]
     pub line: Option<u32>,
+}
+
+/// `rill review reply`.
+#[derive(Args, Debug)]
+pub struct ReplyArgs {
+    /// Change id or version hash.
+    pub change: String,
+    /// Thread id.
+    pub thread: String,
+    /// Reply text.
+    #[arg(short, long)]
+    pub message: String,
 }
 
 /// `rill review resolve-thread`.

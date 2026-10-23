@@ -1,5 +1,5 @@
 //! The everyday commands added on top of the core set: clone, commit,
-//! undo and redo, comment, inbox, land cancel and bug-report.
+//! undo and redo, comment and reply, inbox, land cancel and bug-report.
 
 mod common;
 
@@ -37,12 +37,17 @@ async fn clone_commit_redo_comment_inbox_cancel_and_bug_report() {
     assert_eq!(code, 2, "nothing to redo yet: {out}");
 
     server.json(&co, &["submit"]).await;
-    server
+    let opened = server
         .json(
             &co,
             &["comment", &change, "-m", "looks fine", "--path", "a.txt"],
         )
         .await;
+    let thread = opened["thread_id"].as_str().unwrap();
+    let replied = server
+        .json(&co, &["review", "reply", &change, thread, "-m", "thanks"])
+        .await;
+    assert_eq!(replied["comments"][1]["body"], "thanks", "{replied}");
     let inbox = server.json(&co, &["inbox"]).await;
     assert_eq!(inbox["yours"][0]["change"], change, "{inbox}");
 

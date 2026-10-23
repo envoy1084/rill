@@ -1,11 +1,11 @@
 //! Opening, listing and resolving review threads.
 
 use rill_mcp::json;
-use rill_sdk::NewComment;
+use rill_sdk::{NewComment, Reply};
 use rill_types::{RepoPathBuf, ThreadAnchor};
 use serde_json::json as j;
 
-use super::args::{ChangeArg, CommentArgs, ResolveThreadArgs};
+use super::args::{ChangeArg, CommentArgs, ReplyArgs, ResolveThreadArgs};
 use super::working_change::change_or_working;
 use crate::commands::change_ref;
 use crate::context::Ctx;
@@ -43,6 +43,20 @@ pub async fn comment(ctx: &mut Ctx<'_>, args: CommentArgs) -> Result<()> {
     let thread = repo.reviews().comment(id, new).await?;
     ctx.emit(json::new_thread(&thread), |out| {
         out.line(format!("opened thread {}", out.id(&thread.thread_id)))
+    })
+}
+
+pub(super) async fn reply(ctx: &mut Ctx<'_>, args: ReplyArgs) -> Result<()> {
+    let repo = ctx.repo()?;
+    let id = change_ref(&args.change)?.id(&repo).await?;
+    let reply = Reply {
+        body: args.message,
+        category: None,
+        confidence: None,
+    };
+    let thread = repo.reviews().reply(id, &args.thread, reply).await?;
+    ctx.emit(json::thread(&thread), |out| {
+        out.line(format!("replied on thread {}", out.id(&thread.id)))
     })
 }
 
