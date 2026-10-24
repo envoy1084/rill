@@ -40,9 +40,20 @@ impl SegmentCache {
         Ok(seg)
     }
 
-    /// Keep a segment just written, without fetching it back.
-    pub fn insert(&self, hash: ObjectHash, seg: Arc<Segment>) {
-        self.open.insert(hash, seg);
+    /// Open a segment just written from its bytes, without fetching it
+    /// back: on local disk and mapped when there is a cache directory.
+    pub async fn insert_new(&self, hash: ObjectHash, bytes: bytes::Bytes) -> Result<Arc<Segment>> {
+        let bytes = match &self.dir {
+            Some(dir) => {
+                let path = dir.join(format!("{}.seg", hash.to_hex()));
+                write_file(dir, &path, bytes).await?;
+                map_file(path).await?
+            }
+            None => SegmentBytes::Owned(bytes),
+        };
+        let seg = Arc::new(tokio::task::spawn_blocking(move || Segment::open(bytes)).await??);
+        self.open.insert(hash, seg.clone());
+        Ok(seg)
     }
 
     /// Forget segments no shard lists any more.
@@ -81,23 +92,40 @@ impl SegmentCache {
         let path = dir.join(format!("{}.seg", hash.to_hex()));
         if !path.exists() {
             let bytes = self.fetch(repo, hash).await?;
-            let (dir, tmp, path2) = (dir.to_path_buf(), path.with_extension("tmp"), path.clone());
-            tokio::task::spawn_blocking(move || -> std::io::Result<()> {
-                std::fs::create_dir_all(&dir)?;
-                std::fs::write(&tmp, &bytes)?;
-                std::fs::rename(&tmp, &path2)
-            })
-            .await?
-            .map_err(|e| Error::Codec(format!("caching segment: {e}")))?;
+            write_file(dir, &path, bytes).await?;
         }
-        let map = tokio::task::spawn_blocking(move || -> std::io::Result<memmap2::Mmap> {
-            let file = std::fs::File::open(&path)?;
-            // Safety: segment files are immutable once renamed into place,
-            // and only this cache writes or removes them.
-            unsafe { memmap2::Mmap::map(&file) }
-        })
-        .await?
-        .map_err(|e| Error::Codec(format!("mapping segment: {e}")))?;
-        Ok(SegmentBytes::Mapped(Arc::new(map)))
+        map_file(path).await
     }
+}
+
+/// Write a segment file atomically (via a temporary name).
+async fn write_file(
+    dir: &std::path::Path,
+    path: &std::path::Path,
+    bytes: bytes::Bytes,
+) -> Result<()> {
+    let (dir, tmp, path) = (
+        dir.to_path_buf(),
+        path.with_extension("tmp"),
+        path.to_path_buf(),
+    );
+    tokio::task::spawn_blocking(move || -> std::io::Result<()> {
+        std::fs::create_dir_all(&dir)?;
+        std::fs::write(&tmp, &bytes)?;
+        std::fs::rename(&tmp, &path)
+    })
+    .await?
+    .map_err(|e| Error::Codec(format!("caching segment: {e}")))
+}
+
+async fn map_file(path: PathBuf) -> Result<SegmentBytes> {
+    let map = tokio::task::spawn_blocking(move || -> std::io::Result<memmap2::Mmap> {
+        let file = std::fs::File::open(&path)?;
+        // Safety: segment files are immutable once renamed into place,
+        // and only this cache writes or removes them.
+        unsafe { memmap2::Mmap::map(&file) }
+    })
+    .await?
+    .map_err(|e| Error::Codec(format!("mapping segment: {e}")))?;
+    Ok(SegmentBytes::Mapped(Arc::new(map)))
 }

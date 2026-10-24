@@ -15,7 +15,7 @@ use super::records::{self, SegmentRef, Through};
 use super::search_index::SearchIndex;
 use crate::error::Result;
 use crate::paths::{PathEntry, PathLayer, PathView, MAX_DELTA_DEPTH};
-use crate::segment::{PreparedDoc, Segment, SegmentBuilder, SegmentBytes};
+use crate::segment::{PreparedDoc, SegmentBuilder};
 use crate::symbols::extract_symbols;
 
 /// Changed files above which a new base is written instead of a delta.
@@ -279,9 +279,7 @@ impl SearchIndex {
             bytes: bytes.len() as u64,
             level,
         };
-        let seg = tokio::task::spawn_blocking(move || Segment::open(SegmentBytes::Owned(bytes)))
-            .await??;
-        self.segments.insert(hash, Arc::new(seg));
+        self.segments.insert_new(hash, bytes).await?;
         Ok(r)
     }
 
