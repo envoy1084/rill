@@ -86,11 +86,7 @@ impl SearchIndex {
             });
         }
         let parent_view = match parent {
-            Some(p) => self
-                .view(p)
-                .await?
-                .filter(|v| v.depth < MAX_DELTA_DEPTH)
-                .map(|v| (p, v)),
+            Some(p) => self.view(p).await?.map(|v| (p, v)),
             None => None,
         };
         let mut stats = IndexStats::default();
@@ -120,16 +116,24 @@ impl SearchIndex {
                         })
                         .collect();
                     let view = pv.apply(&changes);
-                    let depth = view.depth;
-                    (
-                        PathLayer::Delta {
-                            parent: p,
-                            depth,
-                            changes,
-                        },
-                        view,
-                        todo,
-                    )
+                    if view.depth >= MAX_DELTA_DEPTH {
+                        // A long chain is folded into a new base from the
+                        // parent's files, without walking the tree again.
+                        let paths = view.entries();
+                        let view = PathView::base(paths.clone());
+                        (PathLayer::Base(paths), view, todo)
+                    } else {
+                        let depth = view.depth;
+                        (
+                            PathLayer::Delta {
+                                parent: p,
+                                depth,
+                                changes,
+                            },
+                            view,
+                            todo,
+                        )
+                    }
                 }
             }
             None => self.full(root).await?,

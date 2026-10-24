@@ -112,3 +112,35 @@ async fn a_replaced_writer_cannot_change_the_index() {
     let root2 = f.derive.get::<rill_core::RootTree>(&v2).await.unwrap();
     assert!(!reader.has_root(root2).await.unwrap());
 }
+
+/// A chain at the depth limit folds into a new base from the parent's
+/// files: only the landing's blobs are read, and every file is kept.
+#[tokio::test]
+async fn a_long_delta_chain_folds_into_a_base_without_a_full_walk() {
+    use rill_search::paths::MAX_DELTA_DEPTH;
+    let f = fixture().await;
+    let mut v = f.version;
+    let mut root = f.root;
+    for n in 0..MAX_DELTA_DEPTH {
+        v = f
+            .child(
+                v,
+                &[(&format!("src/c{n}.rs"), &format!("fn chain_{n}() {{}}\n"))],
+            )
+            .await;
+        let (r, stats) = f.index.index_version(&v, None).await.unwrap();
+        assert!(stats.delta);
+        assert_eq!(stats.blobs_indexed, 1, "landing {n} read only its own file");
+        root = r;
+    }
+    let view = f.index.view(root).await.unwrap().unwrap();
+    assert_eq!(view.depth, 0, "the chain was folded");
+    assert_eq!(view.len(), 4 + MAX_DELTA_DEPTH as usize);
+    let reader = SearchIndex::open(f.repo.clone(), f.derive.clone(), config())
+        .await
+        .unwrap();
+    for q in ["chain_0", "chain_31", "Hello, World"] {
+        let r = run(&reader, root, SearchQuery::new(q), all).await;
+        assert_eq!(r.files, 1, "{q}");
+    }
+}

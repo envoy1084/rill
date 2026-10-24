@@ -53,8 +53,10 @@ stored per root (`idx:paths@1`):
 - **`Delta`:** the parent root's files with this root's changes applied.
   The changes come from `diff_trees`, so a landing costs what it changed.
 
-A new base is written when a chain reaches 32 deltas, or when a change
-touches more than 50,000 files.
+A chain that reaches 32 deltas is folded into a new base built from the
+parent's view plus the landing's changes, so only the landing's blobs are
+read. A change touching more than 50,000 files is indexed with a full
+walk.
 
 A [`PathView`](../../crates/domain/search/src/paths/view.rs) is a base map
 plus the overlay of every delta above it, cached per process. It answers:
@@ -75,7 +77,8 @@ landing (imports). `index_version`:
 1. Takes the version's root and its first parent's root.
 2. Writes a delta when the parent is indexed and the chain is short, a
    full walk otherwise.
-3. Reads only the blobs no marker covers, prepares them in parallel off
+3. Reads only the blobs no marker covers (markers are read and written
+   2,000 per round trip), prepares them in parallel off
    the async threads (tokenize, compress, extract symbols), and fills one
    builder per shard. A builder is cut into a segment at `segment_mb` of
    content.
