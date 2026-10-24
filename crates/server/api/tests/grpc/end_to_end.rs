@@ -193,6 +193,7 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
             languages: Default::default(),
             literal: Default::default(),
             min_seq: Default::default(),
+            ..Default::default()
         })
         .await
         .unwrap()

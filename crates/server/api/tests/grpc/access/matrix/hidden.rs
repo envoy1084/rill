@@ -111,6 +111,26 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             .encode_to_vec(),
         ),
         (
+            "ContentService/FindReferences",
+            pb::FindReferencesRequest {
+                repo: repo(),
+                revision: at.clone(),
+                name: CANARY.into(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        ),
+        (
+            "ContentService/ListSymbols",
+            pb::ListSymbolsRequest {
+                repo: repo(),
+                revision: at.clone(),
+                query: "canary".into(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        ),
+        (
             "ContentService/GrepShards",
             pb::GrepShardsRequest {
                 grep: Some(pb::GrepRequest {

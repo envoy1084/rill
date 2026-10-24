@@ -2611,6 +2611,10 @@ Files, trees, blobs, diffs, blame, history and search.
 | `ListPathHistory` | [ListPathHistoryRequest](#rill-v1-ListPathHistoryRequest) | [ListPathHistoryResponse](#rill-v1-ListPathHistoryResponse) | The versions that changed one path, following renames. |
 | `Grep` | [GrepRequest](#rill-v1-GrepRequest) | [GrepResponse](#rill-v1-GrepResponse) | Regular-expression search over a revision's files. |
 | `GrepShards` | [GrepShardsRequest](#rill-v1-GrepShardsRequest) | [GrepShardsResponse](#rill-v1-GrepShardsResponse) | One server's part of a Grep: the matched files of the shards named, ranked but not merged. Servers call it on each other; clients use Grep. |
+| `ListSymbols` | [ListSymbolsRequest](#rill-v1-ListSymbolsRequest) | [ListSymbolsResponse](#rill-v1-ListSymbolsResponse) | Symbols of one file, or symbols whose names contain a string. |
+| `FindDefinitions` | [FindDefinitionsRequest](#rill-v1-FindDefinitionsRequest) | [FindDefinitionsResponse](#rill-v1-FindDefinitionsResponse) | Where a name is defined: from an uploaded SCIP index when one covers the file, else from the symbols extracted at indexing. |
+| `FindReferences` | [FindReferencesRequest](#rill-v1-FindReferencesRequest) | [FindReferencesResponse](#rill-v1-FindReferencesResponse) | Uses of a symbol: precise from a SCIP index when one covers it, else whole-word matches of its name. |
+| `UploadScip` | [UploadScipRequest](#rill-v1-UploadScipRequest) | [UploadScipResponse](#rill-v1-UploadScipResponse) | Attach a SCIP index (written with WriteBlob) to a revision. |
 | `FindMergeBase` | [FindMergeBaseRequest](#rill-v1-FindMergeBaseRequest) | [FindMergeBaseResponse](#rill-v1-FindMergeBaseResponse) | The merge bases of two revisions. |
 | `IsAncestor` | [IsAncestorRequest](#rill-v1-IsAncestorRequest) | [IsAncestorResponse](#rill-v1-IsAncestorResponse) | Whether one revision is an ancestor of another. |
 
@@ -2733,6 +2737,31 @@ Files, trees, blobs, diffs, blame, history and search.
 | `read_grant` | [string](#string) |  | A read grant for the content on both sides. |
 
 
+<a name="rill-v1-FindDefinitionsRequest"></a>
+
+### FindDefinitionsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `repo` | [string](#string) |  |  |
+| `revision` | [string](#string) |  |  |
+| `name` | [string](#string) |  | Exact symbol name. Required. |
+| `max_results` | [uint32](#uint32) |  | Most definitions; 0 means 100. |
+
+
+<a name="rill-v1-FindDefinitionsResponse"></a>
+
+### FindDefinitionsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `definitions` | [SymbolLocation](#rill-v1-SymbolLocation) | repeated |  |
+
+
 <a name="rill-v1-FindMergeBaseRequest"></a>
 
 ### FindMergeBaseRequest
@@ -2755,6 +2784,36 @@ Files, trees, blobs, diffs, blame, history and search.
 | Field | Type | Label | Description |
 | --- | --- | --- | --- |
 | `bases` | [string](#string) | repeated | Version names; empty when the two share no history. |
+
+
+<a name="rill-v1-FindReferencesRequest"></a>
+
+### FindReferencesRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `repo` | [string](#string) |  |  |
+| `revision` | [string](#string) |  |  |
+| `name` | [string](#string) |  | The symbol's name; or leave empty and give a position. |
+| `path` | [string](#string) |  | The symbol at this file position (1-based line, 0-based column). |
+| `line` | [uint32](#uint32) |  |  |
+| `column` | [uint32](#uint32) |  |  |
+| `max_results` | [uint32](#uint32) |  | Most references; 0 means 1,000. |
+
+
+<a name="rill-v1-FindReferencesResponse"></a>
+
+### FindReferencesResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `references` | [SymbolLocation](#rill-v1-SymbolLocation) | repeated |  |
+| `precise` | [bool](#bool) |  | Every reference came from a SCIP index. |
+| `truncated` | [bool](#bool) |  | More references exist than were returned. |
 
 
 <a name="rill-v1-GetTreeRequest"></a>
@@ -2830,6 +2889,7 @@ One matched file and its rank score.
 | `literal` | [bool](#bool) |  | Match `pattern` as a literal string, not a regex. |
 | `languages` | [string](#string) | repeated | Only files in these languages (`rust`, `python`, …); empty is all. |
 | `min_seq` | [uint64](#uint64) | optional | Wait until trunk is indexed through this position (up to 30 s), so a search sees a landing the caller just made. |
+| `structural` | [bool](#bool) |  | `pattern` is an ast-grep structural pattern (`foo($A, $$$REST)`); `languages` must name exactly one language. |
 
 
 <a name="rill-v1-GrepResponse"></a>
@@ -3006,6 +3066,33 @@ One matched file and its rank score.
 | `next_page_token` | [string](#string) |  |  |
 
 
+<a name="rill-v1-ListSymbolsRequest"></a>
+
+### ListSymbolsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `repo` | [string](#string) |  | `orgs/{org}/repos/{repo}`. Required. |
+| `revision` | [string](#string) |  |  |
+| `path` | [string](#string) |  | The symbols of this file; or, when empty, those named like `query`. |
+| `query` | [string](#string) |  | Case-insensitive substring of symbol names. |
+| `kinds` | [string](#string) | repeated | Only these kinds; empty is all. |
+| `max_results` | [uint32](#uint32) |  | Most symbols; 0 means 1,000. |
+
+
+<a name="rill-v1-ListSymbolsResponse"></a>
+
+### ListSymbolsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `symbols` | [SymbolLocation](#rill-v1-SymbolLocation) | repeated |  |
+
+
 <a name="rill-v1-ObjectRef"></a>
 
 ### ObjectRef
@@ -3108,6 +3195,51 @@ One matched file and its rank score.
 | --- | --- | --- | --- |
 | `entry` | [TreeEntry](#rill-v1-TreeEntry) | optional | Absent if the path does not exist. |
 | `read_grant` | [string](#string) |  |  |
+
+
+<a name="rill-v1-SymbolLocation"></a>
+
+### SymbolLocation
+
+A symbol definition, or a use of one.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `path` | [string](#string) |  |  |
+| `line` | [uint32](#uint32) |  | 1-based. |
+| `name` | [string](#string) |  |  |
+| `kind` | [string](#string) |  | `function`, `class`, `struct`, … (empty for a use). |
+| `start_column` | [uint32](#uint32) |  | 0-based byte columns on the line, when known (SCIP). |
+| `end_column` | [uint32](#uint32) |  |  |
+| `precise` | [bool](#bool) |  | From a SCIP index rather than extraction or text. |
+| `definition` | [bool](#bool) |  | The location defines the symbol (references only). |
+| `symbol` | [string](#string) |  | The SCIP symbol, when precise. |
+
+
+<a name="rill-v1-UploadScipRequest"></a>
+
+### UploadScipRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `repo` | [string](#string) |  |  |
+| `revision` | [string](#string) |  | The revision the index was built from. |
+| `index` | [ContentRef](#rill-v1-ContentRef) |  | The encoded SCIP `Index`, written with WriteBlob. |
+| `prefix` | [string](#string) |  | The directory the index's paths are relative to; empty for the root. |
+
+
+<a name="rill-v1-UploadScipResponse"></a>
+
+### UploadScipResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `files` | [uint32](#uint32) |  | Files of the revision the index covers, and occurrences kept. |
+| `occurrences` | [uint64](#uint64) |  |  |
 
 
 <a name="rill-v1-WriteBlobHeader"></a>

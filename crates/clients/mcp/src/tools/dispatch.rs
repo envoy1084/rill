@@ -4,8 +4,8 @@ use serde_json::Value;
 
 use super::args::Args;
 use super::{
-    check, commit, conflicts, edit, land, overview, read, resolve, respond, search, status, sync,
-    watch,
+    check, commit, conflicts, edit, land, overview, read, resolve, respond, search, status,
+    symbols, sync, watch,
 };
 use super::{ToolContext, ToolDef};
 use crate::error::ToolResult;
@@ -16,6 +16,7 @@ pub fn definitions() -> Vec<ToolDef> {
         overview::definition(),
         read::definition(),
         search::definition(),
+        symbols::definition(),
         edit::definition(),
         check::definition(),
         commit::definition(),
@@ -42,6 +43,7 @@ pub async fn call(ctx: &ToolContext, name: &str, arguments: Value) -> Option<Too
         "rill_context" => overview::call(ctx, &args).await,
         "rill_read" => read::call(ctx, &args).await,
         "rill_search" => search::call(ctx, &args).await,
+        "rill_symbols" => symbols::call(ctx, &args).await,
         "rill_edit" => edit::call(ctx, &args).await,
         "rill_check" => check::call(ctx, &args).await,
         "rill_commit" => commit::call(ctx, &args).await,

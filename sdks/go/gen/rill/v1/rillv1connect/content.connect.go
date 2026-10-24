@@ -75,6 +75,18 @@ const (
 	// ContentServiceGrepShardsProcedure is the fully-qualified name of the ContentService's GrepShards
 	// RPC.
 	ContentServiceGrepShardsProcedure = "/rill.v1.ContentService/GrepShards"
+	// ContentServiceListSymbolsProcedure is the fully-qualified name of the ContentService's
+	// ListSymbols RPC.
+	ContentServiceListSymbolsProcedure = "/rill.v1.ContentService/ListSymbols"
+	// ContentServiceFindDefinitionsProcedure is the fully-qualified name of the ContentService's
+	// FindDefinitions RPC.
+	ContentServiceFindDefinitionsProcedure = "/rill.v1.ContentService/FindDefinitions"
+	// ContentServiceFindReferencesProcedure is the fully-qualified name of the ContentService's
+	// FindReferences RPC.
+	ContentServiceFindReferencesProcedure = "/rill.v1.ContentService/FindReferences"
+	// ContentServiceUploadScipProcedure is the fully-qualified name of the ContentService's UploadScip
+	// RPC.
+	ContentServiceUploadScipProcedure = "/rill.v1.ContentService/UploadScip"
 	// ContentServiceFindMergeBaseProcedure is the fully-qualified name of the ContentService's
 	// FindMergeBase RPC.
 	ContentServiceFindMergeBaseProcedure = "/rill.v1.ContentService/FindMergeBase"
@@ -114,6 +126,16 @@ type ContentServiceClient interface {
 	// One server's part of a Grep: the matched files of the shards named,
 	// ranked but not merged. Servers call it on each other; clients use Grep.
 	GrepShards(context.Context, *connect.Request[v1.GrepShardsRequest]) (*connect.Response[v1.GrepShardsResponse], error)
+	// Symbols of one file, or symbols whose names contain a string.
+	ListSymbols(context.Context, *connect.Request[v1.ListSymbolsRequest]) (*connect.Response[v1.ListSymbolsResponse], error)
+	// Where a name is defined: from an uploaded SCIP index when one covers
+	// the file, else from the symbols extracted at indexing.
+	FindDefinitions(context.Context, *connect.Request[v1.FindDefinitionsRequest]) (*connect.Response[v1.FindDefinitionsResponse], error)
+	// Uses of a symbol: precise from a SCIP index when one covers it, else
+	// whole-word matches of its name.
+	FindReferences(context.Context, *connect.Request[v1.FindReferencesRequest]) (*connect.Response[v1.FindReferencesResponse], error)
+	// Attach a SCIP index (written with WriteBlob) to a revision.
+	UploadScip(context.Context, *connect.Request[v1.UploadScipRequest]) (*connect.Response[v1.UploadScipResponse], error)
 	// The merge bases of two revisions.
 	FindMergeBase(context.Context, *connect.Request[v1.FindMergeBaseRequest]) (*connect.Response[v1.FindMergeBaseResponse], error)
 	// Whether one revision is an ancestor of another.
@@ -215,6 +237,30 @@ func NewContentServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(contentServiceMethods.ByName("GrepShards")),
 			connect.WithClientOptions(opts...),
 		),
+		listSymbols: connect.NewClient[v1.ListSymbolsRequest, v1.ListSymbolsResponse](
+			httpClient,
+			baseURL+ContentServiceListSymbolsProcedure,
+			connect.WithSchema(contentServiceMethods.ByName("ListSymbols")),
+			connect.WithClientOptions(opts...),
+		),
+		findDefinitions: connect.NewClient[v1.FindDefinitionsRequest, v1.FindDefinitionsResponse](
+			httpClient,
+			baseURL+ContentServiceFindDefinitionsProcedure,
+			connect.WithSchema(contentServiceMethods.ByName("FindDefinitions")),
+			connect.WithClientOptions(opts...),
+		),
+		findReferences: connect.NewClient[v1.FindReferencesRequest, v1.FindReferencesResponse](
+			httpClient,
+			baseURL+ContentServiceFindReferencesProcedure,
+			connect.WithSchema(contentServiceMethods.ByName("FindReferences")),
+			connect.WithClientOptions(opts...),
+		),
+		uploadScip: connect.NewClient[v1.UploadScipRequest, v1.UploadScipResponse](
+			httpClient,
+			baseURL+ContentServiceUploadScipProcedure,
+			connect.WithSchema(contentServiceMethods.ByName("UploadScip")),
+			connect.WithClientOptions(opts...),
+		),
 		findMergeBase: connect.NewClient[v1.FindMergeBaseRequest, v1.FindMergeBaseResponse](
 			httpClient,
 			baseURL+ContentServiceFindMergeBaseProcedure,
@@ -246,6 +292,10 @@ type contentServiceClient struct {
 	listPathHistory   *connect.Client[v1.ListPathHistoryRequest, v1.ListPathHistoryResponse]
 	grep              *connect.Client[v1.GrepRequest, v1.GrepResponse]
 	grepShards        *connect.Client[v1.GrepShardsRequest, v1.GrepShardsResponse]
+	listSymbols       *connect.Client[v1.ListSymbolsRequest, v1.ListSymbolsResponse]
+	findDefinitions   *connect.Client[v1.FindDefinitionsRequest, v1.FindDefinitionsResponse]
+	findReferences    *connect.Client[v1.FindReferencesRequest, v1.FindReferencesResponse]
+	uploadScip        *connect.Client[v1.UploadScipRequest, v1.UploadScipResponse]
 	findMergeBase     *connect.Client[v1.FindMergeBaseRequest, v1.FindMergeBaseResponse]
 	isAncestor        *connect.Client[v1.IsAncestorRequest, v1.IsAncestorResponse]
 }
@@ -320,6 +370,26 @@ func (c *contentServiceClient) GrepShards(ctx context.Context, req *connect.Requ
 	return c.grepShards.CallUnary(ctx, req)
 }
 
+// ListSymbols calls rill.v1.ContentService.ListSymbols.
+func (c *contentServiceClient) ListSymbols(ctx context.Context, req *connect.Request[v1.ListSymbolsRequest]) (*connect.Response[v1.ListSymbolsResponse], error) {
+	return c.listSymbols.CallUnary(ctx, req)
+}
+
+// FindDefinitions calls rill.v1.ContentService.FindDefinitions.
+func (c *contentServiceClient) FindDefinitions(ctx context.Context, req *connect.Request[v1.FindDefinitionsRequest]) (*connect.Response[v1.FindDefinitionsResponse], error) {
+	return c.findDefinitions.CallUnary(ctx, req)
+}
+
+// FindReferences calls rill.v1.ContentService.FindReferences.
+func (c *contentServiceClient) FindReferences(ctx context.Context, req *connect.Request[v1.FindReferencesRequest]) (*connect.Response[v1.FindReferencesResponse], error) {
+	return c.findReferences.CallUnary(ctx, req)
+}
+
+// UploadScip calls rill.v1.ContentService.UploadScip.
+func (c *contentServiceClient) UploadScip(ctx context.Context, req *connect.Request[v1.UploadScipRequest]) (*connect.Response[v1.UploadScipResponse], error) {
+	return c.uploadScip.CallUnary(ctx, req)
+}
+
 // FindMergeBase calls rill.v1.ContentService.FindMergeBase.
 func (c *contentServiceClient) FindMergeBase(ctx context.Context, req *connect.Request[v1.FindMergeBaseRequest]) (*connect.Response[v1.FindMergeBaseResponse], error) {
 	return c.findMergeBase.CallUnary(ctx, req)
@@ -361,6 +431,16 @@ type ContentServiceHandler interface {
 	// One server's part of a Grep: the matched files of the shards named,
 	// ranked but not merged. Servers call it on each other; clients use Grep.
 	GrepShards(context.Context, *connect.Request[v1.GrepShardsRequest]) (*connect.Response[v1.GrepShardsResponse], error)
+	// Symbols of one file, or symbols whose names contain a string.
+	ListSymbols(context.Context, *connect.Request[v1.ListSymbolsRequest]) (*connect.Response[v1.ListSymbolsResponse], error)
+	// Where a name is defined: from an uploaded SCIP index when one covers
+	// the file, else from the symbols extracted at indexing.
+	FindDefinitions(context.Context, *connect.Request[v1.FindDefinitionsRequest]) (*connect.Response[v1.FindDefinitionsResponse], error)
+	// Uses of a symbol: precise from a SCIP index when one covers it, else
+	// whole-word matches of its name.
+	FindReferences(context.Context, *connect.Request[v1.FindReferencesRequest]) (*connect.Response[v1.FindReferencesResponse], error)
+	// Attach a SCIP index (written with WriteBlob) to a revision.
+	UploadScip(context.Context, *connect.Request[v1.UploadScipRequest]) (*connect.Response[v1.UploadScipResponse], error)
 	// The merge bases of two revisions.
 	FindMergeBase(context.Context, *connect.Request[v1.FindMergeBaseRequest]) (*connect.Response[v1.FindMergeBaseResponse], error)
 	// Whether one revision is an ancestor of another.
@@ -458,6 +538,30 @@ func NewContentServiceHandler(svc ContentServiceHandler, opts ...connect.Handler
 		connect.WithSchema(contentServiceMethods.ByName("GrepShards")),
 		connect.WithHandlerOptions(opts...),
 	)
+	contentServiceListSymbolsHandler := connect.NewUnaryHandler(
+		ContentServiceListSymbolsProcedure,
+		svc.ListSymbols,
+		connect.WithSchema(contentServiceMethods.ByName("ListSymbols")),
+		connect.WithHandlerOptions(opts...),
+	)
+	contentServiceFindDefinitionsHandler := connect.NewUnaryHandler(
+		ContentServiceFindDefinitionsProcedure,
+		svc.FindDefinitions,
+		connect.WithSchema(contentServiceMethods.ByName("FindDefinitions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	contentServiceFindReferencesHandler := connect.NewUnaryHandler(
+		ContentServiceFindReferencesProcedure,
+		svc.FindReferences,
+		connect.WithSchema(contentServiceMethods.ByName("FindReferences")),
+		connect.WithHandlerOptions(opts...),
+	)
+	contentServiceUploadScipHandler := connect.NewUnaryHandler(
+		ContentServiceUploadScipProcedure,
+		svc.UploadScip,
+		connect.WithSchema(contentServiceMethods.ByName("UploadScip")),
+		connect.WithHandlerOptions(opts...),
+	)
 	contentServiceFindMergeBaseHandler := connect.NewUnaryHandler(
 		ContentServiceFindMergeBaseProcedure,
 		svc.FindMergeBase,
@@ -500,6 +604,14 @@ func NewContentServiceHandler(svc ContentServiceHandler, opts ...connect.Handler
 			contentServiceGrepHandler.ServeHTTP(w, r)
 		case ContentServiceGrepShardsProcedure:
 			contentServiceGrepShardsHandler.ServeHTTP(w, r)
+		case ContentServiceListSymbolsProcedure:
+			contentServiceListSymbolsHandler.ServeHTTP(w, r)
+		case ContentServiceFindDefinitionsProcedure:
+			contentServiceFindDefinitionsHandler.ServeHTTP(w, r)
+		case ContentServiceFindReferencesProcedure:
+			contentServiceFindReferencesHandler.ServeHTTP(w, r)
+		case ContentServiceUploadScipProcedure:
+			contentServiceUploadScipHandler.ServeHTTP(w, r)
 		case ContentServiceFindMergeBaseProcedure:
 			contentServiceFindMergeBaseHandler.ServeHTTP(w, r)
 		case ContentServiceIsAncestorProcedure:
@@ -567,6 +679,22 @@ func (UnimplementedContentServiceHandler) Grep(context.Context, *connect.Request
 
 func (UnimplementedContentServiceHandler) GrepShards(context.Context, *connect.Request[v1.GrepShardsRequest]) (*connect.Response[v1.GrepShardsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ContentService.GrepShards is not implemented"))
+}
+
+func (UnimplementedContentServiceHandler) ListSymbols(context.Context, *connect.Request[v1.ListSymbolsRequest]) (*connect.Response[v1.ListSymbolsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ContentService.ListSymbols is not implemented"))
+}
+
+func (UnimplementedContentServiceHandler) FindDefinitions(context.Context, *connect.Request[v1.FindDefinitionsRequest]) (*connect.Response[v1.FindDefinitionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ContentService.FindDefinitions is not implemented"))
+}
+
+func (UnimplementedContentServiceHandler) FindReferences(context.Context, *connect.Request[v1.FindReferencesRequest]) (*connect.Response[v1.FindReferencesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ContentService.FindReferences is not implemented"))
+}
+
+func (UnimplementedContentServiceHandler) UploadScip(context.Context, *connect.Request[v1.UploadScipRequest]) (*connect.Response[v1.UploadScipResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ContentService.UploadScip is not implemented"))
 }
 
 func (UnimplementedContentServiceHandler) FindMergeBase(context.Context, *connect.Request[v1.FindMergeBaseRequest]) (*connect.Response[v1.FindMergeBaseResponse], error) {

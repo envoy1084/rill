@@ -206,6 +206,10 @@ impl ContentService for MockRepo {
         list_path_history(pb::ListPathHistoryRequest) -> pb::ListPathHistoryResponse;
         grep(pb::GrepRequest) -> pb::GrepResponse;
         grep_shards(pb::GrepShardsRequest) -> pb::GrepShardsResponse;
+        list_symbols(pb::ListSymbolsRequest) -> pb::ListSymbolsResponse;
+        find_definitions(pb::FindDefinitionsRequest) -> pb::FindDefinitionsResponse;
+        find_references(pb::FindReferencesRequest) -> pb::FindReferencesResponse;
+        upload_scip(pb::UploadScipRequest) -> pb::UploadScipResponse;
         find_merge_base(pb::FindMergeBaseRequest) -> pb::FindMergeBaseResponse;
         is_ancestor(pb::IsAncestorRequest) -> pb::IsAncestorResponse;
     }

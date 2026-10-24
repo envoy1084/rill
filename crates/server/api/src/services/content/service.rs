@@ -157,6 +157,42 @@ impl ContentService for ContentSvc {
         Ok(Response::new(self.grep_shards_impl(request).await?))
     }
 
+    async fn list_symbols(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::ListSymbolsRequest>,
+    ) -> GrpcResult<pb::ListSymbolsResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.list_symbols_impl(request).await?))
+    }
+
+    async fn find_definitions(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::FindDefinitionsRequest>,
+    ) -> GrpcResult<pb::FindDefinitionsResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.find_definitions_impl(request).await?))
+    }
+
+    async fn find_references(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::FindReferencesRequest>,
+    ) -> GrpcResult<pb::FindReferencesResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.find_references_impl(request).await?))
+    }
+
+    async fn upload_scip(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::UploadScipRequest>,
+    ) -> GrpcResult<pb::UploadScipResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.upload_scip_impl(request).await?))
+    }
+
     async fn find_merge_base(
         &self,
         ctx: RequestContext,

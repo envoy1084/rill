@@ -2,7 +2,7 @@
 //!
 //! `rill-mcp` exposes Rill to agents over the Model Context Protocol, on
 //! stdio or streamable HTTP. The protocol is the official Rust SDK,
-//! `rmcp`. [`tools`] holds a dozen task-level tools (read, search, edit,
+//! `rmcp`. [`tools`] holds fourteen task-level tools (read, search, edit,
 //! check, commit, review, land) that remember the session's change, fit
 //! their output to a token budget and name the next step; [`resources`]
 //! makes files, diffs and reviews addressable and subscribable.

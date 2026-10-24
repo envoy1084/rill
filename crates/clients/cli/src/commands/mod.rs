@@ -11,6 +11,7 @@ pub mod change;
 pub mod checkout;
 pub mod checks;
 pub mod clone;
+pub mod code;
 pub mod daemon;
 pub mod dev;
 pub mod diff;

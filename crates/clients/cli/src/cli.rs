@@ -7,9 +7,9 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 use crate::commands::{
-    access, admin, blame, bug_report, change, checkout, clone, daemon, diff, health, help, history,
-    identity, import, intent, land, log, man, org, refs, release, repo, review, show, stack,
-    status, watch, ws,
+    access, admin, blame, bug_report, change, checkout, clone, code, daemon, diff, health, help,
+    history, identity, import, intent, land, log, man, org, refs, release, repo, review, show,
+    stack, status, watch, ws,
 };
 
 /// Rill: server-authoritative source control for humans and agents.
@@ -135,6 +135,19 @@ pub enum Command {
 
     /// Search file contents at a root.
     Grep(history::GrepArgs),
+
+    /// Find where a symbol is defined.
+    Def(code::DefArgs),
+
+    /// Find the uses of a symbol.
+    Uses(code::UsesArgs),
+
+    /// List a file's symbols, or search symbols by name.
+    Symbols(code::SymbolsArgs),
+
+    /// Attach SCIP code-intelligence indexes.
+    #[command(subcommand)]
+    Scip(code::ScipCmd),
 
     /// Snapshot the checkout into a new change.
     New(change::NewArgs),

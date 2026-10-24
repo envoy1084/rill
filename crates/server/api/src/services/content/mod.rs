@@ -9,6 +9,7 @@ mod grep;
 mod history;
 mod peers;
 mod service;
+mod symbols;
 
 pub use blobs::{check_content_exists, content_bytes, BlobStream, MAX_INLINE};
 pub use service::ContentSvc;

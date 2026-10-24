@@ -177,6 +177,18 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
             ..Default::default()
         }
         .encode_to_vec(),
+        "ContentService/ListSymbols" => pb::ListSymbolsRequest {
+            repo: repo(),
+            query: "canary".into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+        "ContentService/FindDefinitions" => pb::FindDefinitionsRequest {
+            repo: repo(),
+            name: "canary".into(),
+            ..Default::default()
+        }
+        .encode_to_vec(),
         "ContentService/GrepShards" => pb::GrepShardsRequest {
             grep: Some(pb::GrepRequest {
                 repo: repo(),

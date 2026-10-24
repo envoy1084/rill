@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file rill/v1/content.proto.
  */
 export const file_rill_v1_content: GenFile = /*@__PURE__*/
-  fileDesc("ChVyaWxsL3YxL2NvbnRlbnQucHJvdG8SB3JpbGwudjEiUgoPUmVhZEZpbGVSZXF1ZXN0EgwKBHJlcG8YASABKAkSEAoIcmV2aXNpb24YAiABKAkSDAoEcGF0aBgDIAEoCRIRCgltYXhfYnl0ZXMYBCABKAQiagoQUmVhZEZpbGVSZXNwb25zZRIhCgVlbnRyeRgBIAEoCzISLnJpbGwudjEuVHJlZUVudHJ5EgwKBGRhdGEYAiABKAwSEQoJdHJ1bmNhdGVkGAMgASgIEhIKCnJlYWRfZ3JhbnQYBCABKAkiWQoVQmF0Y2hSZWFkRmlsZXNSZXF1ZXN0EgwKBHJlcG8YASABKAkSEAoIcmV2aXNpb24YAiABKAkSDQoFcGF0aHMYAyADKAkSEQoJbWF4X2J5dGVzGAQgASgEIkIKFkJhdGNoUmVhZEZpbGVzUmVzcG9uc2USKAoFZmlsZXMYASADKAsyGS5yaWxsLnYxLlJlYWRGaWxlUmVzcG9uc2UiOwoLU3RhdFJlcXVlc3QSDAoEcmVwbxgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCRIMCgRwYXRoGAMgASgJIlQKDFN0YXRSZXNwb25zZRImCgVlbnRyeRgBIAEoCzISLnJpbGwudjEuVHJlZUVudHJ5SACIAQESEgoKcmVhZF9ncmFudBgCIAEoCUIICgZfZW50cnkiawoUTGlzdERpcmVjdG9yeVJlcXVlc3QSDAoEcmVwbxgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCRIMCgRwYXRoGAMgASgJEhEKCXBhZ2Vfc2l6ZRgEIAEoBRISCgpwYWdlX3Rva2VuGAUgASgJIoEBChVMaXN0RGlyZWN0b3J5UmVzcG9uc2USEQoJdHJlZV9oYXNoGAEgASgMEigKB2VudHJpZXMYAiADKAsyFy5yaWxsLnYxLk5hbWVkVHJlZUVudHJ5EhcKD25leHRfcGFnZV90b2tlbhgDIAEoCRISCgpyZWFkX2dyYW50GAQgASgJIjsKDkdldFRyZWVSZXF1ZXN0EgwKBHJlcG8YASABKAkSDAoEaGFzaBgCIAEoDBINCgVncmFudBgDIAEoCSJCCg9HZXRUcmVlUmVzcG9uc2USGwoEdHJlZRgBIAEoCzINLnJpbGwudjEuVHJlZRISCgpyZWFkX2dyYW50GAIgASgJIpQBCg9SZWFkQmxvYlJlcXVlc3QSDAoEcmVwbxgBIAEoCRIkCgdjb250ZW50GAIgASgLMhMucmlsbC52MS5Db250ZW50UmVmEhMKBm9mZnNldBgDIAEoBEgAiAEBEhMKBmxlbmd0aBgEIAEoBEgBiAEBEg0KBWdyYW50GAUgASgJQgkKB19vZmZzZXRCCQoHX2xlbmd0aCIgChBSZWFkQmxvYlJlc3BvbnNlEgwKBGRhdGEYASABKAwiVQoQV3JpdGVCbG9iUmVxdWVzdBIqCgZoZWFkZXIYASABKAsyGC5yaWxsLnYxLldyaXRlQmxvYkhlYWRlckgAEg4KBGRhdGEYAiABKAxIAEIFCgNtc2cifQoPV3JpdGVCbG9iSGVhZGVyEhIKCnJlcXVlc3RfaWQYASABKAkSDAoEcmVwbxgCIAEoCRIRCgRzaXplGAMgASgESACIAQESGgoNZXhwZWN0ZWRfaGFzaBgEIAEoDEgBiAEBQgcKBV9zaXplQhAKDl9leHBlY3RlZF9oYXNoIjkKEVdyaXRlQmxvYlJlc3BvbnNlEiQKB2NvbnRlbnQYASABKAsyEy5yaWxsLnYxLkNvbnRlbnRSZWYiTQoYQmF0Y2hDaGVja09iamVjdHNSZXF1ZXN0EgwKBHJlcG8YASABKAkSIwoHb2JqZWN0cxgCIAMoCzISLnJpbGwudjEuT2JqZWN0UmVmIjwKCU9iamVjdFJlZhIhCgRraW5kGAEgASgOMhMucmlsbC52MS5PYmplY3RLaW5kEgwKBGhhc2gYAiABKAwiLAoZQmF0Y2hDaGVja09iamVjdHNSZXNwb25zZRIPCgdwcmVzZW50GAEgAygIIpcBCgtEaWZmUmVxdWVzdBIMCgRyZXBvGAEgASgJEgwKBGJhc2UYAiABKAkSDgoGdGFyZ2V0GAMgASgJEg0KBXBhdGhzGAQgAygJEiMKBmZvcm1hdBgFIAEoDjITLnJpbGwudjEuRGlmZkZvcm1hdBIVCg1jb250ZXh0X2xpbmVzGAYgASgNEhEKCW1heF9maWxlcxgHIAEoDSJXCgxEaWZmUmVzcG9uc2USIAoFZmlsZXMYASADKAsyES5yaWxsLnYxLkZpbGVEaWZmEhEKCXRydW5jYXRlZBgCIAEoCBISCgpyZWFkX2dyYW50GAMgASgJIjwKDEJsYW1lUmVxdWVzdBIMCgRyZXBvGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEgwKBHBhdGgYAyABKAkiMgoNQmxhbWVSZXNwb25zZRIhCgVsaW5lcxgBIAMoCzISLnJpbGwudjEuQmxhbWVMaW5lIo8BCglCbGFtZUxpbmUSDwoHbGluZV9ubxgBIAEoDRIPCgd2ZXJzaW9uGAIgASgJEiIKBmF1dGhvchgDIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsEhsKDnRydW5rX3Bvc2l0aW9uGAQgASgESACIAQESDAoEdGV4dBgFIAEoDEIRCg9fdHJ1bmtfcG9zaXRpb24ifwoSTGlzdEhpc3RvcnlSZXF1ZXN0EgwKBHJlcG8YASABKAkSEAoIcmV2aXNpb24YAiABKAkSDAoEcGF0aBgDIAEoCRIUCgxmaXJzdF9wYXJlbnQYBCABKAgSEQoJcGFnZV9zaXplGAUgASgFEhIKCnBhZ2VfdG9rZW4YBiABKAkiVQoTTGlzdEhpc3RvcnlSZXNwb25zZRIlCgh2ZXJzaW9ucxgBIAMoCzITLnJpbGwudjEuQ2hhbmdlSW5mbxIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkibQoWTGlzdFBhdGhIaXN0b3J5UmVxdWVzdBIMCgRyZXBvGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEgwKBHBhdGgYAyABKAkSEQoJcGFnZV9zaXplGAQgASgFEhIKCnBhZ2VfdG9rZW4YBSABKAkiXgoXTGlzdFBhdGhIaXN0b3J5UmVzcG9uc2USKgoHZW50cmllcxgBIAMoCzIZLnJpbGwudjEuUGF0aEhpc3RvcnlFbnRyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiawoQUGF0aEhpc3RvcnlFbnRyeRIkCgd2ZXJzaW9uGAEgASgLMhMucmlsbC52MS5DaGFuZ2VJbmZvEgwKBHBhdGgYAiABKAkSIwoGY2hhbmdlGAMgASgLMhMucmlsbC52MS5GaWxlQ2hhbmdlIt4BCgtHcmVwUmVxdWVzdBIMCgRyZXBvGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEg8KB3BhdHRlcm4YAyABKAkSGAoQY2FzZV9pbnNlbnNpdGl2ZRgEIAEoCBISCgpwYXRoX2dsb2JzGAUgAygJEhMKC21heF9yZXN1bHRzGAYgASgNEhUKDWNvbnRleHRfbGluZXMYByABKA0SDwoHbGl0ZXJhbBgIIAEoCBIRCglsYW5ndWFnZXMYCSADKAkSFAoHbWluX3NlcRgKIAEoBEgAiAEBQgoKCF9taW5fc2VxIt4CCgxHcmVwUmVzcG9uc2USHgoEaGl0cxgBIAMoCzIQLnJpbGwudjEuR3JlcEhpdBIRCgl0cnVuY2F0ZWQYAiABKAgSFwoPaW5kZXhlZF90aHJvdWdoGAMgASgEEhUKDWZpbGVzX21hdGNoZWQYBCABKA0SDwoHcGFydGlhbBgFIAEoCBI7CgtkaXJlY3RvcmllcxgGIAMoCzImLnJpbGwudjEuR3JlcFJlc3BvbnNlLkRpcmVjdG9yaWVzRW50cnkSNwoJbGFuZ3VhZ2VzGAcgAygLMiQucmlsbC52MS5HcmVwUmVzcG9uc2UuTGFuZ3VhZ2VzRW50cnkaMgoQRGlyZWN0b3JpZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKA06AjgBGjAKDkxhbmd1YWdlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoDToCOAEiRwoRR3JlcFNoYXJkc1JlcXVlc3QSIgoEZ3JlcBgBIAEoCzIULnJpbGwudjEuR3JlcFJlcXVlc3QSDgoGc2hhcmRzGAIgAygNIlcKEkdyZXBTaGFyZHNSZXNwb25zZRIgCgVmaWxlcxgBIAMoCzIRLnJpbGwudjEuR3JlcEZpbGUSDgoGY2FwcGVkGAIgASgIEg8KB3BhcnRpYWwYAyABKAgiRwoIR3JlcEZpbGUSDAoEcGF0aBgBIAEoCRINCgVzY29yZRgCIAEoBRIeCgRoaXRzGAMgAygLMhAucmlsbC52MS5HcmVwSGl0InsKB0dyZXBIaXQSDAoEcGF0aBgBIAEoCRIPCgdsaW5lX25vGAIgASgNEgwKBGxpbmUYAyABKAkSDgoGYmVmb3JlGAQgAygJEg0KBWFmdGVyGAUgAygJEhIKCmJ5dGVfc3RhcnQYBiABKAQSEAoIYnl0ZV9lbmQYByABKAQiOgoURmluZE1lcmdlQmFzZVJlcXVlc3QSDAoEcmVwbxgBIAEoCRIJCgFhGAIgASgJEgkKAWIYAyABKAkiJgoVRmluZE1lcmdlQmFzZVJlc3BvbnNlEg0KBWJhc2VzGAEgAygJIkcKEUlzQW5jZXN0b3JSZXF1ZXN0EgwKBHJlcG8YASABKAkSEAoIYW5jZXN0b3IYAiABKAkSEgoKZGVzY2VuZGFudBgDIAEoCSIpChJJc0FuY2VzdG9yUmVzcG9uc2USEwoLaXNfYW5jZXN0b3IYASABKAgy7AgKDkNvbnRlbnRTZXJ2aWNlEj8KCFJlYWRGaWxlEhgucmlsbC52MS5SZWFkRmlsZVJlcXVlc3QaGS5yaWxsLnYxLlJlYWRGaWxlUmVzcG9uc2USUQoOQmF0Y2hSZWFkRmlsZXMSHi5yaWxsLnYxLkJhdGNoUmVhZEZpbGVzUmVxdWVzdBofLnJpbGwudjEuQmF0Y2hSZWFkRmlsZXNSZXNwb25zZRIzCgRTdGF0EhQucmlsbC52MS5TdGF0UmVxdWVzdBoVLnJpbGwudjEuU3RhdFJlc3BvbnNlEk4KDUxpc3REaXJlY3RvcnkSHS5yaWxsLnYxLkxpc3REaXJlY3RvcnlSZXF1ZXN0Gh4ucmlsbC52MS5MaXN0RGlyZWN0b3J5UmVzcG9uc2USPAoHR2V0VHJlZRIXLnJpbGwudjEuR2V0VHJlZVJlcXVlc3QaGC5yaWxsLnYxLkdldFRyZWVSZXNwb25zZRJBCghSZWFkQmxvYhIYLnJpbGwudjEuUmVhZEJsb2JSZXF1ZXN0GhkucmlsbC52MS5SZWFkQmxvYlJlc3BvbnNlMAESRAoJV3JpdGVCbG9iEhkucmlsbC52MS5Xcml0ZUJsb2JSZXF1ZXN0GhoucmlsbC52MS5Xcml0ZUJsb2JSZXNwb25zZSgBEloKEUJhdGNoQ2hlY2tPYmplY3RzEiEucmlsbC52MS5CYXRjaENoZWNrT2JqZWN0c1JlcXVlc3QaIi5yaWxsLnYxLkJhdGNoQ2hlY2tPYmplY3RzUmVzcG9uc2USMwoERGlmZhIULnJpbGwudjEuRGlmZlJlcXVlc3QaFS5yaWxsLnYxLkRpZmZSZXNwb25zZRI2CgVCbGFtZRIVLnJpbGwudjEuQmxhbWVSZXF1ZXN0GhYucmlsbC52MS5CbGFtZVJlc3BvbnNlEkgKC0xpc3RIaXN0b3J5EhsucmlsbC52MS5MaXN0SGlzdG9yeVJlcXVlc3QaHC5yaWxsLnYxLkxpc3RIaXN0b3J5UmVzcG9uc2USVAoPTGlzdFBhdGhIaXN0b3J5Eh8ucmlsbC52MS5MaXN0UGF0aEhpc3RvcnlSZXF1ZXN0GiAucmlsbC52MS5MaXN0UGF0aEhpc3RvcnlSZXNwb25zZRIzCgRHcmVwEhQucmlsbC52MS5HcmVwUmVxdWVzdBoVLnJpbGwudjEuR3JlcFJlc3BvbnNlEkUKCkdyZXBTaGFyZHMSGi5yaWxsLnYxLkdyZXBTaGFyZHNSZXF1ZXN0GhsucmlsbC52MS5HcmVwU2hhcmRzUmVzcG9uc2USTgoNRmluZE1lcmdlQmFzZRIdLnJpbGwudjEuRmluZE1lcmdlQmFzZVJlcXVlc3QaHi5yaWxsLnYxLkZpbmRNZXJnZUJhc2VSZXNwb25zZRJFCgpJc0FuY2VzdG9yEhoucmlsbC52MS5Jc0FuY2VzdG9yUmVxdWVzdBobLnJpbGwudjEuSXNBbmNlc3RvclJlc3BvbnNlYgZwcm90bzM", [file_rill_v1_types]);
+  fileDesc("ChVyaWxsL3YxL2NvbnRlbnQucHJvdG8SB3JpbGwudjEiUgoPUmVhZEZpbGVSZXF1ZXN0EgwKBHJlcG8YASABKAkSEAoIcmV2aXNpb24YAiABKAkSDAoEcGF0aBgDIAEoCRIRCgltYXhfYnl0ZXMYBCABKAQiagoQUmVhZEZpbGVSZXNwb25zZRIhCgVlbnRyeRgBIAEoCzISLnJpbGwudjEuVHJlZUVudHJ5EgwKBGRhdGEYAiABKAwSEQoJdHJ1bmNhdGVkGAMgASgIEhIKCnJlYWRfZ3JhbnQYBCABKAkiWQoVQmF0Y2hSZWFkRmlsZXNSZXF1ZXN0EgwKBHJlcG8YASABKAkSEAoIcmV2aXNpb24YAiABKAkSDQoFcGF0aHMYAyADKAkSEQoJbWF4X2J5dGVzGAQgASgEIkIKFkJhdGNoUmVhZEZpbGVzUmVzcG9uc2USKAoFZmlsZXMYASADKAsyGS5yaWxsLnYxLlJlYWRGaWxlUmVzcG9uc2UiOwoLU3RhdFJlcXVlc3QSDAoEcmVwbxgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCRIMCgRwYXRoGAMgASgJIlQKDFN0YXRSZXNwb25zZRImCgVlbnRyeRgBIAEoCzISLnJpbGwudjEuVHJlZUVudHJ5SACIAQESEgoKcmVhZF9ncmFudBgCIAEoCUIICgZfZW50cnkiawoUTGlzdERpcmVjdG9yeVJlcXVlc3QSDAoEcmVwbxgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCRIMCgRwYXRoGAMgASgJEhEKCXBhZ2Vfc2l6ZRgEIAEoBRISCgpwYWdlX3Rva2VuGAUgASgJIoEBChVMaXN0RGlyZWN0b3J5UmVzcG9uc2USEQoJdHJlZV9oYXNoGAEgASgMEigKB2VudHJpZXMYAiADKAsyFy5yaWxsLnYxLk5hbWVkVHJlZUVudHJ5EhcKD25leHRfcGFnZV90b2tlbhgDIAEoCRISCgpyZWFkX2dyYW50GAQgASgJIjsKDkdldFRyZWVSZXF1ZXN0EgwKBHJlcG8YASABKAkSDAoEaGFzaBgCIAEoDBINCgVncmFudBgDIAEoCSJCCg9HZXRUcmVlUmVzcG9uc2USGwoEdHJlZRgBIAEoCzINLnJpbGwudjEuVHJlZRISCgpyZWFkX2dyYW50GAIgASgJIpQBCg9SZWFkQmxvYlJlcXVlc3QSDAoEcmVwbxgBIAEoCRIkCgdjb250ZW50GAIgASgLMhMucmlsbC52MS5Db250ZW50UmVmEhMKBm9mZnNldBgDIAEoBEgAiAEBEhMKBmxlbmd0aBgEIAEoBEgBiAEBEg0KBWdyYW50GAUgASgJQgkKB19vZmZzZXRCCQoHX2xlbmd0aCIgChBSZWFkQmxvYlJlc3BvbnNlEgwKBGRhdGEYASABKAwiVQoQV3JpdGVCbG9iUmVxdWVzdBIqCgZoZWFkZXIYASABKAsyGC5yaWxsLnYxLldyaXRlQmxvYkhlYWRlckgAEg4KBGRhdGEYAiABKAxIAEIFCgNtc2cifQoPV3JpdGVCbG9iSGVhZGVyEhIKCnJlcXVlc3RfaWQYASABKAkSDAoEcmVwbxgCIAEoCRIRCgRzaXplGAMgASgESACIAQESGgoNZXhwZWN0ZWRfaGFzaBgEIAEoDEgBiAEBQgcKBV9zaXplQhAKDl9leHBlY3RlZF9oYXNoIjkKEVdyaXRlQmxvYlJlc3BvbnNlEiQKB2NvbnRlbnQYASABKAsyEy5yaWxsLnYxLkNvbnRlbnRSZWYiTQoYQmF0Y2hDaGVja09iamVjdHNSZXF1ZXN0EgwKBHJlcG8YASABKAkSIwoHb2JqZWN0cxgCIAMoCzISLnJpbGwudjEuT2JqZWN0UmVmIjwKCU9iamVjdFJlZhIhCgRraW5kGAEgASgOMhMucmlsbC52MS5PYmplY3RLaW5kEgwKBGhhc2gYAiABKAwiLAoZQmF0Y2hDaGVja09iamVjdHNSZXNwb25zZRIPCgdwcmVzZW50GAEgAygIIpcBCgtEaWZmUmVxdWVzdBIMCgRyZXBvGAEgASgJEgwKBGJhc2UYAiABKAkSDgoGdGFyZ2V0GAMgASgJEg0KBXBhdGhzGAQgAygJEiMKBmZvcm1hdBgFIAEoDjITLnJpbGwudjEuRGlmZkZvcm1hdBIVCg1jb250ZXh0X2xpbmVzGAYgASgNEhEKCW1heF9maWxlcxgHIAEoDSJXCgxEaWZmUmVzcG9uc2USIAoFZmlsZXMYASADKAsyES5yaWxsLnYxLkZpbGVEaWZmEhEKCXRydW5jYXRlZBgCIAEoCBISCgpyZWFkX2dyYW50GAMgASgJIjwKDEJsYW1lUmVxdWVzdBIMCgRyZXBvGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEgwKBHBhdGgYAyABKAkiMgoNQmxhbWVSZXNwb25zZRIhCgVsaW5lcxgBIAMoCzISLnJpbGwudjEuQmxhbWVMaW5lIo8BCglCbGFtZUxpbmUSDwoHbGluZV9ubxgBIAEoDRIPCgd2ZXJzaW9uGAIgASgJEiIKBmF1dGhvchgDIAEoCzISLnJpbGwudjEuUHJpbmNpcGFsEhsKDnRydW5rX3Bvc2l0aW9uGAQgASgESACIAQESDAoEdGV4dBgFIAEoDEIRCg9fdHJ1bmtfcG9zaXRpb24ifwoSTGlzdEhpc3RvcnlSZXF1ZXN0EgwKBHJlcG8YASABKAkSEAoIcmV2aXNpb24YAiABKAkSDAoEcGF0aBgDIAEoCRIUCgxmaXJzdF9wYXJlbnQYBCABKAgSEQoJcGFnZV9zaXplGAUgASgFEhIKCnBhZ2VfdG9rZW4YBiABKAkiVQoTTGlzdEhpc3RvcnlSZXNwb25zZRIlCgh2ZXJzaW9ucxgBIAMoCzITLnJpbGwudjEuQ2hhbmdlSW5mbxIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkibQoWTGlzdFBhdGhIaXN0b3J5UmVxdWVzdBIMCgRyZXBvGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEgwKBHBhdGgYAyABKAkSEQoJcGFnZV9zaXplGAQgASgFEhIKCnBhZ2VfdG9rZW4YBSABKAkiXgoXTGlzdFBhdGhIaXN0b3J5UmVzcG9uc2USKgoHZW50cmllcxgBIAMoCzIZLnJpbGwudjEuUGF0aEhpc3RvcnlFbnRyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiawoQUGF0aEhpc3RvcnlFbnRyeRIkCgd2ZXJzaW9uGAEgASgLMhMucmlsbC52MS5DaGFuZ2VJbmZvEgwKBHBhdGgYAiABKAkSIwoGY2hhbmdlGAMgASgLMhMucmlsbC52MS5GaWxlQ2hhbmdlIvIBCgtHcmVwUmVxdWVzdBIMCgRyZXBvGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEg8KB3BhdHRlcm4YAyABKAkSGAoQY2FzZV9pbnNlbnNpdGl2ZRgEIAEoCBISCgpwYXRoX2dsb2JzGAUgAygJEhMKC21heF9yZXN1bHRzGAYgASgNEhUKDWNvbnRleHRfbGluZXMYByABKA0SDwoHbGl0ZXJhbBgIIAEoCBIRCglsYW5ndWFnZXMYCSADKAkSFAoHbWluX3NlcRgKIAEoBEgAiAEBEhIKCnN0cnVjdHVyYWwYCyABKAhCCgoIX21pbl9zZXEi3gIKDEdyZXBSZXNwb25zZRIeCgRoaXRzGAEgAygLMhAucmlsbC52MS5HcmVwSGl0EhEKCXRydW5jYXRlZBgCIAEoCBIXCg9pbmRleGVkX3Rocm91Z2gYAyABKAQSFQoNZmlsZXNfbWF0Y2hlZBgEIAEoDRIPCgdwYXJ0aWFsGAUgASgIEjsKC2RpcmVjdG9yaWVzGAYgAygLMiYucmlsbC52MS5HcmVwUmVzcG9uc2UuRGlyZWN0b3JpZXNFbnRyeRI3CglsYW5ndWFnZXMYByADKAsyJC5yaWxsLnYxLkdyZXBSZXNwb25zZS5MYW5ndWFnZXNFbnRyeRoyChBEaXJlY3Rvcmllc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoDToCOAEaMAoOTGFuZ3VhZ2VzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgNOgI4ASJHChFHcmVwU2hhcmRzUmVxdWVzdBIiCgRncmVwGAEgASgLMhQucmlsbC52MS5HcmVwUmVxdWVzdBIOCgZzaGFyZHMYAiADKA0iVwoSR3JlcFNoYXJkc1Jlc3BvbnNlEiAKBWZpbGVzGAEgAygLMhEucmlsbC52MS5HcmVwRmlsZRIOCgZjYXBwZWQYAiABKAgSDwoHcGFydGlhbBgDIAEoCCJHCghHcmVwRmlsZRIMCgRwYXRoGAEgASgJEg0KBXNjb3JlGAIgASgFEh4KBGhpdHMYAyADKAsyEC5yaWxsLnYxLkdyZXBIaXQipwEKDlN5bWJvbExvY2F0aW9uEgwKBHBhdGgYASABKAkSDAoEbGluZRgCIAEoDRIMCgRuYW1lGAMgASgJEgwKBGtpbmQYBCABKAkSFAoMc3RhcnRfY29sdW1uGAUgASgNEhIKCmVuZF9jb2x1bW4YBiABKA0SDwoHcHJlY2lzZRgHIAEoCBISCgpkZWZpbml0aW9uGAggASgIEg4KBnN5bWJvbBgJIAEoCSJ1ChJMaXN0U3ltYm9sc1JlcXVlc3QSDAoEcmVwbxgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCRIMCgRwYXRoGAMgASgJEg0KBXF1ZXJ5GAQgASgJEg0KBWtpbmRzGAUgAygJEhMKC21heF9yZXN1bHRzGAYgASgNIj8KE0xpc3RTeW1ib2xzUmVzcG9uc2USKAoHc3ltYm9scxgBIAMoCzIXLnJpbGwudjEuU3ltYm9sTG9jYXRpb24iWwoWRmluZERlZmluaXRpb25zUmVxdWVzdBIMCgRyZXBvGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEgwKBG5hbWUYAyABKAkSEwoLbWF4X3Jlc3VsdHMYBCABKA0iRwoXRmluZERlZmluaXRpb25zUmVzcG9uc2USLAoLZGVmaW5pdGlvbnMYASADKAsyFy5yaWxsLnYxLlN5bWJvbExvY2F0aW9uIoYBChVGaW5kUmVmZXJlbmNlc1JlcXVlc3QSDAoEcmVwbxgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCRIMCgRuYW1lGAMgASgJEgwKBHBhdGgYBCABKAkSDAoEbGluZRgFIAEoDRIOCgZjb2x1bW4YBiABKA0SEwoLbWF4X3Jlc3VsdHMYByABKA0iaQoWRmluZFJlZmVyZW5jZXNSZXNwb25zZRIrCgpyZWZlcmVuY2VzGAEgAygLMhcucmlsbC52MS5TeW1ib2xMb2NhdGlvbhIPCgdwcmVjaXNlGAIgASgIEhEKCXRydW5jYXRlZBgDIAEoCCJnChFVcGxvYWRTY2lwUmVxdWVzdBIMCgRyZXBvGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEiIKBWluZGV4GAMgASgLMhMucmlsbC52MS5Db250ZW50UmVmEg4KBnByZWZpeBgEIAEoCSI4ChJVcGxvYWRTY2lwUmVzcG9uc2USDQoFZmlsZXMYASABKA0SEwoLb2NjdXJyZW5jZXMYAiABKAQiewoHR3JlcEhpdBIMCgRwYXRoGAEgASgJEg8KB2xpbmVfbm8YAiABKA0SDAoEbGluZRgDIAEoCRIOCgZiZWZvcmUYBCADKAkSDQoFYWZ0ZXIYBSADKAkSEgoKYnl0ZV9zdGFydBgGIAEoBBIQCghieXRlX2VuZBgHIAEoBCI6ChRGaW5kTWVyZ2VCYXNlUmVxdWVzdBIMCgRyZXBvGAEgASgJEgkKAWEYAiABKAkSCQoBYhgDIAEoCSImChVGaW5kTWVyZ2VCYXNlUmVzcG9uc2USDQoFYmFzZXMYASADKAkiRwoRSXNBbmNlc3RvclJlcXVlc3QSDAoEcmVwbxgBIAEoCRIQCghhbmNlc3RvchgCIAEoCRISCgpkZXNjZW5kYW50GAMgASgJIikKEklzQW5jZXN0b3JSZXNwb25zZRITCgtpc19hbmNlc3RvchgBIAEoCDKmCwoOQ29udGVudFNlcnZpY2USPwoIUmVhZEZpbGUSGC5yaWxsLnYxLlJlYWRGaWxlUmVxdWVzdBoZLnJpbGwudjEuUmVhZEZpbGVSZXNwb25zZRJRCg5CYXRjaFJlYWRGaWxlcxIeLnJpbGwudjEuQmF0Y2hSZWFkRmlsZXNSZXF1ZXN0Gh8ucmlsbC52MS5CYXRjaFJlYWRGaWxlc1Jlc3BvbnNlEjMKBFN0YXQSFC5yaWxsLnYxLlN0YXRSZXF1ZXN0GhUucmlsbC52MS5TdGF0UmVzcG9uc2USTgoNTGlzdERpcmVjdG9yeRIdLnJpbGwudjEuTGlzdERpcmVjdG9yeVJlcXVlc3QaHi5yaWxsLnYxLkxpc3REaXJlY3RvcnlSZXNwb25zZRI8CgdHZXRUcmVlEhcucmlsbC52MS5HZXRUcmVlUmVxdWVzdBoYLnJpbGwudjEuR2V0VHJlZVJlc3BvbnNlEkEKCFJlYWRCbG9iEhgucmlsbC52MS5SZWFkQmxvYlJlcXVlc3QaGS5yaWxsLnYxLlJlYWRCbG9iUmVzcG9uc2UwARJECglXcml0ZUJsb2ISGS5yaWxsLnYxLldyaXRlQmxvYlJlcXVlc3QaGi5yaWxsLnYxLldyaXRlQmxvYlJlc3BvbnNlKAESWgoRQmF0Y2hDaGVja09iamVjdHMSIS5yaWxsLnYxLkJhdGNoQ2hlY2tPYmplY3RzUmVxdWVzdBoiLnJpbGwudjEuQmF0Y2hDaGVja09iamVjdHNSZXNwb25zZRIzCgREaWZmEhQucmlsbC52MS5EaWZmUmVxdWVzdBoVLnJpbGwudjEuRGlmZlJlc3BvbnNlEjYKBUJsYW1lEhUucmlsbC52MS5CbGFtZVJlcXVlc3QaFi5yaWxsLnYxLkJsYW1lUmVzcG9uc2USSAoLTGlzdEhpc3RvcnkSGy5yaWxsLnYxLkxpc3RIaXN0b3J5UmVxdWVzdBocLnJpbGwudjEuTGlzdEhpc3RvcnlSZXNwb25zZRJUCg9MaXN0UGF0aEhpc3RvcnkSHy5yaWxsLnYxLkxpc3RQYXRoSGlzdG9yeVJlcXVlc3QaIC5yaWxsLnYxLkxpc3RQYXRoSGlzdG9yeVJlc3BvbnNlEjMKBEdyZXASFC5yaWxsLnYxLkdyZXBSZXF1ZXN0GhUucmlsbC52MS5HcmVwUmVzcG9uc2USRQoKR3JlcFNoYXJkcxIaLnJpbGwudjEuR3JlcFNoYXJkc1JlcXVlc3QaGy5yaWxsLnYxLkdyZXBTaGFyZHNSZXNwb25zZRJICgtMaXN0U3ltYm9scxIbLnJpbGwudjEuTGlzdFN5bWJvbHNSZXF1ZXN0GhwucmlsbC52MS5MaXN0U3ltYm9sc1Jlc3BvbnNlElQKD0ZpbmREZWZpbml0aW9ucxIfLnJpbGwudjEuRmluZERlZmluaXRpb25zUmVxdWVzdBogLnJpbGwudjEuRmluZERlZmluaXRpb25zUmVzcG9uc2USUQoORmluZFJlZmVyZW5jZXMSHi5yaWxsLnYxLkZpbmRSZWZlcmVuY2VzUmVxdWVzdBofLnJpbGwudjEuRmluZFJlZmVyZW5jZXNSZXNwb25zZRJFCgpVcGxvYWRTY2lwEhoucmlsbC52MS5VcGxvYWRTY2lwUmVxdWVzdBobLnJpbGwudjEuVXBsb2FkU2NpcFJlc3BvbnNlEk4KDUZpbmRNZXJnZUJhc2USHS5yaWxsLnYxLkZpbmRNZXJnZUJhc2VSZXF1ZXN0Gh4ucmlsbC52MS5GaW5kTWVyZ2VCYXNlUmVzcG9uc2USRQoKSXNBbmNlc3RvchIaLnJpbGwudjEuSXNBbmNlc3RvclJlcXVlc3QaGy5yaWxsLnYxLklzQW5jZXN0b3JSZXNwb25zZWIGcHJvdG8z", [file_rill_v1_types]);
 
 /**
  * @generated from message rill.v1.ReadFileRequest
@@ -954,6 +954,14 @@ export type GrepRequest = Message<"rill.v1.GrepRequest"> & {
    * @generated from field: optional uint64 min_seq = 10;
    */
   minSeq?: bigint | undefined;
+
+  /**
+   * `pattern` is an ast-grep structural pattern (`foo($A, $$$REST)`);
+   * `languages` must name exactly one language.
+   *
+   * @generated from field: bool structural = 11;
+   */
+  structural: boolean;
 };
 
 /**
@@ -1110,6 +1118,345 @@ export const GrepFileSchema: GenMessage<GrepFile> = /*@__PURE__*/
   messageDesc(file_rill_v1_content, 32);
 
 /**
+ * A symbol definition, or a use of one.
+ *
+ * @generated from message rill.v1.SymbolLocation
+ */
+export type SymbolLocation = Message<"rill.v1.SymbolLocation"> & {
+  /**
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * 1-based.
+   *
+   * @generated from field: uint32 line = 2;
+   */
+  line: number;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * `function`, `class`, `struct`, … (empty for a use).
+   *
+   * @generated from field: string kind = 4;
+   */
+  kind: string;
+
+  /**
+   * 0-based byte columns on the line, when known (SCIP).
+   *
+   * @generated from field: uint32 start_column = 5;
+   */
+  startColumn: number;
+
+  /**
+   * @generated from field: uint32 end_column = 6;
+   */
+  endColumn: number;
+
+  /**
+   * From a SCIP index rather than extraction or text.
+   *
+   * @generated from field: bool precise = 7;
+   */
+  precise: boolean;
+
+  /**
+   * The location defines the symbol (references only).
+   *
+   * @generated from field: bool definition = 8;
+   */
+  definition: boolean;
+
+  /**
+   * The SCIP symbol, when precise.
+   *
+   * @generated from field: string symbol = 9;
+   */
+  symbol: string;
+};
+
+/**
+ * Describes the message rill.v1.SymbolLocation.
+ * Use `create(SymbolLocationSchema)` to create a new message.
+ */
+export const SymbolLocationSchema: GenMessage<SymbolLocation> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 33);
+
+/**
+ * @generated from message rill.v1.ListSymbolsRequest
+ */
+export type ListSymbolsRequest = Message<"rill.v1.ListSymbolsRequest"> & {
+  /**
+   * `orgs/{org}/repos/{repo}`. Required.
+   *
+   * @generated from field: string repo = 1;
+   */
+  repo: string;
+
+  /**
+   * @generated from field: string revision = 2;
+   */
+  revision: string;
+
+  /**
+   * The symbols of this file; or, when empty, those named like `query`.
+   *
+   * @generated from field: string path = 3;
+   */
+  path: string;
+
+  /**
+   * Case-insensitive substring of symbol names.
+   *
+   * @generated from field: string query = 4;
+   */
+  query: string;
+
+  /**
+   * Only these kinds; empty is all.
+   *
+   * @generated from field: repeated string kinds = 5;
+   */
+  kinds: string[];
+
+  /**
+   * Most symbols; 0 means 1,000.
+   *
+   * @generated from field: uint32 max_results = 6;
+   */
+  maxResults: number;
+};
+
+/**
+ * Describes the message rill.v1.ListSymbolsRequest.
+ * Use `create(ListSymbolsRequestSchema)` to create a new message.
+ */
+export const ListSymbolsRequestSchema: GenMessage<ListSymbolsRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 34);
+
+/**
+ * @generated from message rill.v1.ListSymbolsResponse
+ */
+export type ListSymbolsResponse = Message<"rill.v1.ListSymbolsResponse"> & {
+  /**
+   * @generated from field: repeated rill.v1.SymbolLocation symbols = 1;
+   */
+  symbols: SymbolLocation[];
+};
+
+/**
+ * Describes the message rill.v1.ListSymbolsResponse.
+ * Use `create(ListSymbolsResponseSchema)` to create a new message.
+ */
+export const ListSymbolsResponseSchema: GenMessage<ListSymbolsResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 35);
+
+/**
+ * @generated from message rill.v1.FindDefinitionsRequest
+ */
+export type FindDefinitionsRequest = Message<"rill.v1.FindDefinitionsRequest"> & {
+  /**
+   * @generated from field: string repo = 1;
+   */
+  repo: string;
+
+  /**
+   * @generated from field: string revision = 2;
+   */
+  revision: string;
+
+  /**
+   * Exact symbol name. Required.
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * Most definitions; 0 means 100.
+   *
+   * @generated from field: uint32 max_results = 4;
+   */
+  maxResults: number;
+};
+
+/**
+ * Describes the message rill.v1.FindDefinitionsRequest.
+ * Use `create(FindDefinitionsRequestSchema)` to create a new message.
+ */
+export const FindDefinitionsRequestSchema: GenMessage<FindDefinitionsRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 36);
+
+/**
+ * @generated from message rill.v1.FindDefinitionsResponse
+ */
+export type FindDefinitionsResponse = Message<"rill.v1.FindDefinitionsResponse"> & {
+  /**
+   * @generated from field: repeated rill.v1.SymbolLocation definitions = 1;
+   */
+  definitions: SymbolLocation[];
+};
+
+/**
+ * Describes the message rill.v1.FindDefinitionsResponse.
+ * Use `create(FindDefinitionsResponseSchema)` to create a new message.
+ */
+export const FindDefinitionsResponseSchema: GenMessage<FindDefinitionsResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 37);
+
+/**
+ * @generated from message rill.v1.FindReferencesRequest
+ */
+export type FindReferencesRequest = Message<"rill.v1.FindReferencesRequest"> & {
+  /**
+   * @generated from field: string repo = 1;
+   */
+  repo: string;
+
+  /**
+   * @generated from field: string revision = 2;
+   */
+  revision: string;
+
+  /**
+   * The symbol's name; or leave empty and give a position.
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * The symbol at this file position (1-based line, 0-based column).
+   *
+   * @generated from field: string path = 4;
+   */
+  path: string;
+
+  /**
+   * @generated from field: uint32 line = 5;
+   */
+  line: number;
+
+  /**
+   * @generated from field: uint32 column = 6;
+   */
+  column: number;
+
+  /**
+   * Most references; 0 means 1,000.
+   *
+   * @generated from field: uint32 max_results = 7;
+   */
+  maxResults: number;
+};
+
+/**
+ * Describes the message rill.v1.FindReferencesRequest.
+ * Use `create(FindReferencesRequestSchema)` to create a new message.
+ */
+export const FindReferencesRequestSchema: GenMessage<FindReferencesRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 38);
+
+/**
+ * @generated from message rill.v1.FindReferencesResponse
+ */
+export type FindReferencesResponse = Message<"rill.v1.FindReferencesResponse"> & {
+  /**
+   * @generated from field: repeated rill.v1.SymbolLocation references = 1;
+   */
+  references: SymbolLocation[];
+
+  /**
+   * Every reference came from a SCIP index.
+   *
+   * @generated from field: bool precise = 2;
+   */
+  precise: boolean;
+
+  /**
+   * More references exist than were returned.
+   *
+   * @generated from field: bool truncated = 3;
+   */
+  truncated: boolean;
+};
+
+/**
+ * Describes the message rill.v1.FindReferencesResponse.
+ * Use `create(FindReferencesResponseSchema)` to create a new message.
+ */
+export const FindReferencesResponseSchema: GenMessage<FindReferencesResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 39);
+
+/**
+ * @generated from message rill.v1.UploadScipRequest
+ */
+export type UploadScipRequest = Message<"rill.v1.UploadScipRequest"> & {
+  /**
+   * @generated from field: string repo = 1;
+   */
+  repo: string;
+
+  /**
+   * The revision the index was built from.
+   *
+   * @generated from field: string revision = 2;
+   */
+  revision: string;
+
+  /**
+   * The encoded SCIP `Index`, written with WriteBlob.
+   *
+   * @generated from field: rill.v1.ContentRef index = 3;
+   */
+  index?: ContentRef | undefined;
+
+  /**
+   * The directory the index's paths are relative to; empty for the root.
+   *
+   * @generated from field: string prefix = 4;
+   */
+  prefix: string;
+};
+
+/**
+ * Describes the message rill.v1.UploadScipRequest.
+ * Use `create(UploadScipRequestSchema)` to create a new message.
+ */
+export const UploadScipRequestSchema: GenMessage<UploadScipRequest> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 40);
+
+/**
+ * @generated from message rill.v1.UploadScipResponse
+ */
+export type UploadScipResponse = Message<"rill.v1.UploadScipResponse"> & {
+  /**
+   * Files of the revision the index covers, and occurrences kept.
+   *
+   * @generated from field: uint32 files = 1;
+   */
+  files: number;
+
+  /**
+   * @generated from field: uint64 occurrences = 2;
+   */
+  occurrences: bigint;
+};
+
+/**
+ * Describes the message rill.v1.UploadScipResponse.
+ * Use `create(UploadScipResponseSchema)` to create a new message.
+ */
+export const UploadScipResponseSchema: GenMessage<UploadScipResponse> = /*@__PURE__*/
+  messageDesc(file_rill_v1_content, 41);
+
+/**
  * @generated from message rill.v1.GrepHit
  */
 export type GrepHit = Message<"rill.v1.GrepHit"> & {
@@ -1154,7 +1501,7 @@ export type GrepHit = Message<"rill.v1.GrepHit"> & {
  * Use `create(GrepHitSchema)` to create a new message.
  */
 export const GrepHitSchema: GenMessage<GrepHit> = /*@__PURE__*/
-  messageDesc(file_rill_v1_content, 33);
+  messageDesc(file_rill_v1_content, 42);
 
 /**
  * @generated from message rill.v1.FindMergeBaseRequest
@@ -1187,7 +1534,7 @@ export type FindMergeBaseRequest = Message<"rill.v1.FindMergeBaseRequest"> & {
  * Use `create(FindMergeBaseRequestSchema)` to create a new message.
  */
 export const FindMergeBaseRequestSchema: GenMessage<FindMergeBaseRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_content, 34);
+  messageDesc(file_rill_v1_content, 43);
 
 /**
  * @generated from message rill.v1.FindMergeBaseResponse
@@ -1206,7 +1553,7 @@ export type FindMergeBaseResponse = Message<"rill.v1.FindMergeBaseResponse"> & {
  * Use `create(FindMergeBaseResponseSchema)` to create a new message.
  */
 export const FindMergeBaseResponseSchema: GenMessage<FindMergeBaseResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_content, 35);
+  messageDesc(file_rill_v1_content, 44);
 
 /**
  * @generated from message rill.v1.IsAncestorRequest
@@ -1239,7 +1586,7 @@ export type IsAncestorRequest = Message<"rill.v1.IsAncestorRequest"> & {
  * Use `create(IsAncestorRequestSchema)` to create a new message.
  */
 export const IsAncestorRequestSchema: GenMessage<IsAncestorRequest> = /*@__PURE__*/
-  messageDesc(file_rill_v1_content, 36);
+  messageDesc(file_rill_v1_content, 45);
 
 /**
  * @generated from message rill.v1.IsAncestorResponse
@@ -1256,7 +1603,7 @@ export type IsAncestorResponse = Message<"rill.v1.IsAncestorResponse"> & {
  * Use `create(IsAncestorResponseSchema)` to create a new message.
  */
 export const IsAncestorResponseSchema: GenMessage<IsAncestorResponse> = /*@__PURE__*/
-  messageDesc(file_rill_v1_content, 37);
+  messageDesc(file_rill_v1_content, 46);
 
 /**
  * Files, trees, blobs, diffs, blame, history and search.
@@ -1404,6 +1751,48 @@ export const ContentService: GenService<{
     methodKind: "unary";
     input: typeof GrepShardsRequestSchema;
     output: typeof GrepShardsResponseSchema;
+  },
+  /**
+   * Symbols of one file, or symbols whose names contain a string.
+   *
+   * @generated from rpc rill.v1.ContentService.ListSymbols
+   */
+  listSymbols: {
+    methodKind: "unary";
+    input: typeof ListSymbolsRequestSchema;
+    output: typeof ListSymbolsResponseSchema;
+  },
+  /**
+   * Where a name is defined: from an uploaded SCIP index when one covers
+   * the file, else from the symbols extracted at indexing.
+   *
+   * @generated from rpc rill.v1.ContentService.FindDefinitions
+   */
+  findDefinitions: {
+    methodKind: "unary";
+    input: typeof FindDefinitionsRequestSchema;
+    output: typeof FindDefinitionsResponseSchema;
+  },
+  /**
+   * Uses of a symbol: precise from a SCIP index when one covers it, else
+   * whole-word matches of its name.
+   *
+   * @generated from rpc rill.v1.ContentService.FindReferences
+   */
+  findReferences: {
+    methodKind: "unary";
+    input: typeof FindReferencesRequestSchema;
+    output: typeof FindReferencesResponseSchema;
+  },
+  /**
+   * Attach a SCIP index (written with WriteBlob) to a revision.
+   *
+   * @generated from rpc rill.v1.ContentService.UploadScip
+   */
+  uploadScip: {
+    methodKind: "unary";
+    input: typeof UploadScipRequestSchema;
+    output: typeof UploadScipResponseSchema;
   },
   /**
    * The merge bases of two revisions.

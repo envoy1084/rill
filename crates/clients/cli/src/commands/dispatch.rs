@@ -3,7 +3,7 @@
 use clap::CommandFactory;
 
 use super::{
-    access, admin, blame, bug_report, change, checkout, clone, daemon, diff, doctor, export,
+    access, admin, blame, bug_report, change, checkout, clone, code, daemon, diff, doctor, export,
     health, help, history, identity, import, intent, land, log, man, org, refs, release, repo,
     review, session, show, stack, status, watch, ws,
 };
@@ -51,6 +51,10 @@ pub async fn run(ctx: &mut Ctx<'_>, command: Command) -> Result<()> {
         Command::Ls(args) => history::ls(ctx, args).await,
         Command::Cat(args) => history::cat(ctx, args).await,
         Command::Grep(args) => history::grep(ctx, args).await,
+        Command::Def(args) => code::def(ctx, args).await,
+        Command::Uses(args) => code::uses(ctx, args).await,
+        Command::Symbols(args) => code::symbols(ctx, args).await,
+        Command::Scip(cmd) => code::scip(ctx, cmd).await,
         Command::New(args) => change::new(ctx, args).await,
         Command::Describe(args) => change::describe(ctx, args).await,
         Command::Amend(args) => change::amend(ctx, args).await,

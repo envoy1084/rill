@@ -9,6 +9,7 @@ mod derived;
 mod history;
 mod refs;
 mod search;
+mod symbols;
 mod tree;
 mod watch;
 mod write;

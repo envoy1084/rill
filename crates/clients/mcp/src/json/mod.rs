@@ -37,5 +37,5 @@ pub use review::{
     submit_decision, sync_result, thread,
 };
 pub use reviewers::{review_run, reviewer_stats};
-pub use search::{grep_hit, grep_result};
+pub use search::{grep_hit, grep_result, references, symbol_location};
 pub use workspace::{operation, sparse_profile, workspace, workspace_op};

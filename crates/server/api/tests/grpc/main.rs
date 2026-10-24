@@ -33,6 +33,7 @@ mod shutdown;
 mod signin;
 mod stacks;
 mod structural;
+mod symbols;
 mod telemetry;
 mod verification;
 mod workspaces;

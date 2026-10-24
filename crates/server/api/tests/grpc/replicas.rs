@@ -65,6 +65,7 @@ async fn servers_sharing_a_store_serve_any_request() {
                 languages: Default::default(),
                 literal: Default::default(),
                 min_seq: Default::default(),
+                ..Default::default()
             })
             .await
             .unwrap()

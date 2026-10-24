@@ -149,6 +149,7 @@ impl ContentSvc {
         let query = SearchQuery::new(req.pattern.clone())
             .case_insensitive(req.case_insensitive)
             .literal(req.literal)
+            .structural(req.structural)
             .languages(req.languages.clone())
             .time_budget(budget)
             .path_globs(req.path_globs.iter().map(String::as_str))

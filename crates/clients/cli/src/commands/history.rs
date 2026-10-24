@@ -49,6 +49,19 @@ pub struct GrepArgs {
     /// Stop after this many matches.
     #[arg(long, default_value_t = 1000)]
     pub max_matches: usize,
+    /// Match the pattern as a literal string.
+    #[arg(short = 'F', long)]
+    pub literal: bool,
+    /// Only files in this language (`rust`, `python`, …); repeatable.
+    #[arg(long = "lang", value_name = "LANG")]
+    pub languages: Vec<String>,
+    /// The pattern is an ast-grep structural pattern (`foo($A)`); needs
+    /// exactly one --lang.
+    #[arg(long, conflicts_with = "literal")]
+    pub structural: bool,
+    /// Wait until trunk is indexed through this position.
+    #[arg(long, value_name = "SEQ")]
+    pub min_seq: Option<u64>,
 }
 
 /// Run `rill ls`.
@@ -115,7 +128,15 @@ pub async fn grep(ctx: &mut Ctx<'_>, args: GrepArgs) -> Result<()> {
     let root = root_arg(args.at.as_deref())?;
     let mut query = GrepQuery::new(&args.pattern)
         .case_insensitive(args.ignore_case)
+        .literal(args.literal)
+        .structural(args.structural)
         .max_results(u32::try_from(args.max_matches).unwrap_or(u32::MAX));
+    for lang in &args.languages {
+        query = query.language(lang.clone());
+    }
+    if let Some(seq) = args.min_seq {
+        query = query.min_seq(seq);
+    }
     if let Some(glob) = &args.glob {
         query = query.glob(glob.clone());
     }

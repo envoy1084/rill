@@ -294,7 +294,7 @@ class PathHistoryEntry(_message.Message):
     def __init__(self, version: _Optional[_Union[_types_pb2.ChangeInfo, _Mapping]] = ..., path: _Optional[str] = ..., change: _Optional[_Union[_types_pb2.FileChange, _Mapping]] = ...) -> None: ...
 
 class GrepRequest(_message.Message):
-    __slots__ = ("repo", "revision", "pattern", "case_insensitive", "path_globs", "max_results", "context_lines", "literal", "languages", "min_seq")
+    __slots__ = ("repo", "revision", "pattern", "case_insensitive", "path_globs", "max_results", "context_lines", "literal", "languages", "min_seq", "structural")
     REPO_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
     PATTERN_FIELD_NUMBER: _ClassVar[int]
@@ -305,6 +305,7 @@ class GrepRequest(_message.Message):
     LITERAL_FIELD_NUMBER: _ClassVar[int]
     LANGUAGES_FIELD_NUMBER: _ClassVar[int]
     MIN_SEQ_FIELD_NUMBER: _ClassVar[int]
+    STRUCTURAL_FIELD_NUMBER: _ClassVar[int]
     repo: str
     revision: str
     pattern: str
@@ -315,7 +316,8 @@ class GrepRequest(_message.Message):
     literal: bool
     languages: _containers.RepeatedScalarFieldContainer[str]
     min_seq: int
-    def __init__(self, repo: _Optional[str] = ..., revision: _Optional[str] = ..., pattern: _Optional[str] = ..., case_insensitive: _Optional[bool] = ..., path_globs: _Optional[_Iterable[str]] = ..., max_results: _Optional[int] = ..., context_lines: _Optional[int] = ..., literal: _Optional[bool] = ..., languages: _Optional[_Iterable[str]] = ..., min_seq: _Optional[int] = ...) -> None: ...
+    structural: bool
+    def __init__(self, repo: _Optional[str] = ..., revision: _Optional[str] = ..., pattern: _Optional[str] = ..., case_insensitive: _Optional[bool] = ..., path_globs: _Optional[_Iterable[str]] = ..., max_results: _Optional[int] = ..., context_lines: _Optional[int] = ..., literal: _Optional[bool] = ..., languages: _Optional[_Iterable[str]] = ..., min_seq: _Optional[int] = ..., structural: _Optional[bool] = ...) -> None: ...
 
 class GrepResponse(_message.Message):
     __slots__ = ("hits", "truncated", "indexed_through", "files_matched", "partial", "directories", "languages")
@@ -376,6 +378,116 @@ class GrepFile(_message.Message):
     score: int
     hits: _containers.RepeatedCompositeFieldContainer[GrepHit]
     def __init__(self, path: _Optional[str] = ..., score: _Optional[int] = ..., hits: _Optional[_Iterable[_Union[GrepHit, _Mapping]]] = ...) -> None: ...
+
+class SymbolLocation(_message.Message):
+    __slots__ = ("path", "line", "name", "kind", "start_column", "end_column", "precise", "definition", "symbol")
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    LINE_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    START_COLUMN_FIELD_NUMBER: _ClassVar[int]
+    END_COLUMN_FIELD_NUMBER: _ClassVar[int]
+    PRECISE_FIELD_NUMBER: _ClassVar[int]
+    DEFINITION_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    path: str
+    line: int
+    name: str
+    kind: str
+    start_column: int
+    end_column: int
+    precise: bool
+    definition: bool
+    symbol: str
+    def __init__(self, path: _Optional[str] = ..., line: _Optional[int] = ..., name: _Optional[str] = ..., kind: _Optional[str] = ..., start_column: _Optional[int] = ..., end_column: _Optional[int] = ..., precise: _Optional[bool] = ..., definition: _Optional[bool] = ..., symbol: _Optional[str] = ...) -> None: ...
+
+class ListSymbolsRequest(_message.Message):
+    __slots__ = ("repo", "revision", "path", "query", "kinds", "max_results")
+    REPO_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    QUERY_FIELD_NUMBER: _ClassVar[int]
+    KINDS_FIELD_NUMBER: _ClassVar[int]
+    MAX_RESULTS_FIELD_NUMBER: _ClassVar[int]
+    repo: str
+    revision: str
+    path: str
+    query: str
+    kinds: _containers.RepeatedScalarFieldContainer[str]
+    max_results: int
+    def __init__(self, repo: _Optional[str] = ..., revision: _Optional[str] = ..., path: _Optional[str] = ..., query: _Optional[str] = ..., kinds: _Optional[_Iterable[str]] = ..., max_results: _Optional[int] = ...) -> None: ...
+
+class ListSymbolsResponse(_message.Message):
+    __slots__ = ("symbols",)
+    SYMBOLS_FIELD_NUMBER: _ClassVar[int]
+    symbols: _containers.RepeatedCompositeFieldContainer[SymbolLocation]
+    def __init__(self, symbols: _Optional[_Iterable[_Union[SymbolLocation, _Mapping]]] = ...) -> None: ...
+
+class FindDefinitionsRequest(_message.Message):
+    __slots__ = ("repo", "revision", "name", "max_results")
+    REPO_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    MAX_RESULTS_FIELD_NUMBER: _ClassVar[int]
+    repo: str
+    revision: str
+    name: str
+    max_results: int
+    def __init__(self, repo: _Optional[str] = ..., revision: _Optional[str] = ..., name: _Optional[str] = ..., max_results: _Optional[int] = ...) -> None: ...
+
+class FindDefinitionsResponse(_message.Message):
+    __slots__ = ("definitions",)
+    DEFINITIONS_FIELD_NUMBER: _ClassVar[int]
+    definitions: _containers.RepeatedCompositeFieldContainer[SymbolLocation]
+    def __init__(self, definitions: _Optional[_Iterable[_Union[SymbolLocation, _Mapping]]] = ...) -> None: ...
+
+class FindReferencesRequest(_message.Message):
+    __slots__ = ("repo", "revision", "name", "path", "line", "column", "max_results")
+    REPO_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    LINE_FIELD_NUMBER: _ClassVar[int]
+    COLUMN_FIELD_NUMBER: _ClassVar[int]
+    MAX_RESULTS_FIELD_NUMBER: _ClassVar[int]
+    repo: str
+    revision: str
+    name: str
+    path: str
+    line: int
+    column: int
+    max_results: int
+    def __init__(self, repo: _Optional[str] = ..., revision: _Optional[str] = ..., name: _Optional[str] = ..., path: _Optional[str] = ..., line: _Optional[int] = ..., column: _Optional[int] = ..., max_results: _Optional[int] = ...) -> None: ...
+
+class FindReferencesResponse(_message.Message):
+    __slots__ = ("references", "precise", "truncated")
+    REFERENCES_FIELD_NUMBER: _ClassVar[int]
+    PRECISE_FIELD_NUMBER: _ClassVar[int]
+    TRUNCATED_FIELD_NUMBER: _ClassVar[int]
+    references: _containers.RepeatedCompositeFieldContainer[SymbolLocation]
+    precise: bool
+    truncated: bool
+    def __init__(self, references: _Optional[_Iterable[_Union[SymbolLocation, _Mapping]]] = ..., precise: _Optional[bool] = ..., truncated: _Optional[bool] = ...) -> None: ...
+
+class UploadScipRequest(_message.Message):
+    __slots__ = ("repo", "revision", "index", "prefix")
+    REPO_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    INDEX_FIELD_NUMBER: _ClassVar[int]
+    PREFIX_FIELD_NUMBER: _ClassVar[int]
+    repo: str
+    revision: str
+    index: _types_pb2.ContentRef
+    prefix: str
+    def __init__(self, repo: _Optional[str] = ..., revision: _Optional[str] = ..., index: _Optional[_Union[_types_pb2.ContentRef, _Mapping]] = ..., prefix: _Optional[str] = ...) -> None: ...
+
+class UploadScipResponse(_message.Message):
+    __slots__ = ("files", "occurrences")
+    FILES_FIELD_NUMBER: _ClassVar[int]
+    OCCURRENCES_FIELD_NUMBER: _ClassVar[int]
+    files: int
+    occurrences: int
+    def __init__(self, files: _Optional[int] = ..., occurrences: _Optional[int] = ...) -> None: ...
 
 class GrepHit(_message.Message):
     __slots__ = ("path", "line_no", "line", "before", "after", "byte_start", "byte_end")

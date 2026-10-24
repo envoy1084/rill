@@ -102,7 +102,9 @@ retried call returns the first call's result (see
 
 `RepoClient` covers repository info, history (`log`, `log_page`,
 `path_history`, `blame`), trees and files (`list_dir`, `read_file`), blobs,
-diff and ancestry, refs and trunk, `grep`, derived data and `watch_*`
+diff and ancestry, refs and trunk, `grep`, code intelligence
+(`find_definitions`, `find_references`, `file_symbols`, `search_symbols`,
+`upload_scip`), derived data and `watch_*`
 streams. Each module under `repo/` wraps one group of RPCs.
 `watch_log(WatchStart)` starts `Now`, from the `Beginning` or `After` a
 `Versionstamp` cursor, and yields `LogEntry { cursor, info }`, so a client

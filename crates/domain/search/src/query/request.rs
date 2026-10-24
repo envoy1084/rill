@@ -64,6 +64,11 @@ impl SearchQuery {
         self
     }
 
+    /// A case-sensitive search for `word` as a whole word.
+    pub fn whole_word(word: &str) -> Self {
+        SearchQuery::new(format!(r"\b{}\b", regex::escape(word)))
+    }
+
     /// Match literally.
     pub fn literal(mut self, yes: bool) -> Self {
         self.literal = yes;

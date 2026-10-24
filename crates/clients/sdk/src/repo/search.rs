@@ -24,6 +24,7 @@ impl RepoClient {
                 languages: query.languages.clone(),
                 literal: query.literal,
                 min_seq: query.min_seq,
+                structural: query.structural,
             };
             async move { svc.grep(request).await }
         })

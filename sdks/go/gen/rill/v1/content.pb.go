@@ -1826,7 +1826,10 @@ type GrepRequest struct {
 	Languages []string `protobuf:"bytes,9,rep,name=languages,proto3" json:"languages,omitempty"`
 	// Wait until trunk is indexed through this position (up to 30 s), so
 	// a search sees a landing the caller just made.
-	MinSeq        *uint64 `protobuf:"varint,10,opt,name=min_seq,json=minSeq,proto3,oneof" json:"min_seq,omitempty"`
+	MinSeq *uint64 `protobuf:"varint,10,opt,name=min_seq,json=minSeq,proto3,oneof" json:"min_seq,omitempty"`
+	// `pattern` is an ast-grep structural pattern (`foo($A, $$$REST)`);
+	// `languages` must name exactly one language.
+	Structural    bool `protobuf:"varint,11,opt,name=structural,proto3" json:"structural,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1929,6 +1932,13 @@ func (x *GrepRequest) GetMinSeq() uint64 {
 		return *x.MinSeq
 	}
 	return 0
+}
+
+func (x *GrepRequest) GetStructural() bool {
+	if x != nil {
+		return x.Structural
+	}
+	return false
 }
 
 type GrepResponse struct {
@@ -2207,6 +2217,649 @@ func (x *GrepFile) GetHits() []*GrepHit {
 	return nil
 }
 
+// A symbol definition, or a use of one.
+type SymbolLocation struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Path  string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	// 1-based.
+	Line uint32 `protobuf:"varint,2,opt,name=line,proto3" json:"line,omitempty"`
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// `function`, `class`, `struct`, … (empty for a use).
+	Kind string `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	// 0-based byte columns on the line, when known (SCIP).
+	StartColumn uint32 `protobuf:"varint,5,opt,name=start_column,json=startColumn,proto3" json:"start_column,omitempty"`
+	EndColumn   uint32 `protobuf:"varint,6,opt,name=end_column,json=endColumn,proto3" json:"end_column,omitempty"`
+	// From a SCIP index rather than extraction or text.
+	Precise bool `protobuf:"varint,7,opt,name=precise,proto3" json:"precise,omitempty"`
+	// The location defines the symbol (references only).
+	Definition bool `protobuf:"varint,8,opt,name=definition,proto3" json:"definition,omitempty"`
+	// The SCIP symbol, when precise.
+	Symbol        string `protobuf:"bytes,9,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SymbolLocation) Reset() {
+	*x = SymbolLocation{}
+	mi := &file_rill_v1_content_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SymbolLocation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SymbolLocation) ProtoMessage() {}
+
+func (x *SymbolLocation) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SymbolLocation.ProtoReflect.Descriptor instead.
+func (*SymbolLocation) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *SymbolLocation) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SymbolLocation) GetLine() uint32 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
+}
+
+func (x *SymbolLocation) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SymbolLocation) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *SymbolLocation) GetStartColumn() uint32 {
+	if x != nil {
+		return x.StartColumn
+	}
+	return 0
+}
+
+func (x *SymbolLocation) GetEndColumn() uint32 {
+	if x != nil {
+		return x.EndColumn
+	}
+	return 0
+}
+
+func (x *SymbolLocation) GetPrecise() bool {
+	if x != nil {
+		return x.Precise
+	}
+	return false
+}
+
+func (x *SymbolLocation) GetDefinition() bool {
+	if x != nil {
+		return x.Definition
+	}
+	return false
+}
+
+func (x *SymbolLocation) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+type ListSymbolsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// `orgs/{org}/repos/{repo}`. Required.
+	Repo     string `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
+	Revision string `protobuf:"bytes,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	// The symbols of this file; or, when empty, those named like `query`.
+	Path string `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
+	// Case-insensitive substring of symbol names.
+	Query string `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	// Only these kinds; empty is all.
+	Kinds []string `protobuf:"bytes,5,rep,name=kinds,proto3" json:"kinds,omitempty"`
+	// Most symbols; 0 means 1,000.
+	MaxResults    uint32 `protobuf:"varint,6,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSymbolsRequest) Reset() {
+	*x = ListSymbolsRequest{}
+	mi := &file_rill_v1_content_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSymbolsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSymbolsRequest) ProtoMessage() {}
+
+func (x *ListSymbolsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSymbolsRequest.ProtoReflect.Descriptor instead.
+func (*ListSymbolsRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ListSymbolsRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *ListSymbolsRequest) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+func (x *ListSymbolsRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ListSymbolsRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *ListSymbolsRequest) GetKinds() []string {
+	if x != nil {
+		return x.Kinds
+	}
+	return nil
+}
+
+func (x *ListSymbolsRequest) GetMaxResults() uint32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type ListSymbolsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Symbols       []*SymbolLocation      `protobuf:"bytes,1,rep,name=symbols,proto3" json:"symbols,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSymbolsResponse) Reset() {
+	*x = ListSymbolsResponse{}
+	mi := &file_rill_v1_content_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSymbolsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSymbolsResponse) ProtoMessage() {}
+
+func (x *ListSymbolsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSymbolsResponse.ProtoReflect.Descriptor instead.
+func (*ListSymbolsResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ListSymbolsResponse) GetSymbols() []*SymbolLocation {
+	if x != nil {
+		return x.Symbols
+	}
+	return nil
+}
+
+type FindDefinitionsRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Repo     string                 `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
+	Revision string                 `protobuf:"bytes,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	// Exact symbol name. Required.
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// Most definitions; 0 means 100.
+	MaxResults    uint32 `protobuf:"varint,4,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FindDefinitionsRequest) Reset() {
+	*x = FindDefinitionsRequest{}
+	mi := &file_rill_v1_content_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FindDefinitionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FindDefinitionsRequest) ProtoMessage() {}
+
+func (x *FindDefinitionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FindDefinitionsRequest.ProtoReflect.Descriptor instead.
+func (*FindDefinitionsRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *FindDefinitionsRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *FindDefinitionsRequest) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+func (x *FindDefinitionsRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *FindDefinitionsRequest) GetMaxResults() uint32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type FindDefinitionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Definitions   []*SymbolLocation      `protobuf:"bytes,1,rep,name=definitions,proto3" json:"definitions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FindDefinitionsResponse) Reset() {
+	*x = FindDefinitionsResponse{}
+	mi := &file_rill_v1_content_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FindDefinitionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FindDefinitionsResponse) ProtoMessage() {}
+
+func (x *FindDefinitionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FindDefinitionsResponse.ProtoReflect.Descriptor instead.
+func (*FindDefinitionsResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *FindDefinitionsResponse) GetDefinitions() []*SymbolLocation {
+	if x != nil {
+		return x.Definitions
+	}
+	return nil
+}
+
+type FindReferencesRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Repo     string                 `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
+	Revision string                 `protobuf:"bytes,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	// The symbol's name; or leave empty and give a position.
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// The symbol at this file position (1-based line, 0-based column).
+	Path   string `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	Line   uint32 `protobuf:"varint,5,opt,name=line,proto3" json:"line,omitempty"`
+	Column uint32 `protobuf:"varint,6,opt,name=column,proto3" json:"column,omitempty"`
+	// Most references; 0 means 1,000.
+	MaxResults    uint32 `protobuf:"varint,7,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FindReferencesRequest) Reset() {
+	*x = FindReferencesRequest{}
+	mi := &file_rill_v1_content_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FindReferencesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FindReferencesRequest) ProtoMessage() {}
+
+func (x *FindReferencesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FindReferencesRequest.ProtoReflect.Descriptor instead.
+func (*FindReferencesRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *FindReferencesRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *FindReferencesRequest) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+func (x *FindReferencesRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *FindReferencesRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FindReferencesRequest) GetLine() uint32 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
+}
+
+func (x *FindReferencesRequest) GetColumn() uint32 {
+	if x != nil {
+		return x.Column
+	}
+	return 0
+}
+
+func (x *FindReferencesRequest) GetMaxResults() uint32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type FindReferencesResponse struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	References []*SymbolLocation      `protobuf:"bytes,1,rep,name=references,proto3" json:"references,omitempty"`
+	// Every reference came from a SCIP index.
+	Precise bool `protobuf:"varint,2,opt,name=precise,proto3" json:"precise,omitempty"`
+	// More references exist than were returned.
+	Truncated     bool `protobuf:"varint,3,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FindReferencesResponse) Reset() {
+	*x = FindReferencesResponse{}
+	mi := &file_rill_v1_content_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FindReferencesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FindReferencesResponse) ProtoMessage() {}
+
+func (x *FindReferencesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FindReferencesResponse.ProtoReflect.Descriptor instead.
+func (*FindReferencesResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *FindReferencesResponse) GetReferences() []*SymbolLocation {
+	if x != nil {
+		return x.References
+	}
+	return nil
+}
+
+func (x *FindReferencesResponse) GetPrecise() bool {
+	if x != nil {
+		return x.Precise
+	}
+	return false
+}
+
+func (x *FindReferencesResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+type UploadScipRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Repo  string                 `protobuf:"bytes,1,opt,name=repo,proto3" json:"repo,omitempty"`
+	// The revision the index was built from.
+	Revision string `protobuf:"bytes,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	// The encoded SCIP `Index`, written with WriteBlob.
+	Index *ContentRef `protobuf:"bytes,3,opt,name=index,proto3" json:"index,omitempty"`
+	// The directory the index's paths are relative to; empty for the root.
+	Prefix        string `protobuf:"bytes,4,opt,name=prefix,proto3" json:"prefix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UploadScipRequest) Reset() {
+	*x = UploadScipRequest{}
+	mi := &file_rill_v1_content_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadScipRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadScipRequest) ProtoMessage() {}
+
+func (x *UploadScipRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadScipRequest.ProtoReflect.Descriptor instead.
+func (*UploadScipRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *UploadScipRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *UploadScipRequest) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
+}
+
+func (x *UploadScipRequest) GetIndex() *ContentRef {
+	if x != nil {
+		return x.Index
+	}
+	return nil
+}
+
+func (x *UploadScipRequest) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
+type UploadScipResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Files of the revision the index covers, and occurrences kept.
+	Files         uint32 `protobuf:"varint,1,opt,name=files,proto3" json:"files,omitempty"`
+	Occurrences   uint64 `protobuf:"varint,2,opt,name=occurrences,proto3" json:"occurrences,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UploadScipResponse) Reset() {
+	*x = UploadScipResponse{}
+	mi := &file_rill_v1_content_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadScipResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadScipResponse) ProtoMessage() {}
+
+func (x *UploadScipResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadScipResponse.ProtoReflect.Descriptor instead.
+func (*UploadScipResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *UploadScipResponse) GetFiles() uint32 {
+	if x != nil {
+		return x.Files
+	}
+	return 0
+}
+
+func (x *UploadScipResponse) GetOccurrences() uint64 {
+	if x != nil {
+		return x.Occurrences
+	}
+	return 0
+}
+
 type GrepHit struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
@@ -2222,7 +2875,7 @@ type GrepHit struct {
 
 func (x *GrepHit) Reset() {
 	*x = GrepHit{}
-	mi := &file_rill_v1_content_proto_msgTypes[33]
+	mi := &file_rill_v1_content_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2234,7 +2887,7 @@ func (x *GrepHit) String() string {
 func (*GrepHit) ProtoMessage() {}
 
 func (x *GrepHit) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[33]
+	mi := &file_rill_v1_content_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2247,7 +2900,7 @@ func (x *GrepHit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrepHit.ProtoReflect.Descriptor instead.
 func (*GrepHit) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{33}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GrepHit) GetPath() string {
@@ -2313,7 +2966,7 @@ type FindMergeBaseRequest struct {
 
 func (x *FindMergeBaseRequest) Reset() {
 	*x = FindMergeBaseRequest{}
-	mi := &file_rill_v1_content_proto_msgTypes[34]
+	mi := &file_rill_v1_content_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2325,7 +2978,7 @@ func (x *FindMergeBaseRequest) String() string {
 func (*FindMergeBaseRequest) ProtoMessage() {}
 
 func (x *FindMergeBaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[34]
+	mi := &file_rill_v1_content_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2338,7 +2991,7 @@ func (x *FindMergeBaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindMergeBaseRequest.ProtoReflect.Descriptor instead.
 func (*FindMergeBaseRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{34}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *FindMergeBaseRequest) GetRepo() string {
@@ -2372,7 +3025,7 @@ type FindMergeBaseResponse struct {
 
 func (x *FindMergeBaseResponse) Reset() {
 	*x = FindMergeBaseResponse{}
-	mi := &file_rill_v1_content_proto_msgTypes[35]
+	mi := &file_rill_v1_content_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2384,7 +3037,7 @@ func (x *FindMergeBaseResponse) String() string {
 func (*FindMergeBaseResponse) ProtoMessage() {}
 
 func (x *FindMergeBaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[35]
+	mi := &file_rill_v1_content_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2397,7 +3050,7 @@ func (x *FindMergeBaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindMergeBaseResponse.ProtoReflect.Descriptor instead.
 func (*FindMergeBaseResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{35}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *FindMergeBaseResponse) GetBases() []string {
@@ -2421,7 +3074,7 @@ type IsAncestorRequest struct {
 
 func (x *IsAncestorRequest) Reset() {
 	*x = IsAncestorRequest{}
-	mi := &file_rill_v1_content_proto_msgTypes[36]
+	mi := &file_rill_v1_content_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2433,7 +3086,7 @@ func (x *IsAncestorRequest) String() string {
 func (*IsAncestorRequest) ProtoMessage() {}
 
 func (x *IsAncestorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[36]
+	mi := &file_rill_v1_content_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2446,7 +3099,7 @@ func (x *IsAncestorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsAncestorRequest.ProtoReflect.Descriptor instead.
 func (*IsAncestorRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{36}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *IsAncestorRequest) GetRepo() string {
@@ -2479,7 +3132,7 @@ type IsAncestorResponse struct {
 
 func (x *IsAncestorResponse) Reset() {
 	*x = IsAncestorResponse{}
-	mi := &file_rill_v1_content_proto_msgTypes[37]
+	mi := &file_rill_v1_content_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2491,7 +3144,7 @@ func (x *IsAncestorResponse) String() string {
 func (*IsAncestorResponse) ProtoMessage() {}
 
 func (x *IsAncestorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[37]
+	mi := &file_rill_v1_content_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2504,7 +3157,7 @@ func (x *IsAncestorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsAncestorResponse.ProtoReflect.Descriptor instead.
 func (*IsAncestorResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{37}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *IsAncestorResponse) GetIsAncestor() bool {
@@ -2649,7 +3302,7 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"\x10PathHistoryEntry\x12-\n" +
 	"\aversion\x18\x01 \x01(\v2\x13.rill.v1.ChangeInfoR\aversion\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12+\n" +
-	"\x06change\x18\x03 \x01(\v2\x13.rill.v1.FileChangeR\x06change\"\xc9\x02\n" +
+	"\x06change\x18\x03 \x01(\v2\x13.rill.v1.FileChangeR\x06change\"\xe9\x02\n" +
 	"\vGrepRequest\x12\x12\n" +
 	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\tR\brevision\x12\x18\n" +
@@ -2663,7 +3316,10 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"\aliteral\x18\b \x01(\bR\aliteral\x12\x1c\n" +
 	"\tlanguages\x18\t \x03(\tR\tlanguages\x12\x1c\n" +
 	"\amin_seq\x18\n" +
-	" \x01(\x04H\x00R\x06minSeq\x88\x01\x01B\n" +
+	" \x01(\x04H\x00R\x06minSeq\x88\x01\x01\x12\x1e\n" +
+	"\n" +
+	"structural\x18\v \x01(\bR\n" +
+	"structuralB\n" +
 	"\n" +
 	"\b_min_seq\"\xc6\x03\n" +
 	"\fGrepResponse\x12$\n" +
@@ -2690,7 +3346,61 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"\bGrepFile\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x14\n" +
 	"\x05score\x18\x02 \x01(\x05R\x05score\x12$\n" +
-	"\x04hits\x18\x03 \x03(\v2\x10.rill.v1.GrepHitR\x04hits\"\xb2\x01\n" +
+	"\x04hits\x18\x03 \x03(\v2\x10.rill.v1.GrepHitR\x04hits\"\xf4\x01\n" +
+	"\x0eSymbolLocation\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
+	"\x04line\x18\x02 \x01(\rR\x04line\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04kind\x18\x04 \x01(\tR\x04kind\x12!\n" +
+	"\fstart_column\x18\x05 \x01(\rR\vstartColumn\x12\x1d\n" +
+	"\n" +
+	"end_column\x18\x06 \x01(\rR\tendColumn\x12\x18\n" +
+	"\aprecise\x18\a \x01(\bR\aprecise\x12\x1e\n" +
+	"\n" +
+	"definition\x18\b \x01(\bR\n" +
+	"definition\x12\x16\n" +
+	"\x06symbol\x18\t \x01(\tR\x06symbol\"\xa5\x01\n" +
+	"\x12ListSymbolsRequest\x12\x12\n" +
+	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\tR\brevision\x12\x12\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12\x14\n" +
+	"\x05kinds\x18\x05 \x03(\tR\x05kinds\x12\x1f\n" +
+	"\vmax_results\x18\x06 \x01(\rR\n" +
+	"maxResults\"H\n" +
+	"\x13ListSymbolsResponse\x121\n" +
+	"\asymbols\x18\x01 \x03(\v2\x17.rill.v1.SymbolLocationR\asymbols\"}\n" +
+	"\x16FindDefinitionsRequest\x12\x12\n" +
+	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\tR\brevision\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1f\n" +
+	"\vmax_results\x18\x04 \x01(\rR\n" +
+	"maxResults\"T\n" +
+	"\x17FindDefinitionsResponse\x129\n" +
+	"\vdefinitions\x18\x01 \x03(\v2\x17.rill.v1.SymbolLocationR\vdefinitions\"\xbc\x01\n" +
+	"\x15FindReferencesRequest\x12\x12\n" +
+	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\tR\brevision\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x12\n" +
+	"\x04line\x18\x05 \x01(\rR\x04line\x12\x16\n" +
+	"\x06column\x18\x06 \x01(\rR\x06column\x12\x1f\n" +
+	"\vmax_results\x18\a \x01(\rR\n" +
+	"maxResults\"\x89\x01\n" +
+	"\x16FindReferencesResponse\x127\n" +
+	"\n" +
+	"references\x18\x01 \x03(\v2\x17.rill.v1.SymbolLocationR\n" +
+	"references\x12\x18\n" +
+	"\aprecise\x18\x02 \x01(\bR\aprecise\x12\x1c\n" +
+	"\ttruncated\x18\x03 \x01(\bR\ttruncated\"\x86\x01\n" +
+	"\x11UploadScipRequest\x12\x12\n" +
+	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\tR\brevision\x12)\n" +
+	"\x05index\x18\x03 \x01(\v2\x13.rill.v1.ContentRefR\x05index\x12\x16\n" +
+	"\x06prefix\x18\x04 \x01(\tR\x06prefix\"L\n" +
+	"\x12UploadScipResponse\x12\x14\n" +
+	"\x05files\x18\x01 \x01(\rR\x05files\x12 \n" +
+	"\voccurrences\x18\x02 \x01(\x04R\voccurrences\"\xb2\x01\n" +
 	"\aGrepHit\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x17\n" +
 	"\aline_no\x18\x02 \x01(\rR\x06lineNo\x12\x12\n" +
@@ -2714,7 +3424,7 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"descendant\"5\n" +
 	"\x12IsAncestorResponse\x12\x1f\n" +
 	"\vis_ancestor\x18\x01 \x01(\bR\n" +
-	"isAncestor2\xec\b\n" +
+	"isAncestor2\xa6\v\n" +
 	"\x0eContentService\x12?\n" +
 	"\bReadFile\x12\x18.rill.v1.ReadFileRequest\x1a\x19.rill.v1.ReadFileResponse\x12Q\n" +
 	"\x0eBatchReadFiles\x12\x1e.rill.v1.BatchReadFilesRequest\x1a\x1f.rill.v1.BatchReadFilesResponse\x123\n" +
@@ -2730,7 +3440,12 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"\x0fListPathHistory\x12\x1f.rill.v1.ListPathHistoryRequest\x1a .rill.v1.ListPathHistoryResponse\x123\n" +
 	"\x04Grep\x12\x14.rill.v1.GrepRequest\x1a\x15.rill.v1.GrepResponse\x12E\n" +
 	"\n" +
-	"GrepShards\x12\x1a.rill.v1.GrepShardsRequest\x1a\x1b.rill.v1.GrepShardsResponse\x12N\n" +
+	"GrepShards\x12\x1a.rill.v1.GrepShardsRequest\x1a\x1b.rill.v1.GrepShardsResponse\x12H\n" +
+	"\vListSymbols\x12\x1b.rill.v1.ListSymbolsRequest\x1a\x1c.rill.v1.ListSymbolsResponse\x12T\n" +
+	"\x0fFindDefinitions\x12\x1f.rill.v1.FindDefinitionsRequest\x1a .rill.v1.FindDefinitionsResponse\x12Q\n" +
+	"\x0eFindReferences\x12\x1e.rill.v1.FindReferencesRequest\x1a\x1f.rill.v1.FindReferencesResponse\x12E\n" +
+	"\n" +
+	"UploadScip\x12\x1a.rill.v1.UploadScipRequest\x1a\x1b.rill.v1.UploadScipResponse\x12N\n" +
 	"\rFindMergeBase\x12\x1d.rill.v1.FindMergeBaseRequest\x1a\x1e.rill.v1.FindMergeBaseResponse\x12E\n" +
 	"\n" +
 	"IsAncestor\x12\x1a.rill.v1.IsAncestorRequest\x1a\x1b.rill.v1.IsAncestorResponseB\x8d\x01\n" +
@@ -2748,7 +3463,7 @@ func file_rill_v1_content_proto_rawDescGZIP() []byte {
 	return file_rill_v1_content_proto_rawDescData
 }
 
-var file_rill_v1_content_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_rill_v1_content_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
 var file_rill_v1_content_proto_goTypes = []any{
 	(*ReadFileRequest)(nil),           // 0: rill.v1.ReadFileRequest
 	(*ReadFileResponse)(nil),          // 1: rill.v1.ReadFileResponse
@@ -2783,86 +3498,107 @@ var file_rill_v1_content_proto_goTypes = []any{
 	(*GrepShardsRequest)(nil),         // 30: rill.v1.GrepShardsRequest
 	(*GrepShardsResponse)(nil),        // 31: rill.v1.GrepShardsResponse
 	(*GrepFile)(nil),                  // 32: rill.v1.GrepFile
-	(*GrepHit)(nil),                   // 33: rill.v1.GrepHit
-	(*FindMergeBaseRequest)(nil),      // 34: rill.v1.FindMergeBaseRequest
-	(*FindMergeBaseResponse)(nil),     // 35: rill.v1.FindMergeBaseResponse
-	(*IsAncestorRequest)(nil),         // 36: rill.v1.IsAncestorRequest
-	(*IsAncestorResponse)(nil),        // 37: rill.v1.IsAncestorResponse
-	nil,                               // 38: rill.v1.GrepResponse.DirectoriesEntry
-	nil,                               // 39: rill.v1.GrepResponse.LanguagesEntry
-	(*TreeEntry)(nil),                 // 40: rill.v1.TreeEntry
-	(*NamedTreeEntry)(nil),            // 41: rill.v1.NamedTreeEntry
-	(*Tree)(nil),                      // 42: rill.v1.Tree
-	(*ContentRef)(nil),                // 43: rill.v1.ContentRef
-	(ObjectKind)(0),                   // 44: rill.v1.ObjectKind
-	(DiffFormat)(0),                   // 45: rill.v1.DiffFormat
-	(*FileDiff)(nil),                  // 46: rill.v1.FileDiff
-	(*Principal)(nil),                 // 47: rill.v1.Principal
-	(*ChangeInfo)(nil),                // 48: rill.v1.ChangeInfo
-	(*FileChange)(nil),                // 49: rill.v1.FileChange
+	(*SymbolLocation)(nil),            // 33: rill.v1.SymbolLocation
+	(*ListSymbolsRequest)(nil),        // 34: rill.v1.ListSymbolsRequest
+	(*ListSymbolsResponse)(nil),       // 35: rill.v1.ListSymbolsResponse
+	(*FindDefinitionsRequest)(nil),    // 36: rill.v1.FindDefinitionsRequest
+	(*FindDefinitionsResponse)(nil),   // 37: rill.v1.FindDefinitionsResponse
+	(*FindReferencesRequest)(nil),     // 38: rill.v1.FindReferencesRequest
+	(*FindReferencesResponse)(nil),    // 39: rill.v1.FindReferencesResponse
+	(*UploadScipRequest)(nil),         // 40: rill.v1.UploadScipRequest
+	(*UploadScipResponse)(nil),        // 41: rill.v1.UploadScipResponse
+	(*GrepHit)(nil),                   // 42: rill.v1.GrepHit
+	(*FindMergeBaseRequest)(nil),      // 43: rill.v1.FindMergeBaseRequest
+	(*FindMergeBaseResponse)(nil),     // 44: rill.v1.FindMergeBaseResponse
+	(*IsAncestorRequest)(nil),         // 45: rill.v1.IsAncestorRequest
+	(*IsAncestorResponse)(nil),        // 46: rill.v1.IsAncestorResponse
+	nil,                               // 47: rill.v1.GrepResponse.DirectoriesEntry
+	nil,                               // 48: rill.v1.GrepResponse.LanguagesEntry
+	(*TreeEntry)(nil),                 // 49: rill.v1.TreeEntry
+	(*NamedTreeEntry)(nil),            // 50: rill.v1.NamedTreeEntry
+	(*Tree)(nil),                      // 51: rill.v1.Tree
+	(*ContentRef)(nil),                // 52: rill.v1.ContentRef
+	(ObjectKind)(0),                   // 53: rill.v1.ObjectKind
+	(DiffFormat)(0),                   // 54: rill.v1.DiffFormat
+	(*FileDiff)(nil),                  // 55: rill.v1.FileDiff
+	(*Principal)(nil),                 // 56: rill.v1.Principal
+	(*ChangeInfo)(nil),                // 57: rill.v1.ChangeInfo
+	(*FileChange)(nil),                // 58: rill.v1.FileChange
 }
 var file_rill_v1_content_proto_depIdxs = []int32{
-	40, // 0: rill.v1.ReadFileResponse.entry:type_name -> rill.v1.TreeEntry
+	49, // 0: rill.v1.ReadFileResponse.entry:type_name -> rill.v1.TreeEntry
 	1,  // 1: rill.v1.BatchReadFilesResponse.files:type_name -> rill.v1.ReadFileResponse
-	40, // 2: rill.v1.StatResponse.entry:type_name -> rill.v1.TreeEntry
-	41, // 3: rill.v1.ListDirectoryResponse.entries:type_name -> rill.v1.NamedTreeEntry
-	42, // 4: rill.v1.GetTreeResponse.tree:type_name -> rill.v1.Tree
-	43, // 5: rill.v1.ReadBlobRequest.content:type_name -> rill.v1.ContentRef
+	49, // 2: rill.v1.StatResponse.entry:type_name -> rill.v1.TreeEntry
+	50, // 3: rill.v1.ListDirectoryResponse.entries:type_name -> rill.v1.NamedTreeEntry
+	51, // 4: rill.v1.GetTreeResponse.tree:type_name -> rill.v1.Tree
+	52, // 5: rill.v1.ReadBlobRequest.content:type_name -> rill.v1.ContentRef
 	13, // 6: rill.v1.WriteBlobRequest.header:type_name -> rill.v1.WriteBlobHeader
-	43, // 7: rill.v1.WriteBlobResponse.content:type_name -> rill.v1.ContentRef
+	52, // 7: rill.v1.WriteBlobResponse.content:type_name -> rill.v1.ContentRef
 	16, // 8: rill.v1.BatchCheckObjectsRequest.objects:type_name -> rill.v1.ObjectRef
-	44, // 9: rill.v1.ObjectRef.kind:type_name -> rill.v1.ObjectKind
-	45, // 10: rill.v1.DiffRequest.format:type_name -> rill.v1.DiffFormat
-	46, // 11: rill.v1.DiffResponse.files:type_name -> rill.v1.FileDiff
+	53, // 9: rill.v1.ObjectRef.kind:type_name -> rill.v1.ObjectKind
+	54, // 10: rill.v1.DiffRequest.format:type_name -> rill.v1.DiffFormat
+	55, // 11: rill.v1.DiffResponse.files:type_name -> rill.v1.FileDiff
 	22, // 12: rill.v1.BlameResponse.lines:type_name -> rill.v1.BlameLine
-	47, // 13: rill.v1.BlameLine.author:type_name -> rill.v1.Principal
-	48, // 14: rill.v1.ListHistoryResponse.versions:type_name -> rill.v1.ChangeInfo
+	56, // 13: rill.v1.BlameLine.author:type_name -> rill.v1.Principal
+	57, // 14: rill.v1.ListHistoryResponse.versions:type_name -> rill.v1.ChangeInfo
 	27, // 15: rill.v1.ListPathHistoryResponse.entries:type_name -> rill.v1.PathHistoryEntry
-	48, // 16: rill.v1.PathHistoryEntry.version:type_name -> rill.v1.ChangeInfo
-	49, // 17: rill.v1.PathHistoryEntry.change:type_name -> rill.v1.FileChange
-	33, // 18: rill.v1.GrepResponse.hits:type_name -> rill.v1.GrepHit
-	38, // 19: rill.v1.GrepResponse.directories:type_name -> rill.v1.GrepResponse.DirectoriesEntry
-	39, // 20: rill.v1.GrepResponse.languages:type_name -> rill.v1.GrepResponse.LanguagesEntry
+	57, // 16: rill.v1.PathHistoryEntry.version:type_name -> rill.v1.ChangeInfo
+	58, // 17: rill.v1.PathHistoryEntry.change:type_name -> rill.v1.FileChange
+	42, // 18: rill.v1.GrepResponse.hits:type_name -> rill.v1.GrepHit
+	47, // 19: rill.v1.GrepResponse.directories:type_name -> rill.v1.GrepResponse.DirectoriesEntry
+	48, // 20: rill.v1.GrepResponse.languages:type_name -> rill.v1.GrepResponse.LanguagesEntry
 	28, // 21: rill.v1.GrepShardsRequest.grep:type_name -> rill.v1.GrepRequest
 	32, // 22: rill.v1.GrepShardsResponse.files:type_name -> rill.v1.GrepFile
-	33, // 23: rill.v1.GrepFile.hits:type_name -> rill.v1.GrepHit
-	0,  // 24: rill.v1.ContentService.ReadFile:input_type -> rill.v1.ReadFileRequest
-	2,  // 25: rill.v1.ContentService.BatchReadFiles:input_type -> rill.v1.BatchReadFilesRequest
-	4,  // 26: rill.v1.ContentService.Stat:input_type -> rill.v1.StatRequest
-	6,  // 27: rill.v1.ContentService.ListDirectory:input_type -> rill.v1.ListDirectoryRequest
-	8,  // 28: rill.v1.ContentService.GetTree:input_type -> rill.v1.GetTreeRequest
-	10, // 29: rill.v1.ContentService.ReadBlob:input_type -> rill.v1.ReadBlobRequest
-	12, // 30: rill.v1.ContentService.WriteBlob:input_type -> rill.v1.WriteBlobRequest
-	15, // 31: rill.v1.ContentService.BatchCheckObjects:input_type -> rill.v1.BatchCheckObjectsRequest
-	18, // 32: rill.v1.ContentService.Diff:input_type -> rill.v1.DiffRequest
-	20, // 33: rill.v1.ContentService.Blame:input_type -> rill.v1.BlameRequest
-	23, // 34: rill.v1.ContentService.ListHistory:input_type -> rill.v1.ListHistoryRequest
-	25, // 35: rill.v1.ContentService.ListPathHistory:input_type -> rill.v1.ListPathHistoryRequest
-	28, // 36: rill.v1.ContentService.Grep:input_type -> rill.v1.GrepRequest
-	30, // 37: rill.v1.ContentService.GrepShards:input_type -> rill.v1.GrepShardsRequest
-	34, // 38: rill.v1.ContentService.FindMergeBase:input_type -> rill.v1.FindMergeBaseRequest
-	36, // 39: rill.v1.ContentService.IsAncestor:input_type -> rill.v1.IsAncestorRequest
-	1,  // 40: rill.v1.ContentService.ReadFile:output_type -> rill.v1.ReadFileResponse
-	3,  // 41: rill.v1.ContentService.BatchReadFiles:output_type -> rill.v1.BatchReadFilesResponse
-	5,  // 42: rill.v1.ContentService.Stat:output_type -> rill.v1.StatResponse
-	7,  // 43: rill.v1.ContentService.ListDirectory:output_type -> rill.v1.ListDirectoryResponse
-	9,  // 44: rill.v1.ContentService.GetTree:output_type -> rill.v1.GetTreeResponse
-	11, // 45: rill.v1.ContentService.ReadBlob:output_type -> rill.v1.ReadBlobResponse
-	14, // 46: rill.v1.ContentService.WriteBlob:output_type -> rill.v1.WriteBlobResponse
-	17, // 47: rill.v1.ContentService.BatchCheckObjects:output_type -> rill.v1.BatchCheckObjectsResponse
-	19, // 48: rill.v1.ContentService.Diff:output_type -> rill.v1.DiffResponse
-	21, // 49: rill.v1.ContentService.Blame:output_type -> rill.v1.BlameResponse
-	24, // 50: rill.v1.ContentService.ListHistory:output_type -> rill.v1.ListHistoryResponse
-	26, // 51: rill.v1.ContentService.ListPathHistory:output_type -> rill.v1.ListPathHistoryResponse
-	29, // 52: rill.v1.ContentService.Grep:output_type -> rill.v1.GrepResponse
-	31, // 53: rill.v1.ContentService.GrepShards:output_type -> rill.v1.GrepShardsResponse
-	35, // 54: rill.v1.ContentService.FindMergeBase:output_type -> rill.v1.FindMergeBaseResponse
-	37, // 55: rill.v1.ContentService.IsAncestor:output_type -> rill.v1.IsAncestorResponse
-	40, // [40:56] is the sub-list for method output_type
-	24, // [24:40] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	42, // 23: rill.v1.GrepFile.hits:type_name -> rill.v1.GrepHit
+	33, // 24: rill.v1.ListSymbolsResponse.symbols:type_name -> rill.v1.SymbolLocation
+	33, // 25: rill.v1.FindDefinitionsResponse.definitions:type_name -> rill.v1.SymbolLocation
+	33, // 26: rill.v1.FindReferencesResponse.references:type_name -> rill.v1.SymbolLocation
+	52, // 27: rill.v1.UploadScipRequest.index:type_name -> rill.v1.ContentRef
+	0,  // 28: rill.v1.ContentService.ReadFile:input_type -> rill.v1.ReadFileRequest
+	2,  // 29: rill.v1.ContentService.BatchReadFiles:input_type -> rill.v1.BatchReadFilesRequest
+	4,  // 30: rill.v1.ContentService.Stat:input_type -> rill.v1.StatRequest
+	6,  // 31: rill.v1.ContentService.ListDirectory:input_type -> rill.v1.ListDirectoryRequest
+	8,  // 32: rill.v1.ContentService.GetTree:input_type -> rill.v1.GetTreeRequest
+	10, // 33: rill.v1.ContentService.ReadBlob:input_type -> rill.v1.ReadBlobRequest
+	12, // 34: rill.v1.ContentService.WriteBlob:input_type -> rill.v1.WriteBlobRequest
+	15, // 35: rill.v1.ContentService.BatchCheckObjects:input_type -> rill.v1.BatchCheckObjectsRequest
+	18, // 36: rill.v1.ContentService.Diff:input_type -> rill.v1.DiffRequest
+	20, // 37: rill.v1.ContentService.Blame:input_type -> rill.v1.BlameRequest
+	23, // 38: rill.v1.ContentService.ListHistory:input_type -> rill.v1.ListHistoryRequest
+	25, // 39: rill.v1.ContentService.ListPathHistory:input_type -> rill.v1.ListPathHistoryRequest
+	28, // 40: rill.v1.ContentService.Grep:input_type -> rill.v1.GrepRequest
+	30, // 41: rill.v1.ContentService.GrepShards:input_type -> rill.v1.GrepShardsRequest
+	34, // 42: rill.v1.ContentService.ListSymbols:input_type -> rill.v1.ListSymbolsRequest
+	36, // 43: rill.v1.ContentService.FindDefinitions:input_type -> rill.v1.FindDefinitionsRequest
+	38, // 44: rill.v1.ContentService.FindReferences:input_type -> rill.v1.FindReferencesRequest
+	40, // 45: rill.v1.ContentService.UploadScip:input_type -> rill.v1.UploadScipRequest
+	43, // 46: rill.v1.ContentService.FindMergeBase:input_type -> rill.v1.FindMergeBaseRequest
+	45, // 47: rill.v1.ContentService.IsAncestor:input_type -> rill.v1.IsAncestorRequest
+	1,  // 48: rill.v1.ContentService.ReadFile:output_type -> rill.v1.ReadFileResponse
+	3,  // 49: rill.v1.ContentService.BatchReadFiles:output_type -> rill.v1.BatchReadFilesResponse
+	5,  // 50: rill.v1.ContentService.Stat:output_type -> rill.v1.StatResponse
+	7,  // 51: rill.v1.ContentService.ListDirectory:output_type -> rill.v1.ListDirectoryResponse
+	9,  // 52: rill.v1.ContentService.GetTree:output_type -> rill.v1.GetTreeResponse
+	11, // 53: rill.v1.ContentService.ReadBlob:output_type -> rill.v1.ReadBlobResponse
+	14, // 54: rill.v1.ContentService.WriteBlob:output_type -> rill.v1.WriteBlobResponse
+	17, // 55: rill.v1.ContentService.BatchCheckObjects:output_type -> rill.v1.BatchCheckObjectsResponse
+	19, // 56: rill.v1.ContentService.Diff:output_type -> rill.v1.DiffResponse
+	21, // 57: rill.v1.ContentService.Blame:output_type -> rill.v1.BlameResponse
+	24, // 58: rill.v1.ContentService.ListHistory:output_type -> rill.v1.ListHistoryResponse
+	26, // 59: rill.v1.ContentService.ListPathHistory:output_type -> rill.v1.ListPathHistoryResponse
+	29, // 60: rill.v1.ContentService.Grep:output_type -> rill.v1.GrepResponse
+	31, // 61: rill.v1.ContentService.GrepShards:output_type -> rill.v1.GrepShardsResponse
+	35, // 62: rill.v1.ContentService.ListSymbols:output_type -> rill.v1.ListSymbolsResponse
+	37, // 63: rill.v1.ContentService.FindDefinitions:output_type -> rill.v1.FindDefinitionsResponse
+	39, // 64: rill.v1.ContentService.FindReferences:output_type -> rill.v1.FindReferencesResponse
+	41, // 65: rill.v1.ContentService.UploadScip:output_type -> rill.v1.UploadScipResponse
+	44, // 66: rill.v1.ContentService.FindMergeBase:output_type -> rill.v1.FindMergeBaseResponse
+	46, // 67: rill.v1.ContentService.IsAncestor:output_type -> rill.v1.IsAncestorResponse
+	48, // [48:68] is the sub-list for method output_type
+	28, // [28:48] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_content_proto_init() }
@@ -2886,7 +3622,7 @@ func file_rill_v1_content_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_content_proto_rawDesc), len(file_rill_v1_content_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   40,
+			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

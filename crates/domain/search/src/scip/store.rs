@@ -63,8 +63,9 @@ impl LoadedScip {
 pub struct ScipLocation {
     pub path: RepoPathBuf,
     pub occurrence: ScipOccurrence,
-    /// The full SCIP symbol.
+    /// The full SCIP symbol, and its short name.
     pub symbol: String,
+    pub name: String,
 }
 
 /// The SCIP index that applies to one scope.
@@ -91,6 +92,7 @@ impl ScipView {
                     path: doc.path.clone(),
                     occurrence: occ,
                     symbol: self.loaded.index.symbols[symbol as usize].clone(),
+                    name: self.loaded.index.names[symbol as usize].clone(),
                 });
             }
         }

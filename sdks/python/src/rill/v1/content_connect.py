@@ -59,6 +59,18 @@ class ContentService(Protocol):
     async def grep_shards(self, request: rill_dot_v1_dot_content__pb2.GrepShardsRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.GrepShardsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def list_symbols(self, request: rill_dot_v1_dot_content__pb2.ListSymbolsRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.ListSymbolsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def find_definitions(self, request: rill_dot_v1_dot_content__pb2.FindDefinitionsRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.FindDefinitionsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def find_references(self, request: rill_dot_v1_dot_content__pb2.FindReferencesRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.FindReferencesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def upload_scip(self, request: rill_dot_v1_dot_content__pb2.UploadScipRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.UploadScipResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def find_merge_base(self, request: rill_dot_v1_dot_content__pb2.FindMergeBaseRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.FindMergeBaseResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -210,6 +222,46 @@ class ContentServiceASGIApplication(ConnectASGIApplication[ContentService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.grep_shards,
+                ),
+                "/rill.v1.ContentService/ListSymbols": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListSymbols",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.ListSymbolsRequest,
+                        output=rill_dot_v1_dot_content__pb2.ListSymbolsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_symbols,
+                ),
+                "/rill.v1.ContentService/FindDefinitions": Endpoint.unary(
+                    method=MethodInfo(
+                        name="FindDefinitions",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.FindDefinitionsRequest,
+                        output=rill_dot_v1_dot_content__pb2.FindDefinitionsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.find_definitions,
+                ),
+                "/rill.v1.ContentService/FindReferences": Endpoint.unary(
+                    method=MethodInfo(
+                        name="FindReferences",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.FindReferencesRequest,
+                        output=rill_dot_v1_dot_content__pb2.FindReferencesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.find_references,
+                ),
+                "/rill.v1.ContentService/UploadScip": Endpoint.unary(
+                    method=MethodInfo(
+                        name="UploadScip",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.UploadScipRequest,
+                        output=rill_dot_v1_dot_content__pb2.UploadScipResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.upload_scip,
                 ),
                 "/rill.v1.ContentService/FindMergeBase": Endpoint.unary(
                     method=MethodInfo(
@@ -524,6 +576,86 @@ class ContentServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def list_symbols(
+        self,
+        request: rill_dot_v1_dot_content__pb2.ListSymbolsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.ListSymbolsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListSymbols",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.ListSymbolsRequest,
+                output=rill_dot_v1_dot_content__pb2.ListSymbolsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def find_definitions(
+        self,
+        request: rill_dot_v1_dot_content__pb2.FindDefinitionsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.FindDefinitionsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="FindDefinitions",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.FindDefinitionsRequest,
+                output=rill_dot_v1_dot_content__pb2.FindDefinitionsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def find_references(
+        self,
+        request: rill_dot_v1_dot_content__pb2.FindReferencesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.FindReferencesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="FindReferences",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.FindReferencesRequest,
+                output=rill_dot_v1_dot_content__pb2.FindReferencesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def upload_scip(
+        self,
+        request: rill_dot_v1_dot_content__pb2.UploadScipRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.UploadScipResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="UploadScip",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.UploadScipRequest,
+                output=rill_dot_v1_dot_content__pb2.UploadScipResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def find_merge_base(
         self,
         request: rill_dot_v1_dot_content__pb2.FindMergeBaseRequest,
@@ -593,6 +725,14 @@ class ContentServiceSync(Protocol):
     def grep(self, request: rill_dot_v1_dot_content__pb2.GrepRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.GrepResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def grep_shards(self, request: rill_dot_v1_dot_content__pb2.GrepShardsRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.GrepShardsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_symbols(self, request: rill_dot_v1_dot_content__pb2.ListSymbolsRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.ListSymbolsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def find_definitions(self, request: rill_dot_v1_dot_content__pb2.FindDefinitionsRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.FindDefinitionsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def find_references(self, request: rill_dot_v1_dot_content__pb2.FindReferencesRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.FindReferencesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def upload_scip(self, request: rill_dot_v1_dot_content__pb2.UploadScipRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.UploadScipResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def find_merge_base(self, request: rill_dot_v1_dot_content__pb2.FindMergeBaseRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.FindMergeBaseResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -743,6 +883,46 @@ class ContentServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.grep_shards,
+                ),
+                "/rill.v1.ContentService/ListSymbols": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListSymbols",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.ListSymbolsRequest,
+                        output=rill_dot_v1_dot_content__pb2.ListSymbolsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_symbols,
+                ),
+                "/rill.v1.ContentService/FindDefinitions": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="FindDefinitions",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.FindDefinitionsRequest,
+                        output=rill_dot_v1_dot_content__pb2.FindDefinitionsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.find_definitions,
+                ),
+                "/rill.v1.ContentService/FindReferences": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="FindReferences",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.FindReferencesRequest,
+                        output=rill_dot_v1_dot_content__pb2.FindReferencesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.find_references,
+                ),
+                "/rill.v1.ContentService/UploadScip": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="UploadScip",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.UploadScipRequest,
+                        output=rill_dot_v1_dot_content__pb2.UploadScipResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.upload_scip,
                 ),
                 "/rill.v1.ContentService/FindMergeBase": EndpointSync.unary(
                     method=MethodInfo(
@@ -1051,6 +1231,86 @@ class ContentServiceClientSync(ConnectClientSync):
                 service_name="rill.v1.ContentService",
                 input=rill_dot_v1_dot_content__pb2.GrepShardsRequest,
                 output=rill_dot_v1_dot_content__pb2.GrepShardsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_symbols(
+        self,
+        request: rill_dot_v1_dot_content__pb2.ListSymbolsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.ListSymbolsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListSymbols",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.ListSymbolsRequest,
+                output=rill_dot_v1_dot_content__pb2.ListSymbolsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def find_definitions(
+        self,
+        request: rill_dot_v1_dot_content__pb2.FindDefinitionsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.FindDefinitionsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="FindDefinitions",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.FindDefinitionsRequest,
+                output=rill_dot_v1_dot_content__pb2.FindDefinitionsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def find_references(
+        self,
+        request: rill_dot_v1_dot_content__pb2.FindReferencesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.FindReferencesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="FindReferences",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.FindReferencesRequest,
+                output=rill_dot_v1_dot_content__pb2.FindReferencesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def upload_scip(
+        self,
+        request: rill_dot_v1_dot_content__pb2.UploadScipRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.UploadScipResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="UploadScip",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.UploadScipRequest,
+                output=rill_dot_v1_dot_content__pb2.UploadScipResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

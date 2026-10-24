@@ -1,4 +1,4 @@
-//! The tools: a dozen task-level operations (read, search, edit, check,
+//! The tools: fourteen task-level operations (read, search, edit, check,
 //! commit, review, land, …) rather than one per RPC, each fitted to a
 //! response budget and ending with the next step.
 
@@ -23,6 +23,7 @@ mod root;
 mod schema;
 mod search;
 mod status;
+mod symbols;
 mod sync;
 mod watch;
 

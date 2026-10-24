@@ -14,6 +14,7 @@ mod review;
 mod reviewers;
 mod root;
 mod search;
+mod symbols;
 mod trunk;
 mod workspace;
 
@@ -42,6 +43,7 @@ pub use reviewers::{
 };
 pub use root::{LogStart, Root};
 pub use search::{GrepHit, GrepQuery, GrepResult};
+pub use symbols::{ReferenceTarget, References, ScipUpload, SymbolLocation};
 pub use trunk::{
     BisectResult, DerivedBytes, Landing, NewVerification, RevertResult, RevertSelector,
     TrunkStatus, VerificationRecord, VerificationReport, VerificationStatus,

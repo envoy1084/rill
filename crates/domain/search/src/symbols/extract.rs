@@ -23,6 +23,48 @@ pub enum SymbolKind {
     Other,
 }
 
+impl SymbolKind {
+    const ALL: [SymbolKind; 12] = [
+        SymbolKind::Function,
+        SymbolKind::Class,
+        SymbolKind::Struct,
+        SymbolKind::Enum,
+        SymbolKind::Trait,
+        SymbolKind::Impl,
+        SymbolKind::Interface,
+        SymbolKind::Module,
+        SymbolKind::Const,
+        SymbolKind::Static,
+        SymbolKind::Type,
+        SymbolKind::Other,
+    ];
+
+    /// The kind's lowercase name (`function`, `class`, …).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SymbolKind::Function => "function",
+            SymbolKind::Class => "class",
+            SymbolKind::Struct => "struct",
+            SymbolKind::Enum => "enum",
+            SymbolKind::Trait => "trait",
+            SymbolKind::Impl => "impl",
+            SymbolKind::Interface => "interface",
+            SymbolKind::Module => "module",
+            SymbolKind::Const => "const",
+            SymbolKind::Static => "static",
+            SymbolKind::Type => "type",
+            SymbolKind::Other => "other",
+        }
+    }
+
+    /// The kind [`SymbolKind::as_str`] names (case-insensitive).
+    pub fn parse(name: &str) -> Option<SymbolKind> {
+        Self::ALL
+            .into_iter()
+            .find(|k| k.as_str().eq_ignore_ascii_case(name))
+    }
+}
+
 /// A definition found in a file.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Symbol {

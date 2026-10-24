@@ -42,6 +42,16 @@ service ContentService {
   // One server's part of a Grep: the matched files of the shards named,
   // ranked but not merged. Servers call it on each other; clients use Grep.
   rpc GrepShards(GrepShardsRequest) returns (GrepShardsResponse);
+  // Symbols of one file, or symbols whose names contain a string.
+  rpc ListSymbols(ListSymbolsRequest) returns (ListSymbolsResponse);
+  // Where a name is defined: from an uploaded SCIP index when one covers
+  // the file, else from the symbols extracted at indexing.
+  rpc FindDefinitions(FindDefinitionsRequest) returns (FindDefinitionsResponse);
+  // Uses of a symbol: precise from a SCIP index when one covers it, else
+  // whole-word matches of its name.
+  rpc FindReferences(FindReferencesRequest) returns (FindReferencesResponse);
+  // Attach a SCIP index (written with WriteBlob) to a revision.
+  rpc UploadScip(UploadScipRequest) returns (UploadScipResponse);
   // The merge bases of two revisions.
   rpc FindMergeBase(FindMergeBaseRequest) returns (FindMergeBaseResponse);
   // Whether one revision is an ancestor of another.
@@ -269,6 +279,9 @@ message GrepRequest {
   // Wait until trunk is indexed through this position (up to 30 s), so
   // a search sees a landing the caller just made.
   optional uint64 min_seq = 10;
+  // `pattern` is an ast-grep structural pattern (`foo($A, $$$REST)`);
+  // `languages` must name exactly one language.
+  bool structural = 11;
 }
 message GrepResponse {
   // Best files first (definitions, source over vendored or test code,
@@ -304,6 +317,84 @@ message GrepFile {
   string path = 1;
   int32 score = 2;
   repeated GrepHit hits = 3;
+}
+// A symbol definition, or a use of one.
+message SymbolLocation {
+  string path = 1;
+  // 1-based.
+  uint32 line = 2;
+  string name = 3;
+  // `function`, `class`, `struct`, … (empty for a use).
+  string kind = 4;
+  // 0-based byte columns on the line, when known (SCIP).
+  uint32 start_column = 5;
+  uint32 end_column = 6;
+  // From a SCIP index rather than extraction or text.
+  bool precise = 7;
+  // The location defines the symbol (references only).
+  bool definition = 8;
+  // The SCIP symbol, when precise.
+  string symbol = 9;
+}
+message ListSymbolsRequest {
+  // `orgs/{org}/repos/{repo}`. Required.
+  string repo = 1;
+  string revision = 2;
+  // The symbols of this file; or, when empty, those named like `query`.
+  string path = 3;
+  // Case-insensitive substring of symbol names.
+  string query = 4;
+  // Only these kinds; empty is all.
+  repeated string kinds = 5;
+  // Most symbols; 0 means 1,000.
+  uint32 max_results = 6;
+}
+message ListSymbolsResponse {
+  repeated SymbolLocation symbols = 1;
+}
+message FindDefinitionsRequest {
+  string repo = 1;
+  string revision = 2;
+  // Exact symbol name. Required.
+  string name = 3;
+  // Most definitions; 0 means 100.
+  uint32 max_results = 4;
+}
+message FindDefinitionsResponse {
+  repeated SymbolLocation definitions = 1;
+}
+message FindReferencesRequest {
+  string repo = 1;
+  string revision = 2;
+  // The symbol's name; or leave empty and give a position.
+  string name = 3;
+  // The symbol at this file position (1-based line, 0-based column).
+  string path = 4;
+  uint32 line = 5;
+  uint32 column = 6;
+  // Most references; 0 means 1,000.
+  uint32 max_results = 7;
+}
+message FindReferencesResponse {
+  repeated SymbolLocation references = 1;
+  // Every reference came from a SCIP index.
+  bool precise = 2;
+  // More references exist than were returned.
+  bool truncated = 3;
+}
+message UploadScipRequest {
+  string repo = 1;
+  // The revision the index was built from.
+  string revision = 2;
+  // The encoded SCIP `Index`, written with WriteBlob.
+  ContentRef index = 3;
+  // The directory the index's paths are relative to; empty for the root.
+  string prefix = 4;
+}
+message UploadScipResponse {
+  // Files of the revision the index covers, and occurrences kept.
+  uint32 files = 1;
+  uint64 occurrences = 2;
 }
 message GrepHit {
   string path = 1;

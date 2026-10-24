@@ -25,6 +25,9 @@ pub struct GrepQuery {
     pub languages: Vec<String>,
     /// Wait until trunk is indexed through this position.
     pub min_seq: Option<u64>,
+    /// `pattern` is an ast-grep structural pattern; set exactly one
+    /// language.
+    pub structural: bool,
 }
 
 impl GrepQuery {
@@ -39,7 +42,16 @@ impl GrepQuery {
             literal: false,
             languages: Vec::new(),
             min_seq: None,
+            structural: false,
         }
+    }
+
+    /// Match `pattern` as an ast-grep structural pattern
+    /// (`foo($A, $$$REST)`) in the one language set with
+    /// [`GrepQuery::language`].
+    pub fn structural(mut self, yes: bool) -> Self {
+        self.structural = yes;
+        self
     }
 
     /// Match literally.

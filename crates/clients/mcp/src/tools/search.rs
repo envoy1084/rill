@@ -1,5 +1,5 @@
-//! `rill_search`: regex search over a root, served from the server's
-//! index and fitted to the response budget.
+//! `rill_search`: regex, literal or structural search over a root, served
+//! from the server's index and fitted to the response budget.
 
 use rill_sdk::GrepQuery;
 use serde_json::{json, Value};
@@ -19,13 +19,16 @@ const MAX_HITS: u32 = 1_000;
 pub fn definition() -> ToolDef {
     ToolDef {
         name: "rill_search",
-        description: "Search file contents with a regular expression (Rust syntax). Searches the session's change by default, else trunk. Returns matching lines with optional context; cut to `max_tokens` with a next_cursor.",
+        description: "Search file contents with a regular expression (Rust syntax), a literal string, or an ast-grep structural pattern (`foo($A, $$$REST)`, with one `language`). Searches the session's change by default, else trunk. Returns matching lines, best files first, with optional context; cut to `max_tokens` with a next_cursor.",
         input_schema: budget::props(
             Props::repo()
                 .req("pattern", string("Regular expression"))
                 .opt("path", string("Only under this directory"))
                 .opt("glob", string("Only files matching this glob, e.g. `*.rs`"))
                 .opt("ignore_case", boolean("Case-insensitive matching"))
+                .opt("literal", boolean("Match `pattern` as a literal string"))
+                .opt("structural", boolean("`pattern` is an ast-grep structural pattern; needs `language`"))
+                .opt("language", string("Only files in this language (`rust`, `python`, …)"))
                 .opt("context", integer("Lines of context around each match (default 0)"))
                 .opt("at", root("Root to search"))
                 .change(),
@@ -40,8 +43,13 @@ pub async fn call(ctx: &ToolContext, args: &Args) -> ToolResult<Value> {
     let root = read_root(ctx, &repo, args).await?;
     let mut query = GrepQuery::new(args.str("pattern")?)
         .case_insensitive(args.bool_or("ignore_case", false)?)
+        .literal(args.bool_or("literal", false)?)
+        .structural(args.bool_or("structural", false)?)
         .context_lines(args.limit("context", 0)?.min(20))
         .max_results(MAX_HITS);
+    if let Some(lang) = args.opt_string("language")? {
+        query = query.language(lang);
+    }
     if let Some(glob) = args.opt_string("glob")? {
         query = query.glob(glob);
     }

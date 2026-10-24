@@ -16,7 +16,7 @@ async fn an_agent_reads_edits_checks_commits_reviews_and_lands() {
         .iter()
         .filter_map(|t| t["name"].as_str())
         .collect();
-    assert_eq!(names.len(), 13, "{names:?}");
+    assert_eq!(names.len(), 14, "{names:?}");
 
     let context = s.call("rill_context", json!({})).await;
     assert!(context["change"].is_null(), "{context}");

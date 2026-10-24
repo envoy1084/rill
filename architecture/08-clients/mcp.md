@@ -8,7 +8,7 @@ framing, `initialize` and version negotiation, `ping`, cancellation,
 subscriptions and both transports. Rill implements only `ServerHandler`
 ([`server.rs`](../../crates/clients/mcp/src/server.rs)).
 
-The tools are task-level, not one per RPC. There are thirteen of them, and
+The tools are task-level, not one per RPC. There are fourteen of them, and
 each:
 
 - defaults to the session's current change;
@@ -40,7 +40,8 @@ sequenceDiagram
 | --- | --- |
 | `rill_context` | Start here. Returns who you are, the repository, the trunk head and how many changes are landing, the session's change with its review status, the next step, and the workflow. |
 | `rill_read` | Reads by `mode`: `content` (line ranges), `list`, `history`, `blame` or `diff`, over a batch of `paths`. |
-| `rill_search` | Regex search (server `Grep`) with path, glob, case and context options. |
+| `rill_search` | Search (server `Grep`): regex, `literal` or `structural` (ast-grep, one `language`), with path, glob, case and context options. |
+| `rill_symbols` | Code navigation by `find`: `definitions` of a name, `references` to a name or a file position (precise with an uploaded SCIP index, else whole-word text), or `symbols` of a file or matching a name. |
 | `rill_edit` | Applies `set`, `delete`, `patch` and `move` edits. With no current change it starts one on `base` (default trunk). Otherwise it amends the current change, keeping its earlier edits. |
 | `rill_check` | Reports conflicted paths and the verification runs of the current version, each failing step with the tail of its log. `wait_seconds` waits for running checks. |
 | `rill_commit` | Sets the final message, links an intent, and submits for review (by default). Returns the submit decision. It is idempotent once the change is submitted. |
