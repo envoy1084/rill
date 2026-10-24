@@ -36,7 +36,6 @@ pub struct IndexStats {
 }
 
 /// A blob to index: its content and a path that names its language.
-#[derive(Clone)]
 struct Todo {
     path: RepoPathBuf,
     content: ContentRef,
@@ -178,15 +177,19 @@ impl SearchIndex {
             .filter(|t| unique.insert(t.content.content_hash()))
             .collect();
         let mut fresh = Vec::new();
-        for batch in todo.chunks(MARKER_BATCH) {
+        let mut todo = todo.into_iter();
+        loop {
+            let batch: Vec<Todo> = todo.by_ref().take(MARKER_BATCH).collect();
+            if batch.is_empty() {
+                break;
+            }
             let hashes: Vec<ObjectHash> = batch.iter().map(|t| t.content.content_hash()).collect();
             let known = records::markers(&self.repo, &hashes).await?;
             fresh.extend(
                 batch
-                    .iter()
+                    .into_iter()
                     .zip(known)
-                    .filter(|(_, k)| k.is_none())
-                    .map(|(t, _)| t.clone()),
+                    .filter_map(|(t, k)| k.is_none().then_some(t)),
             );
         }
         let shards = self.config.shards.max(1) as usize;
