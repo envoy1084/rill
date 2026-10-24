@@ -1,42 +1,68 @@
 //! A root's files as queries see them: a base map plus the overlay of
 //! every delta above it.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use rill_types::{FileKind, ObjectHash, RepoPath, RepoPathBuf};
 
+use super::hasher::ContentMap;
 use super::layer::{PathChange, PathEntry};
 
 /// A base map and the index from content to the paths holding it.
 #[derive(Debug, Default)]
 pub struct BaseMap {
     entries: Vec<PathEntry>,
-    /// `(content, entry)` sorted by content: one compact array rather than
-    /// a map of lists, which at ten million files cost a gigabyte.
-    by_hash: Vec<(ObjectHash, u32)>,
+    /// Each content's first entry; a map of lists cost a gigabyte at ten
+    /// million files, and most contents sit at one path.
+    first: ContentMap<u32>,
+    /// The further entries of contents at several paths.
+    more: ContentMap<Vec<u32>>,
 }
 
 impl BaseMap {
     pub fn new(mut entries: Vec<PathEntry>) -> BaseMap {
         entries.sort_by(|a, b| a.path.cmp(&b.path));
-        let mut by_hash: Vec<(ObjectHash, u32)> = entries
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (e.hash, i as u32))
-            .collect();
-        by_hash.sort_unstable();
-        BaseMap { entries, by_hash }
+        let mut first = ContentMap::default();
+        first.reserve(entries.len());
+        let mut more: ContentMap<Vec<u32>> = ContentMap::default();
+        for (i, e) in entries.iter().enumerate() {
+            if first.try_insert_first(e.hash, i as u32) {
+                continue;
+            }
+            more.entry(e.hash).or_default().push(i as u32);
+        }
+        BaseMap {
+            entries,
+            first,
+            more,
+        }
     }
 
     /// The entries holding `hash`.
     fn holding(&self, hash: &ObjectHash) -> impl Iterator<Item = &PathEntry> {
-        let hash = *hash;
-        let start = self.by_hash.partition_point(|(h, _)| *h < hash);
-        self.by_hash[start..]
-            .iter()
-            .take_while(move |(h, _)| *h == hash)
-            .map(|&(_, i)| &self.entries[i as usize])
+        self.first
+            .get(hash)
+            .into_iter()
+            .chain(self.more.get(hash).into_iter().flatten())
+            .map(|&i| &self.entries[i as usize])
+    }
+}
+
+trait InsertFirst {
+    /// Insert unless the key is present; whether it was inserted.
+    fn try_insert_first(&mut self, hash: ObjectHash, entry: u32) -> bool;
+}
+
+impl InsertFirst for ContentMap<u32> {
+    fn try_insert_first(&mut self, hash: ObjectHash, entry: u32) -> bool {
+        match self.entry(hash) {
+            std::collections::hash_map::Entry::Occupied(_) => false,
+            std::collections::hash_map::Entry::Vacant(v) => {
+                v.insert(entry);
+                true
+            }
+        }
     }
 }
 
@@ -47,7 +73,10 @@ pub struct PathView {
     /// Paths the deltas set (`Some`) or removed (`None`).
     overlay: Arc<BTreeMap<RepoPathBuf, Option<(ObjectHash, FileKind)>>>,
     /// The overlay's paths by content.
-    overlay_by_hash: Arc<HashMap<ObjectHash, Vec<RepoPathBuf>>>,
+    overlay_by_hash: Arc<ContentMap<Vec<RepoPathBuf>>>,
+    /// Base contents with a path the overlay replaces: only their paths
+    /// need checking against the overlay.
+    shadowed: Arc<ContentMap<()>>,
     /// How many deltas lie between this root and its base; 0 for a base.
     pub depth: u32,
 }
@@ -59,6 +88,7 @@ impl PathView {
             base: Arc::new(BaseMap::new(entries)),
             overlay: Arc::default(),
             overlay_by_hash: Arc::default(),
+            shadowed: Arc::default(),
             depth: 0,
         }
     }
@@ -69,16 +99,25 @@ impl PathView {
         for (path, state) in changes {
             overlay.insert(path.clone(), *state);
         }
-        let mut by_hash: HashMap<ObjectHash, Vec<RepoPathBuf>> = HashMap::new();
+        let mut by_hash: ContentMap<Vec<RepoPathBuf>> = ContentMap::default();
+        let mut shadowed: ContentMap<()> = ContentMap::default();
         for (path, state) in &overlay {
             if let Some((hash, _)) = state {
                 by_hash.entry(*hash).or_default().push(path.clone());
+            }
+            if let Ok(i) = self
+                .base
+                .entries
+                .binary_search_by(|e| e.path.as_path().cmp(path))
+            {
+                shadowed.insert(self.base.entries[i].hash, ());
             }
         }
         PathView {
             base: self.base.clone(),
             overlay: Arc::new(overlay),
             overlay_by_hash: Arc::new(by_hash),
+            shadowed: Arc::new(shadowed),
             depth: self.depth + 1,
         }
     }
@@ -97,27 +136,25 @@ impl PathView {
 
     /// Every path holding the content `hash`, in path order.
     pub fn paths_of(&self, hash: &ObjectHash) -> Vec<RepoPathBuf> {
-        let mut out: Vec<RepoPathBuf> = self
-            .base
-            .holding(hash)
-            .map(|e| &e.path)
-            .filter(|p| !self.overlay.contains_key(*p))
-            .cloned()
-            .collect();
-        if let Some(extra) = self.overlay_by_hash.get(hash) {
-            out.extend(extra.iter().cloned());
-        }
+        let mut out: Vec<RepoPathBuf> = self.paths(hash).cloned().collect();
         out.sort();
         out
     }
 
     /// Whether any path holds `hash`.
+    /// The paths holding `hash`, borrowed and unordered.
+    pub fn paths<'a>(&'a self, hash: &ObjectHash) -> impl Iterator<Item = &'a RepoPathBuf> + 'a {
+        let extra = self.overlay_by_hash.get(hash).into_iter().flatten();
+        let check = self.shadowed.contains_key(hash);
+        self.base
+            .holding(hash)
+            .map(|e| &e.path)
+            .filter(move |p| !check || !self.overlay.contains_key(*p))
+            .chain(extra)
+    }
+
     pub fn holds(&self, hash: &ObjectHash) -> bool {
-        self.overlay_by_hash.contains_key(hash)
-            || self
-                .base
-                .holding(hash)
-                .any(|e| !self.overlay.contains_key(&e.path))
+        self.paths(hash).next().is_some()
     }
 
     /// Every file, in path order.

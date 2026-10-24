@@ -2,6 +2,7 @@
 //! and small delta maps for the roots after it (one per landing), so a
 //! landing costs what it changed, not the size of the repository.
 
+mod hasher;
 mod layer;
 mod view;
 

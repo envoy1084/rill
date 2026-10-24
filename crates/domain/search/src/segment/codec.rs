@@ -10,6 +10,15 @@ pub fn compress(content: &[u8]) -> Result<Vec<u8>> {
     Ok(lz4_flex::block::compress(content))
 }
 
+/// Decompress one document's content of `len` bytes into `out`.
+pub fn decompress_into(raw: &[u8], len: usize, out: &mut Vec<u8>) -> Result<()> {
+    out.resize(len, 0);
+    let n = lz4_flex::block::decompress_into(raw, out)
+        .map_err(|e| Error::Codec(format!("content: {e}")))?;
+    out.truncate(n);
+    Ok(())
+}
+
 /// Decompress one document's content of `len` bytes.
 pub fn decompress(raw: &[u8], len: usize) -> Result<Vec<u8>> {
     lz4_flex::block::decompress(raw, len).map_err(|e| Error::Codec(format!("content: {e}")))

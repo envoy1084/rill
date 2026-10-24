@@ -38,6 +38,8 @@ impl<F: Fn(&RepoPath) -> bool + Send + Sync> PathFilter for F {}
 /// twice its share, and at least `MIN_SHARD_POOL`.
 const RANK_POOL: usize = 2;
 const MIN_SHARD_POOL: usize = 10;
+/// Candidates verified between checks of the time budget.
+const DEADLINE_EVERY: usize = 64;
 
 /// One matched file with its score, before the files are merged.
 struct FileMatch {
@@ -152,33 +154,28 @@ impl<F: PathFilter> Job<F> {
     /// The matched files of one shard's segments.
     fn shard(&self, segments: &[Arc<Segment>]) -> Result<(Vec<FileMatch>, bool)> {
         let mut out = Vec::new();
+        let mut content = Vec::new();
         for seg in segments {
             let candidates = seg.candidates(&self.plan)?;
             let docs: Box<dyn Iterator<Item = u32>> = match &candidates {
                 Candidates::All => Box::new(0..seg.docs().len() as u32),
                 Candidates::Docs(d) => Box::new(d.iter()),
             };
-            for doc in docs {
-                if Instant::now() > self.deadline {
+            for (n, doc) in docs.enumerate() {
+                if n % DEADLINE_EVERY == 0 && Instant::now() > self.deadline {
                     return Ok((out, true));
                 }
                 let hash = seg.docs()[doc as usize].hash;
-                if !self.view.holds(&hash) {
+                let Some(first) = self.view.paths(&hash).find(|p| self.wanted(p)) else {
+                    continue;
+                };
+                if self.redacted(&hash) {
                     continue;
                 }
-                let paths: Vec<RepoPathBuf> = self
-                    .view
-                    .paths_of(&hash)
-                    .into_iter()
-                    .filter(|p| self.wanted(p))
-                    .collect();
-                if paths.is_empty() || self.redacted(&hash) {
-                    continue;
-                }
-                let content = seg.content(doc)?;
+                seg.content_into(doc, &mut content)?;
                 let lines = scan_blob(
                     &self.matcher,
-                    paths[0].as_str(),
+                    first.as_str(),
                     &content,
                     self.query.context_lines,
                     self.query.max_results,
@@ -188,7 +185,10 @@ impl<F: PathFilter> Job<F> {
                 }
                 let defs: HashSet<u32> = seg.symbols(doc)?.into_iter().map(|s| s.line).collect();
                 let defines = lines.iter().any(|l| defs.contains(&l.0));
-                for path in &paths {
+                let mut paths: Vec<&RepoPathBuf> =
+                    self.view.paths(&hash).filter(|p| self.wanted(p)).collect();
+                paths.sort();
+                for path in paths {
                     out.push(self.rank(path, lines.clone(), defines));
                 }
                 if out.len() >= self.pool {

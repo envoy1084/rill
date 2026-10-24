@@ -122,6 +122,17 @@ impl Segment {
         super::codec::decompress(raw, d.len as usize)
     }
 
+    /// [`Segment::content`] into a buffer the caller reuses.
+    pub fn content_into(&self, doc: u32, out: &mut Vec<u8>) -> Result<()> {
+        let d = self
+            .header
+            .docs
+            .get(doc as usize)
+            .ok_or_else(|| corrupt("no such doc"))?;
+        let region = self.header.contents.slice(self.data())?;
+        super::codec::decompress_into(d.content.slice(region)?, d.len as usize, out)
+    }
+
     /// The symbols of blob `doc`.
     pub fn symbols(&self, doc: u32) -> Result<Vec<Symbol>> {
         let d = self

@@ -238,9 +238,7 @@ impl SearchIndex {
                     builders[shard].push(doc);
                     if builders[shard].raw_bytes() >= self.config.segment_bytes {
                         let full = std::mem::take(&mut builders[shard]);
-                        written
-                            .refs
-                            .push((shard, self.write_segment(full, 0).await?));
+                        written.refs.push((shard, self.write_segment(full).await?));
                         stats.segments_written += 1;
                     }
                 }
@@ -248,7 +246,7 @@ impl SearchIndex {
         }
         for (shard, b) in builders.into_iter().enumerate() {
             if !b.is_empty() {
-                written.refs.push((shard, self.write_segment(b, 0).await?));
+                written.refs.push((shard, self.write_segment(b).await?));
                 stats.segments_written += 1;
             }
         }
@@ -256,22 +254,13 @@ impl SearchIndex {
     }
 
     /// Build and store one segment.
-    pub(super) async fn write_segment(
-        &self,
-        builder: SegmentBuilder,
-        level: u8,
-    ) -> Result<SegmentRef> {
+    pub(super) async fn write_segment(&self, builder: SegmentBuilder) -> Result<SegmentRef> {
         let docs = builder.len() as u32;
         let bytes = tokio::task::spawn_blocking(move || builder.build()).await??;
-        self.store_segment(bytes, docs, level).await
+        self.store_segment(bytes, docs).await
     }
 
-    pub(super) async fn store_segment(
-        &self,
-        bytes: bytes::Bytes,
-        docs: u32,
-        level: u8,
-    ) -> Result<SegmentRef> {
+    pub(super) async fn store_segment(&self, bytes: bytes::Bytes, docs: u32) -> Result<SegmentRef> {
         let hash = ObjectHash::digest(ObjectKind::Derived, &bytes);
         self.repo
             .objects()
@@ -281,7 +270,7 @@ impl SearchIndex {
             hash,
             docs,
             bytes: bytes.len() as u64,
-            level,
+            level: super::compact::tier(bytes.len() as u64, self.config.merge_fanout),
         };
         self.segments.insert_new(hash, bytes).await?;
         Ok(r)

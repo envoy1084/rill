@@ -1,6 +1,9 @@
-//! Merging small segments into larger ones, tier by tier: once a shard has
-//! `merge_fanout` segments of one level, they become one segment of the
-//! next level, and the segment list swaps them in one write.
+//! Merging small segments into larger ones, tier by tier. A segment's
+//! level is its size tier (under 1 MiB × fanout is level 0, each further
+//! factor of `merge_fanout` one more), so a landing's tiny segments merge
+//! with each other, never with a full index's large ones. Once a shard has
+//! `merge_fanout` segments of one level, they become one segment, and the
+//! segment list swaps them in one write.
 
 use rill_store::repo::Lease;
 
@@ -15,6 +18,21 @@ pub struct CompactStats {
     pub merges: usize,
     pub segments_before: usize,
     pub segments_after: usize,
+}
+
+/// The smallest size a tier spans, before the first factor of the fanout.
+const TIER_BASE: u64 = 1024 * 1024;
+
+/// The size tier of a segment of `bytes`.
+pub(super) fn tier(bytes: u64, fanout: usize) -> u8 {
+    let fanout = fanout.max(2) as u64;
+    let mut level = 0u8;
+    let mut cap = TIER_BASE.saturating_mul(fanout);
+    while bytes >= cap && level < u8::MAX {
+        level += 1;
+        cap = cap.saturating_mul(fanout);
+    }
+    level
 }
 
 impl SearchIndex {
@@ -49,9 +67,7 @@ impl SearchIndex {
                     merge_segments(&refs)
                 })
                 .await??;
-                let merged = self
-                    .store_segment(bytes, docs, level.saturating_add(1))
-                    .await?;
+                let merged = self.store_segment(bytes, docs).await?;
                 let gone: Vec<_> = group.iter().map(|r| r.hash).collect();
                 set.shards[shard].retain(|r| !gone.contains(&r.hash));
                 set.shards[shard].push(merged);
@@ -65,5 +81,18 @@ impl SearchIndex {
         }
         stats.segments_after = set.shards.iter().map(Vec::len).sum();
         Ok(stats)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tier;
+
+    #[test]
+    fn tiers_grow_by_the_fanout() {
+        assert_eq!(tier(0, 8), 0);
+        assert_eq!(tier(8 * 1024 * 1024 - 1, 8), 0);
+        assert_eq!(tier(8 * 1024 * 1024, 8), 1);
+        assert_eq!(tier(64 * 1024 * 1024, 8), 2);
     }
 }
