@@ -185,6 +185,11 @@ impl RepoRegistry {
             exec: self.exec.clone(),
             attestor: self.attestor.clone(),
             index_requests: Default::default(),
+            search_nodes: Arc::new(super::search_nodes::SearchNodes::new(
+                self.config.search.shards,
+                self.config.search.serve_shards.clone(),
+                self.advertised.clone(),
+            )),
         })
     }
 }

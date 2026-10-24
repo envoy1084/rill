@@ -349,6 +349,34 @@ class GrepResponse(_message.Message):
     languages: _containers.ScalarMap[str, int]
     def __init__(self, hits: _Optional[_Iterable[_Union[GrepHit, _Mapping]]] = ..., truncated: _Optional[bool] = ..., indexed_through: _Optional[int] = ..., files_matched: _Optional[int] = ..., partial: _Optional[bool] = ..., directories: _Optional[_Mapping[str, int]] = ..., languages: _Optional[_Mapping[str, int]] = ...) -> None: ...
 
+class GrepShardsRequest(_message.Message):
+    __slots__ = ("grep", "shards")
+    GREP_FIELD_NUMBER: _ClassVar[int]
+    SHARDS_FIELD_NUMBER: _ClassVar[int]
+    grep: GrepRequest
+    shards: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, grep: _Optional[_Union[GrepRequest, _Mapping]] = ..., shards: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class GrepShardsResponse(_message.Message):
+    __slots__ = ("files", "capped", "partial")
+    FILES_FIELD_NUMBER: _ClassVar[int]
+    CAPPED_FIELD_NUMBER: _ClassVar[int]
+    PARTIAL_FIELD_NUMBER: _ClassVar[int]
+    files: _containers.RepeatedCompositeFieldContainer[GrepFile]
+    capped: bool
+    partial: bool
+    def __init__(self, files: _Optional[_Iterable[_Union[GrepFile, _Mapping]]] = ..., capped: _Optional[bool] = ..., partial: _Optional[bool] = ...) -> None: ...
+
+class GrepFile(_message.Message):
+    __slots__ = ("path", "score", "hits")
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    SCORE_FIELD_NUMBER: _ClassVar[int]
+    HITS_FIELD_NUMBER: _ClassVar[int]
+    path: str
+    score: int
+    hits: _containers.RepeatedCompositeFieldContainer[GrepHit]
+    def __init__(self, path: _Optional[str] = ..., score: _Optional[int] = ..., hits: _Optional[_Iterable[_Union[GrepHit, _Mapping]]] = ...) -> None: ...
+
 class GrepHit(_message.Message):
     __slots__ = ("path", "line_no", "line", "before", "after", "byte_start", "byte_end")
     PATH_FIELD_NUMBER: _ClassVar[int]

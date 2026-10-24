@@ -57,6 +57,7 @@ axum = { workspace = true }
 axum-server = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
+rustls-native-certs = { workspace = true }
 tower = { workspace = true }
 http = { workspace = true }
 parking_lot = { workspace = true }

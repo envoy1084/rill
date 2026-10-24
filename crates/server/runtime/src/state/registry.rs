@@ -31,6 +31,8 @@ pub struct RepoRegistry {
     pub(super) merger: Option<Arc<rill_merge_syntax::WeaveMerger>>,
     /// The execution scheduler verification submits to.
     pub(super) exec: Arc<rill_exec::remote::Scheduler>,
+    /// The URL peers reach this server's API at, once it listens.
+    pub(super) advertised: Arc<std::sync::OnceLock<String>>,
 }
 
 impl RepoRegistry {
@@ -59,7 +61,13 @@ impl RepoRegistry {
             lifecycle,
             merger,
             exec,
+            advertised: Default::default(),
         }
+    }
+
+    /// Set the URL peers reach this server's API at; the first call wins.
+    pub fn advertise(&self, url: String) {
+        let _ = self.advertised.set(url);
     }
 
     /// The structural merger, when structural merge is on.

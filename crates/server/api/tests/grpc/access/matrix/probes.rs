@@ -177,6 +177,16 @@ pub(super) fn targeted(name: &str, callers: &Callers) -> Option<Bytes> {
             ..Default::default()
         }
         .encode_to_vec(),
+        "ContentService/GrepShards" => pb::GrepShardsRequest {
+            grep: Some(pb::GrepRequest {
+                repo: repo(),
+                pattern: CANARY.into(),
+                ..Default::default()
+            })
+            .into(),
+            shards: vec![0],
+        }
+        .encode_to_vec(),
         "ChangeService/CreateVersion" => {
             let mut cv = rill_types::ChangeVersion {
                 change_id: rill_types::ChangeId::new(),

@@ -19,6 +19,13 @@ pub fn spawn_repo_workers(ctx: &Arc<RepoContext>, roles: crate::config::Roles) {
     ctx.lifecycle
         .tasks
         .spawn(follower::run(ctx.clone(), shutdown.clone()));
+    if roles.api && ctx.search_nodes.partial() {
+        ctx.lifecycle.tasks.spawn(crate::state::search_nodes::run(
+            ctx.search_nodes.clone(),
+            ctx.repo.clone(),
+            shutdown.clone(),
+        ));
+    }
     if !roles.workers {
         return;
     }

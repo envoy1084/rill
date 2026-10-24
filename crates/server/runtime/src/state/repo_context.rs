@@ -65,6 +65,8 @@ pub struct RepoContext {
     /// Signs an attestation for every committed version.
     pub attestor: Arc<rill_policy::Signer>,
     pub(super) index_requests: super::index_requests::IndexRequests,
+    /// Which servers serve which search shards.
+    pub search_nodes: Arc<super::search_nodes::SearchNodes>,
 }
 
 impl RepoContext {

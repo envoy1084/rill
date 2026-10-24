@@ -11,10 +11,10 @@ mod registry;
 mod releases;
 mod repo_build;
 mod repo_context;
+pub mod search_nodes;
 mod stores;
 
 pub use app::AppState;
-pub use grep::GrepOutcome;
 pub use lifecycle::Lifecycle;
 pub use registry::RepoRegistry;
 pub use releases::ReleaseLanders;

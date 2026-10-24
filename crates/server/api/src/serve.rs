@@ -83,6 +83,22 @@ pub async fn serve_with_state(
     tracing::info!(%grpc_addr, %http_addr, dev_mode = state.dev_mode(), "rill server listening");
 
     let roles = state.config.roles;
+    match &state.config.search.advertise_url {
+        Some(url) => state.repos.advertise(url.clone()),
+        None if !grpc_addr.ip().is_unspecified() => {
+            let scheme = if state.config.tls.is_some() {
+                "https"
+            } else {
+                "http"
+            };
+            state.repos.advertise(format!("{scheme}://{grpc_addr}"))
+        }
+        None if !state.config.search.serve_shards.is_empty() => tracing::warn!(
+            %grpc_addr,
+            "serving some search shards on a wildcard address without [search] advertise_url: peers cannot reach this server"
+        ),
+        None => {}
+    }
     tokio::spawn(rill_runtime::telemetry::sample_forever(
         state.clone(),
         shutdown.clone(),

@@ -151,6 +151,7 @@ const MATRIX: &[(&str, Class)] = &[
     ("ContentService/ListHistory", ReadAny),
     ("ContentService/ListPathHistory", ReadRoot),
     ("ContentService/Grep", ReadAny),
+    ("ContentService/GrepShards", ReadAny),
     ("ContentService/FindMergeBase", ReadAny),
     ("ContentService/IsAncestor", ReadAny),
     ("ChangeService/GetVersion", ReadAny),

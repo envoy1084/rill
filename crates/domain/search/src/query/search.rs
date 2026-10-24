@@ -37,11 +37,65 @@ impl<F: Fn(&RepoPath) -> bool + Send + Sync> PathFilter for F {}
 /// hits asked for (at least 50).
 const RANK_POOL: usize = 2;
 
-/// One matched file, before ranking.
+/// One matched file with its score, before the files are merged.
 struct FileMatch {
     path: RepoPathBuf,
     lines: Vec<RawHit>,
     score: i32,
+}
+
+/// A matched file from one set of shards, ready to merge with others.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RankedFile {
+    pub path: RepoPathBuf,
+    pub score: i32,
+    pub hits: Vec<SearchHit>,
+}
+
+/// Which shards a search covers, and whether it reads the live files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShardSelect {
+    /// `None` for every shard.
+    pub shards: Option<Vec<usize>>,
+    pub live: bool,
+}
+
+impl ShardSelect {
+    pub fn all() -> ShardSelect {
+        ShardSelect {
+            shards: None,
+            live: true,
+        }
+    }
+}
+
+/// The matched files of some shards.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShardResults {
+    pub files: Vec<RankedFile>,
+    /// A shard stopped at its file limit.
+    pub capped: bool,
+    /// The time budget ran out.
+    pub partial: bool,
+}
+
+fn ranked(f: FileMatch) -> RankedFile {
+    RankedFile {
+        hits: f
+            .lines
+            .into_iter()
+            .map(|(line_no, line, before, after, byte_range)| SearchHit {
+                path: f.path.clone(),
+                line_no,
+                line,
+                before,
+                after,
+                byte_range,
+            })
+            .collect(),
+        path: f.path,
+        score: f.score,
+    }
 }
 
 type RawHit = (
@@ -150,8 +204,25 @@ pub async fn search<F: PathFilter + Clone + 'static>(
     query: &SearchQuery,
     allow: F,
 ) -> Result<SearchResult> {
+    let found = search_shards(index, scope, query, allow, &ShardSelect::all()).await?;
+    Ok(assemble(
+        found.files,
+        query.max_results,
+        found.capped,
+        found.partial,
+    ))
+}
+
+/// The matched files of the shards `select` names (and the live files,
+/// when it says so), for merging with other shards' with [`assemble`].
+pub async fn search_shards<F: PathFilter + Clone + 'static>(
+    index: &SearchIndex,
+    scope: &Scope,
+    query: &SearchQuery,
+    allow: F,
+    select: &ShardSelect,
+) -> Result<ShardResults> {
     index.refresh().await?;
-    let snapshot = index.snapshot();
     let job = Arc::new(Job {
         view: scope.view.clone(),
         regex: query.compile()?,
@@ -163,9 +234,14 @@ pub async fn search<F: PathFilter + Clone + 'static>(
         pool: query.max_results.max(50) * RANK_POOL,
         shadowed: scope.live.iter().map(|f| f.path.clone()).collect(),
     });
-    let mut tasks = Vec::with_capacity(snapshot.shards.len());
-    for segments in &snapshot.shards {
-        let (job, segments) = (job.clone(), segments.clone());
+    let shards: Vec<usize> = match &select.shards {
+        Some(s) => s.clone(),
+        None => (0..index.config().shards.max(1) as usize).collect(),
+    };
+    let mut tasks = Vec::with_capacity(shards.len());
+    for shard in shards {
+        let segments = index.segments_of(shard).await?;
+        let job = job.clone();
         tasks.push(tokio::task::spawn_blocking(move || job.shard(&segments)));
     }
     let mut files = Vec::new();
@@ -176,8 +252,14 @@ pub async fn search<F: PathFilter + Clone + 'static>(
         files.extend(found);
     }
     let partial = Instant::now() > job.deadline;
-    files.extend(live(&job, scope).await?);
-    Ok(assemble(files, query.max_results, capped, partial))
+    if select.live {
+        files.extend(live(&job, scope).await?);
+    }
+    Ok(ShardResults {
+        files: files.into_iter().map(ranked).collect(),
+        capped,
+        partial,
+    })
 }
 
 /// Matches in the live files.
@@ -222,9 +304,16 @@ async fn live<F: PathFilter + 'static>(job: &Arc<Job<F>>, scope: &Scope) -> Resu
     Ok(out)
 }
 
-/// Rank, count facets and flatten into at most `max` hits.
-fn assemble(mut files: Vec<FileMatch>, max: usize, capped: bool, partial: bool) -> SearchResult {
+/// Merge matched files (from any number of shard searches): rank, count
+/// facets and flatten into at most `max` hits.
+pub fn assemble(
+    mut files: Vec<RankedFile>,
+    max: usize,
+    capped: bool,
+    partial: bool,
+) -> SearchResult {
     files.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.path.cmp(&b.path)));
+    files.dedup_by(|a, b| a.path == b.path);
     let mut facets = Facets::default();
     for f in &files {
         let top = match f.path.as_str().split_once('/') {
@@ -237,23 +326,12 @@ fn assemble(mut files: Vec<FileMatch>, max: usize, capped: bool, partial: bool) 
             .entry(language_of(f.path.as_str()).to_string())
             .or_default() += 1;
     }
-    let total: usize = files.iter().map(|f| f.lines.len()).sum();
-    let mut hits = Vec::new();
-    'outer: for f in &files {
-        for (line_no, line, before, after, byte_range) in &f.lines {
-            if hits.len() >= max {
-                break 'outer;
-            }
-            hits.push(SearchHit {
-                path: f.path.clone(),
-                line_no: *line_no,
-                line: line.clone(),
-                before: before.clone(),
-                after: after.clone(),
-                byte_range: byte_range.clone(),
-            });
-        }
-    }
+    let total: usize = files.iter().map(|f| f.hits.len()).sum();
+    let hits: Vec<SearchHit> = files
+        .iter()
+        .flat_map(|f| f.hits.iter().cloned())
+        .take(max)
+        .collect();
     SearchResult {
         truncated: capped || total > hits.len(),
         files: files.len() as u32,

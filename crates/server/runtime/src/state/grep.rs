@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use rill_core::{diff_trees, RootTree};
-use rill_search::{LiveFile, Scope, SearchQuery, SearchResult, Through};
+use rill_search::{LiveFile, Scope, SearchQuery, ShardResults, ShardSelect};
 use rill_types::{ChangeVersionHash, TreeHash, TrunkSeq};
 
 use super::RepoContext;
@@ -21,41 +21,41 @@ const MAX_ANCESTORS: usize = 64;
 /// Files that may be read live instead of from the index.
 const MAX_LIVE_FILES: usize = 2_000;
 
-/// A search's results and how far trunk was indexed when it ran.
-pub struct GrepOutcome {
-    pub result: SearchResult,
-    pub through: Option<Through>,
-}
-
 impl RepoContext {
-    /// Search `root` (of `version`, when it has one) for `query`, showing
-    /// only paths `allowed` admits. With `min_seq`, first wait until trunk
-    /// is indexed through that position.
-    pub async fn grep(
+    /// What a search of `root` (of `version`, when it has one) covers.
+    /// With `min_seq`, first wait until trunk is indexed through that
+    /// position.
+    pub async fn search_scope(
         &self,
         version: Option<ChangeVersionHash>,
         root: TreeHash,
-        query: SearchQuery,
-        allowed: rill_policy::PathFilter,
         min_seq: Option<TrunkSeq>,
-    ) -> Result<GrepOutcome> {
+    ) -> Result<Scope> {
         if let Some(seq) = min_seq {
             self.wait_for_seq(seq).await?;
         }
-        let scope = self.scope(version, root).await?;
+        self.scope(version, root).await
+    }
+
+    /// The matched files of the shards `select` names, at paths `allowed`
+    /// admits.
+    pub async fn grep_shards(
+        &self,
+        scope: Scope,
+        query: SearchQuery,
+        allowed: rill_policy::PathFilter,
+        select: ShardSelect,
+    ) -> Result<ShardResults> {
         let search = self.search.clone();
         // Boxed so the borrow-heavy search future has a concrete `Send`
         // bound for the handler that awaits it.
         let fut: std::pin::Pin<
-            Box<dyn std::future::Future<Output = rill_search::Result<SearchResult>> + Send>,
+            Box<dyn std::future::Future<Output = rill_search::Result<ShardResults>> + Send>,
         > = Box::pin(async move {
-            rill_search::search(&search, &scope, &query, move |p| allowed.allows(p)).await
+            rill_search::search_shards(&search, &scope, &query, move |p| allowed.allows(p), &select)
+                .await
         });
-        let result = fut.await?;
-        Ok(GrepOutcome {
-            result,
-            through: self.search.through(),
-        })
+        Ok(fut.await?)
     }
 
     /// What a search of `root` covers.

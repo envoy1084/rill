@@ -111,6 +111,20 @@ async fn a_path_reader_learns_nothing_of_the_hidden_directory() {
             .encode_to_vec(),
         ),
         (
+            "ContentService/GrepShards",
+            pb::GrepShardsRequest {
+                grep: Some(pb::GrepRequest {
+                    repo: repo(),
+                    revision: at.clone(),
+                    pattern: CANARY.into(),
+                    ..Default::default()
+                })
+                .into(),
+                shards: (0..16).collect(),
+            }
+            .encode_to_vec(),
+        ),
+        (
             "ContentService/Stat",
             pb::StatRequest {
                 repo: repo(),

@@ -2610,6 +2610,7 @@ Files, trees, blobs, diffs, blame, history and search.
 | `ListHistory` | [ListHistoryRequest](#rill-v1-ListHistoryRequest) | [ListHistoryResponse](#rill-v1-ListHistoryResponse) | The versions behind a revision, newest first. |
 | `ListPathHistory` | [ListPathHistoryRequest](#rill-v1-ListPathHistoryRequest) | [ListPathHistoryResponse](#rill-v1-ListPathHistoryResponse) | The versions that changed one path, following renames. |
 | `Grep` | [GrepRequest](#rill-v1-GrepRequest) | [GrepResponse](#rill-v1-GrepResponse) | Regular-expression search over a revision's files. |
+| `GrepShards` | [GrepShardsRequest](#rill-v1-GrepShardsRequest) | [GrepShardsResponse](#rill-v1-GrepShardsResponse) | One server's part of a Grep: the matched files of the shards named, ranked but not merged. Servers call it on each other; clients use Grep. |
 | `FindMergeBase` | [FindMergeBaseRequest](#rill-v1-FindMergeBaseRequest) | [FindMergeBaseResponse](#rill-v1-FindMergeBaseResponse) | The merge bases of two revisions. |
 | `IsAncestor` | [IsAncestorRequest](#rill-v1-IsAncestorRequest) | [IsAncestorResponse](#rill-v1-IsAncestorResponse) | Whether one revision is an ancestor of another. |
 
@@ -2781,6 +2782,19 @@ Files, trees, blobs, diffs, blame, history and search.
 | `read_grant` | [string](#string) |  |  |
 
 
+<a name="rill-v1-GrepFile"></a>
+
+### GrepFile
+
+One matched file and its rank score.
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `path` | [string](#string) |  |  |
+| `score` | [int32](#int32) |  |  |
+| `hits` | [GrepHit](#rill-v1-GrepHit) | repeated |  |
+
+
 <a name="rill-v1-GrepHit"></a>
 
 ### GrepHit
@@ -2857,6 +2871,31 @@ Files, trees, blobs, diffs, blame, history and search.
 | --- | --- | --- | --- |
 | `key` | [string](#string) |  |  |
 | `value` | [uint32](#uint32) |  |  |
+
+
+<a name="rill-v1-GrepShardsRequest"></a>
+
+### GrepShardsRequest
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `grep` | [GrepRequest](#rill-v1-GrepRequest) |  | The search, with `revision` pinned (a version hash or `tree:<hash>`). |
+| `shards` | [uint32](#uint32) | repeated | The shards to search. |
+
+
+<a name="rill-v1-GrepShardsResponse"></a>
+
+### GrepShardsResponse
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `files` | [GrepFile](#rill-v1-GrepFile) | repeated |  |
+| `capped` | [bool](#bool) |  | A shard stopped at its file limit. |
+| `partial` | [bool](#bool) |  | The time budget ran out first. |
 
 
 <a name="rill-v1-IsAncestorRequest"></a>

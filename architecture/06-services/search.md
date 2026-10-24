@@ -141,6 +141,31 @@ files), or when the query's time budget runs out (`partial`).
 
 Facets count matched files by top-level directory and by language.
 
+## Serving shards across servers
+
+By default every server serves every shard. With `[search] serve_shards`
+set, a server opens only those shards' segments ahead of queries, and
+[`SearchNodes`](../../crates/server/runtime/src/state/search_nodes.rs)
+heartbeats its advertised URL and shard list into one record per
+repository (`search-nodes`, every 10 s, entries live 30 s).
+
+A `Grep` on any server then:
+
+1. builds the scope and searches its own shards plus the live files;
+2. sends each other shard to a live server serving it (spread by shard
+   number) with `ContentService.GrepShards`, pinning the revision to a
+   version hash or `tree:<hash>` and forwarding the caller's
+   `authorization` header, so the peer filters by the caller's access;
+3. searches a shard itself when no live server serves it, or when the
+   peer fails or misses the time budget plus 5 s;
+4. merges the ranked files of every part and flattens them
+   ([`assemble`](../../crates/domain/search/src/query/search.rs)).
+
+The advertised URL is `advertise_url`, else the bound gRPC address
+(`https` when the server has TLS). On a wildcard address set
+`advertise_url`. Peers over `https` are verified against the system roots
+plus `peer_ca_file`.
+
 ## Scopes and freshness
 
 A [`Scope`](../../crates/domain/search/src/query/scope.rs) is a view plus
@@ -177,6 +202,7 @@ It returns:
 - `indexed_through`.
 
 It requires read access somewhere; results are filtered to readable paths.
+`GrepShards` (one server's part of a search, for peers) needs the same.
 
 | `[search]` | Default | Meaning |
 | --- | --- | --- |
@@ -185,6 +211,9 @@ It requires read access somewhere; results are filtered to readable paths.
 | `segment_mb` | 64 | content per fresh segment |
 | `merge_fanout` | 8 | segments per tier before a merge |
 | `time_budget_ms` | 10000 | when a query returns partial results |
+| `serve_shards` | all | shards this server serves |
+| `advertise_url` | bound address | where peers reach this server |
+| `peer_ca_file` | none | extra CA for `https` peers |
 
 Error mapping:
 - `InvalidPattern` and `InvalidGlob` are `INVALID_ARGUMENT`;
@@ -207,7 +236,7 @@ Error mapping:
 * [index/](../../crates/domain/search/src/index/mod.rs): records, cache, writer, compaction, snapshot
 * [query/](../../crates/domain/search/src/query/mod.rs): scope, search, ranking, facets
 * [trigram/](../../crates/domain/search/src/trigram/mod.rs): extraction, planner, queries
-* Server: [state/grep.rs](../../crates/server/runtime/src/state/grep.rs), [workers/indexer.rs](../../crates/server/runtime/src/workers/indexer.rs), [services/content/grep.rs](../../crates/server/api/src/services/content/grep.rs)
+* Server: [state/grep.rs](../../crates/server/runtime/src/state/grep.rs), [state/search_nodes.rs](../../crates/server/runtime/src/state/search_nodes.rs), [services/content/peers.rs](../../crates/server/api/src/services/content/peers.rs), [workers/indexer.rs](../../crates/server/runtime/src/workers/indexer.rs), [services/content/grep.rs](../../crates/server/api/src/services/content/grep.rs)
 
 ---
 ← Previous: [Security review packet](../05-policy/security-review.md) · [Index](../index.md) · Next: [Exec](exec.md) →

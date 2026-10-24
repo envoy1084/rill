@@ -131,11 +131,13 @@ impl SearchIndex {
     pub(super) async fn install(&self, set: SegmentSet) -> Result<()> {
         let mut shards = Vec::with_capacity(set.shards.len());
         let mut live = HashSet::new();
-        for refs in &set.shards {
+        for (shard, refs) in set.shards.iter().enumerate() {
             let mut open = Vec::with_capacity(refs.len());
-            for r in refs {
-                open.push(self.segments.get(&self.repo, r).await?);
-                live.insert(r.hash);
+            if self.config.serves(shard) {
+                for r in refs {
+                    open.push(self.segments.get(&self.repo, r).await?);
+                    live.insert(r.hash);
+                }
             }
             shards.push(open);
         }
@@ -147,6 +149,31 @@ impl SearchIndex {
         });
         *self.set.lock() = set;
         Ok(())
+    }
+
+    /// The open segments of `shard`, opening them when this process does
+    /// not serve it.
+    pub async fn segments_of(&self, shard: usize) -> Result<Vec<Arc<Segment>>> {
+        if self.config.serves(shard) {
+            return Ok(self
+                .snapshot()
+                .shards
+                .get(shard)
+                .cloned()
+                .unwrap_or_default());
+        }
+        let refs = self
+            .set
+            .lock()
+            .shards
+            .get(shard)
+            .cloned()
+            .unwrap_or_default();
+        let mut out = Vec::with_capacity(refs.len());
+        for r in &refs {
+            out.push(self.segments.get(&self.repo, r).await?);
+        }
+        Ok(out)
     }
 
     /// The files of `root`, when it is indexed.

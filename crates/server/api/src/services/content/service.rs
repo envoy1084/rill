@@ -15,12 +15,16 @@ use rill_runtime::state::AppState;
 #[derive(Clone)]
 pub struct ContentSvc {
     pub(super) state: Arc<AppState>,
+    pub(super) peers: Arc<super::peers::SearchPeers>,
 }
 
 impl ContentSvc {
     /// A service over `state`.
     pub fn new(state: Arc<AppState>) -> Self {
-        ContentSvc { state }
+        let peers = Arc::new(super::peers::SearchPeers::new(
+            state.config.search.peer_ca_file.clone(),
+        ));
+        ContentSvc { state, peers }
     }
 }
 
@@ -142,6 +146,15 @@ impl ContentService for ContentSvc {
     ) -> GrpcResult<pb::GrepResponse> {
         let request = Call::new(ctx, request);
         Ok(Response::new(self.grep_impl(request).await?))
+    }
+
+    async fn grep_shards(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, pb::GrepShardsRequest>,
+    ) -> GrpcResult<pb::GrepShardsResponse> {
+        let request = Call::new(ctx, request);
+        Ok(Response::new(self.grep_shards_impl(request).await?))
     }
 
     async fn find_merge_base(

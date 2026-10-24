@@ -16,4 +16,6 @@ pub use lines::LineIndex;
 pub use request::{SearchQuery, DEFAULT_MAX_RESULTS, DEFAULT_TIME_BUDGET};
 pub use result::{Facets, SearchResult};
 pub use scope::{LiveFile, Scope};
-pub use search::{search, PathFilter};
+pub use search::{
+    assemble, search, search_shards, PathFilter, RankedFile, ShardResults, ShardSelect,
+};

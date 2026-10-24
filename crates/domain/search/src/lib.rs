@@ -22,7 +22,8 @@ pub use error::{Error, Result};
 pub use index::{CompactStats, IndexConfig, IndexStats, SearchIndex, Snapshot, Through};
 pub use paths::PathView;
 pub use query::{
-    language_of, search, Facets, LiveFile, PathFilter, Scope, SearchHit, SearchQuery, SearchResult,
+    assemble, language_of, search, search_shards, Facets, LiveFile, PathFilter, RankedFile, Scope,
+    SearchHit, SearchQuery, SearchResult, ShardResults, ShardSelect,
 };
 pub use symbols::{extract_symbols, Symbol, SymbolKind};
 pub use trigram::{required_trigrams_for_regex, trigrams, TrigramQuery};

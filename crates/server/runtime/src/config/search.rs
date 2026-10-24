@@ -19,6 +19,14 @@ pub struct SearchConfig {
     pub merge_fanout: usize,
     /// Milliseconds a query may run before it returns partial results.
     pub time_budget_ms: u64,
+    /// The shards this server serves; every shard when empty. A search
+    /// sends each other shard to a live server that serves it.
+    pub serve_shards: Vec<u16>,
+    /// The URL other servers reach this one's API at, for shard searches;
+    /// the bound address when unset (unless it is a wildcard address).
+    pub advertise_url: Option<String>,
+    /// A CA bundle (PEM) trusted for `https://` peers, besides the system's.
+    pub peer_ca_file: Option<PathBuf>,
 }
 
 impl Default for SearchConfig {
@@ -29,6 +37,9 @@ impl Default for SearchConfig {
             segment_mb: 64,
             merge_fanout: 8,
             time_budget_ms: 10_000,
+            serve_shards: Vec::new(),
+            advertise_url: None,
+            peer_ca_file: None,
         }
     }
 }
@@ -41,6 +52,7 @@ impl SearchConfig {
             cache_dir: self.cache_dir.as_ref().map(|d| d.join(repo.to_string())),
             segment_bytes: self.segment_mb.max(1) * 1024 * 1024,
             merge_fanout: self.merge_fanout.max(2),
+            serve: (!self.serve_shards.is_empty()).then(|| self.serve_shards.clone()),
             ..rill_search::IndexConfig::default()
         }
     }

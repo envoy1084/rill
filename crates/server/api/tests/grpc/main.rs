@@ -28,6 +28,7 @@ mod replicas;
 mod retries;
 mod scim;
 mod search;
+mod search_shards;
 mod shutdown;
 mod signin;
 mod stacks;

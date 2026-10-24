@@ -7,6 +7,7 @@ mod compare;
 mod files;
 mod grep;
 mod history;
+mod peers;
 mod service;
 
 pub use blobs::{check_content_exists, content_bytes, BlobStream, MAX_INLINE};

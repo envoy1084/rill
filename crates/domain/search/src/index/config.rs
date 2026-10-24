@@ -21,6 +21,19 @@ pub struct IndexConfig {
     /// Where segments are kept on local disk and memory-mapped; in memory
     /// when unset.
     pub cache_dir: Option<PathBuf>,
+    /// The shards this process serves (opens ahead of queries); every
+    /// shard when unset. Others are opened only if a query falls back to
+    /// them.
+    pub serve: Option<Vec<u16>>,
+}
+
+impl IndexConfig {
+    /// Whether this process serves `shard`.
+    pub fn serves(&self, shard: usize) -> bool {
+        self.serve
+            .as_ref()
+            .is_none_or(|s| s.iter().any(|&x| x as usize == shard))
+    }
 }
 
 impl Default for IndexConfig {
@@ -32,6 +45,7 @@ impl Default for IndexConfig {
             segment_bytes: 64 * 1024 * 1024,
             merge_fanout: 8,
             cache_dir: None,
+            serve: None,
         }
     }
 }

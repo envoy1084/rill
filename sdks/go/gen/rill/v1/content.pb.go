@@ -2030,6 +2030,183 @@ func (x *GrepResponse) GetLanguages() map[string]uint32 {
 	return nil
 }
 
+type GrepShardsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The search, with `revision` pinned (a version hash or `tree:<hash>`).
+	Grep *GrepRequest `protobuf:"bytes,1,opt,name=grep,proto3" json:"grep,omitempty"`
+	// The shards to search.
+	Shards        []uint32 `protobuf:"varint,2,rep,packed,name=shards,proto3" json:"shards,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrepShardsRequest) Reset() {
+	*x = GrepShardsRequest{}
+	mi := &file_rill_v1_content_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrepShardsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrepShardsRequest) ProtoMessage() {}
+
+func (x *GrepShardsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrepShardsRequest.ProtoReflect.Descriptor instead.
+func (*GrepShardsRequest) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *GrepShardsRequest) GetGrep() *GrepRequest {
+	if x != nil {
+		return x.Grep
+	}
+	return nil
+}
+
+func (x *GrepShardsRequest) GetShards() []uint32 {
+	if x != nil {
+		return x.Shards
+	}
+	return nil
+}
+
+type GrepShardsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Files []*GrepFile            `protobuf:"bytes,1,rep,name=files,proto3" json:"files,omitempty"`
+	// A shard stopped at its file limit.
+	Capped bool `protobuf:"varint,2,opt,name=capped,proto3" json:"capped,omitempty"`
+	// The time budget ran out first.
+	Partial       bool `protobuf:"varint,3,opt,name=partial,proto3" json:"partial,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrepShardsResponse) Reset() {
+	*x = GrepShardsResponse{}
+	mi := &file_rill_v1_content_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrepShardsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrepShardsResponse) ProtoMessage() {}
+
+func (x *GrepShardsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrepShardsResponse.ProtoReflect.Descriptor instead.
+func (*GrepShardsResponse) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *GrepShardsResponse) GetFiles() []*GrepFile {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *GrepShardsResponse) GetCapped() bool {
+	if x != nil {
+		return x.Capped
+	}
+	return false
+}
+
+func (x *GrepShardsResponse) GetPartial() bool {
+	if x != nil {
+		return x.Partial
+	}
+	return false
+}
+
+// One matched file and its rank score.
+type GrepFile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Score         int32                  `protobuf:"varint,2,opt,name=score,proto3" json:"score,omitempty"`
+	Hits          []*GrepHit             `protobuf:"bytes,3,rep,name=hits,proto3" json:"hits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrepFile) Reset() {
+	*x = GrepFile{}
+	mi := &file_rill_v1_content_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrepFile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrepFile) ProtoMessage() {}
+
+func (x *GrepFile) ProtoReflect() protoreflect.Message {
+	mi := &file_rill_v1_content_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrepFile.ProtoReflect.Descriptor instead.
+func (*GrepFile) Descriptor() ([]byte, []int) {
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *GrepFile) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *GrepFile) GetScore() int32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *GrepFile) GetHits() []*GrepHit {
+	if x != nil {
+		return x.Hits
+	}
+	return nil
+}
+
 type GrepHit struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
@@ -2045,7 +2222,7 @@ type GrepHit struct {
 
 func (x *GrepHit) Reset() {
 	*x = GrepHit{}
-	mi := &file_rill_v1_content_proto_msgTypes[30]
+	mi := &file_rill_v1_content_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2057,7 +2234,7 @@ func (x *GrepHit) String() string {
 func (*GrepHit) ProtoMessage() {}
 
 func (x *GrepHit) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[30]
+	mi := &file_rill_v1_content_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2070,7 +2247,7 @@ func (x *GrepHit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrepHit.ProtoReflect.Descriptor instead.
 func (*GrepHit) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{30}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GrepHit) GetPath() string {
@@ -2136,7 +2313,7 @@ type FindMergeBaseRequest struct {
 
 func (x *FindMergeBaseRequest) Reset() {
 	*x = FindMergeBaseRequest{}
-	mi := &file_rill_v1_content_proto_msgTypes[31]
+	mi := &file_rill_v1_content_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2148,7 +2325,7 @@ func (x *FindMergeBaseRequest) String() string {
 func (*FindMergeBaseRequest) ProtoMessage() {}
 
 func (x *FindMergeBaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[31]
+	mi := &file_rill_v1_content_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2161,7 +2338,7 @@ func (x *FindMergeBaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindMergeBaseRequest.ProtoReflect.Descriptor instead.
 func (*FindMergeBaseRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{31}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *FindMergeBaseRequest) GetRepo() string {
@@ -2195,7 +2372,7 @@ type FindMergeBaseResponse struct {
 
 func (x *FindMergeBaseResponse) Reset() {
 	*x = FindMergeBaseResponse{}
-	mi := &file_rill_v1_content_proto_msgTypes[32]
+	mi := &file_rill_v1_content_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2207,7 +2384,7 @@ func (x *FindMergeBaseResponse) String() string {
 func (*FindMergeBaseResponse) ProtoMessage() {}
 
 func (x *FindMergeBaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[32]
+	mi := &file_rill_v1_content_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2220,7 +2397,7 @@ func (x *FindMergeBaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindMergeBaseResponse.ProtoReflect.Descriptor instead.
 func (*FindMergeBaseResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{32}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *FindMergeBaseResponse) GetBases() []string {
@@ -2244,7 +2421,7 @@ type IsAncestorRequest struct {
 
 func (x *IsAncestorRequest) Reset() {
 	*x = IsAncestorRequest{}
-	mi := &file_rill_v1_content_proto_msgTypes[33]
+	mi := &file_rill_v1_content_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2256,7 +2433,7 @@ func (x *IsAncestorRequest) String() string {
 func (*IsAncestorRequest) ProtoMessage() {}
 
 func (x *IsAncestorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[33]
+	mi := &file_rill_v1_content_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2269,7 +2446,7 @@ func (x *IsAncestorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsAncestorRequest.ProtoReflect.Descriptor instead.
 func (*IsAncestorRequest) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{33}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *IsAncestorRequest) GetRepo() string {
@@ -2302,7 +2479,7 @@ type IsAncestorResponse struct {
 
 func (x *IsAncestorResponse) Reset() {
 	*x = IsAncestorResponse{}
-	mi := &file_rill_v1_content_proto_msgTypes[34]
+	mi := &file_rill_v1_content_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2314,7 +2491,7 @@ func (x *IsAncestorResponse) String() string {
 func (*IsAncestorResponse) ProtoMessage() {}
 
 func (x *IsAncestorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rill_v1_content_proto_msgTypes[34]
+	mi := &file_rill_v1_content_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2327,7 +2504,7 @@ func (x *IsAncestorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsAncestorResponse.ProtoReflect.Descriptor instead.
 func (*IsAncestorResponse) Descriptor() ([]byte, []int) {
-	return file_rill_v1_content_proto_rawDescGZIP(), []int{34}
+	return file_rill_v1_content_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *IsAncestorResponse) GetIsAncestor() bool {
@@ -2502,7 +2679,18 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\x1a<\n" +
 	"\x0eLanguagesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\"\xb2\x01\n" +
+	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\"U\n" +
+	"\x11GrepShardsRequest\x12(\n" +
+	"\x04grep\x18\x01 \x01(\v2\x14.rill.v1.GrepRequestR\x04grep\x12\x16\n" +
+	"\x06shards\x18\x02 \x03(\rR\x06shards\"o\n" +
+	"\x12GrepShardsResponse\x12'\n" +
+	"\x05files\x18\x01 \x03(\v2\x11.rill.v1.GrepFileR\x05files\x12\x16\n" +
+	"\x06capped\x18\x02 \x01(\bR\x06capped\x12\x18\n" +
+	"\apartial\x18\x03 \x01(\bR\apartial\"Z\n" +
+	"\bGrepFile\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x14\n" +
+	"\x05score\x18\x02 \x01(\x05R\x05score\x12$\n" +
+	"\x04hits\x18\x03 \x03(\v2\x10.rill.v1.GrepHitR\x04hits\"\xb2\x01\n" +
 	"\aGrepHit\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x17\n" +
 	"\aline_no\x18\x02 \x01(\rR\x06lineNo\x12\x12\n" +
@@ -2526,7 +2714,7 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"descendant\"5\n" +
 	"\x12IsAncestorResponse\x12\x1f\n" +
 	"\vis_ancestor\x18\x01 \x01(\bR\n" +
-	"isAncestor2\xa5\b\n" +
+	"isAncestor2\xec\b\n" +
 	"\x0eContentService\x12?\n" +
 	"\bReadFile\x12\x18.rill.v1.ReadFileRequest\x1a\x19.rill.v1.ReadFileResponse\x12Q\n" +
 	"\x0eBatchReadFiles\x12\x1e.rill.v1.BatchReadFilesRequest\x1a\x1f.rill.v1.BatchReadFilesResponse\x123\n" +
@@ -2540,7 +2728,9 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"\x05Blame\x12\x15.rill.v1.BlameRequest\x1a\x16.rill.v1.BlameResponse\x12H\n" +
 	"\vListHistory\x12\x1b.rill.v1.ListHistoryRequest\x1a\x1c.rill.v1.ListHistoryResponse\x12T\n" +
 	"\x0fListPathHistory\x12\x1f.rill.v1.ListPathHistoryRequest\x1a .rill.v1.ListPathHistoryResponse\x123\n" +
-	"\x04Grep\x12\x14.rill.v1.GrepRequest\x1a\x15.rill.v1.GrepResponse\x12N\n" +
+	"\x04Grep\x12\x14.rill.v1.GrepRequest\x1a\x15.rill.v1.GrepResponse\x12E\n" +
+	"\n" +
+	"GrepShards\x12\x1a.rill.v1.GrepShardsRequest\x1a\x1b.rill.v1.GrepShardsResponse\x12N\n" +
 	"\rFindMergeBase\x12\x1d.rill.v1.FindMergeBaseRequest\x1a\x1e.rill.v1.FindMergeBaseResponse\x12E\n" +
 	"\n" +
 	"IsAncestor\x12\x1a.rill.v1.IsAncestorRequest\x1a\x1b.rill.v1.IsAncestorResponseB\x8d\x01\n" +
@@ -2558,7 +2748,7 @@ func file_rill_v1_content_proto_rawDescGZIP() []byte {
 	return file_rill_v1_content_proto_rawDescData
 }
 
-var file_rill_v1_content_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_rill_v1_content_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_rill_v1_content_proto_goTypes = []any{
 	(*ReadFileRequest)(nil),           // 0: rill.v1.ReadFileRequest
 	(*ReadFileResponse)(nil),          // 1: rill.v1.ReadFileResponse
@@ -2590,81 +2780,89 @@ var file_rill_v1_content_proto_goTypes = []any{
 	(*PathHistoryEntry)(nil),          // 27: rill.v1.PathHistoryEntry
 	(*GrepRequest)(nil),               // 28: rill.v1.GrepRequest
 	(*GrepResponse)(nil),              // 29: rill.v1.GrepResponse
-	(*GrepHit)(nil),                   // 30: rill.v1.GrepHit
-	(*FindMergeBaseRequest)(nil),      // 31: rill.v1.FindMergeBaseRequest
-	(*FindMergeBaseResponse)(nil),     // 32: rill.v1.FindMergeBaseResponse
-	(*IsAncestorRequest)(nil),         // 33: rill.v1.IsAncestorRequest
-	(*IsAncestorResponse)(nil),        // 34: rill.v1.IsAncestorResponse
-	nil,                               // 35: rill.v1.GrepResponse.DirectoriesEntry
-	nil,                               // 36: rill.v1.GrepResponse.LanguagesEntry
-	(*TreeEntry)(nil),                 // 37: rill.v1.TreeEntry
-	(*NamedTreeEntry)(nil),            // 38: rill.v1.NamedTreeEntry
-	(*Tree)(nil),                      // 39: rill.v1.Tree
-	(*ContentRef)(nil),                // 40: rill.v1.ContentRef
-	(ObjectKind)(0),                   // 41: rill.v1.ObjectKind
-	(DiffFormat)(0),                   // 42: rill.v1.DiffFormat
-	(*FileDiff)(nil),                  // 43: rill.v1.FileDiff
-	(*Principal)(nil),                 // 44: rill.v1.Principal
-	(*ChangeInfo)(nil),                // 45: rill.v1.ChangeInfo
-	(*FileChange)(nil),                // 46: rill.v1.FileChange
+	(*GrepShardsRequest)(nil),         // 30: rill.v1.GrepShardsRequest
+	(*GrepShardsResponse)(nil),        // 31: rill.v1.GrepShardsResponse
+	(*GrepFile)(nil),                  // 32: rill.v1.GrepFile
+	(*GrepHit)(nil),                   // 33: rill.v1.GrepHit
+	(*FindMergeBaseRequest)(nil),      // 34: rill.v1.FindMergeBaseRequest
+	(*FindMergeBaseResponse)(nil),     // 35: rill.v1.FindMergeBaseResponse
+	(*IsAncestorRequest)(nil),         // 36: rill.v1.IsAncestorRequest
+	(*IsAncestorResponse)(nil),        // 37: rill.v1.IsAncestorResponse
+	nil,                               // 38: rill.v1.GrepResponse.DirectoriesEntry
+	nil,                               // 39: rill.v1.GrepResponse.LanguagesEntry
+	(*TreeEntry)(nil),                 // 40: rill.v1.TreeEntry
+	(*NamedTreeEntry)(nil),            // 41: rill.v1.NamedTreeEntry
+	(*Tree)(nil),                      // 42: rill.v1.Tree
+	(*ContentRef)(nil),                // 43: rill.v1.ContentRef
+	(ObjectKind)(0),                   // 44: rill.v1.ObjectKind
+	(DiffFormat)(0),                   // 45: rill.v1.DiffFormat
+	(*FileDiff)(nil),                  // 46: rill.v1.FileDiff
+	(*Principal)(nil),                 // 47: rill.v1.Principal
+	(*ChangeInfo)(nil),                // 48: rill.v1.ChangeInfo
+	(*FileChange)(nil),                // 49: rill.v1.FileChange
 }
 var file_rill_v1_content_proto_depIdxs = []int32{
-	37, // 0: rill.v1.ReadFileResponse.entry:type_name -> rill.v1.TreeEntry
+	40, // 0: rill.v1.ReadFileResponse.entry:type_name -> rill.v1.TreeEntry
 	1,  // 1: rill.v1.BatchReadFilesResponse.files:type_name -> rill.v1.ReadFileResponse
-	37, // 2: rill.v1.StatResponse.entry:type_name -> rill.v1.TreeEntry
-	38, // 3: rill.v1.ListDirectoryResponse.entries:type_name -> rill.v1.NamedTreeEntry
-	39, // 4: rill.v1.GetTreeResponse.tree:type_name -> rill.v1.Tree
-	40, // 5: rill.v1.ReadBlobRequest.content:type_name -> rill.v1.ContentRef
+	40, // 2: rill.v1.StatResponse.entry:type_name -> rill.v1.TreeEntry
+	41, // 3: rill.v1.ListDirectoryResponse.entries:type_name -> rill.v1.NamedTreeEntry
+	42, // 4: rill.v1.GetTreeResponse.tree:type_name -> rill.v1.Tree
+	43, // 5: rill.v1.ReadBlobRequest.content:type_name -> rill.v1.ContentRef
 	13, // 6: rill.v1.WriteBlobRequest.header:type_name -> rill.v1.WriteBlobHeader
-	40, // 7: rill.v1.WriteBlobResponse.content:type_name -> rill.v1.ContentRef
+	43, // 7: rill.v1.WriteBlobResponse.content:type_name -> rill.v1.ContentRef
 	16, // 8: rill.v1.BatchCheckObjectsRequest.objects:type_name -> rill.v1.ObjectRef
-	41, // 9: rill.v1.ObjectRef.kind:type_name -> rill.v1.ObjectKind
-	42, // 10: rill.v1.DiffRequest.format:type_name -> rill.v1.DiffFormat
-	43, // 11: rill.v1.DiffResponse.files:type_name -> rill.v1.FileDiff
+	44, // 9: rill.v1.ObjectRef.kind:type_name -> rill.v1.ObjectKind
+	45, // 10: rill.v1.DiffRequest.format:type_name -> rill.v1.DiffFormat
+	46, // 11: rill.v1.DiffResponse.files:type_name -> rill.v1.FileDiff
 	22, // 12: rill.v1.BlameResponse.lines:type_name -> rill.v1.BlameLine
-	44, // 13: rill.v1.BlameLine.author:type_name -> rill.v1.Principal
-	45, // 14: rill.v1.ListHistoryResponse.versions:type_name -> rill.v1.ChangeInfo
+	47, // 13: rill.v1.BlameLine.author:type_name -> rill.v1.Principal
+	48, // 14: rill.v1.ListHistoryResponse.versions:type_name -> rill.v1.ChangeInfo
 	27, // 15: rill.v1.ListPathHistoryResponse.entries:type_name -> rill.v1.PathHistoryEntry
-	45, // 16: rill.v1.PathHistoryEntry.version:type_name -> rill.v1.ChangeInfo
-	46, // 17: rill.v1.PathHistoryEntry.change:type_name -> rill.v1.FileChange
-	30, // 18: rill.v1.GrepResponse.hits:type_name -> rill.v1.GrepHit
-	35, // 19: rill.v1.GrepResponse.directories:type_name -> rill.v1.GrepResponse.DirectoriesEntry
-	36, // 20: rill.v1.GrepResponse.languages:type_name -> rill.v1.GrepResponse.LanguagesEntry
-	0,  // 21: rill.v1.ContentService.ReadFile:input_type -> rill.v1.ReadFileRequest
-	2,  // 22: rill.v1.ContentService.BatchReadFiles:input_type -> rill.v1.BatchReadFilesRequest
-	4,  // 23: rill.v1.ContentService.Stat:input_type -> rill.v1.StatRequest
-	6,  // 24: rill.v1.ContentService.ListDirectory:input_type -> rill.v1.ListDirectoryRequest
-	8,  // 25: rill.v1.ContentService.GetTree:input_type -> rill.v1.GetTreeRequest
-	10, // 26: rill.v1.ContentService.ReadBlob:input_type -> rill.v1.ReadBlobRequest
-	12, // 27: rill.v1.ContentService.WriteBlob:input_type -> rill.v1.WriteBlobRequest
-	15, // 28: rill.v1.ContentService.BatchCheckObjects:input_type -> rill.v1.BatchCheckObjectsRequest
-	18, // 29: rill.v1.ContentService.Diff:input_type -> rill.v1.DiffRequest
-	20, // 30: rill.v1.ContentService.Blame:input_type -> rill.v1.BlameRequest
-	23, // 31: rill.v1.ContentService.ListHistory:input_type -> rill.v1.ListHistoryRequest
-	25, // 32: rill.v1.ContentService.ListPathHistory:input_type -> rill.v1.ListPathHistoryRequest
-	28, // 33: rill.v1.ContentService.Grep:input_type -> rill.v1.GrepRequest
-	31, // 34: rill.v1.ContentService.FindMergeBase:input_type -> rill.v1.FindMergeBaseRequest
-	33, // 35: rill.v1.ContentService.IsAncestor:input_type -> rill.v1.IsAncestorRequest
-	1,  // 36: rill.v1.ContentService.ReadFile:output_type -> rill.v1.ReadFileResponse
-	3,  // 37: rill.v1.ContentService.BatchReadFiles:output_type -> rill.v1.BatchReadFilesResponse
-	5,  // 38: rill.v1.ContentService.Stat:output_type -> rill.v1.StatResponse
-	7,  // 39: rill.v1.ContentService.ListDirectory:output_type -> rill.v1.ListDirectoryResponse
-	9,  // 40: rill.v1.ContentService.GetTree:output_type -> rill.v1.GetTreeResponse
-	11, // 41: rill.v1.ContentService.ReadBlob:output_type -> rill.v1.ReadBlobResponse
-	14, // 42: rill.v1.ContentService.WriteBlob:output_type -> rill.v1.WriteBlobResponse
-	17, // 43: rill.v1.ContentService.BatchCheckObjects:output_type -> rill.v1.BatchCheckObjectsResponse
-	19, // 44: rill.v1.ContentService.Diff:output_type -> rill.v1.DiffResponse
-	21, // 45: rill.v1.ContentService.Blame:output_type -> rill.v1.BlameResponse
-	24, // 46: rill.v1.ContentService.ListHistory:output_type -> rill.v1.ListHistoryResponse
-	26, // 47: rill.v1.ContentService.ListPathHistory:output_type -> rill.v1.ListPathHistoryResponse
-	29, // 48: rill.v1.ContentService.Grep:output_type -> rill.v1.GrepResponse
-	32, // 49: rill.v1.ContentService.FindMergeBase:output_type -> rill.v1.FindMergeBaseResponse
-	34, // 50: rill.v1.ContentService.IsAncestor:output_type -> rill.v1.IsAncestorResponse
-	36, // [36:51] is the sub-list for method output_type
-	21, // [21:36] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	48, // 16: rill.v1.PathHistoryEntry.version:type_name -> rill.v1.ChangeInfo
+	49, // 17: rill.v1.PathHistoryEntry.change:type_name -> rill.v1.FileChange
+	33, // 18: rill.v1.GrepResponse.hits:type_name -> rill.v1.GrepHit
+	38, // 19: rill.v1.GrepResponse.directories:type_name -> rill.v1.GrepResponse.DirectoriesEntry
+	39, // 20: rill.v1.GrepResponse.languages:type_name -> rill.v1.GrepResponse.LanguagesEntry
+	28, // 21: rill.v1.GrepShardsRequest.grep:type_name -> rill.v1.GrepRequest
+	32, // 22: rill.v1.GrepShardsResponse.files:type_name -> rill.v1.GrepFile
+	33, // 23: rill.v1.GrepFile.hits:type_name -> rill.v1.GrepHit
+	0,  // 24: rill.v1.ContentService.ReadFile:input_type -> rill.v1.ReadFileRequest
+	2,  // 25: rill.v1.ContentService.BatchReadFiles:input_type -> rill.v1.BatchReadFilesRequest
+	4,  // 26: rill.v1.ContentService.Stat:input_type -> rill.v1.StatRequest
+	6,  // 27: rill.v1.ContentService.ListDirectory:input_type -> rill.v1.ListDirectoryRequest
+	8,  // 28: rill.v1.ContentService.GetTree:input_type -> rill.v1.GetTreeRequest
+	10, // 29: rill.v1.ContentService.ReadBlob:input_type -> rill.v1.ReadBlobRequest
+	12, // 30: rill.v1.ContentService.WriteBlob:input_type -> rill.v1.WriteBlobRequest
+	15, // 31: rill.v1.ContentService.BatchCheckObjects:input_type -> rill.v1.BatchCheckObjectsRequest
+	18, // 32: rill.v1.ContentService.Diff:input_type -> rill.v1.DiffRequest
+	20, // 33: rill.v1.ContentService.Blame:input_type -> rill.v1.BlameRequest
+	23, // 34: rill.v1.ContentService.ListHistory:input_type -> rill.v1.ListHistoryRequest
+	25, // 35: rill.v1.ContentService.ListPathHistory:input_type -> rill.v1.ListPathHistoryRequest
+	28, // 36: rill.v1.ContentService.Grep:input_type -> rill.v1.GrepRequest
+	30, // 37: rill.v1.ContentService.GrepShards:input_type -> rill.v1.GrepShardsRequest
+	34, // 38: rill.v1.ContentService.FindMergeBase:input_type -> rill.v1.FindMergeBaseRequest
+	36, // 39: rill.v1.ContentService.IsAncestor:input_type -> rill.v1.IsAncestorRequest
+	1,  // 40: rill.v1.ContentService.ReadFile:output_type -> rill.v1.ReadFileResponse
+	3,  // 41: rill.v1.ContentService.BatchReadFiles:output_type -> rill.v1.BatchReadFilesResponse
+	5,  // 42: rill.v1.ContentService.Stat:output_type -> rill.v1.StatResponse
+	7,  // 43: rill.v1.ContentService.ListDirectory:output_type -> rill.v1.ListDirectoryResponse
+	9,  // 44: rill.v1.ContentService.GetTree:output_type -> rill.v1.GetTreeResponse
+	11, // 45: rill.v1.ContentService.ReadBlob:output_type -> rill.v1.ReadBlobResponse
+	14, // 46: rill.v1.ContentService.WriteBlob:output_type -> rill.v1.WriteBlobResponse
+	17, // 47: rill.v1.ContentService.BatchCheckObjects:output_type -> rill.v1.BatchCheckObjectsResponse
+	19, // 48: rill.v1.ContentService.Diff:output_type -> rill.v1.DiffResponse
+	21, // 49: rill.v1.ContentService.Blame:output_type -> rill.v1.BlameResponse
+	24, // 50: rill.v1.ContentService.ListHistory:output_type -> rill.v1.ListHistoryResponse
+	26, // 51: rill.v1.ContentService.ListPathHistory:output_type -> rill.v1.ListPathHistoryResponse
+	29, // 52: rill.v1.ContentService.Grep:output_type -> rill.v1.GrepResponse
+	31, // 53: rill.v1.ContentService.GrepShards:output_type -> rill.v1.GrepShardsResponse
+	35, // 54: rill.v1.ContentService.FindMergeBase:output_type -> rill.v1.FindMergeBaseResponse
+	37, // 55: rill.v1.ContentService.IsAncestor:output_type -> rill.v1.IsAncestorResponse
+	40, // [40:56] is the sub-list for method output_type
+	24, // [24:40] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_content_proto_init() }
@@ -2688,7 +2886,7 @@ func file_rill_v1_content_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_content_proto_rawDesc), len(file_rill_v1_content_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   37,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

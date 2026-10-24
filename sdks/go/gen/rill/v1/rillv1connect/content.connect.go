@@ -72,6 +72,9 @@ const (
 	ContentServiceListPathHistoryProcedure = "/rill.v1.ContentService/ListPathHistory"
 	// ContentServiceGrepProcedure is the fully-qualified name of the ContentService's Grep RPC.
 	ContentServiceGrepProcedure = "/rill.v1.ContentService/Grep"
+	// ContentServiceGrepShardsProcedure is the fully-qualified name of the ContentService's GrepShards
+	// RPC.
+	ContentServiceGrepShardsProcedure = "/rill.v1.ContentService/GrepShards"
 	// ContentServiceFindMergeBaseProcedure is the fully-qualified name of the ContentService's
 	// FindMergeBase RPC.
 	ContentServiceFindMergeBaseProcedure = "/rill.v1.ContentService/FindMergeBase"
@@ -108,6 +111,9 @@ type ContentServiceClient interface {
 	ListPathHistory(context.Context, *connect.Request[v1.ListPathHistoryRequest]) (*connect.Response[v1.ListPathHistoryResponse], error)
 	// Regular-expression search over a revision's files.
 	Grep(context.Context, *connect.Request[v1.GrepRequest]) (*connect.Response[v1.GrepResponse], error)
+	// One server's part of a Grep: the matched files of the shards named,
+	// ranked but not merged. Servers call it on each other; clients use Grep.
+	GrepShards(context.Context, *connect.Request[v1.GrepShardsRequest]) (*connect.Response[v1.GrepShardsResponse], error)
 	// The merge bases of two revisions.
 	FindMergeBase(context.Context, *connect.Request[v1.FindMergeBaseRequest]) (*connect.Response[v1.FindMergeBaseResponse], error)
 	// Whether one revision is an ancestor of another.
@@ -203,6 +209,12 @@ func NewContentServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(contentServiceMethods.ByName("Grep")),
 			connect.WithClientOptions(opts...),
 		),
+		grepShards: connect.NewClient[v1.GrepShardsRequest, v1.GrepShardsResponse](
+			httpClient,
+			baseURL+ContentServiceGrepShardsProcedure,
+			connect.WithSchema(contentServiceMethods.ByName("GrepShards")),
+			connect.WithClientOptions(opts...),
+		),
 		findMergeBase: connect.NewClient[v1.FindMergeBaseRequest, v1.FindMergeBaseResponse](
 			httpClient,
 			baseURL+ContentServiceFindMergeBaseProcedure,
@@ -233,6 +245,7 @@ type contentServiceClient struct {
 	listHistory       *connect.Client[v1.ListHistoryRequest, v1.ListHistoryResponse]
 	listPathHistory   *connect.Client[v1.ListPathHistoryRequest, v1.ListPathHistoryResponse]
 	grep              *connect.Client[v1.GrepRequest, v1.GrepResponse]
+	grepShards        *connect.Client[v1.GrepShardsRequest, v1.GrepShardsResponse]
 	findMergeBase     *connect.Client[v1.FindMergeBaseRequest, v1.FindMergeBaseResponse]
 	isAncestor        *connect.Client[v1.IsAncestorRequest, v1.IsAncestorResponse]
 }
@@ -302,6 +315,11 @@ func (c *contentServiceClient) Grep(ctx context.Context, req *connect.Request[v1
 	return c.grep.CallUnary(ctx, req)
 }
 
+// GrepShards calls rill.v1.ContentService.GrepShards.
+func (c *contentServiceClient) GrepShards(ctx context.Context, req *connect.Request[v1.GrepShardsRequest]) (*connect.Response[v1.GrepShardsResponse], error) {
+	return c.grepShards.CallUnary(ctx, req)
+}
+
 // FindMergeBase calls rill.v1.ContentService.FindMergeBase.
 func (c *contentServiceClient) FindMergeBase(ctx context.Context, req *connect.Request[v1.FindMergeBaseRequest]) (*connect.Response[v1.FindMergeBaseResponse], error) {
 	return c.findMergeBase.CallUnary(ctx, req)
@@ -340,6 +358,9 @@ type ContentServiceHandler interface {
 	ListPathHistory(context.Context, *connect.Request[v1.ListPathHistoryRequest]) (*connect.Response[v1.ListPathHistoryResponse], error)
 	// Regular-expression search over a revision's files.
 	Grep(context.Context, *connect.Request[v1.GrepRequest]) (*connect.Response[v1.GrepResponse], error)
+	// One server's part of a Grep: the matched files of the shards named,
+	// ranked but not merged. Servers call it on each other; clients use Grep.
+	GrepShards(context.Context, *connect.Request[v1.GrepShardsRequest]) (*connect.Response[v1.GrepShardsResponse], error)
 	// The merge bases of two revisions.
 	FindMergeBase(context.Context, *connect.Request[v1.FindMergeBaseRequest]) (*connect.Response[v1.FindMergeBaseResponse], error)
 	// Whether one revision is an ancestor of another.
@@ -431,6 +452,12 @@ func NewContentServiceHandler(svc ContentServiceHandler, opts ...connect.Handler
 		connect.WithSchema(contentServiceMethods.ByName("Grep")),
 		connect.WithHandlerOptions(opts...),
 	)
+	contentServiceGrepShardsHandler := connect.NewUnaryHandler(
+		ContentServiceGrepShardsProcedure,
+		svc.GrepShards,
+		connect.WithSchema(contentServiceMethods.ByName("GrepShards")),
+		connect.WithHandlerOptions(opts...),
+	)
 	contentServiceFindMergeBaseHandler := connect.NewUnaryHandler(
 		ContentServiceFindMergeBaseProcedure,
 		svc.FindMergeBase,
@@ -471,6 +498,8 @@ func NewContentServiceHandler(svc ContentServiceHandler, opts ...connect.Handler
 			contentServiceListPathHistoryHandler.ServeHTTP(w, r)
 		case ContentServiceGrepProcedure:
 			contentServiceGrepHandler.ServeHTTP(w, r)
+		case ContentServiceGrepShardsProcedure:
+			contentServiceGrepShardsHandler.ServeHTTP(w, r)
 		case ContentServiceFindMergeBaseProcedure:
 			contentServiceFindMergeBaseHandler.ServeHTTP(w, r)
 		case ContentServiceIsAncestorProcedure:
@@ -534,6 +563,10 @@ func (UnimplementedContentServiceHandler) ListPathHistory(context.Context, *conn
 
 func (UnimplementedContentServiceHandler) Grep(context.Context, *connect.Request[v1.GrepRequest]) (*connect.Response[v1.GrepResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ContentService.Grep is not implemented"))
+}
+
+func (UnimplementedContentServiceHandler) GrepShards(context.Context, *connect.Request[v1.GrepShardsRequest]) (*connect.Response[v1.GrepShardsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("rill.v1.ContentService.GrepShards is not implemented"))
 }
 
 func (UnimplementedContentServiceHandler) FindMergeBase(context.Context, *connect.Request[v1.FindMergeBaseRequest]) (*connect.Response[v1.FindMergeBaseResponse], error) {

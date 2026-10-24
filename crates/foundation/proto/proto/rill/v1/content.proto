@@ -39,6 +39,9 @@ service ContentService {
   rpc ListPathHistory(ListPathHistoryRequest) returns (ListPathHistoryResponse);
   // Regular-expression search over a revision's files.
   rpc Grep(GrepRequest) returns (GrepResponse);
+  // One server's part of a Grep: the matched files of the shards named,
+  // ranked but not merged. Servers call it on each other; clients use Grep.
+  rpc GrepShards(GrepShardsRequest) returns (GrepShardsResponse);
   // The merge bases of two revisions.
   rpc FindMergeBase(FindMergeBaseRequest) returns (FindMergeBaseResponse);
   // Whether one revision is an ancestor of another.
@@ -282,6 +285,25 @@ message GrepResponse {
   // Matched files by top-level directory and by language.
   map<string, uint32> directories = 6;
   map<string, uint32> languages = 7;
+}
+message GrepShardsRequest {
+  // The search, with `revision` pinned (a version hash or `tree:<hash>`).
+  GrepRequest grep = 1;
+  // The shards to search.
+  repeated uint32 shards = 2;
+}
+message GrepShardsResponse {
+  repeated GrepFile files = 1;
+  // A shard stopped at its file limit.
+  bool capped = 2;
+  // The time budget ran out first.
+  bool partial = 3;
+}
+// One matched file and its rank score.
+message GrepFile {
+  string path = 1;
+  int32 score = 2;
+  repeated GrepHit hits = 3;
 }
 message GrepHit {
   string path = 1;

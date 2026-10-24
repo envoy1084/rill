@@ -56,6 +56,9 @@ class ContentService(Protocol):
     async def grep(self, request: rill_dot_v1_dot_content__pb2.GrepRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.GrepResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def grep_shards(self, request: rill_dot_v1_dot_content__pb2.GrepShardsRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.GrepShardsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def find_merge_base(self, request: rill_dot_v1_dot_content__pb2.FindMergeBaseRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.FindMergeBaseResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -197,6 +200,16 @@ class ContentServiceASGIApplication(ConnectASGIApplication[ContentService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.grep,
+                ),
+                "/rill.v1.ContentService/GrepShards": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GrepShards",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.GrepShardsRequest,
+                        output=rill_dot_v1_dot_content__pb2.GrepShardsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.grep_shards,
                 ),
                 "/rill.v1.ContentService/FindMergeBase": Endpoint.unary(
                     method=MethodInfo(
@@ -491,6 +504,26 @@ class ContentServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def grep_shards(
+        self,
+        request: rill_dot_v1_dot_content__pb2.GrepShardsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.GrepShardsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GrepShards",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.GrepShardsRequest,
+                output=rill_dot_v1_dot_content__pb2.GrepShardsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def find_merge_base(
         self,
         request: rill_dot_v1_dot_content__pb2.FindMergeBaseRequest,
@@ -558,6 +591,8 @@ class ContentServiceSync(Protocol):
     def list_path_history(self, request: rill_dot_v1_dot_content__pb2.ListPathHistoryRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.ListPathHistoryResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def grep(self, request: rill_dot_v1_dot_content__pb2.GrepRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.GrepResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def grep_shards(self, request: rill_dot_v1_dot_content__pb2.GrepShardsRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.GrepShardsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def find_merge_base(self, request: rill_dot_v1_dot_content__pb2.FindMergeBaseRequest, ctx: RequestContext) -> rill_dot_v1_dot_content__pb2.FindMergeBaseResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -698,6 +733,16 @@ class ContentServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.grep,
+                ),
+                "/rill.v1.ContentService/GrepShards": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GrepShards",
+                        service_name="rill.v1.ContentService",
+                        input=rill_dot_v1_dot_content__pb2.GrepShardsRequest,
+                        output=rill_dot_v1_dot_content__pb2.GrepShardsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.grep_shards,
                 ),
                 "/rill.v1.ContentService/FindMergeBase": EndpointSync.unary(
                     method=MethodInfo(
@@ -986,6 +1031,26 @@ class ContentServiceClientSync(ConnectClientSync):
                 service_name="rill.v1.ContentService",
                 input=rill_dot_v1_dot_content__pb2.GrepRequest,
                 output=rill_dot_v1_dot_content__pb2.GrepResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def grep_shards(
+        self,
+        request: rill_dot_v1_dot_content__pb2.GrepShardsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rill_dot_v1_dot_content__pb2.GrepShardsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GrepShards",
+                service_name="rill.v1.ContentService",
+                input=rill_dot_v1_dot_content__pb2.GrepShardsRequest,
+                output=rill_dot_v1_dot_content__pb2.GrepShardsResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

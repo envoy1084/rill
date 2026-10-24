@@ -205,6 +205,7 @@ impl ContentService for MockRepo {
         blame(pb::BlameRequest) -> pb::BlameResponse;
         list_path_history(pb::ListPathHistoryRequest) -> pb::ListPathHistoryResponse;
         grep(pb::GrepRequest) -> pb::GrepResponse;
+        grep_shards(pb::GrepShardsRequest) -> pb::GrepShardsResponse;
         find_merge_base(pb::FindMergeBaseRequest) -> pb::FindMergeBaseResponse;
         is_ancestor(pb::IsAncestorRequest) -> pb::IsAncestorResponse;
     }
