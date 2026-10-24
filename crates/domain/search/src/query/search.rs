@@ -33,9 +33,11 @@ pub trait PathFilter: Fn(&RepoPath) -> bool + Send + Sync {}
 
 impl<F: Fn(&RepoPath) -> bool + Send + Sync> PathFilter for F {}
 
-/// Matched files collected per shard before ranking, as a multiple of the
-/// hits asked for (at least 50).
+/// Matched files ranked per query, as a multiple of the hits asked for
+/// (at least 50), split across the shards searched; each shard collects
+/// twice its share, and at least `MIN_SHARD_POOL`.
 const RANK_POOL: usize = 2;
+const MIN_SHARD_POOL: usize = 10;
 
 /// One matched file with its score, before the files are merged.
 struct FileMatch {
@@ -225,6 +227,10 @@ pub async fn search_shards<F: PathFilter + Clone + 'static>(
 ) -> Result<ShardResults> {
     index.refresh().await?;
     let matcher = query.matcher()?;
+    let shards: Vec<usize> = match &select.shards {
+        Some(s) => s.clone(),
+        None => (0..index.config().shards.max(1) as usize).collect(),
+    };
     let job = Arc::new(Job {
         view: scope.view.clone(),
         matcher: matcher.clone(),
@@ -233,23 +239,20 @@ pub async fn search_shards<F: PathFilter + Clone + 'static>(
         allow,
         objects: index.repo().objects().clone(),
         deadline: Instant::now() + query.time_budget,
-        pool: query.max_results.max(50) * RANK_POOL,
+        pool: (query.max_results.max(50) * RANK_POOL)
+            .div_ceil(shards.len().max(1))
+            .saturating_mul(2)
+            .max(MIN_SHARD_POOL),
         shadowed: scope.live.iter().map(|f| f.path.clone()).collect(),
     });
-    let shards: Vec<usize> = match &select.shards {
-        Some(s) => s.clone(),
-        None => (0..index.config().shards.max(1) as usize).collect(),
-    };
-    let mut tasks = Vec::with_capacity(shards.len());
+    let mut segments = Vec::with_capacity(shards.len());
     for shard in shards {
-        let segments = index.segments_of(shard).await?;
-        let job = job.clone();
-        tasks.push(tokio::task::spawn_blocking(move || job.shard(&segments)));
+        segments.push(index.segments_of(shard).await?);
     }
+    let shard_job = job.clone();
     let mut files = Vec::new();
     let mut capped = false;
-    for t in tasks {
-        let (found, cut) = t.await??;
+    for (found, cut) in crate::cpu::map(segments, move |s| shard_job.shard(&s)).await? {
         capped |= cut;
         files.extend(found);
     }

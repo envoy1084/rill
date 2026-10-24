@@ -27,6 +27,8 @@ globset = { workspace = true }
 zstd = { workspace = true }
 memmap2 = { workspace = true }
 fst = { workspace = true }
+rayon = { workspace = true }
+lz4_flex = { workspace = true }
 postcard = { workspace = true }
 ast-grep-core = { workspace = true }
 tree-sitter = { workspace = true }

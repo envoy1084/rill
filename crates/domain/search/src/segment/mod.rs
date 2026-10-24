@@ -3,11 +3,12 @@
 //! A segment holds a trigram dictionary (an `fst` map from trigram to the
 //! place of its posting list), the posting lists (roaring bitmaps of the
 //! segment's own document numbers), each blob's content compressed with
-//! zstd so a candidate is verified without fetching the blob, and each
+//! lz4 so a candidate is verified without fetching the blob, and each
 //! blob's symbols. Segments never change once written; the index grows by
 //! adding small segments and merging them into larger ones.
 
 mod bytes;
+mod codec;
 mod format;
 mod merge;
 mod reader;

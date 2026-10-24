@@ -51,6 +51,8 @@ zstd = "0.14.3"
 # Search segments: memory-mapped files and compact sorted maps.
 memmap2 = "0.9.12"
 fst = "=0.4.7"
+rayon = "1.12.0"
+lz4_flex = { version = "=0.14.0", default-features = false, features = ["std", "safe-decode", "safe-encode"] }
 
 # Async and runtime
 tokio = { version = "1.54.0", features = ["full"] }

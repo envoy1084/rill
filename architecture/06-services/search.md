@@ -29,8 +29,9 @@ holds:
 - **A trigram dictionary:** an [`fst`](https://crates.io/crates/fst) map from
   each three-byte sequence (ASCII case-folded) to its posting list.
 - **Posting lists:** roaring bitmaps of the segment's document numbers.
-- **Each blob's content,** compressed with zstd, so a candidate is verified
-  without fetching the blob.
+- **Each blob's content,** an lz4 block, so a candidate is verified
+  without fetching the blob. lz4 decodes without per-document setup;
+  zstd's per-frame tables cost most of a query's time on small files.
 - **Each blob's symbols:** definitions extracted with sem-core, using the
   first path the blob was indexed under to pick the language.
 
@@ -115,11 +116,15 @@ port of Russ Cox's codesearch analysis onto `regex-syntax`'s HIR:
 
 **Search.**
 [`search(index, scope, query, allow)`](../../crates/domain/search/src/query/search.rs)
-runs every shard on the blocking pool at once. For each segment, the
-candidates are documents that:
+runs every shard at once as jobs on rayon's fixed pool
+([cpu.rs](../../crates/domain/search/src/cpu.rs)), each answering on a
+channel, so thousands of queries a second neither grow threads nor nest
+jobs. For each segment, the candidates are documents that:
 
 1. satisfy the trigram query (all documents when the pattern has no
-   required trigram);
+   required trigram). A conjunction intersects its trigrams' posting
+   lists smallest first and stops once 64 candidates remain; the rest is
+   left to verification;
 2. are held by the scope's view at some path;
 3. are at a path the glob, the language filter and the caller's
    `PathFilter` admit (the filter is applied after intersection, from the
@@ -127,8 +132,9 @@ candidates are documents that:
 4. are not redacted (the object store's `refuses`).
 
 Candidates are then verified with the regex (16 MiB size limits) on the
-stored content. A shard stops at twice the requested hits (at least 50
-files), or when the query's time budget runs out (`partial`).
+stored content. A query ranks twice the requested hits (at least 50) in
+files; each shard collects twice its share of that (at least 10), or stops
+when the query's time budget runs out (`partial`).
 
 **Ranking (v1).** Files are scored, then hits flattened best file first:
 

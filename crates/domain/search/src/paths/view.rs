@@ -12,17 +12,31 @@ use super::layer::{PathChange, PathEntry};
 #[derive(Debug, Default)]
 pub struct BaseMap {
     entries: Vec<PathEntry>,
-    by_hash: HashMap<ObjectHash, Vec<u32>>,
+    /// `(content, entry)` sorted by content: one compact array rather than
+    /// a map of lists, which at ten million files cost a gigabyte.
+    by_hash: Vec<(ObjectHash, u32)>,
 }
 
 impl BaseMap {
     pub fn new(mut entries: Vec<PathEntry>) -> BaseMap {
         entries.sort_by(|a, b| a.path.cmp(&b.path));
-        let mut by_hash: HashMap<ObjectHash, Vec<u32>> = HashMap::new();
-        for (i, e) in entries.iter().enumerate() {
-            by_hash.entry(e.hash).or_default().push(i as u32);
-        }
+        let mut by_hash: Vec<(ObjectHash, u32)> = entries
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.hash, i as u32))
+            .collect();
+        by_hash.sort_unstable();
         BaseMap { entries, by_hash }
+    }
+
+    /// The entries holding `hash`.
+    fn holding(&self, hash: &ObjectHash) -> impl Iterator<Item = &PathEntry> {
+        let hash = *hash;
+        let start = self.by_hash.partition_point(|(h, _)| *h < hash);
+        self.by_hash[start..]
+            .iter()
+            .take_while(move |(h, _)| *h == hash)
+            .map(|&(_, i)| &self.entries[i as usize])
     }
 }
 
@@ -85,11 +99,8 @@ impl PathView {
     pub fn paths_of(&self, hash: &ObjectHash) -> Vec<RepoPathBuf> {
         let mut out: Vec<RepoPathBuf> = self
             .base
-            .by_hash
-            .get(hash)
-            .into_iter()
-            .flatten()
-            .map(|&i| &self.base.entries[i as usize].path)
+            .holding(hash)
+            .map(|e| &e.path)
             .filter(|p| !self.overlay.contains_key(*p))
             .cloned()
             .collect();
@@ -103,13 +114,10 @@ impl PathView {
     /// Whether any path holds `hash`.
     pub fn holds(&self, hash: &ObjectHash) -> bool {
         self.overlay_by_hash.contains_key(hash)
-            || self.base.by_hash.get(hash).is_some_and(|ids| {
-                ids.iter().any(|&i| {
-                    !self
-                        .overlay
-                        .contains_key(&self.base.entries[i as usize].path)
-                })
-            })
+            || self
+                .base
+                .holding(hash)
+                .any(|e| !self.overlay.contains_key(&e.path))
     }
 
     /// Every file, in path order.

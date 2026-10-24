@@ -4936,6 +4936,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4050469837a6ff301cd14c1f8f24f88549e6d548f24f64e2148eb0f72cebc51f"
 
 [[package]]
+name = "lz4_flex"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226"
+
+[[package]]
 name = "mac_address"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7193,10 +7199,13 @@ dependencies = [
  "rand 0.10.3",
  "reqwest",
  "rill-cache",
+ "rill-core",
  "rill-daemon",
  "rill-proto",
  "rill-reapi-proto",
  "rill-sdk",
+ "rill-search",
+ "rill-store",
  "rill-types",
  "serde_json",
  "tempfile",
@@ -7450,11 +7459,13 @@ dependencies = [
  "fst",
  "futures",
  "globset",
+ "lz4_flex",
  "memmap2",
  "parking_lot",
  "postcard",
  "proptest",
  "protobuf",
+ "rayon",
  "regex",
  "regex-syntax",
  "rill-core",

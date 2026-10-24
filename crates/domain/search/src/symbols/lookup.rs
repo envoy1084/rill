@@ -73,61 +73,55 @@ pub async fn find_symbols<F: PathFilter + Clone + 'static>(
     let plan = TrigramQuery::literal(query.name.text().as_bytes());
     let shadowed: Arc<HashSet<RepoPathBuf>> =
         Arc::new(scope.live.iter().map(|f| f.path.clone()).collect());
-    let mut tasks = Vec::new();
+    let mut segments = Vec::new();
     for shard in 0..index.config().shards.max(1) as usize {
-        let segments = index.segments_of(shard).await?;
-        let (view, query, plan, allow, shadowed, objects) = (
-            scope.view.clone(),
-            query.clone(),
-            plan.clone(),
-            allow.clone(),
-            shadowed.clone(),
-            index.repo().objects().clone(),
-        );
-        tasks.push(tokio::task::spawn_blocking(
-            move || -> Result<Vec<SymbolHit>> {
-                let mut out = Vec::new();
-                for seg in &segments {
-                    let candidates = seg.candidates(&plan)?;
-                    let docs: Box<dyn Iterator<Item = u32>> = match &candidates {
-                        Candidates::All => Box::new(0..seg.docs().len() as u32),
-                        Candidates::Docs(d) => Box::new(d.iter()),
-                    };
-                    for doc in docs {
-                        let hash = seg.docs()[doc as usize].hash;
-                        if !view.holds(&hash) || objects.refuses(ObjectKind::Blob, &hash).is_err() {
-                            continue;
-                        }
-                        let symbols: Vec<Symbol> = seg
-                            .symbols(doc)?
-                            .into_iter()
-                            .filter(|s| query.wants(s))
-                            .collect();
-                        if symbols.is_empty() {
-                            continue;
-                        }
-                        for path in view.paths_of(&hash) {
-                            if shadowed.contains(&path) || !allow(&path) {
-                                continue;
-                            }
-                            out.extend(symbols.iter().map(|s| SymbolHit {
-                                path: path.clone(),
-                                symbol: s.clone(),
-                            }));
-                        }
-                        if out.len() >= query.limit {
-                            return Ok(out);
-                        }
-                    }
+        segments.push(index.segments_of(shard).await?);
+    }
+    let (view, wanted, objects) = (
+        scope.view.clone(),
+        query.clone(),
+        index.repo().objects().clone(),
+    );
+    let (admit, shadow) = (allow.clone(), shadowed.clone());
+    let per_shard = crate::cpu::map(segments, move |segments| -> Result<Vec<SymbolHit>> {
+        let mut out = Vec::new();
+        for seg in &segments {
+            let candidates = seg.candidates(&plan)?;
+            let docs: Box<dyn Iterator<Item = u32>> = match &candidates {
+                Candidates::All => Box::new(0..seg.docs().len() as u32),
+                Candidates::Docs(d) => Box::new(d.iter()),
+            };
+            for doc in docs {
+                let hash = seg.docs()[doc as usize].hash;
+                if !view.holds(&hash) || objects.refuses(ObjectKind::Blob, &hash).is_err() {
+                    continue;
                 }
-                Ok(out)
-            },
-        ));
-    }
-    let mut hits = Vec::new();
-    for t in tasks {
-        hits.extend(t.await??);
-    }
+                let symbols: Vec<Symbol> = seg
+                    .symbols(doc)?
+                    .into_iter()
+                    .filter(|s| wanted.wants(s))
+                    .collect();
+                if symbols.is_empty() {
+                    continue;
+                }
+                for path in view.paths_of(&hash) {
+                    if shadow.contains(&path) || !admit(&path) {
+                        continue;
+                    }
+                    out.extend(symbols.iter().map(|s| SymbolHit {
+                        path: path.clone(),
+                        symbol: s.clone(),
+                    }));
+                }
+                if out.len() >= wanted.limit {
+                    return Ok(out);
+                }
+            }
+        }
+        Ok(out)
+    })
+    .await?;
+    let mut hits: Vec<SymbolHit> = per_shard.into_iter().flatten().collect();
     let live: Vec<_> = scope
         .live
         .iter()

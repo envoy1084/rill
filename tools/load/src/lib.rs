@@ -7,6 +7,7 @@ pub mod healing;
 pub mod ledger;
 pub mod profile;
 pub mod run;
+pub mod search_gate;
 pub mod slo;
 pub mod stats;
 pub mod watch;

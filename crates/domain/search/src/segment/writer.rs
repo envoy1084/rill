@@ -10,9 +10,6 @@ use crate::error::{Error, Result};
 use crate::symbols::Symbol;
 use crate::trigram::{trigrams, PostingList};
 
-/// zstd level for stored contents: fast to write, still a good ratio.
-const ZSTD_LEVEL: i32 = 3;
-
 /// One blob made ready for a segment: tokenized and compressed, the
 /// CPU-heavy part, done off the async threads.
 pub struct PreparedDoc {
@@ -29,8 +26,7 @@ impl PreparedDoc {
         Ok(PreparedDoc {
             hash,
             trigrams: trigrams(content, true).into_iter().collect(),
-            compressed: zstd::bulk::compress(content, ZSTD_LEVEL)
-                .map_err(|e| Error::Codec(format!("compressing content: {e}")))?,
+            compressed: super::codec::compress(content)?,
             symbols: postcard::to_stdvec(symbols)
                 .map_err(|e| Error::Codec(format!("symbols: {e}")))?,
             len: content.len() as u32,

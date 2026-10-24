@@ -37,7 +37,9 @@ impl Error {
                 rill_search::Error::Store(s) => store_code(s),
                 rill_search::Error::Core(c) => core_code(c),
                 rill_search::Error::Types(_) => Code::InvalidArgument,
-                rill_search::Error::Codec(_) | rill_search::Error::Join(_) => Code::Internal,
+                rill_search::Error::Codec(_)
+                | rill_search::Error::Join(_)
+                | rill_search::Error::Worker => Code::Internal,
             },
             Error::Types(_) | Error::Convert(_) | Error::InvalidArgument(_) => {
                 Code::InvalidArgument

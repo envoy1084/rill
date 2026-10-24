@@ -8,7 +8,7 @@ use super::bytes::SegmentBytes;
 use super::format::{trigram_key, unpack_entry, Header, SegmentDoc, MAGIC};
 use crate::error::{Error, Result};
 use crate::symbols::Symbol;
-use crate::trigram::{Candidates, PostingList, TrigramQuery};
+use crate::trigram::{Candidates, PostingList, Postings, TrigramQuery};
 
 /// An open segment.
 pub struct Segment {
@@ -90,22 +90,21 @@ impl Segment {
         let raw = region
             .get(offset..offset + len)
             .ok_or_else(|| corrupt("posting list out of range"))?;
-        PostingList::deserialize_from(raw)
+        // Segments are content-addressed and verified when fetched, so
+        // their posting lists are read without re-validating them.
+        PostingList::deserialize_unchecked_from(raw)
             .map(Some)
             .map_err(|e| Error::Codec(format!("posting list: {e}")))
     }
 
     /// The blobs `query` admits.
     pub fn candidates(&self, query: &TrigramQuery) -> Result<Candidates> {
-        let failed = std::cell::RefCell::new(None);
-        let out = query.evaluate(&|t| match self.postings(t) {
-            Ok(p) => p,
-            Err(e) => {
-                failed.borrow_mut().get_or_insert(e);
-                None
-            }
-        });
-        match failed.into_inner() {
+        let lookup = SegmentPostings {
+            segment: self,
+            failed: std::cell::RefCell::new(None),
+        };
+        let out = query.evaluate(&lookup);
+        match lookup.failed.into_inner() {
             Some(e) => Err(e),
             None => Ok(out),
         }
@@ -120,8 +119,7 @@ impl Segment {
             .ok_or_else(|| corrupt("no such doc"))?;
         let region = self.header.contents.slice(self.data())?;
         let raw = d.content.slice(region)?;
-        zstd::bulk::decompress(raw, d.len as usize)
-            .map_err(|e| Error::Codec(format!("content: {e}")))
+        super::codec::decompress(raw, d.len as usize)
     }
 
     /// The symbols of blob `doc`.
@@ -134,5 +132,30 @@ impl Segment {
         let region = self.header.symbols.slice(self.data())?;
         postcard::from_bytes(d.symbols.slice(region)?)
             .map_err(|e| Error::Codec(format!("symbols: {e}")))
+    }
+}
+
+/// A segment's posting lists, keeping the first read error.
+struct SegmentPostings<'a> {
+    segment: &'a Segment,
+    failed: std::cell::RefCell<Option<Error>>,
+}
+
+impl Postings for SegmentPostings<'_> {
+    fn size(&self, trigram: u32) -> Option<usize> {
+        self.segment
+            .dict
+            .get(trigram_key(trigram))
+            .map(|entry| unpack_entry(entry).1)
+    }
+
+    fn get(&self, trigram: u32) -> Option<PostingList> {
+        match self.segment.postings(trigram) {
+            Ok(p) => p,
+            Err(e) => {
+                self.failed.borrow_mut().get_or_insert(e);
+                None
+            }
+        }
     }
 }

@@ -10,6 +10,7 @@
 //! them against the stored content and ranks the files. [`symbols`]
 //! extracts definitions, stored with each blob.
 
+mod cpu;
 pub mod error;
 pub mod index;
 pub mod paths;

@@ -30,6 +30,9 @@ pub enum Error {
 
     #[error("background task failed: {0}")]
     Join(#[from] tokio::task::JoinError),
+
+    #[error("a search worker stopped before answering")]
+    Worker,
 }
 
 impl From<regex::Error> for Error {

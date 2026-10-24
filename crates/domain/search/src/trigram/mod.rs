@@ -9,4 +9,4 @@ mod query;
 pub use extract::{fold_byte, pack, trigrams, unpack};
 pub use plan::required_trigrams_for_regex;
 pub use postings::{DocId, PostingList};
-pub use query::{Candidates, TrigramQuery};
+pub use query::{Candidates, Postings, TrigramQuery};
