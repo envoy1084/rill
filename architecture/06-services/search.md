@@ -1,182 +1,213 @@
 # Search
 
-`rill-search` is a trigram text index over blob content plus a manifest of
-paths per root tree. The index is keyed by blob hash, not by path or
-version, so a blob is tokenized once no matter how many roots contain it.
-The server serves the `Grep` RPC from it and keeps it current as versions
-land on trunk.
+`rill-search` serves code search from immutable index segments, in the
+style of Zoekt and Lucene. Three things make it scale:
+
+- **Segments are keyed by content.** A blob is tokenized once, however
+  many roots or paths hold it.
+- **Path maps are layered.** A landing costs what it changed.
+- **Shards are searched in parallel.** Each shard is a list of segments.
 
 ```mermaid
 flowchart LR
-  subgraph server[rill-api]
-    grep[RepoSvc::grep_impl] --> ctx[RepoContext::grep]
-    idx[workers::indexer index jobs]
-  end
-  subgraph search[rill-search]
-    si[SearchIndex]
-    q[search]
-  end
-  ctx --> q --> si
-  idx -->|index_version + flush| si
-  si <--> derived[(derived idx:*)]
-  q --> objects[(object store)]
+  L[landing] -->|index job| W[writer: path layer + new segments]
+  W --> S[(segment objects)]
+  W --> R[(idx:segments@1 / idx:paths@1)]
+  Q[Grep] --> P[planner: trigram query]
+  P --> F[every shard in parallel]
+  F --> V[candidates held by the root at permitted paths]
+  V --> C[verify on stored content]
+  C --> K[rank, facets]
 ```
 
-The caller decides permissions by passing a `PathFilter`.
+## Segments
 
-## Index build
+A segment ([segment/](../../crates/domain/search/src/segment/mod.rs)) is an
+immutable object (`ObjectKind::Derived`) covering a batch of blobs. It
+holds:
 
-`SearchIndex::index_root(root)` is a no-op when the root already has a
-manifest. Otherwise it walks the whole tree, builds a `RootManifest`
-(entries sorted by path, each with its `ContentRef` and `FileKind`), and
-tokenizes only content hashes that the index has not seen in memory or as
-a persisted `BlobMarker`. Blob reads run `IndexConfig::concurrency` (16)
-at a time. `index_version` derives the version's `RootTree` first.
+- **A trigram dictionary:** an [`fst`](https://crates.io/crates/fst) map from
+  each three-byte sequence (ASCII case-folded) to its posting list.
+- **Posting lists:** roaring bitmaps of the segment's document numbers.
+- **Each blob's content,** compressed with zstd, so a candidate is verified
+  without fetching the blob.
+- **Each blob's symbols:** definitions extracted with sem-core, using the
+  first path the blob was indexed under to pick the language.
 
-`index_blob` is the only tokenizer entry point:
+Segments never change. A blob over 1 MiB or binary is not put in a segment
+(its marker says "skipped"), so it is findable by path only.
 
-* Blobs over `IndexConfig::max_blob_size` (1 MiB) or flagged by
-  `rill_core::is_binary` get a marker with `doc: None` and are never
-  searched.
-* Other blobs get the next dense `DocId` (`u32`) from the `DocTable`, and
-  the id is added to the `PostingList` of every trigram in the blob.
-* `trigrams()` packs three consecutive bytes into a `u32`. Postings are
-  always ASCII-case-folded (`fold_byte`), so one index serves both
-  case-sensitive and case-insensitive queries; the regex filters exactly.
-* A `PostingList` is a `roaring::RoaringBitmap` of `DocId`s, persisted in
-  roaring's portable serialization; `evaluate` intersects and unions them
-  with the bitmap operators.
+Blobs are spread over `shards` (16 by default) by content hash.
 
-## Query
+**Where segments live.** With `[search] cache_dir` set, a server keeps
+segments on local disk, under a subdirectory per repository, and
+memory-maps them with `memmap2`. Otherwise it holds them in memory. Either
+way they are fetched from the object store once.
 
-`required_trigrams_for_regex` parses the pattern with `regex_syntax` and
-folds the HIR into a `TrigramQuery`. Literal runs become `And` of their
-trigrams, alternations become `Or`, captures and zero-width assertions are
-transparent, and anything unconstrained (wide classes, repetitions with
-`min == 0`) becomes `All`. The query is sound but not complete: a matching
-document always satisfies it, and the regex always runs over candidates.
-`evaluate` intersects and unions posting lists into `Candidates::Docs` or
-`Candidates::All`.
+## Path layers
 
-```mermaid
-sequenceDiagram
-  participant H as grep_impl
-  participant C as RepoContext::grep
-  participant S as search()
-  participant O as object store
-  H->>H: read_filter(), resolve_root, SearchQuery(max+1)
-  H->>C: grep(root, query, filter)
-  C->>C: manifest(root) missing? index_root(root)
-  C->>S: search(index, root, query, allow)
-  S->>S: compile regex, evaluate trigram query
-  S->>S: keep entries passing glob, allow, candidates
-  loop buffered(16), path order
-    S->>O: read_content
-    S->>S: scan_blob on spawn_blocking
-  end
-  S-->>H: hits cut at max_results
-```
+Which files a root has is a [`PathLayer`](../../crates/domain/search/src/paths/layer.rs),
+stored per root (`idx:paths@1`):
 
-`search` never reads a blob whose path the glob or `PathFilter` rejects,
-or a blob with no `DocId`. A `SearchHit` is one line of one file: `path`,
-1-based `line_no`, the line, context lines, and the `byte_range` of the
-first match on that line. Hits come back in path order, then line order.
-Patterns are Rust `regex` over bytes, multi-line; globs use `globset`.
+- **`Base`:** every file of the root, with its content hash and kind.
+- **`Delta`:** the parent root's files with this root's changes applied.
+  The changes come from `diff_trees`, so a landing costs what it changed.
+
+A new base is written when a chain reaches 32 deltas, or when a change
+touches more than 50,000 files.
+
+A [`PathView`](../../crates/domain/search/src/paths/view.rs) is a base map
+plus the overlay of every delta above it, cached per process. It answers:
+
+- which paths hold a content hash;
+- what is at a path;
+- which paths changed recently (a ranking signal).
+
+## Writing the index
+
+One server writes, the holder of the repository's `search` lease; every
+write is fenced on it.
+
+Each landing queues an index job for the new trunk head. The worker also
+queues the current head when it starts, because trunk can move without a
+landing (imports). `index_version`:
+
+1. Takes the version's root and its first parent's root.
+2. Writes a delta when the parent is indexed and the chain is short, a
+   full walk otherwise.
+3. Reads only the blobs no marker covers, prepares them in parallel off
+   the async threads (tokenize, compress, extract symbols), and fills one
+   builder per shard. A builder is cut into a segment at `segment_mb` of
+   content.
+4. Commits in this order:
+   - the segment list (`idx:segments@1`, with a generation);
+   - the blob markers (`idx:marker@1`);
+   - the root's layer.
+
+   A reader never sees a layer whose blobs are not in a listed segment.
+5. Records `indexed_through` (trunk position and root) when the version is
+   on trunk.
+
+After each job, `compact` merges segments tier by tier. Once a shard has
+`merge_fanout` segments of one level, they become one segment of the next
+level, built from the stored contents (no blob is fetched again). The
+segment list then swaps them in one write.
+
+Every other server reloads when the stored generation moves. It costs one
+read per search and opens only new segments.
+
+## Queries
+
+**Planning.** The planner
+([trigram/plan.rs](../../crates/domain/search/src/trigram/plan.rs)) is a
+port of Russ Cox's codesearch analysis onto `regex-syntax`'s HIR:
+
+- Each sub-expression is summarised by whether it can match empty, its
+  exact strings (when few), its prefixes and suffixes, and a trigram query.
+- Concatenation crosses exact sets, so `(abc|def)ghi` requires `abcghi` or
+  `defghi`, and `x(a|b)yz` requires `xayz` or `xbyz`.
+- Oversized sets fold into the query.
+- The query is sound (a property test checks this): any document the regex
+  matches satisfies it.
+
+**Search.**
+[`search(index, scope, query, allow)`](../../crates/domain/search/src/query/search.rs)
+runs every shard on the blocking pool at once. For each segment, the
+candidates are documents that:
+
+1. satisfy the trigram query (all documents when the pattern has no
+   required trigram);
+2. are held by the scope's view at some path;
+3. are at a path the glob, the language filter and the caller's
+   `PathFilter` admit (the filter is applied after intersection, from the
+   current permissions, so nothing about access is baked into segments);
+4. are not redacted (the object store's `refuses`).
+
+Candidates are then verified with the regex (16 MiB size limits) on the
+stored content. A shard stops at twice the requested hits (at least 50
+files), or when the query's time budget runs out (`partial`).
+
+**Ranking (v1).** Files are scored, then hits flattened best file first:
+
+| Signal | Score |
+| --- | --- |
+| base | 100 − 3 per directory level |
+| the file name matches | +20 |
+| a matched line defines a symbol | +25 |
+| under `src/` or `lib/` | +15 |
+| changed in the view's recent deltas | +10 |
+| under `vendor/`, `third_party/`, `node_modules/`, `generated/` | −30 |
+| a test file | −15 |
+
+Facets count matched files by top-level directory and by language.
+
+## Scopes and freshness
+
+A [`Scope`](../../crates/domain/search/src/query/scope.rs) is a view plus
+**live files**: files read from the object store and scanned directly,
+which shadow their paths in the view.
+[`RepoContext::grep`](../../crates/server/runtime/src/state/grep.rs)
+builds one per request:
+
+1. **An indexed root:** its view.
+2. **A version that isn't indexed** (an unlanded change, a workspace
+   snapshot, a just-landed head the writer has not reached): its nearest
+   indexed first-parent ancestor (up to 64 back). The view gets the diff
+   applied, and the changed files are read live (up to 2,000).
+3. **Otherwise:** the writer is asked to index the root, and the search
+   waits up to 30 s. Concurrent searches of one root share one job
+   (`state::index_requests`).
+
+Every response carries `indexed_through`. A request with `min_seq` waits
+up to 30 s until trunk is indexed through that position, then fails with
+`UNAVAILABLE`.
 
 ## Server surface
 
-`RepoSvc::grep_impl` rejects an empty pattern, takes the caller's
-`Permit::read_filter()` (allow-all in dev mode or bootstrap, else the
-paths the caller can read; a failed relation load denies all), resolves the
-root (trunk head by default), and asks for `max + 1` hits so `truncated` is
-exact. `max_results` of 0 means 200 and is capped at 5000; `context_lines`
-is capped at 20. A root without a manifest is not indexed by the server
-that was asked: `RepoContext::grep` queues a high-priority `index_root`
-job and waits up to 30 s for the manifest (then `RootNotIndexed`), so any
-tree is searchable at the cost of a full walk by the index writer. Concurrent searches of one root on a server share one job
-(`state::index_requests`): under load every search of a new trunk head
-would otherwise queue its own, and the queue grows without bound.
+`ContentService.Grep` takes:
+- a pattern (regex, or `literal`), case-insensitivity, path globs and
+  `languages`;
+- `max_results` (default and cap 5,000) and `context_lines` (cap 20);
+- the revision, and `min_seq`.
 
-Error mapping: `InvalidPattern` and `InvalidGlob` are `InvalidArgument`,
-`RootNotIndexed` is `Unavailable`, `Codec` and `Join` are `Internal`.
+It returns:
+- ranked hits;
+- `truncated`, `partial`, `files_matched`;
+- the directory and language facets;
+- `indexed_through`.
 
-Indexing runs as jobs, written by one server per repository. Document ids
-are allocated in memory, so two writers would corrupt the index: index
-jobs run only on the server holding the repository's `search` lease, which
-loads the stored index when it takes the lease, and every index write is
-fenced on that lease. Each landing enqueues an `index_version` job for the
-new trunk head on the repository's `index` queue, in the land transaction.
-The index worker (`workers::indexer::run`) queues the current head once at
-start (trunk can move without a landing, by import), then runs
-`index_version` and `index_root` jobs. A failure is retried with backoff
-and a job whose worker died reruns when its claim expires (see
-[events and workers](../07-runtime/events-and-workers.md#jobs)). It
-flushes once more on shutdown. The server always uses
-`IndexConfig::default()`; nothing in server config tunes the index.
+It requires read access somewhere; results are filtered to readable paths.
 
-## Persistence
-
-All records live in the repository's derived keyspace (see
-[derived data](../02-data/derived-data.md)) with `encode_record` framing.
-
-| Kind | Key | Value |
+| `[search]` | Default | Meaning |
 | --- | --- | --- |
-| `idx:blob@1` | content hash | `BlobMarker { doc }`; `None` means skipped |
-| `idx:root@1` | root `TreeHash` | `RootManifest` |
-| `idx:docs@1` | `ObjectHash::ZERO` | `DocTableRecord { hashes }`; id = position |
-| `idx:post@1` | `shard_key(trigram >> 16)`, 256 shards | `ShardRecord` of encoded lists |
-| `idx:sym@1` | root `TreeHash` | symbol table (see below) |
+| `shards` | 16 | shards blobs are spread over |
+| `cache_dir` | none | local segment cache (memory when unset) |
+| `segment_mb` | 64 | content per fresh segment |
+| `merge_fanout` | 8 | segments per tier before a merge |
+| `time_budget_ms` | 10000 | when a query returns partial results |
 
-| `idx:state@1` | `ObjectHash::ZERO` | `IndexState`: a generation per shard and for the table |
-
-`index_root` tokenizes, flushes, and only then writes the root's manifest,
-so a manifest is never visible without the postings behind it. `flush`
-writes dirty shards whole, then the document table, then pending blob
-markers, then the new generations, in that order; a crash between steps
-never leaves a blob marked indexed without its postings. On read, a marker
-whose `DocId` does not map back to the same hash in the loaded table is
-treated as unknown and the blob is re-indexed. `open` loads every shard and
-the document table into memory.
-
-Every other server keeps a read-only copy. `search` calls `refresh` after
-reading the root's manifest: it compares the stored `IndexState` with the
-one it loaded (one read) and reloads only the shards, and the table, whose
-generation moved. A process with unflushed writes of its own is the writer
-and skips refreshing.
-
-## Symbols
-
-`SymbolIndex::for_root` extracts definitions with `sem-core` (pinned; the
-same tree-sitter entity extraction weave's structural merge uses) from
-every file sem-core's registry parses as code, up to 1 MiB. Each entity
-becomes a `Symbol { name, kind, line }`, its kind mapped from sem-core's
-entity type. Extraction is cached per `(content hash, path)` and the
-per-root table is stored as derived data (`idx:sym@1`), so a root is
-walked once. It offers `find_definition` and `list_symbols`. It is
-library-only: the server never constructs one and there is no RPC.
+Error mapping:
+- `InvalidPattern` and `InvalidGlob` are `INVALID_ARGUMENT`;
+- `RootNotIndexed` and an unmet `min_seq` are `UNAVAILABLE`;
+- `Codec` and `Join` are `INTERNAL`.
 
 ## Limitations
 
-* Pruning is by trigram only. A pattern with no mandatory three-byte
-  literal scans every indexed blob in the root.
-* The whole index lives in memory, and shards are rewritten whole on every
-  flush.
-* Case-insensitive planning considers only ASCII fold variants, so a match
-  that exists only through a non-ASCII fold (the Kelvin sign for `k`) can
-  be pruned.
-* Only trunk heads are indexed ahead of time: one per landing batch, and
-  the head at worker start. Intermediate landed roots and roots from other
-  refs are indexed lazily on first `Grep`.
-* Symbols cover the languages sem-core parses; definitions produced by
-  macros are not seen.
+- Merged-away segment objects stay in the object store until GC (phase 28).
+- A blob's symbols and language come from the first path it was indexed
+  under.
+- Case-insensitive planning folds ASCII only.
+- A redacted blob is hidden at query time, but its segment still holds the
+  content until it is merged or rebuilt.
 
 ## Code
 
-* [lib.rs](../../crates/domain/search/src/lib.rs), [error.rs](../../crates/domain/search/src/error.rs), [trigram/extract.rs](../../crates/domain/search/src/trigram/extract.rs), [trigram/literals.rs](../../crates/domain/search/src/trigram/literals.rs), [trigram/query.rs](../../crates/domain/search/src/trigram/query.rs)
-* [index/search_index.rs](../../crates/domain/search/src/index/search_index.rs), [index/persist.rs](../../crates/domain/search/src/index/persist.rs), [index/docs.rs](../../crates/domain/search/src/index/docs.rs), [index/manifest.rs](../../crates/domain/search/src/index/manifest.rs), [index/config.rs](../../crates/domain/search/src/index/config.rs)
-* [query/search.rs](../../crates/domain/search/src/query/search.rs), [query/request.rs](../../crates/domain/search/src/query/request.rs), [query/lines.rs](../../crates/domain/search/src/query/lines.rs)
-* [symbols/index.rs](../../crates/domain/search/src/symbols/index.rs), [symbols/extract.rs](../../crates/domain/search/src/symbols/extract.rs)
-* Server: [workers/indexer.rs](../../crates/server/runtime/src/workers/indexer.rs), [services/content/grep.rs](../../crates/server/api/src/services/content/grep.rs), [state/repo_context.rs](../../crates/server/runtime/src/state/repo_context.rs), [repos.proto](../../crates/foundation/proto/proto/rill/v1/repos.proto)
+* [segment/](../../crates/domain/search/src/segment/mod.rs): format, writer, reader, merge
+* [paths/](../../crates/domain/search/src/paths/mod.rs): layers and views
+* [index/](../../crates/domain/search/src/index/mod.rs): records, cache, writer, compaction, snapshot
+* [query/](../../crates/domain/search/src/query/mod.rs): scope, search, ranking, facets
+* [trigram/](../../crates/domain/search/src/trigram/mod.rs): extraction, planner, queries
+* Server: [state/grep.rs](../../crates/server/runtime/src/state/grep.rs), [workers/indexer.rs](../../crates/server/runtime/src/workers/indexer.rs), [services/content/grep.rs](../../crates/server/api/src/services/content/grep.rs)
 
 ---
 ← Previous: [Security review packet](../05-policy/security-review.md) · [Index](../index.md) · Next: [Exec](exec.md) →

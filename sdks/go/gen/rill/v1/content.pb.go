@@ -1818,8 +1818,15 @@ type GrepRequest struct {
 	// Glob filters on paths, e.g. `src/**/*.rs`; empty means all paths.
 	PathGlobs []string `protobuf:"bytes,5,rep,name=path_globs,json=pathGlobs,proto3" json:"path_globs,omitempty"`
 	// Most hits; 0 means 5,000.
-	MaxResults    uint32 `protobuf:"varint,6,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
-	ContextLines  uint32 `protobuf:"varint,7,opt,name=context_lines,json=contextLines,proto3" json:"context_lines,omitempty"`
+	MaxResults   uint32 `protobuf:"varint,6,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	ContextLines uint32 `protobuf:"varint,7,opt,name=context_lines,json=contextLines,proto3" json:"context_lines,omitempty"`
+	// Match `pattern` as a literal string, not a regex.
+	Literal bool `protobuf:"varint,8,opt,name=literal,proto3" json:"literal,omitempty"`
+	// Only files in these languages (`rust`, `python`, …); empty is all.
+	Languages []string `protobuf:"bytes,9,rep,name=languages,proto3" json:"languages,omitempty"`
+	// Wait until trunk is indexed through this position (up to 30 s), so
+	// a search sees a landing the caller just made.
+	MinSeq        *uint64 `protobuf:"varint,10,opt,name=min_seq,json=minSeq,proto3,oneof" json:"min_seq,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1903,11 +1910,43 @@ func (x *GrepRequest) GetContextLines() uint32 {
 	return 0
 }
 
+func (x *GrepRequest) GetLiteral() bool {
+	if x != nil {
+		return x.Literal
+	}
+	return false
+}
+
+func (x *GrepRequest) GetLanguages() []string {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
+}
+
+func (x *GrepRequest) GetMinSeq() uint64 {
+	if x != nil && x.MinSeq != nil {
+		return *x.MinSeq
+	}
+	return 0
+}
+
 type GrepResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Hits  []*GrepHit             `protobuf:"bytes,1,rep,name=hits,proto3" json:"hits,omitempty"`
-	// `max_results` cut the hits.
-	Truncated     bool `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	// Best files first (definitions, source over vendored or test code,
+	// shallow paths, recent changes), then in line order within a file.
+	Hits []*GrepHit `protobuf:"bytes,1,rep,name=hits,proto3" json:"hits,omitempty"`
+	// More hits exist than were returned.
+	Truncated bool `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	// Trunk is indexed through this position.
+	IndexedThrough uint64 `protobuf:"varint,3,opt,name=indexed_through,json=indexedThrough,proto3" json:"indexed_through,omitempty"`
+	// Files with a match, among those looked at.
+	FilesMatched uint32 `protobuf:"varint,4,opt,name=files_matched,json=filesMatched,proto3" json:"files_matched,omitempty"`
+	// The time budget ran out first: results are incomplete.
+	Partial bool `protobuf:"varint,5,opt,name=partial,proto3" json:"partial,omitempty"`
+	// Matched files by top-level directory and by language.
+	Directories   map[string]uint32 `protobuf:"bytes,6,rep,name=directories,proto3" json:"directories,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Languages     map[string]uint32 `protobuf:"bytes,7,rep,name=languages,proto3" json:"languages,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1954,6 +1993,41 @@ func (x *GrepResponse) GetTruncated() bool {
 		return x.Truncated
 	}
 	return false
+}
+
+func (x *GrepResponse) GetIndexedThrough() uint64 {
+	if x != nil {
+		return x.IndexedThrough
+	}
+	return 0
+}
+
+func (x *GrepResponse) GetFilesMatched() uint32 {
+	if x != nil {
+		return x.FilesMatched
+	}
+	return 0
+}
+
+func (x *GrepResponse) GetPartial() bool {
+	if x != nil {
+		return x.Partial
+	}
+	return false
+}
+
+func (x *GrepResponse) GetDirectories() map[string]uint32 {
+	if x != nil {
+		return x.Directories
+	}
+	return nil
+}
+
+func (x *GrepResponse) GetLanguages() map[string]uint32 {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
 }
 
 type GrepHit struct {
@@ -2398,7 +2472,7 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"\x10PathHistoryEntry\x12-\n" +
 	"\aversion\x18\x01 \x01(\v2\x13.rill.v1.ChangeInfoR\aversion\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12+\n" +
-	"\x06change\x18\x03 \x01(\v2\x13.rill.v1.FileChangeR\x06change\"\xe7\x01\n" +
+	"\x06change\x18\x03 \x01(\v2\x13.rill.v1.FileChangeR\x06change\"\xc9\x02\n" +
 	"\vGrepRequest\x12\x12\n" +
 	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\tR\brevision\x12\x18\n" +
@@ -2408,10 +2482,27 @@ const file_rill_v1_content_proto_rawDesc = "" +
 	"path_globs\x18\x05 \x03(\tR\tpathGlobs\x12\x1f\n" +
 	"\vmax_results\x18\x06 \x01(\rR\n" +
 	"maxResults\x12#\n" +
-	"\rcontext_lines\x18\a \x01(\rR\fcontextLines\"R\n" +
+	"\rcontext_lines\x18\a \x01(\rR\fcontextLines\x12\x18\n" +
+	"\aliteral\x18\b \x01(\bR\aliteral\x12\x1c\n" +
+	"\tlanguages\x18\t \x03(\tR\tlanguages\x12\x1c\n" +
+	"\amin_seq\x18\n" +
+	" \x01(\x04H\x00R\x06minSeq\x88\x01\x01B\n" +
+	"\n" +
+	"\b_min_seq\"\xc6\x03\n" +
 	"\fGrepResponse\x12$\n" +
 	"\x04hits\x18\x01 \x03(\v2\x10.rill.v1.GrepHitR\x04hits\x12\x1c\n" +
-	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"\xb2\x01\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated\x12'\n" +
+	"\x0findexed_through\x18\x03 \x01(\x04R\x0eindexedThrough\x12#\n" +
+	"\rfiles_matched\x18\x04 \x01(\rR\ffilesMatched\x12\x18\n" +
+	"\apartial\x18\x05 \x01(\bR\apartial\x12H\n" +
+	"\vdirectories\x18\x06 \x03(\v2&.rill.v1.GrepResponse.DirectoriesEntryR\vdirectories\x12B\n" +
+	"\tlanguages\x18\a \x03(\v2$.rill.v1.GrepResponse.LanguagesEntryR\tlanguages\x1a>\n" +
+	"\x10DirectoriesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\x1a<\n" +
+	"\x0eLanguagesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\"\xb2\x01\n" +
 	"\aGrepHit\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x17\n" +
 	"\aline_no\x18\x02 \x01(\rR\x06lineNo\x12\x12\n" +
@@ -2467,7 +2558,7 @@ func file_rill_v1_content_proto_rawDescGZIP() []byte {
 	return file_rill_v1_content_proto_rawDescData
 }
 
-var file_rill_v1_content_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_rill_v1_content_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_rill_v1_content_proto_goTypes = []any{
 	(*ReadFileRequest)(nil),           // 0: rill.v1.ReadFileRequest
 	(*ReadFileResponse)(nil),          // 1: rill.v1.ReadFileResponse
@@ -2504,72 +2595,76 @@ var file_rill_v1_content_proto_goTypes = []any{
 	(*FindMergeBaseResponse)(nil),     // 32: rill.v1.FindMergeBaseResponse
 	(*IsAncestorRequest)(nil),         // 33: rill.v1.IsAncestorRequest
 	(*IsAncestorResponse)(nil),        // 34: rill.v1.IsAncestorResponse
-	(*TreeEntry)(nil),                 // 35: rill.v1.TreeEntry
-	(*NamedTreeEntry)(nil),            // 36: rill.v1.NamedTreeEntry
-	(*Tree)(nil),                      // 37: rill.v1.Tree
-	(*ContentRef)(nil),                // 38: rill.v1.ContentRef
-	(ObjectKind)(0),                   // 39: rill.v1.ObjectKind
-	(DiffFormat)(0),                   // 40: rill.v1.DiffFormat
-	(*FileDiff)(nil),                  // 41: rill.v1.FileDiff
-	(*Principal)(nil),                 // 42: rill.v1.Principal
-	(*ChangeInfo)(nil),                // 43: rill.v1.ChangeInfo
-	(*FileChange)(nil),                // 44: rill.v1.FileChange
+	nil,                               // 35: rill.v1.GrepResponse.DirectoriesEntry
+	nil,                               // 36: rill.v1.GrepResponse.LanguagesEntry
+	(*TreeEntry)(nil),                 // 37: rill.v1.TreeEntry
+	(*NamedTreeEntry)(nil),            // 38: rill.v1.NamedTreeEntry
+	(*Tree)(nil),                      // 39: rill.v1.Tree
+	(*ContentRef)(nil),                // 40: rill.v1.ContentRef
+	(ObjectKind)(0),                   // 41: rill.v1.ObjectKind
+	(DiffFormat)(0),                   // 42: rill.v1.DiffFormat
+	(*FileDiff)(nil),                  // 43: rill.v1.FileDiff
+	(*Principal)(nil),                 // 44: rill.v1.Principal
+	(*ChangeInfo)(nil),                // 45: rill.v1.ChangeInfo
+	(*FileChange)(nil),                // 46: rill.v1.FileChange
 }
 var file_rill_v1_content_proto_depIdxs = []int32{
-	35, // 0: rill.v1.ReadFileResponse.entry:type_name -> rill.v1.TreeEntry
+	37, // 0: rill.v1.ReadFileResponse.entry:type_name -> rill.v1.TreeEntry
 	1,  // 1: rill.v1.BatchReadFilesResponse.files:type_name -> rill.v1.ReadFileResponse
-	35, // 2: rill.v1.StatResponse.entry:type_name -> rill.v1.TreeEntry
-	36, // 3: rill.v1.ListDirectoryResponse.entries:type_name -> rill.v1.NamedTreeEntry
-	37, // 4: rill.v1.GetTreeResponse.tree:type_name -> rill.v1.Tree
-	38, // 5: rill.v1.ReadBlobRequest.content:type_name -> rill.v1.ContentRef
+	37, // 2: rill.v1.StatResponse.entry:type_name -> rill.v1.TreeEntry
+	38, // 3: rill.v1.ListDirectoryResponse.entries:type_name -> rill.v1.NamedTreeEntry
+	39, // 4: rill.v1.GetTreeResponse.tree:type_name -> rill.v1.Tree
+	40, // 5: rill.v1.ReadBlobRequest.content:type_name -> rill.v1.ContentRef
 	13, // 6: rill.v1.WriteBlobRequest.header:type_name -> rill.v1.WriteBlobHeader
-	38, // 7: rill.v1.WriteBlobResponse.content:type_name -> rill.v1.ContentRef
+	40, // 7: rill.v1.WriteBlobResponse.content:type_name -> rill.v1.ContentRef
 	16, // 8: rill.v1.BatchCheckObjectsRequest.objects:type_name -> rill.v1.ObjectRef
-	39, // 9: rill.v1.ObjectRef.kind:type_name -> rill.v1.ObjectKind
-	40, // 10: rill.v1.DiffRequest.format:type_name -> rill.v1.DiffFormat
-	41, // 11: rill.v1.DiffResponse.files:type_name -> rill.v1.FileDiff
+	41, // 9: rill.v1.ObjectRef.kind:type_name -> rill.v1.ObjectKind
+	42, // 10: rill.v1.DiffRequest.format:type_name -> rill.v1.DiffFormat
+	43, // 11: rill.v1.DiffResponse.files:type_name -> rill.v1.FileDiff
 	22, // 12: rill.v1.BlameResponse.lines:type_name -> rill.v1.BlameLine
-	42, // 13: rill.v1.BlameLine.author:type_name -> rill.v1.Principal
-	43, // 14: rill.v1.ListHistoryResponse.versions:type_name -> rill.v1.ChangeInfo
+	44, // 13: rill.v1.BlameLine.author:type_name -> rill.v1.Principal
+	45, // 14: rill.v1.ListHistoryResponse.versions:type_name -> rill.v1.ChangeInfo
 	27, // 15: rill.v1.ListPathHistoryResponse.entries:type_name -> rill.v1.PathHistoryEntry
-	43, // 16: rill.v1.PathHistoryEntry.version:type_name -> rill.v1.ChangeInfo
-	44, // 17: rill.v1.PathHistoryEntry.change:type_name -> rill.v1.FileChange
+	45, // 16: rill.v1.PathHistoryEntry.version:type_name -> rill.v1.ChangeInfo
+	46, // 17: rill.v1.PathHistoryEntry.change:type_name -> rill.v1.FileChange
 	30, // 18: rill.v1.GrepResponse.hits:type_name -> rill.v1.GrepHit
-	0,  // 19: rill.v1.ContentService.ReadFile:input_type -> rill.v1.ReadFileRequest
-	2,  // 20: rill.v1.ContentService.BatchReadFiles:input_type -> rill.v1.BatchReadFilesRequest
-	4,  // 21: rill.v1.ContentService.Stat:input_type -> rill.v1.StatRequest
-	6,  // 22: rill.v1.ContentService.ListDirectory:input_type -> rill.v1.ListDirectoryRequest
-	8,  // 23: rill.v1.ContentService.GetTree:input_type -> rill.v1.GetTreeRequest
-	10, // 24: rill.v1.ContentService.ReadBlob:input_type -> rill.v1.ReadBlobRequest
-	12, // 25: rill.v1.ContentService.WriteBlob:input_type -> rill.v1.WriteBlobRequest
-	15, // 26: rill.v1.ContentService.BatchCheckObjects:input_type -> rill.v1.BatchCheckObjectsRequest
-	18, // 27: rill.v1.ContentService.Diff:input_type -> rill.v1.DiffRequest
-	20, // 28: rill.v1.ContentService.Blame:input_type -> rill.v1.BlameRequest
-	23, // 29: rill.v1.ContentService.ListHistory:input_type -> rill.v1.ListHistoryRequest
-	25, // 30: rill.v1.ContentService.ListPathHistory:input_type -> rill.v1.ListPathHistoryRequest
-	28, // 31: rill.v1.ContentService.Grep:input_type -> rill.v1.GrepRequest
-	31, // 32: rill.v1.ContentService.FindMergeBase:input_type -> rill.v1.FindMergeBaseRequest
-	33, // 33: rill.v1.ContentService.IsAncestor:input_type -> rill.v1.IsAncestorRequest
-	1,  // 34: rill.v1.ContentService.ReadFile:output_type -> rill.v1.ReadFileResponse
-	3,  // 35: rill.v1.ContentService.BatchReadFiles:output_type -> rill.v1.BatchReadFilesResponse
-	5,  // 36: rill.v1.ContentService.Stat:output_type -> rill.v1.StatResponse
-	7,  // 37: rill.v1.ContentService.ListDirectory:output_type -> rill.v1.ListDirectoryResponse
-	9,  // 38: rill.v1.ContentService.GetTree:output_type -> rill.v1.GetTreeResponse
-	11, // 39: rill.v1.ContentService.ReadBlob:output_type -> rill.v1.ReadBlobResponse
-	14, // 40: rill.v1.ContentService.WriteBlob:output_type -> rill.v1.WriteBlobResponse
-	17, // 41: rill.v1.ContentService.BatchCheckObjects:output_type -> rill.v1.BatchCheckObjectsResponse
-	19, // 42: rill.v1.ContentService.Diff:output_type -> rill.v1.DiffResponse
-	21, // 43: rill.v1.ContentService.Blame:output_type -> rill.v1.BlameResponse
-	24, // 44: rill.v1.ContentService.ListHistory:output_type -> rill.v1.ListHistoryResponse
-	26, // 45: rill.v1.ContentService.ListPathHistory:output_type -> rill.v1.ListPathHistoryResponse
-	29, // 46: rill.v1.ContentService.Grep:output_type -> rill.v1.GrepResponse
-	32, // 47: rill.v1.ContentService.FindMergeBase:output_type -> rill.v1.FindMergeBaseResponse
-	34, // 48: rill.v1.ContentService.IsAncestor:output_type -> rill.v1.IsAncestorResponse
-	34, // [34:49] is the sub-list for method output_type
-	19, // [19:34] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	35, // 19: rill.v1.GrepResponse.directories:type_name -> rill.v1.GrepResponse.DirectoriesEntry
+	36, // 20: rill.v1.GrepResponse.languages:type_name -> rill.v1.GrepResponse.LanguagesEntry
+	0,  // 21: rill.v1.ContentService.ReadFile:input_type -> rill.v1.ReadFileRequest
+	2,  // 22: rill.v1.ContentService.BatchReadFiles:input_type -> rill.v1.BatchReadFilesRequest
+	4,  // 23: rill.v1.ContentService.Stat:input_type -> rill.v1.StatRequest
+	6,  // 24: rill.v1.ContentService.ListDirectory:input_type -> rill.v1.ListDirectoryRequest
+	8,  // 25: rill.v1.ContentService.GetTree:input_type -> rill.v1.GetTreeRequest
+	10, // 26: rill.v1.ContentService.ReadBlob:input_type -> rill.v1.ReadBlobRequest
+	12, // 27: rill.v1.ContentService.WriteBlob:input_type -> rill.v1.WriteBlobRequest
+	15, // 28: rill.v1.ContentService.BatchCheckObjects:input_type -> rill.v1.BatchCheckObjectsRequest
+	18, // 29: rill.v1.ContentService.Diff:input_type -> rill.v1.DiffRequest
+	20, // 30: rill.v1.ContentService.Blame:input_type -> rill.v1.BlameRequest
+	23, // 31: rill.v1.ContentService.ListHistory:input_type -> rill.v1.ListHistoryRequest
+	25, // 32: rill.v1.ContentService.ListPathHistory:input_type -> rill.v1.ListPathHistoryRequest
+	28, // 33: rill.v1.ContentService.Grep:input_type -> rill.v1.GrepRequest
+	31, // 34: rill.v1.ContentService.FindMergeBase:input_type -> rill.v1.FindMergeBaseRequest
+	33, // 35: rill.v1.ContentService.IsAncestor:input_type -> rill.v1.IsAncestorRequest
+	1,  // 36: rill.v1.ContentService.ReadFile:output_type -> rill.v1.ReadFileResponse
+	3,  // 37: rill.v1.ContentService.BatchReadFiles:output_type -> rill.v1.BatchReadFilesResponse
+	5,  // 38: rill.v1.ContentService.Stat:output_type -> rill.v1.StatResponse
+	7,  // 39: rill.v1.ContentService.ListDirectory:output_type -> rill.v1.ListDirectoryResponse
+	9,  // 40: rill.v1.ContentService.GetTree:output_type -> rill.v1.GetTreeResponse
+	11, // 41: rill.v1.ContentService.ReadBlob:output_type -> rill.v1.ReadBlobResponse
+	14, // 42: rill.v1.ContentService.WriteBlob:output_type -> rill.v1.WriteBlobResponse
+	17, // 43: rill.v1.ContentService.BatchCheckObjects:output_type -> rill.v1.BatchCheckObjectsResponse
+	19, // 44: rill.v1.ContentService.Diff:output_type -> rill.v1.DiffResponse
+	21, // 45: rill.v1.ContentService.Blame:output_type -> rill.v1.BlameResponse
+	24, // 46: rill.v1.ContentService.ListHistory:output_type -> rill.v1.ListHistoryResponse
+	26, // 47: rill.v1.ContentService.ListPathHistory:output_type -> rill.v1.ListPathHistoryResponse
+	29, // 48: rill.v1.ContentService.Grep:output_type -> rill.v1.GrepResponse
+	32, // 49: rill.v1.ContentService.FindMergeBase:output_type -> rill.v1.FindMergeBaseResponse
+	34, // 50: rill.v1.ContentService.IsAncestor:output_type -> rill.v1.IsAncestorResponse
+	36, // [36:51] is the sub-list for method output_type
+	21, // [21:36] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_rill_v1_content_proto_init() }
@@ -2586,13 +2681,14 @@ func file_rill_v1_content_proto_init() {
 	}
 	file_rill_v1_content_proto_msgTypes[13].OneofWrappers = []any{}
 	file_rill_v1_content_proto_msgTypes[22].OneofWrappers = []any{}
+	file_rill_v1_content_proto_msgTypes[28].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rill_v1_content_proto_rawDesc), len(file_rill_v1_content_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   35,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

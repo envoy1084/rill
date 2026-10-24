@@ -2813,6 +2813,9 @@ Files, trees, blobs, diffs, blame, history and search.
 | `path_globs` | [string](#string) | repeated | Glob filters on paths, e.g. `src/**/*.rs`; empty means all paths. |
 | `max_results` | [uint32](#uint32) |  | Most hits; 0 means 5,000. |
 | `context_lines` | [uint32](#uint32) |  |  |
+| `literal` | [bool](#bool) |  | Match `pattern` as a literal string, not a regex. |
+| `languages` | [string](#string) | repeated | Only files in these languages (`rust`, `python`, …); empty is all. |
+| `min_seq` | [uint64](#uint64) | optional | Wait until trunk is indexed through this position (up to 30 s), so a search sees a landing the caller just made. |
 
 
 <a name="rill-v1-GrepResponse"></a>
@@ -2823,8 +2826,37 @@ Files, trees, blobs, diffs, blame, history and search.
 
 | Field | Type | Label | Description |
 | --- | --- | --- | --- |
-| `hits` | [GrepHit](#rill-v1-GrepHit) | repeated |  |
-| `truncated` | [bool](#bool) |  | `max_results` cut the hits. |
+| `hits` | [GrepHit](#rill-v1-GrepHit) | repeated | Best files first (definitions, source over vendored or test code, shallow paths, recent changes), then in line order within a file. |
+| `truncated` | [bool](#bool) |  | More hits exist than were returned. |
+| `indexed_through` | [uint64](#uint64) |  | Trunk is indexed through this position. |
+| `files_matched` | [uint32](#uint32) |  | Files with a match, among those looked at. |
+| `partial` | [bool](#bool) |  | The time budget ran out first: results are incomplete. |
+| `directories` | [GrepResponse.DirectoriesEntry](#rill-v1-GrepResponse-DirectoriesEntry) | repeated | Matched files by top-level directory and by language. |
+| `languages` | [GrepResponse.LanguagesEntry](#rill-v1-GrepResponse-LanguagesEntry) | repeated |  |
+
+
+<a name="rill-v1-GrepResponse-DirectoriesEntry"></a>
+
+### GrepResponse.DirectoriesEntry
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `key` | [string](#string) |  |  |
+| `value` | [uint32](#uint32) |  |  |
+
+
+<a name="rill-v1-GrepResponse-LanguagesEntry"></a>
+
+### GrepResponse.LanguagesEntry
+
+
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| `key` | [string](#string) |  |  |
+| `value` | [uint32](#uint32) |  |  |
 
 
 <a name="rill-v1-IsAncestorRequest"></a>

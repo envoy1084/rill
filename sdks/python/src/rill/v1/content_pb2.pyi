@@ -294,7 +294,7 @@ class PathHistoryEntry(_message.Message):
     def __init__(self, version: _Optional[_Union[_types_pb2.ChangeInfo, _Mapping]] = ..., path: _Optional[str] = ..., change: _Optional[_Union[_types_pb2.FileChange, _Mapping]] = ...) -> None: ...
 
 class GrepRequest(_message.Message):
-    __slots__ = ("repo", "revision", "pattern", "case_insensitive", "path_globs", "max_results", "context_lines")
+    __slots__ = ("repo", "revision", "pattern", "case_insensitive", "path_globs", "max_results", "context_lines", "literal", "languages", "min_seq")
     REPO_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
     PATTERN_FIELD_NUMBER: _ClassVar[int]
@@ -302,6 +302,9 @@ class GrepRequest(_message.Message):
     PATH_GLOBS_FIELD_NUMBER: _ClassVar[int]
     MAX_RESULTS_FIELD_NUMBER: _ClassVar[int]
     CONTEXT_LINES_FIELD_NUMBER: _ClassVar[int]
+    LITERAL_FIELD_NUMBER: _ClassVar[int]
+    LANGUAGES_FIELD_NUMBER: _ClassVar[int]
+    MIN_SEQ_FIELD_NUMBER: _ClassVar[int]
     repo: str
     revision: str
     pattern: str
@@ -309,15 +312,42 @@ class GrepRequest(_message.Message):
     path_globs: _containers.RepeatedScalarFieldContainer[str]
     max_results: int
     context_lines: int
-    def __init__(self, repo: _Optional[str] = ..., revision: _Optional[str] = ..., pattern: _Optional[str] = ..., case_insensitive: _Optional[bool] = ..., path_globs: _Optional[_Iterable[str]] = ..., max_results: _Optional[int] = ..., context_lines: _Optional[int] = ...) -> None: ...
+    literal: bool
+    languages: _containers.RepeatedScalarFieldContainer[str]
+    min_seq: int
+    def __init__(self, repo: _Optional[str] = ..., revision: _Optional[str] = ..., pattern: _Optional[str] = ..., case_insensitive: _Optional[bool] = ..., path_globs: _Optional[_Iterable[str]] = ..., max_results: _Optional[int] = ..., context_lines: _Optional[int] = ..., literal: _Optional[bool] = ..., languages: _Optional[_Iterable[str]] = ..., min_seq: _Optional[int] = ...) -> None: ...
 
 class GrepResponse(_message.Message):
-    __slots__ = ("hits", "truncated")
+    __slots__ = ("hits", "truncated", "indexed_through", "files_matched", "partial", "directories", "languages")
+    class DirectoriesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: int
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[int] = ...) -> None: ...
+    class LanguagesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: int
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[int] = ...) -> None: ...
     HITS_FIELD_NUMBER: _ClassVar[int]
     TRUNCATED_FIELD_NUMBER: _ClassVar[int]
+    INDEXED_THROUGH_FIELD_NUMBER: _ClassVar[int]
+    FILES_MATCHED_FIELD_NUMBER: _ClassVar[int]
+    PARTIAL_FIELD_NUMBER: _ClassVar[int]
+    DIRECTORIES_FIELD_NUMBER: _ClassVar[int]
+    LANGUAGES_FIELD_NUMBER: _ClassVar[int]
     hits: _containers.RepeatedCompositeFieldContainer[GrepHit]
     truncated: bool
-    def __init__(self, hits: _Optional[_Iterable[_Union[GrepHit, _Mapping]]] = ..., truncated: _Optional[bool] = ...) -> None: ...
+    indexed_through: int
+    files_matched: int
+    partial: bool
+    directories: _containers.ScalarMap[str, int]
+    languages: _containers.ScalarMap[str, int]
+    def __init__(self, hits: _Optional[_Iterable[_Union[GrepHit, _Mapping]]] = ..., truncated: _Optional[bool] = ..., indexed_through: _Optional[int] = ..., files_matched: _Optional[int] = ..., partial: _Optional[bool] = ..., directories: _Optional[_Mapping[str, int]] = ..., languages: _Optional[_Mapping[str, int]] = ...) -> None: ...
 
 class GrepHit(_message.Message):
     __slots__ = ("path", "line_no", "line", "before", "after", "byte_start", "byte_end")

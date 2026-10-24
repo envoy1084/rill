@@ -63,6 +63,8 @@ pub struct ServerConfig {
     pub exec: super::ExecConfig,
     /// Notifications: email, insecure URLs, digest hour.
     pub notify: super::NotifyConfig,
+    /// Code search: shards, segment cache, time budget.
+    pub search: super::SearchConfig,
     /// File holding the hex P-256 secret key the server signs commit
     /// attestations with. Without it a key is generated per process, so
     /// attestations do not verify across restarts.
@@ -101,6 +103,7 @@ impl Default for ServerConfig {
             rate_limit: super::RateLimitConfig::default(),
             exec: super::ExecConfig::default(),
             notify: super::NotifyConfig::default(),
+            search: super::SearchConfig::default(),
             attestation_key: None,
             dev_mode: false,
         }

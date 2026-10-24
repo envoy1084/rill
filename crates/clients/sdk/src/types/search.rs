@@ -19,6 +19,12 @@ pub struct GrepQuery {
     pub max_results: u32,
     /// Lines of context around each hit.
     pub context_lines: u32,
+    /// Match `pattern` literally, not as a regex.
+    pub literal: bool,
+    /// Only files in these languages; empty is every language.
+    pub languages: Vec<String>,
+    /// Wait until trunk is indexed through this position.
+    pub min_seq: Option<u64>,
 }
 
 impl GrepQuery {
@@ -30,7 +36,28 @@ impl GrepQuery {
             path_globs: Vec::new(),
             max_results: 0,
             context_lines: 0,
+            literal: false,
+            languages: Vec::new(),
+            min_seq: None,
         }
+    }
+
+    /// Match literally.
+    pub fn literal(mut self, yes: bool) -> Self {
+        self.literal = yes;
+        self
+    }
+
+    /// Restrict results to a language (`rust`, `python`, …).
+    pub fn language(mut self, lang: impl Into<String>) -> Self {
+        self.languages.push(lang.into());
+        self
+    }
+
+    /// Wait until trunk is indexed through `seq` first.
+    pub fn min_seq(mut self, seq: u64) -> Self {
+        self.min_seq = Some(seq);
+        self
     }
 
     /// Match case-insensitively.
@@ -96,10 +123,20 @@ impl TryFrom<pb::GrepHit> for GrepHit {
 /// Result of a search.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct GrepResult {
-    /// Hits in path, then line order.
+    /// Best files first, then line order within a file.
     pub hits: Vec<GrepHit>,
-    /// True when the result set was cut at `max_results`.
+    /// More hits exist than were returned.
     pub truncated: bool,
+    /// Trunk is indexed through this position.
+    pub indexed_through: u64,
+    /// Files with a match, among those looked at.
+    pub files_matched: u32,
+    /// The server's time budget ran out first.
+    pub partial: bool,
+    /// Matched files by top-level directory.
+    pub directories: std::collections::BTreeMap<String, u32>,
+    /// Matched files by language.
+    pub languages: std::collections::BTreeMap<String, u32>,
 }
 
 impl GrepResult {
@@ -112,6 +149,11 @@ impl GrepResult {
         Ok(GrepResult {
             hits,
             truncated: resp.truncated,
+            indexed_through: resp.indexed_through,
+            files_matched: resp.files_matched,
+            partial: resp.partial,
+            directories: resp.directories.into_iter().collect(),
+            languages: resp.languages.into_iter().collect(),
         })
     }
 }

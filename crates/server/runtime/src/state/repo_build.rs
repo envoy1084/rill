@@ -14,7 +14,7 @@ use super::ReleaseLanders;
 use rill_policy::Authorizer;
 use rill_review::service::{ReviewEvent, ReviewService};
 use rill_review::votes::LabelSet;
-use rill_search::{IndexConfig, SearchIndex};
+use rill_search::SearchIndex;
 use rill_store::repo::RepoConfig;
 use rill_store::RepoStore;
 use tokio::sync::broadcast;
@@ -154,8 +154,12 @@ impl RepoRegistry {
                 std::time::Duration::from_secs(self.config.postland.full_every_secs),
             )
         });
-        let search =
-            SearchIndex::open(repo.clone(), derive.clone(), IndexConfig::default()).await?;
+        let search = SearchIndex::open(
+            repo.clone(),
+            derive.clone(),
+            self.config.search.index(&config.id),
+        )
+        .await?;
 
         Ok(RepoContext {
             config,

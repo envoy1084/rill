@@ -48,6 +48,9 @@ hex = "0.4.3"
 bytes = { version = "1.12.1", features = ["serde"] }
 fastcdc = { version = "5.0.0", features = ["tokio"] }
 zstd = "0.14.3"
+# Search segments: memory-mapped files and compact sorted maps.
+memmap2 = "0.9.12"
+fst = "=0.4.7"
 
 # Async and runtime
 tokio = { version = "1.54.0", features = ["full"] }

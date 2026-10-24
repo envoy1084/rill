@@ -7,8 +7,9 @@ use crate::error::Result;
 use crate::types::{GrepQuery, GrepResult, Root};
 
 impl RepoClient {
-    /// Regex search over the files of `root`, served from the server's
-    /// trigram index. Paths the caller may not read are never returned.
+    /// Regex (or literal) search over the files of `root`, served from the
+    /// server's index and ranked best files first. Paths the caller may not
+    /// read are never returned.
     pub async fn grep(&self, root: &Root, query: &GrepQuery) -> Result<GrepResult> {
         let resp = crate::client::retry_idempotent(|| {
             let svc = self.content();
@@ -20,6 +21,9 @@ impl RepoClient {
                 path_globs: query.path_globs.clone(),
                 max_results: query.max_results,
                 context_lines: query.context_lines,
+                languages: query.languages.clone(),
+                literal: query.literal,
+                min_seq: query.min_seq,
             };
             async move { svc.grep(request).await }
         })

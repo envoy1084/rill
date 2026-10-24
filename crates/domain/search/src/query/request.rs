@@ -1,5 +1,7 @@
 //! Search parameters.
 
+use std::time::Duration;
+
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use regex::bytes::{Regex, RegexBuilder};
 
@@ -8,6 +10,10 @@ use crate::trigram::{required_trigrams_for_regex, TrigramQuery};
 
 /// Default cap on returned hits.
 pub const DEFAULT_MAX_RESULTS: usize = 100;
+/// Default time a query may spend before it returns partial results.
+pub const DEFAULT_TIME_BUDGET: Duration = Duration::from_secs(10);
+/// Most memory a compiled pattern may use; larger patterns are refused.
+const REGEX_SIZE_LIMIT: usize = 16 * 1024 * 1024;
 
 /// A regex search over one root.
 #[derive(Debug, Clone)]
@@ -22,6 +28,13 @@ pub struct SearchQuery {
     pub max_results: usize,
     /// Lines of context on each side of a hit.
     pub context_lines: usize,
+    /// Match the pattern as a literal string, not a regex.
+    pub literal: bool,
+    /// Only files in these languages (as [`super::language_of`] names
+    /// them, case-insensitive); empty is every language.
+    pub languages: Vec<String>,
+    /// Time after which the search stops and reports partial results.
+    pub time_budget: Duration,
 }
 
 impl SearchQuery {
@@ -33,6 +46,44 @@ impl SearchQuery {
             path_glob: None,
             max_results: DEFAULT_MAX_RESULTS,
             context_lines: 0,
+            literal: false,
+            languages: Vec::new(),
+            time_budget: DEFAULT_TIME_BUDGET,
+        }
+    }
+
+    /// Match literally.
+    pub fn literal(mut self, yes: bool) -> Self {
+        self.literal = yes;
+        self
+    }
+
+    /// Restrict to languages.
+    pub fn languages(mut self, langs: Vec<String>) -> Self {
+        self.languages = langs;
+        self
+    }
+
+    /// Set the time budget.
+    pub fn time_budget(mut self, budget: Duration) -> Self {
+        self.time_budget = budget;
+        self
+    }
+
+    /// The regex syntax of the pattern.
+    fn regex_source(&self) -> String {
+        if self.literal {
+            regex::escape(&self.pattern)
+        } else {
+            self.pattern.clone()
+        }
+    }
+
+    /// Whether `path`'s language passes the language filter.
+    pub fn language_allowed(&self, path: &str) -> bool {
+        self.languages.is_empty() || {
+            let lang = super::language_of(path);
+            self.languages.iter().any(|l| l.eq_ignore_ascii_case(lang))
         }
     }
 
@@ -79,16 +130,18 @@ impl SearchQuery {
 
     /// Compile the pattern as a multi-line byte regex.
     pub fn compile(&self) -> Result<Regex> {
-        Ok(RegexBuilder::new(&self.pattern)
+        Ok(RegexBuilder::new(&self.regex_source())
             .case_insensitive(self.case_insensitive)
             .multi_line(true)
+            .size_limit(REGEX_SIZE_LIMIT)
+            .dfa_size_limit(REGEX_SIZE_LIMIT)
             .build()?)
     }
 
     /// The trigram query to run against a folded index. The index folds
     /// case regardless of the query, so literals are always folded here.
     pub fn trigram_query(&self) -> Result<TrigramQuery> {
-        required_trigrams_for_regex(&self.pattern, true)
+        required_trigrams_for_regex(&self.regex_source(), true)
     }
 
     /// Whether `path` passes the glob filter.

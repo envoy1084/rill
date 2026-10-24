@@ -20,11 +20,6 @@ use super::repo_build::build_review;
 use crate::config::ServerConfig;
 use crate::error::Result;
 
-/// How long a search waits for a root it asked to have indexed.
-const INDEX_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
-/// How often a waiting search looks for the root's manifest.
-const INDEX_POLL: std::time::Duration = std::time::Duration::from_millis(50);
-
 /// Everything the handlers need for one repository.
 pub struct RepoContext {
     /// The repository record.
@@ -81,55 +76,6 @@ impl RepoContext {
     /// Seconds between post-land verification sweeps.
     pub fn postland_interval(&self) -> std::time::Duration {
         std::time::Duration::from_secs(self.server_config.postland.interval_secs.max(1))
-    }
-
-    /// Search an indexed root, showing only paths `allowed` admits. This
-    /// is the server side of `RepoService.Grep`. The root is indexed on demand
-    /// when the indexer has not caught up with it.
-    pub async fn grep(
-        &self,
-        root: rill_types::TreeHash,
-        query: rill_search::SearchQuery,
-        allowed: rill_policy::PathFilter,
-    ) -> Result<Vec<rill_search::SearchHit>> {
-        if self.search.manifest(root).await.is_err() {
-            self.wait_for_index(root).await?;
-        }
-        // Boxed so the borrow-heavy search future has a concrete `Send`
-        // bound; otherwise the compiler cannot prove it for the tonic
-        // handler that awaits this.
-        let search = self.search.clone();
-        let fut: std::pin::Pin<
-            Box<
-                dyn std::future::Future<Output = rill_search::Result<Vec<rill_search::SearchHit>>>
-                    + Send,
-            >,
-        > = Box::pin(async move {
-            rill_search::search(&search, root, &query, move |p| allowed.allows(p)).await
-        });
-        Ok(fut.await?)
-    }
-
-    /// Ask the search writer to index `root` and wait for its manifest:
-    /// only the server holding the search lease writes the index.
-    async fn wait_for_index(&self, root: rill_types::TreeHash) -> Result<()> {
-        let _request = match self.index_requests.claim(root) {
-            Some(request) => {
-                rill_jobs::Queue::new(self.repo.clone(), rill_lander::land::followups::INDEX_QUEUE)
-                    .push(rill_lander::land::followups::index_root_job(&root))
-                    .await?;
-                Some(request)
-            }
-            None => None,
-        };
-        let deadline = tokio::time::Instant::now() + INDEX_WAIT;
-        while tokio::time::Instant::now() < deadline {
-            if self.search.manifest(root).await.is_ok() {
-                return Ok(());
-            }
-            tokio::time::sleep(INDEX_POLL).await;
-        }
-        Err(rill_search::Error::RootNotIndexed(root).into())
     }
 
     /// The current review service. Hot-swapped when policy changes, so

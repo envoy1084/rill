@@ -27,19 +27,38 @@ impl ContentSvc {
         let resolved = revision::resolve(ctx, &req.revision).await?;
 
         let max = limit(req.max_results, DEFAULT_RESULTS, MAX_RESULTS);
+        let budget = std::time::Duration::from_millis(self.state.config.search.time_budget_ms);
         let query = SearchQuery::new(req.pattern.clone())
             .case_insensitive(req.case_insensitive)
+            .literal(req.literal)
+            .languages(req.languages.clone())
+            .time_budget(budget)
             .path_globs(req.path_globs.iter().map(String::as_str))
             .map_err(|e| Error::invalid(e.to_string()))?
             // Ask for one extra hit so truncation is reported exactly.
             .max_results(max + 1)
             .context_lines(req.context_lines.min(MAX_CONTEXT) as usize);
 
-        let mut hits = ctx.grep(resolved.root, query, filter).await?;
-        let truncated = hits.len() > max;
+        let outcome = ctx
+            .grep(
+                resolved.version,
+                resolved.root,
+                query,
+                filter,
+                req.min_seq.map(rill_types::TrunkSeq),
+            )
+            .await?;
+        let result = outcome.result;
+        let mut hits = result.hits;
+        let truncated = result.truncated || hits.len() > max;
         hits.truncate(max);
 
         Ok(pb::GrepResponse {
+            indexed_through: outcome.through.map_or(0, |t| t.seq.0),
+            files_matched: result.files,
+            partial: result.partial,
+            directories: result.facets.directories.into_iter().collect(),
+            languages: result.facets.languages.into_iter().collect(),
             hits: hits
                 .into_iter()
                 .map(|h| pb::GrepHit {

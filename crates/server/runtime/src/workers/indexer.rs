@@ -41,6 +41,16 @@ impl Handler for IndexHandler {
             other => return Err(JobFailure::Fatal(format!("unknown job kind {other:?}"))),
         };
         tracing::debug!(%root, files = stats.files, "indexed root");
+        // Merging is a no-op until a tier fills; doing it here keeps one
+        // writer for the segment list.
+        let compacted = search.compact(fence).await.map_err(retry)?;
+        if compacted.merges > 0 {
+            tracing::debug!(
+                merges = compacted.merges,
+                segments = compacted.segments_after,
+                "compacted the search index"
+            );
+        }
         Ok(())
     }
 }

@@ -3,6 +3,7 @@
 
 mod app;
 pub mod decisions;
+mod grep;
 mod index_requests;
 mod lifecycle;
 pub mod policy;
@@ -13,6 +14,7 @@ mod repo_context;
 mod stores;
 
 pub use app::AppState;
+pub use grep::GrepOutcome;
 pub use lifecycle::Lifecycle;
 pub use registry::RepoRegistry;
 pub use releases::ReleaseLanders;

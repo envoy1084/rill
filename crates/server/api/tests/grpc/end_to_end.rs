@@ -190,6 +190,9 @@ pub(super) async fn scenario(endpoint: &str, http: std::net::SocketAddr) {
             path_globs: vec!["*.md".into()],
             max_results: 10,
             context_lines: 1,
+            languages: Default::default(),
+            literal: Default::default(),
+            min_seq: Default::default(),
         })
         .await
         .unwrap()

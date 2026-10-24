@@ -1,27 +1,28 @@
 //! Code search for Rill.
 //!
-//! The index is keyed by blob hash, so a blob that is unchanged between
-//! versions is never tokenized twice (the idea behind GitHub's Blackbird).
-//! Two layers make that work:
-//!
-//! 1. A trigram index over blob content ([`trigram`], [`index`]): every
-//!    blob gets a dense document id and its trigrams point at it.
-//! 2. A manifest per root tree ([`index::RootManifest`]): the paths of a
-//!    root and the content behind each.
-//!
-//! A query ([`query`]) turns the regex into the trigrams it requires,
-//! intersects their posting lists into candidate documents, runs the regex
-//! over the candidate blobs of the requested root, and maps hits back to
-//! paths. [`symbols`] adds definition lookup on top of the same trees.
+//! The index is built from immutable segments ([`segment`]), each covering
+//! a batch of blobs by content hash, spread over shards and merged into
+//! larger segments over time ([`index`]). Which files a root has is kept as
+//! layered path maps ([`paths`]): a base map plus a small delta per
+//! landing. A query ([`query`]) turns its pattern into the trigrams every
+//! match requires ([`trigram`]), finds candidate blobs in every shard at
+//! once, keeps those the root holds at paths the caller may read, verifies
+//! them against the stored content and ranks the files. [`symbols`]
+//! extracts definitions, stored with each blob.
 
 pub mod error;
 pub mod index;
+pub mod paths;
 pub mod query;
+pub mod segment;
 pub mod symbols;
 pub mod trigram;
 
 pub use error::{Error, Result};
-pub use index::{FlushStats, IndexConfig, IndexStats, RootManifest, SearchIndex};
-pub use query::{search, PathFilter, SearchHit, SearchQuery};
-pub use symbols::{extract_symbols, RootSymbols, Symbol, SymbolIndex, SymbolKind, SymbolLocation};
+pub use index::{CompactStats, IndexConfig, IndexStats, SearchIndex, Snapshot, Through};
+pub use paths::PathView;
+pub use query::{
+    language_of, search, Facets, LiveFile, PathFilter, Scope, SearchHit, SearchQuery, SearchResult,
+};
+pub use symbols::{extract_symbols, Symbol, SymbolKind};
 pub use trigram::{required_trigrams_for_regex, trigrams, TrigramQuery};

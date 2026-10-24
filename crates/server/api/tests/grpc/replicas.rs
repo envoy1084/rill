@@ -62,6 +62,9 @@ async fn servers_sharing_a_store_serve_any_request() {
                 path_globs: vec![],
                 max_results: 0,
                 context_lines: 0,
+                languages: Default::default(),
+                literal: Default::default(),
+                min_seq: Default::default(),
             })
             .await
             .unwrap()

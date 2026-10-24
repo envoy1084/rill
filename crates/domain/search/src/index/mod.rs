@@ -1,15 +1,16 @@
-//! The search index: per-blob trigram postings plus per-root path
-//! manifests, both persisted as derived data of the repository.
+//! The index: segments per shard (blobs by content hash), path layers per
+//! root, and how both are written, merged and read.
 
+mod cache;
+mod compact;
 mod config;
-mod docs;
-mod manifest;
-mod persist;
+mod records;
 mod search_index;
-mod sync;
+mod views;
+mod writer;
 
+pub use compact::CompactStats;
 pub use config::IndexConfig;
-pub use docs::DocTable;
-pub use manifest::{ManifestEntry, RootManifest};
-pub use persist::{KIND_BLOB, KIND_DOCS, KIND_POST, KIND_ROOT, KIND_STATE};
-pub use search_index::{FlushStats, IndexStats, SearchIndex};
+pub use records::{SegmentRef, SegmentSet, Through, KIND_MARKER, KIND_PATHS, KIND_SEGMENTS};
+pub use search_index::{SearchIndex, Snapshot};
+pub use writer::IndexStats;

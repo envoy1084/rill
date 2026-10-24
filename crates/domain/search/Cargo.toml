@@ -24,7 +24,16 @@ parking_lot = { workspace = true }
 regex = { workspace = true }
 regex-syntax = { workspace = true }
 globset = { workspace = true }
+zstd = { workspace = true }
+memmap2 = { workspace = true }
+fst = { workspace = true }
+postcard = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
 proptest = { workspace = true }
+tempfile = { workspace = true }
+
+[[test]]
+name = "search"
+path = "tests/search/main.rs"

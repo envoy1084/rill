@@ -14,6 +14,7 @@ mod exec;
 mod identity;
 mod notify;
 mod rate_limit;
+mod search;
 mod server;
 mod storage;
 
@@ -24,6 +25,7 @@ pub use exec::{ExecConfig, LocalWorkersConfig, SandboxKind};
 pub use identity::{IdentityConfig, LifetimesConfig, RotationConfig};
 pub use notify::NotifyConfig;
 pub use rate_limit::RateLimitConfig;
+pub use search::SearchConfig;
 pub use server::{
     FlakeConfig, LogFormat, PostLandConfig, Roles, ServerConfig, ShutdownConfig, TelemetryConfig,
     TlsConfig, VerifyConfig, DEFAULT_GRPC_ADDR, DEFAULT_HTTP_ADDR,
