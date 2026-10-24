@@ -5,7 +5,9 @@ use std::time::Duration;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use regex::bytes::{Regex, RegexBuilder};
 
-use crate::error::Result;
+use super::matcher::Matcher;
+use crate::error::{Error, Result};
+use crate::structural::StructuralPattern;
 use crate::trigram::{required_trigrams_for_regex, TrigramQuery};
 
 /// Default cap on returned hits.
@@ -35,6 +37,9 @@ pub struct SearchQuery {
     pub languages: Vec<String>,
     /// Time after which the search stops and reports partial results.
     pub time_budget: Duration,
+    /// The pattern is an ast-grep structural pattern in the one language
+    /// `languages` names.
+    pub structural: bool,
 }
 
 impl SearchQuery {
@@ -49,7 +54,14 @@ impl SearchQuery {
             literal: false,
             languages: Vec::new(),
             time_budget: DEFAULT_TIME_BUDGET,
+            structural: false,
         }
+    }
+
+    /// Match structurally.
+    pub fn structural(mut self, yes: bool) -> Self {
+        self.structural = yes;
+        self
     }
 
     /// Match literally.
@@ -142,6 +154,26 @@ impl SearchQuery {
     /// case regardless of the query, so literals are always folded here.
     pub fn trigram_query(&self) -> Result<TrigramQuery> {
         required_trigrams_for_regex(&self.regex_source(), true)
+    }
+
+    /// Compile the pattern: structurally for a structural query, else as
+    /// [`SearchQuery::compile`] does.
+    pub fn matcher(&self) -> Result<Matcher> {
+        if !self.structural {
+            return Ok(Matcher::Regex {
+                regex: self.compile()?,
+                source: self.regex_source(),
+            });
+        }
+        match self.languages.as_slice() {
+            [language] => Ok(Matcher::Structural(StructuralPattern::new(
+                &self.pattern,
+                language,
+            )?)),
+            _ => Err(Error::InvalidPattern(
+                "structural search needs exactly one language".into(),
+            )),
+        }
     }
 
     /// Whether `path` passes the glob filter.

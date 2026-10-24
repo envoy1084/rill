@@ -8,7 +8,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use futures::stream::{self, StreamExt};
-use regex::bytes::Regex;
 use rill_core::read_content;
 use rill_store::ObjectStore;
 use rill_types::{ObjectHash, ObjectKind, RepoPath, RepoPathBuf};
@@ -16,6 +15,7 @@ use rill_types::{ObjectHash, ObjectKind, RepoPath, RepoPathBuf};
 use super::hit::SearchHit;
 use super::lang::language_of;
 use super::lines::LineIndex;
+use super::matcher::Matcher;
 use super::rank::{score, Signals};
 use super::request::SearchQuery;
 use super::result::{Facets, SearchResult};
@@ -110,7 +110,7 @@ type RawHit = (
 struct Job<F> {
     view: Arc<PathView>,
     query: SearchQuery,
-    regex: Regex,
+    matcher: Matcher,
     plan: TrigramQuery,
     allow: F,
     objects: Arc<dyn ObjectStore>,
@@ -136,7 +136,7 @@ impl<F: PathFilter> Job<F> {
         let name = path.as_str().rsplit('/').next().unwrap_or_default();
         let s = score(&Signals {
             path,
-            name_matches: self.regex.is_match(name.as_bytes()),
+            name_matches: self.matcher.matches_name(name),
             defines,
             recent: self.view.recently_changed(path),
         });
@@ -175,7 +175,8 @@ impl<F: PathFilter> Job<F> {
                 }
                 let content = seg.content(doc)?;
                 let lines = scan_blob(
-                    &self.regex,
+                    &self.matcher,
+                    paths[0].as_str(),
                     &content,
                     self.query.context_lines,
                     self.query.max_results,
@@ -223,10 +224,11 @@ pub async fn search_shards<F: PathFilter + Clone + 'static>(
     select: &ShardSelect,
 ) -> Result<ShardResults> {
     index.refresh().await?;
+    let matcher = query.matcher()?;
     let job = Arc::new(Job {
         view: scope.view.clone(),
-        regex: query.compile()?,
-        plan: query.trigram_query()?,
+        matcher: matcher.clone(),
+        plan: matcher.trigram_query()?,
         query: query.clone(),
         allow,
         objects: index.repo().objects().clone(),
@@ -286,14 +288,16 @@ async fn live<F: PathFilter + 'static>(job: &Arc<Job<F>>, scope: &Scope) -> Resu
                 if rill_core::is_binary(&bytes) {
                     return Ok::<_, crate::Error>(None);
                 }
-                let (regex, context, max) = (
-                    job.regex.clone(),
+                let (matcher, context, max) = (
+                    job.matcher.clone(),
                     job.query.context_lines,
                     job.query.max_results,
                 );
-                let lines =
-                    tokio::task::spawn_blocking(move || scan_blob(&regex, &bytes, context, max))
-                        .await?;
+                let path = f.path.to_string();
+                let lines = tokio::task::spawn_blocking(move || {
+                    scan_blob(&matcher, &path, &bytes, context, max)
+                })
+                .await?;
                 Ok((!lines.is_empty()).then(|| job.rank(&f.path, lines, false)))
             }
         })
@@ -342,16 +346,22 @@ pub fn assemble(
 }
 
 /// Matching lines of one blob, at most `limit` of them.
-fn scan_blob(regex: &Regex, bytes: &[u8], context: usize, limit: usize) -> Vec<RawHit> {
+fn scan_blob(
+    matcher: &Matcher,
+    path: &str,
+    bytes: &[u8],
+    context: usize,
+    limit: usize,
+) -> Vec<RawHit> {
     let mut out = Vec::new();
     let mut lines: Option<LineIndex> = None;
     let mut last_line: Option<usize> = None;
-    for m in regex.find_iter(bytes) {
+    for m in matcher.find(path, bytes) {
         if out.len() >= limit {
             break;
         }
         let idx = lines.get_or_insert_with(|| LineIndex::new(bytes));
-        let line = idx.line_of(m.start());
+        let line = idx.line_of(m.start);
         if last_line == Some(line) {
             continue;
         }
@@ -361,7 +371,7 @@ fn scan_blob(regex: &Regex, bytes: &[u8], context: usize, limit: usize) -> Vec<R
             idx.line_string(line),
             idx.before(line, context),
             idx.after(line, context),
-            m.range(),
+            m,
         ));
     }
     out
@@ -371,15 +381,20 @@ fn scan_blob(regex: &Regex, bytes: &[u8], context: usize, limit: usize) -> Vec<R
 mod tests {
     use super::*;
 
+    use regex::bytes::Regex;
+
     #[test]
     fn one_hit_per_line_with_context() {
-        let re = Regex::new("a").unwrap();
-        let hits = scan_blob(&re, b"x\naa\ny\na\n", 1, 10);
+        let re = Matcher::Regex {
+            regex: Regex::new("a").unwrap(),
+            source: "a".into(),
+        };
+        let hits = scan_blob(&re, "f", b"x\naa\ny\na\n", 1, 10);
         assert_eq!(hits.len(), 2);
         assert_eq!((hits[0].0, hits[0].1.as_str()), (2, "aa"));
         assert_eq!(hits[0].2, vec!["x"]);
         assert_eq!(hits[0].3, vec!["y"]);
         assert_eq!(hits[0].4, 2..3);
-        assert_eq!(scan_blob(&re, b"a\na\na\n", 0, 2).len(), 2);
+        assert_eq!(scan_blob(&re, "f", b"a\na\na\n", 0, 2).len(), 2);
     }
 }

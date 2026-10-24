@@ -51,6 +51,7 @@ pub struct SearchIndex {
     pub(super) set: parking_lot::Mutex<SegmentSet>,
     /// Serialises writes and refreshes.
     pub(super) writing: tokio::sync::Mutex<()>,
+    pub(super) scip: crate::scip::ScipCache,
 }
 
 impl SearchIndex {
@@ -65,7 +66,13 @@ impl SearchIndex {
             snapshot: RwLock::new(Arc::default()),
             set: parking_lot::Mutex::new(SegmentSet::default()),
             writing: tokio::sync::Mutex::new(()),
+            scip: Default::default(),
         })
+    }
+
+    /// Recently loaded SCIP indexes.
+    pub(crate) fn scip_cache(&self) -> &crate::scip::ScipCache {
+        &self.scip
     }
 
     /// An index loaded from what was stored.

@@ -30,9 +30,9 @@ impl Error {
                 rill_identity::Error::Config(_) => Code::Internal,
             },
             Error::Search(e) => match e {
-                rill_search::Error::InvalidPattern(_) | rill_search::Error::InvalidGlob(_) => {
-                    Code::InvalidArgument
-                }
+                rill_search::Error::InvalidPattern(_)
+                | rill_search::Error::InvalidGlob(_)
+                | rill_search::Error::InvalidScip(_) => Code::InvalidArgument,
                 rill_search::Error::RootNotIndexed(_) => Code::Unavailable,
                 rill_search::Error::Store(s) => store_code(s),
                 rill_search::Error::Core(c) => core_code(c),

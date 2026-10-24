@@ -53,8 +53,8 @@ impl Candidates {
 }
 
 impl TrigramQuery {
-    /// Conjunction of the trigrams of a literal; `All` if it is too short to
-    /// contain one.
+    /// Conjunction of the trigrams of a literal, case-folded as the index
+    /// is; `All` if it is too short to contain one.
     pub fn literal(bytes: &[u8]) -> TrigramQuery {
         if bytes.len() < 3 {
             return TrigramQuery::All;
@@ -62,7 +62,10 @@ impl TrigramQuery {
         TrigramQuery::and(
             bytes
                 .windows(3)
-                .map(|w| TrigramQuery::Trigram(super::pack(w[0], w[1], w[2])))
+                .map(|w| {
+                    let f = super::extract::fold_byte;
+                    TrigramQuery::Trigram(super::pack(f(w[0]), f(w[1]), f(w[2])))
+                })
                 .collect(),
         )
     }

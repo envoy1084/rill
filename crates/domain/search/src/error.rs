@@ -22,6 +22,9 @@ pub enum Error {
     #[error("root tree {0} is not indexed")]
     RootNotIndexed(TreeHash),
 
+    #[error("invalid SCIP index: {0}")]
+    InvalidScip(String),
+
     #[error("index codec error: {0}")]
     Codec(String),
 

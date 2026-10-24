@@ -14,7 +14,9 @@ pub mod error;
 pub mod index;
 pub mod paths;
 pub mod query;
+pub mod scip;
 pub mod segment;
+pub mod structural;
 pub mod symbols;
 pub mod trigram;
 
@@ -25,5 +27,10 @@ pub use query::{
     assemble, language_of, search, search_shards, Facets, LiveFile, PathFilter, RankedFile, Scope,
     SearchHit, SearchQuery, SearchResult, ShardResults, ShardSelect,
 };
-pub use symbols::{extract_symbols, Symbol, SymbolKind};
+pub use scip::{scip_for, store_scip, ScipIndex, ScipLocation, ScipView};
+pub use structural::{structural_languages, StructuralPattern};
+pub use symbols::{
+    extract_symbols, file_symbols, find_symbols, Symbol, SymbolHit, SymbolKind, SymbolName,
+    SymbolQuery,
+};
 pub use trigram::{required_trigrams_for_regex, trigrams, TrigramQuery};

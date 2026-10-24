@@ -129,3 +129,87 @@ async fn live_files_replace_their_indexed_paths() {
         .unwrap();
     assert!(r.hits.is_empty(), "the indexed copy is shadowed");
 }
+
+#[tokio::test]
+async fn structural_patterns_match_syntax_not_text() {
+    let f = fixture().await;
+    let text = SearchQuery::new("helper()").literal(true);
+    assert_eq!(
+        lines(&run(&f.index, f.root, text, all).await.hits),
+        [("src/main.rs".into(), 6), ("src/main.rs".into(), 9)]
+    );
+    let call = SearchQuery::new("helper($$$ARGS)")
+        .structural(true)
+        .languages(vec!["rust".into()]);
+    assert!(!call.matcher().unwrap().trigram_query().unwrap().is_all());
+    assert_eq!(
+        lines(&run(&f.index, f.root, call, all).await.hits),
+        [("src/main.rs".into(), 6)],
+        "the definition is not a call"
+    );
+    let unscoped = SearchQuery::new("helper()").structural(true);
+    assert!(unscoped.matcher().is_err());
+}
+
+#[tokio::test]
+async fn symbols_by_name_substring_and_file() {
+    use rill_search::{file_symbols, find_symbols, SymbolKind, SymbolName, SymbolQuery};
+    let f = fixture().await;
+    let view = f.index.view(f.root).await.unwrap().unwrap();
+    let scope = Scope::indexed(view);
+    let query = |name, kinds| SymbolQuery {
+        name,
+        kinds,
+        limit: 10,
+    };
+    let defs = find_symbols(
+        &f.index,
+        &scope,
+        &query(SymbolName::Exact("helper".into()), vec![]),
+        all,
+    )
+    .await
+    .unwrap();
+    assert_eq!(defs.len(), 1);
+    assert_eq!(
+        (defs[0].path.as_str(), defs[0].symbol.line),
+        ("src/main.rs", 9)
+    );
+    let classes = find_symbols(
+        &f.index,
+        &scope,
+        &query(
+            SymbolName::Contains("GREET".into()),
+            vec![SymbolKind::Class],
+        ),
+        all,
+    )
+    .await
+    .unwrap();
+    assert_eq!(classes.len(), 1);
+    assert_eq!(classes[0].symbol.name, "Greeter");
+    let hidden = find_symbols(
+        &f.index,
+        &scope,
+        &query(SymbolName::Exact("helper".into()), vec![]),
+        |p: &rill_types::RepoPath| !p.as_str().starts_with("src/"),
+    )
+    .await
+    .unwrap();
+    assert!(hidden.is_empty());
+
+    let main = RepoPathBuf::new("src/main.rs").unwrap();
+    let names: Vec<_> = file_symbols(&f.index, &scope, &main)
+        .await
+        .unwrap()
+        .unwrap()
+        .into_iter()
+        .map(|s| s.name)
+        .collect();
+    assert_eq!(names, ["main", "helper"]);
+    let missing = RepoPathBuf::new("nope.rs").unwrap();
+    assert!(file_symbols(&f.index, &scope, &missing)
+        .await
+        .unwrap()
+        .is_none());
+}

@@ -187,6 +187,23 @@ roaring = "0.11"
 governor = "0.10.4"
 # Pinned with weave-core, which depends on the same release.
 sem-core = { version = "=0.28.1", features = ["grammar-all"] }
+# Structural search; 0.45 is the last release on tree-sitter 0.26, which
+# sem-core uses. The grammars are the versions sem-core pins.
+ast-grep-core = "=0.45.0"
+tree-sitter = "0.26.13"
+tree-sitter-rust = "=0.23.3"
+tree-sitter-go = "=0.23.4"
+tree-sitter-python = "=0.23.6"
+tree-sitter-javascript = "=0.23.1"
+tree-sitter-typescript = "=0.23.2"
+tree-sitter-java = "=0.23.5"
+tree-sitter-c = "=0.23.4"
+tree-sitter-cpp = "=0.23.4"
+tree-sitter-ruby = "=0.23.1"
+# SCIP code intelligence indexes (precise definitions and references).
+scip = "=0.10.0"
+# The protobuf runtime scip is generated against.
+protobuf = "=3.7.2"
 proptest = "1.12.0"
 
 # Testing, benchmarking and fuzzing tools
