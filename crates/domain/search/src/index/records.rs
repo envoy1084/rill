@@ -105,8 +105,15 @@ pub async fn put_markers(
     Ok(())
 }
 
+/// A root's layer, decoded off the async threads (a base holds every
+/// file of the root).
 pub async fn layer(repo: &RepoStore, root: &TreeHash) -> Result<Option<PathLayer>> {
-    get(repo, KIND_PATHS, root).await
+    match repo.get_derived(KIND_PATHS, root).await? {
+        Some(bytes) => Ok(Some(
+            tokio::task::spawn_blocking(move || decode_tagged(KIND_PATHS, &bytes)).await??,
+        )),
+        None => Ok(None),
+    }
 }
 
 pub async fn put_layer(

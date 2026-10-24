@@ -38,7 +38,11 @@ impl ViewCache {
                         "path layer of {at} is missing below {root}"
                     )))
                 }
-                Some(PathLayer::Base(entries)) => break Arc::new(PathView::base(entries)),
+                Some(PathLayer::Base(entries)) => {
+                    break Arc::new(
+                        tokio::task::spawn_blocking(move || PathView::base(entries)).await?,
+                    )
+                }
                 Some(PathLayer::Delta {
                     parent, changes, ..
                 }) => {
@@ -53,9 +57,10 @@ impl ViewCache {
             self.views.insert(r, view.clone());
         }
         if self.views.len() > MAX_VIEWS {
+            // Bases are kept: rebuilding one means decoding every file of
+            // its root.
             let keep = root;
-            self.views.retain(|r, _| *r == keep);
-            self.views.insert(root, view.clone());
+            self.views.retain(|r, v| *r == keep || v.depth == 0);
         }
         Ok(Some(view))
     }
