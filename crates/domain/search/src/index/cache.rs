@@ -123,7 +123,17 @@ async fn map_file(path: PathBuf) -> Result<SegmentBytes> {
         let file = std::fs::File::open(&path)?;
         // Safety: segment files are immutable once renamed into place,
         // and only this cache writes or removes them.
-        unsafe { memmap2::Mmap::map(&file) }
+        let map = unsafe { memmap2::Mmap::map(&file) }?;
+        // Fault the whole segment in before it serves: the first queries
+        // after a server opened its segments otherwise stalled for seconds
+        // on page faults.
+        let _ = map.advise(memmap2::Advice::WillNeed);
+        let mut touched = 0u8;
+        for page in (0..map.len()).step_by(4096) {
+            touched ^= map[page];
+        }
+        std::hint::black_box(touched);
+        Ok(map)
     })
     .await?
     .map_err(|e| Error::Codec(format!("mapping segment: {e}")))?;

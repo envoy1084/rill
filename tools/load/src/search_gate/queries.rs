@@ -31,7 +31,7 @@ pub fn next(rng: &mut StdRng) -> (&'static str, SearchQuery) {
             )
         }
         80..85 => {
-            let prefix = &w(rng, 0, 5_000)[..5];
+            let prefix = &w(rng, 0, 5_000)[..4];
             ("prefix", SearchQuery::new(format!(r"\b{prefix}\w*_\w+\(")))
         }
         85..90 => (

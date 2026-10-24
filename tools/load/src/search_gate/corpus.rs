@@ -1,6 +1,9 @@
 //! Synthetic source files: `d{top}/s{sub}/f{i}.{ext}`, about 250 bytes of
 //! Rust, Python, TypeScript or Go each, whose identifiers follow a Zipf
 //! distribution over a fixed vocabulary, as identifiers in real code do.
+//! The vocabulary spans enough syllables that trigrams discriminate: a
+//! first version built words from 16 syllables, so every file held nearly
+//! every trigram and the index could not narrow anything.
 
 use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
@@ -11,15 +14,28 @@ pub const VOCABULARY: usize = 50_000;
 pub const TOP_DIRS: usize = 100;
 pub const SUBDIRS: usize = 100;
 
-const SYLLABLES: [&str; 16] = [
-    "ka", "to", "ri", "men", "sol", "dar", "vex", "lin", "qua", "bor", "tis", "fen", "gal", "hu",
-    "jor", "pel",
-];
+const CONSONANTS: &[u8] = b"bcdfghjklmnprstvwz";
+const VOWELS: &[u8] = b"aeiou";
+/// Consonant-vowel syllables, and three-syllable words drawn from them.
+const SYLLABLES: usize = 90;
+const WORDS: usize = SYLLABLES * SYLLABLES * SYLLABLES;
 
-/// The identifier of rank `rank` (0 is the most frequent).
+fn syllable(i: usize, out: &mut String) {
+    out.push(CONSONANTS[i / VOWELS.len()] as char);
+    out.push(VOWELS[i % VOWELS.len()] as char);
+}
+
+/// The identifier of rank `rank` (0 is the most frequent). Ranks spread
+/// over the word space by a bijection, so neighbouring ranks share no
+/// syllables and the corpus has as many distinct trigrams as code does.
 pub fn word(rank: usize) -> String {
-    let d = |shift: usize| SYLLABLES[(rank >> shift) & 15];
-    format!("{}{}_{}{}", d(12), d(8), d(4), d(0))
+    let i = (rank * 7_919) % WORDS;
+    let mut out = String::with_capacity(8);
+    syllable(i / (SYLLABLES * SYLLABLES), &mut out);
+    syllable(i / SYLLABLES % SYLLABLES, &mut out);
+    out.push('_');
+    syllable(i % SYLLABLES, &mut out);
+    out
 }
 
 fn camel(rank: usize) -> String {

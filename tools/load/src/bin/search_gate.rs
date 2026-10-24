@@ -48,6 +48,9 @@ struct Args {
     /// Where the stores and segment caches live; reused when present.
     #[arg(long, default_value = "/tmp/rill-search-gate")]
     dir: PathBuf,
+    /// Seconds between opening the reader and offering load.
+    #[arg(long, default_value_t = 5)]
+    settle_secs: u64,
     /// Queries in flight before new ones count as dropped.
     #[arg(long, default_value_t = 4_096)]
     max_in_flight: u64,
@@ -159,22 +162,38 @@ fn summary(h: &Histogram<u64>) -> serde_json::Value {
 /// The scope queries run against: the newest root the reader has seen.
 type Current = Arc<RwLock<Scope>>;
 
-/// Land a change every `every` until `stop`, recording index lag.
-async fn landings(
+/// What the landing task works with.
+struct Landings {
     writer: Arc<SearchIndex>,
     reader: Arc<SearchIndex>,
     trees: TreeOps,
-    mut root: TreeHash,
     files: usize,
     every: Duration,
     stop: Instant,
     current: Current,
-) -> anyhow::Result<Histogram<u64>> {
+}
+
+/// Land a change every `every` until `stop` on top of `root`, recording
+/// index lag.
+async fn landings(l: Landings, mut root: TreeHash) -> anyhow::Result<Histogram<u64>> {
+    let Landings {
+        writer,
+        reader,
+        trees,
+        files,
+        every,
+        stop,
+        current,
+    } = l;
     let zipf = corpus::Zipf::default();
-    let mut rng = StdRng::seed_from_u64(26);
+    // Each run lands fresh content, so a reused store indexes it anew.
+    let run = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(1, |d| d.as_secs());
+    let mut rng = StdRng::seed_from_u64(run);
     let mut lags = histogram();
-    let mut added = 0;
-    let mut rev = 1;
+    let mut added = rng.random_range(0..1_000_000);
+    let mut rev = (run % 60_000) as u32 + 1;
     while Instant::now() + every < stop {
         tokio::time::sleep(every).await;
         let mut builder = TreeBuilder::new();
@@ -235,22 +254,29 @@ async fn main() -> anyhow::Result<()> {
     let open_secs = started.elapsed().as_secs_f64();
     eprintln!("reader opened {} files in {open_secs:.1}s", view.len());
     let current: Current = Arc::new(RwLock::new(Scope::indexed(view)));
+    // As a server would before reporting ready: the first seconds after
+    // opening a ten-million-file index are slow while it settles.
+    tokio::time::sleep(Duration::from_secs(args.settle_secs)).await;
 
     let begin = Instant::now();
     let stop = begin + Duration::from_secs(args.duration);
     let lander = tokio::spawn(landings(
-        writer.clone(),
-        reader.clone(),
-        trees.clone(),
+        Landings {
+            writer: writer.clone(),
+            reader: reader.clone(),
+            trees: trees.clone(),
+            files: args.files,
+            every: Duration::from_millis(args.land_every_ms),
+            stop,
+            current: current.clone(),
+        },
         root,
-        args.files,
-        Duration::from_millis(args.land_every_ms),
-        stop,
-        current.clone(),
     ));
 
     let kinds: Arc<Mutex<BTreeMap<&'static str, Histogram<u64>>>> = Default::default();
     let all = Arc::new(Mutex::new(histogram()));
+    // The slowest query started in each second, to place stalls.
+    let worst = Arc::new(Mutex::new(vec![0u64; args.duration as usize + 1]));
     let (in_flight, dropped, errors) = (
         Arc::new(AtomicU64::new(0)),
         Arc::new(AtomicU64::new(0)),
@@ -270,13 +296,15 @@ async fn main() -> anyhow::Result<()> {
             }
             let (kind, query) = queries::next(&mut rng);
             let scope = current.read().clone();
-            let (reader, kinds, all, in_flight, errors) = (
+            let (reader, kinds, all, in_flight, errors, worst) = (
                 reader.clone(),
                 kinds.clone(),
                 all.clone(),
                 in_flight.clone(),
                 errors.clone(),
+                worst.clone(),
             );
+            let second = (now - begin).as_secs() as usize;
             in_flight.fetch_add(1, Ordering::Relaxed);
             tasks.spawn(async move {
                 let t = Instant::now();
@@ -290,6 +318,9 @@ async fn main() -> anyhow::Result<()> {
                     return;
                 }
                 let _ = all.lock().record(us);
+                if let Some(w) = worst.lock().get_mut(second) {
+                    *w = (*w).max(us);
+                }
                 let _ = kinds
                     .lock()
                     .entry(kind)
@@ -314,13 +345,14 @@ async fn main() -> anyhow::Result<()> {
     );
     let pass = achieved >= args.qps as f64 * 0.95
         && p99 < TARGET_P99
-        && lags.len() > 0
+        && !lags.is_empty()
         && lag_p99 < TARGET_LAG_P99
         && dropped == 0
         && errors == 0;
     let report = json!({
         "files": args.files,
         "reused_tree": reused,
+        "settle_secs": args.settle_secs,
         "index": {
             "seconds": index_secs,
             "already_indexed": stats.already_indexed,
@@ -337,6 +369,7 @@ async fn main() -> anyhow::Result<()> {
             "by_kind": kinds.lock().iter().map(|(k, h)| (k.to_string(), summary(h))).collect::<BTreeMap<_, _>>(),
         },
         "index_lag": summary(&lags),
+        "stalls": worst.lock().iter().enumerate().filter(|(_, &us)| us > 100_000).map(|(s, &us)| json!({"second": s, "worst_ms": us / 1_000})).collect::<Vec<_>>(),
         "targets": {
             "qps": args.qps,
             "p99_ms": TARGET_P99.as_millis() as u64,

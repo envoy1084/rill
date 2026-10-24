@@ -219,9 +219,43 @@ status, which commits the 1,000 buffered writes, 0.99 s); the cold CI host
 reads 1,000 files in 1.2 s, all regional hits. An eager checkout on macOS
 has status p99 14 ms, each call settling the watcher with a cookie.
 
+### Code search
+
+`search_gate` (in `rill-load`) is the code search gate. It builds a
+synthetic repository of 10M source files on local stores (`d00..d99/
+s00..s99/f{i}.{rs,py,ts,go}`, about 250 bytes each, content inline in
+the trees, identifiers drawn from a 50,000-word Zipf vocabulary), indexes
+it with a full walk, and then for a minute:
+
+* offers 1,500 queries a second, open-loop, to a reader index whose
+  segments are memory-mapped from its own cache directory: frequent,
+  rare and common identifiers, definition regexes, prefix regexes,
+  misses, a language filter and case-insensitive searches, 50 hits each;
+* lands a change of 1–20 files every 2 s and indexes it (delta layer,
+  compaction), timing from the landing's root to the reader seeing it.
+
+The targets are the offered rate achieved with nothing dropped, query p99
+< 1 s, and index lag p99 < 60 s. Load starts `--settle-secs` (5) after the
+reader opens, as a server would report ready: in the first seconds after
+opening a ten-million-file index, queries were slow (p99 near 2 s) while
+the process settled. The store is kept under `--dir` and reused, so later
+runs skip the build.
+
+```
+cargo run --release -p rill-load --bin search_gate [-- --files 10000000 --qps 1500 --duration 60]
+```
+
+On an 11-core Apple laptop (18 GB): the tree builds in 37 s and the full
+index takes 18 minutes (32 segments, 8.1 GB peak resident); the reader
+opens the 10M-file view in 1.6 s. Over 60 s at 1,500 queries a second:
+1,500 achieved, none dropped or failed, p50 0.81 ms, p90 1.4 ms, p99
+175 ms, max 351 ms; 28 landings with index lag p50 72 ms, p99 140 ms.
+
 ## Limitations
 
-- No benchmark covers search indexing, blame or path history yet.
+- No benchmark covers blame or path history yet.
+- A full index feeds its segment builders from one task (about 20,000
+  files a second).
 - At low percentages the land ticker fires rarely, so a short run gives few
   land samples.
 - The load harness creates its own repository. It cannot load an existing
@@ -232,7 +266,7 @@ has status p99 14 ms, each call settling the watcher with a cookie.
 ## Code
 
 - [rill-bench/src/lib.rs](../../tools/bench/src/lib.rs), [rill-bench/benches/core.rs](../../tools/bench/benches/core.rs), [rill-bench/benches/meta.rs](../../tools/bench/benches/meta.rs)
-- [rill-load/src/bin/exec_load.rs](../../tools/load/src/bin/exec_load.rs), [trunk_red.rs](../../tools/load/src/bin/trunk_red.rs), [healing/](../../tools/load/src/healing/mod.rs), [daemon_gate.rs](../../tools/load/src/bin/daemon_gate.rs)
+- [rill-load/src/bin/exec_load.rs](../../tools/load/src/bin/exec_load.rs), [trunk_red.rs](../../tools/load/src/bin/trunk_red.rs), [healing/](../../tools/load/src/healing/mod.rs), [daemon_gate.rs](../../tools/load/src/bin/daemon_gate.rs), [search_gate.rs](../../tools/load/src/bin/search_gate.rs) and [search_gate/](../../tools/load/src/search_gate/mod.rs)
 - [rill-load/src/run.rs](../../tools/load/src/run.rs), [workload.rs](../../tools/load/src/workload.rs), [profile.rs](../../tools/load/src/profile.rs), [stats.rs](../../tools/load/src/stats.rs)
 
 ---
