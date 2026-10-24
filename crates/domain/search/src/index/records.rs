@@ -77,26 +77,32 @@ async fn get<T: serde::de::DeserializeOwned>(
     }
 }
 
-/// Whether the blob was indexed (`true`) or skipped (`false`); `None`
+/// Whether each blob was indexed (`true`) or skipped (`false`); `None`
 /// when unknown.
-pub async fn marker(repo: &RepoStore, hash: &ObjectHash) -> Result<Option<bool>> {
-    get(repo, KIND_MARKER, hash).await
+pub async fn markers(repo: &RepoStore, hashes: &[ObjectHash]) -> Result<Vec<Option<bool>>> {
+    repo.get_derived_many(KIND_MARKER, hashes)
+        .await?
+        .into_iter()
+        .map(|v| {
+            v.map(|b| decode_tagged(KIND_MARKER, &b))
+                .transpose()
+                .map_err(Into::into)
+        })
+        .collect()
 }
 
-pub async fn put_marker(
+/// Store markers in one transaction.
+pub async fn put_markers(
     repo: &RepoStore,
-    hash: &ObjectHash,
-    indexed: bool,
+    markers: &[(ObjectHash, bool)],
     fence: Option<&Lease>,
 ) -> Result<()> {
-    put(
-        repo,
-        KIND_MARKER,
-        hash,
-        encode_tagged(KIND_MARKER, &indexed)?,
-        fence,
-    )
-    .await
+    let values = markers
+        .iter()
+        .map(|(h, indexed)| Ok((*h, encode_tagged(KIND_MARKER, indexed)?)))
+        .collect::<Result<Vec<_>>>()?;
+    repo.put_derived_many(KIND_MARKER, &values, fence).await?;
+    Ok(())
 }
 
 pub async fn layer(repo: &RepoStore, root: &TreeHash) -> Result<Option<PathLayer>> {

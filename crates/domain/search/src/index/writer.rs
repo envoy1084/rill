@@ -20,6 +20,8 @@ use crate::symbols::extract_symbols;
 
 /// Changed files above which a new base is written instead of a delta.
 const MAX_DELTA_CHANGES: usize = 50_000;
+/// Markers read or written per round trip (one transaction each).
+const MARKER_BATCH: usize = 2_000;
 
 /// What indexing a root did.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -34,6 +36,7 @@ pub struct IndexStats {
 }
 
 /// A blob to index: its content and a path that names its language.
+#[derive(Clone)]
 struct Todo {
     path: RepoPathBuf,
     content: ContentRef,
@@ -170,12 +173,21 @@ impl SearchIndex {
     /// segment holds yet.
     async fn index_blobs(&self, todo: Vec<Todo>, stats: &mut IndexStats) -> Result<Written> {
         let mut unique = HashSet::new();
+        let todo: Vec<Todo> = todo
+            .into_iter()
+            .filter(|t| unique.insert(t.content.content_hash()))
+            .collect();
         let mut fresh = Vec::new();
-        for t in todo {
-            let hash = t.content.content_hash();
-            if unique.insert(hash) && records::marker(&self.repo, &hash).await?.is_none() {
-                fresh.push(t);
-            }
+        for batch in todo.chunks(MARKER_BATCH) {
+            let hashes: Vec<ObjectHash> = batch.iter().map(|t| t.content.content_hash()).collect();
+            let known = records::markers(&self.repo, &hashes).await?;
+            fresh.extend(
+                batch
+                    .iter()
+                    .zip(known)
+                    .filter(|(_, k)| k.is_none())
+                    .map(|(t, _)| t.clone()),
+            );
         }
         let shards = self.config.shards.max(1) as usize;
         let mut builders: Vec<SegmentBuilder> =
@@ -293,8 +305,8 @@ impl SearchIndex {
             records::put_segment_set(&self.repo, &set, fence).await?;
             self.install(set).await?;
         }
-        for (hash, indexed) in markers {
-            records::put_marker(&self.repo, hash, *indexed, fence).await?;
+        for batch in markers.chunks(MARKER_BATCH) {
+            records::put_markers(&self.repo, batch, fence).await?;
         }
         records::put_layer(&self.repo, &root, layer, fence).await
     }

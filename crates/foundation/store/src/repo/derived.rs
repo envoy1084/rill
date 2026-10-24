@@ -24,6 +24,44 @@ impl RepoStore {
         self.open_row(row).await
     }
 
+    /// Several derived values of one kind, in one round trip.
+    pub async fn get_derived_many(
+        &self,
+        kind: &str,
+        hashes: &[ObjectHash],
+    ) -> Result<Vec<Option<Bytes>>> {
+        let keys: Vec<Bytes> = hashes
+            .iter()
+            .map(|h| self.keys().derived(kind, h))
+            .collect();
+        let rows = self.meta().get_many(&keys).await?;
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            out.push(self.open_row(row).await?);
+        }
+        Ok(out)
+    }
+
+    /// Store several derived values of one kind in one transaction, which
+    /// fails once `fence` (when given) is lost.
+    pub async fn put_derived_many(
+        &self,
+        kind: &str,
+        values: &[(ObjectHash, Bytes)],
+        fence: Option<&super::leases::Lease>,
+    ) -> Result<()> {
+        let mut tx = crate::meta::Transaction::new();
+        for (hash, value) in values {
+            tx.mutations
+                .push(self.derived_mutation(kind, hash, value.clone()).await?);
+        }
+        if let Some(lease) = fence {
+            tx.conditions.push(lease.fence(self));
+        }
+        self.meta().transact(tx).await?;
+        Ok(())
+    }
+
     /// The write storing a derived value, for a larger transaction.
     pub async fn derived_mutation(
         &self,
@@ -191,5 +229,25 @@ mod tests {
         );
         let row = repo.meta().get(&repo.keys().misc("big")).await.unwrap();
         assert_eq!(row.unwrap().len(), 33);
+    }
+
+    #[tokio::test]
+    async fn derived_values_batch_in_one_round_trip() {
+        let stores = Stores::memory();
+        let repo = stores.repo(stores.create_repo("r", "").await.unwrap().id);
+        let h = |i: u8| ObjectHash::digest(ObjectKind::Blob, &[i]);
+        let big = Bytes::from(vec![1u8; OFFLOAD_BYTES + 1]);
+        repo.put_derived_many(
+            "k",
+            &[(h(1), Bytes::from_static(b"a")), (h(2), big.clone())],
+            None,
+        )
+        .await
+        .unwrap();
+        let got = repo
+            .get_derived_many("k", &[h(1), h(3), h(2)])
+            .await
+            .unwrap();
+        assert_eq!(got, vec![Some(Bytes::from_static(b"a")), None, Some(big)]);
     }
 }
